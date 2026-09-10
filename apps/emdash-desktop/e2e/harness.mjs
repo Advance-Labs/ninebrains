@@ -18,7 +18,7 @@ export const repoRoot = resolve(appDir, '../..');
 function resolveFakeClaude() {
   const candidates = [
     process.env.NINEBRAINS_FAKE_CLAUDE,
-    join(repoRoot, 'spikes/fake-agent/bin/fake-claude.mjs'),
+    join(repoRoot, 'tooling/fake-agent/bin/fake-claude.mjs'),
     join(here, 'stub-claude.mjs'),
   ];
   return candidates.find((candidate) => candidate && existsSync(candidate));
