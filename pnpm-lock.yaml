@@ -29,6 +29,9 @@ importers:
       '@emdash/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@emdash/gates-core':
+        specifier: workspace:*
+        version: link:../../packages/gates-core
       '@emdash/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins
