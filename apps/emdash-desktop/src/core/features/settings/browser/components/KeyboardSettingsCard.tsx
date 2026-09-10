@@ -81,7 +81,7 @@ const KeyboardSettingsCard: React.FC = observer(function KeyboardSettingsCard() 
       if (rejected) {
         const conflictingTitle =
           COMMAND_CATALOG.byId(rejected.id)?.title ??
-          (rejected.id === SYSTEM_HIDE_ENTRY.id ? 'Hide Emdash' : rejected.id);
+          (rejected.id === SYSTEM_HIDE_ENTRY.id ? 'Hide Ninebrains' : rejected.id);
         toast.error(
           rejected.severity === 'reserved' ? 'Shortcut is reserved' : 'Shortcut conflict',
           { description: `Conflicts with "${conflictingTitle}". Choose a different shortcut.` }

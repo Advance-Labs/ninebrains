@@ -126,7 +126,7 @@ export const PrSelector = observer(function PrSelector({
   const githubAuthDescription =
     error?.type === 'github_account_not_found'
       ? 'The selected GitHub account is no longer connected. Reconnect GitHub to show pull requests for this repository.'
-      : 'Emdash needs a connected GitHub account before it can show pull requests for this repository.';
+      : 'Ninebrains needs a connected GitHub account before it can show pull requests for this repository.';
   const connectGitHubButton = (
     <Button
       type="button"

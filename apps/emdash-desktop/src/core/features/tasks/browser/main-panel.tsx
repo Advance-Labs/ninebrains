@@ -146,7 +146,7 @@ const TaskMainPanelContent = observer(function TaskMainPanelContent() {
 
 function MissingWorkspaceState({
   title = 'Workspace is missing',
-  description = 'Emdash could not activate this workspace. Re-provision it or remove the task.',
+  description = 'Ninebrains could not activate this workspace. Re-provision it or remove the task.',
   actionDisabledReason,
   reprovision,
   removeAndReprovision,

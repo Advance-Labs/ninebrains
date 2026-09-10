@@ -19,7 +19,7 @@ export function QuitUnsavedChangesDialog({ count }: QuitUnsavedChangesDialogArgs
       </Dialog.Header>
       <Dialog.Body className="pt-0">
         <p>
-          {count} {label} unsaved changes. Save them before quitting Emdash?
+          {count} {label} unsaved changes. Save them before quitting Ninebrains?
         </p>
       </Dialog.Body>
       <Dialog.Footer>

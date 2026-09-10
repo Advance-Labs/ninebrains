@@ -471,7 +471,7 @@ export function MachineFormFields({
                 label={
                   <FieldLabelWithInfo
                     label="Authentication"
-                    info="Choose how Emdash authenticates to the remote server. SSH config entries can preselect the best option."
+                    info="Choose how Ninebrains authenticates to the remote server. SSH config entries can preselect the best option."
                   />
                 }
                 layout="row"

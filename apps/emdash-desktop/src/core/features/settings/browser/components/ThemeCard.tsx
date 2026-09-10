@@ -12,8 +12,18 @@ const themeOptions: Array<{
   icon: LucideIcon;
 }> = [
   { value: null, label: 'System', ariaLabel: 'Set theme to system preference', icon: Monitor },
-  { value: 'emlight', label: 'Emdash Light', ariaLabel: 'Set theme to Emdash Light', icon: Sun },
-  { value: 'emdark', label: 'Emdash Dark', ariaLabel: 'Set theme to Emdash Dark', icon: Moon },
+  {
+    value: 'emlight',
+    label: 'Ninebrains Light',
+    ariaLabel: 'Set theme to Ninebrains Light',
+    icon: Sun,
+  },
+  {
+    value: 'emdark',
+    label: 'Ninebrains Dark',
+    ariaLabel: 'Set theme to Ninebrains Dark',
+    icon: Moon,
+  },
 ];
 
 const ThemeCard: React.FC = () => {

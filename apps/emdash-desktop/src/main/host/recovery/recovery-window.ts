@@ -82,7 +82,7 @@ export async function showRecoveryWindow(options: RecoveryWindowOptions): Promis
     height: 480,
     minWidth: 440,
     minHeight: 380,
-    title: 'Emdash Recovery',
+    title: 'Ninebrains Recovery',
     show: false,
     autoHideMenuBar: true,
     webPreferences: {

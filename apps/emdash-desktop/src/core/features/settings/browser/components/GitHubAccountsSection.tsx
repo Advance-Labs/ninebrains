@@ -92,7 +92,7 @@ export function GitHubAccountRows({ accounts }: { accounts: GitHubAccountSummary
   };
 
   const confirmRemove = async (account: GitHubAccountSummary) => {
-    let description = 'This removes the saved GitHub token from Emdash.';
+    let description = 'This removes the saved GitHub token from Ninebrains.';
     try {
       const count = await (
         await getProjectsWireClient()
