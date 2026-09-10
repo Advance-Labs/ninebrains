@@ -19,6 +19,7 @@ import {
   useImportGitHubCliAccounts,
 } from '@core/features/github/api/browser/useGithubAccounts';
 import { useModalController, useOpenModal } from '@core/manifests/browser/modal-api';
+import { HOSTED_ACCOUNT_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import { defineModal } from '@core/primitives/modals/react';
 import { cn } from '@core/primitives/styling/browser/cn';
 
@@ -45,7 +46,7 @@ export function GithubConnectModal() {
   const deviceFlowLoading = deviceFlowMutation.isPending;
   const anyLoading = oauthLoading || cliLoading || deviceFlowLoading;
   const oauthContent = getOAuthContent({ isSignedIn, hasAccount });
-  const showDeviceFlowMethod = !hasAccount;
+  const showDeviceFlowMethod = !HOSTED_ACCOUNT_ENABLED || !hasAccount;
 
   const connectOAuth = async () => {
     setError(null);
@@ -110,8 +111,8 @@ export function GithubConnectModal() {
       toast('GitHub CLI accounts imported', {
         description:
           result.importedAccountIds.length === 1
-            ? '1 account is available in Emdash.'
-            : `${result.importedAccountIds.length} accounts are available in Emdash.`,
+            ? '1 account is available in Ninebrains.'
+            : `${result.importedAccountIds.length} accounts are available in Ninebrains.`,
       });
       modal.complete();
     } finally {
@@ -139,17 +140,19 @@ export function GithubConnectModal() {
         <Dialog.Title>Connect GitHub</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body className="gap-3">
-        <ConnectMethodCard
-          icon={Github}
-          title={oauthContent.title}
-          description={oauthContent.description}
-          label={oauthContent.buttonLabel}
-          loadingLabel={oauthContent.loadingLabel}
-          loading={oauthLoading}
-          disabled={anyLoading}
-          onClick={() => void connectOAuth()}
-          error={error?.method === 'oauth' ? error.message : undefined}
-        />
+        {HOSTED_ACCOUNT_ENABLED && (
+          <ConnectMethodCard
+            icon={Github}
+            title={oauthContent.title}
+            description={oauthContent.description}
+            label={oauthContent.buttonLabel}
+            loadingLabel={oauthContent.loadingLabel}
+            loading={oauthLoading}
+            disabled={anyLoading}
+            onClick={() => void connectOAuth()}
+            error={error?.method === 'oauth' ? error.message : undefined}
+          />
+        )}
 
         <ConnectMethodCard
           icon={Terminal}

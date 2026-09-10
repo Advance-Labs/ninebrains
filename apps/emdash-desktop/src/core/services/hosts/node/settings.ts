@@ -7,9 +7,12 @@ import { hostSettingsSchemaContribution } from '../contributions/settings';
 // aggregated by the node settings manifest.
 export const hostSettingsContribution = defineSettingsContribution<'remoteMachine', HostSettings>({
   ...hostSettingsSchemaContribution,
+  // Ninebrains: Emdash's R2 bucket is not used. No workspace-server release is published yet, so
+  // remote installs fail with artifact-download-failed until one is, or until
+  // EMDASH_WORKSPACE_SERVER_ARTIFACTS_URL points at a mirror we own.
   defaults: () => ({
     installBaseUrl:
       process.env['EMDASH_WORKSPACE_SERVER_ARTIFACTS_URL'] ??
-      'https://releases.emdash.sh/workspace-server',
+      'https://github.com/Advance-Labs/ninebrains/releases/download/workspace-server',
   }),
 });

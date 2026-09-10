@@ -3,7 +3,7 @@ import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { automationsViewDef } from '@core/features/automations/contributions/views';
 import { settingsViewDef } from '@core/features/settings/contributions/views';
-import { useOpenModal } from '@core/manifests/browser/modal-api';
+import { openExternal } from '@core/primitives/desktop-host/browser/host-client';
 import { BoundShortcut } from '@core/primitives/keybindings/browser/shortcut';
 import { WORKBENCH_BOTTOM_BAR_HEIGHT_PX } from '@core/primitives/layouts/api/workbench-layout';
 import {
@@ -12,6 +12,7 @@ import {
   useWorkspaceSlots,
 } from '@core/primitives/navigation/browser/navigation-hooks';
 import { cn } from '@core/primitives/styling/browser/cn';
+import { EMDASH_ISSUES_NEW_URL } from '@core/primitives/urls/api/urls';
 import { SidebarPinnedTaskList } from './pinned-task-list';
 import { ProjectsGroupLabel } from './projects-group-label';
 import {
@@ -33,7 +34,6 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
   const { navigate } = useNavigate();
   const { currentView } = useWorkspaceSlots();
 
-  const openFeedbackModal = useOpenModal('feedbackModal');
   const { isDragOver, onDragOver, onDragEnter, onDragLeave, onDrop } = useSidebarDrop();
 
   return (
@@ -103,7 +103,7 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
           <button
             type="button"
             className="flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-foreground-muted focus:outline-none focus-visible:outline-none"
-            onClick={() => void openFeedbackModal({})}
+            onClick={() => void openExternal(EMDASH_ISSUES_NEW_URL)}
           >
             <MessageSquareShare className="size-4 shrink-0" />
             <span className="truncate">Give feedback</span>

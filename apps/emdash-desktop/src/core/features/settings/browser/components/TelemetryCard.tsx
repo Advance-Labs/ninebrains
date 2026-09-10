@@ -24,7 +24,7 @@ const TelemetryCard: React.FC = () => {
               variant="link"
               size="sm"
               className="group text-muted-foreground inline-flex h-auto items-center gap-1 px-0 text-sm font-normal hover:text-foreground hover:no-underline focus-visible:ring-0 focus-visible:outline-none"
-              onClick={() => openExternal('https://docs.emdash.sh/telemetry')}
+              onClick={() => openExternal('https://github.com/Advance-Labs/ninebrains#readme')}
             >
               <span className="transition-colors group-hover:text-foreground">
                 Telemetry information

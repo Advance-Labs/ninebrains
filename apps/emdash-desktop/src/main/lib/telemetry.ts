@@ -349,9 +349,10 @@ class DesktopTelemetryService implements Disposable, TelemetryServicePort {
     this.appVersion = options?.appVersion ?? 'unknown';
     this.isPackaged = options?.isPackaged ?? false;
     this.enabled = !isViteDevBuild && config.telemetryEnabled;
-    // build value wins (prod); dev fallback used locally without VITE_ vars set
-    this.apiKey = appEnv.build.VITE_POSTHOG_KEY ?? appEnv.dev.POSTHOG_PROJECT_API_KEY;
-    this.host = this.normalizeHost(appEnv.build.VITE_POSTHOG_HOST ?? appEnv.dev.POSTHOG_HOST);
+    // Ninebrains: telemetry is pointed at nothing. No PostHog key or host is read from the build
+    // or the environment, so isEnabled() stays false and no request is ever made.
+    this.apiKey = undefined;
+    this.host = undefined;
     this.installSource = config.installSource ?? options?.installSource;
     this.sessionId = randomUUID();
 
@@ -384,7 +385,8 @@ class DesktopTelemetryService implements Disposable, TelemetryServicePort {
       void this.kv.set('instanceId', this.instanceId);
     }
 
-    this.userOptOut = storedEnabled === 'false' ? true : undefined;
+    // Ninebrains: opt-in. Telemetry stays off unless the user has explicitly turned it on.
+    this.userOptOut = storedEnabled !== 'true';
     this.lastActiveDate = storedActiveDate ?? undefined;
 
     // Detect unclean exit from the previous session: if we have a recorded session ID

@@ -1,6 +1,6 @@
 provider: github
-owner: generalaction
-repo: emdash
+owner: Advance-Labs
+repo: ninebrains
 channel: canary
 allowPrerelease: true
-updaterCacheDirName: emdash-canary-updater
+updaterCacheDirName: ninebrains-canary-updater

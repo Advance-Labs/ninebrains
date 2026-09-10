@@ -1,6 +1,7 @@
 import { app, clipboard, Menu, shell } from 'electron';
 import { desktopHostEvents } from '@core/features/workbench/node';
 import { MENU_ITEMS } from '@core/manifests/shared/menu-items';
+import { UPDATES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import {
   resolveEffectiveChord,
   toElectronAccelerator,
@@ -40,7 +41,7 @@ function emitCommand(commandId: string): void {
 function copyInstallationId(): void {
   const instanceId = telemetryService.getInstanceId() ?? 'unavailable';
   const lines = [
-    `Emdash ${app.getVersion()}`,
+    `${app.name} ${app.getVersion()}`,
     `Installation ID: ${instanceId}`,
     `Platform: ${process.platform} ${process.arch}`,
     `Electron: ${process.versions.electron}`,
@@ -73,10 +74,15 @@ export function setupApplicationMenu(
                 accelerator: acceleratorFor('app.settings'),
                 click: () => emitCommand('app.settings'),
               },
-              {
-                label: 'Check for Updates\u2026',
-                click: () => desktopHostEvents.emit(undefined, { type: 'menu-check-for-updates' }),
-              },
+              ...(UPDATES_ENABLED
+                ? [
+                    {
+                      label: 'Check for Updates\u2026',
+                      click: () =>
+                        desktopHostEvents.emit(undefined, { type: 'menu-check-for-updates' }),
+                    },
+                  ]
+                : []),
               { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
@@ -172,7 +178,7 @@ export function setupApplicationMenu(
       role: 'help' as const,
       label: 'Help',
       submenu: [
-        ...(!isMac
+        ...(!isMac && UPDATES_ENABLED
           ? [
               {
                 label: 'Check for Updates\u2026',

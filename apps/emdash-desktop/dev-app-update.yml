@@ -1,4 +1,4 @@
 provider: github
-owner: generalaction
-repo: emdash
-updaterCacheDirName: emdash-updater
+owner: Advance-Labs
+repo: ninebrains
+updaterCacheDirName: ninebrains-updater

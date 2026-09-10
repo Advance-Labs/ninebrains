@@ -115,13 +115,13 @@ describe('GitHub connect-and-resume', () => {
     expect(interruptedSettled).toBe(false);
   });
 
-  it('completes the connect modal after a successful OAuth connect', async () => {
+  // Ninebrains: the Emdash-account OAuth method is hidden (HOSTED_ACCOUNT_ENABLED is off).
+  it('does not offer the hosted-account OAuth method', async () => {
     await renderConnectModal();
 
-    await act(async () => methodButton('Continue').click());
-
-    expect(accountHooks.signIn).toHaveBeenCalledWith('github');
-    expect(controller.complete).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('button[aria-label="Continue"]')).toBeNull();
+    expect(methodButton('Use device flow')).toBeDefined();
+    expect(accountHooks.signIn).not.toHaveBeenCalled();
   });
 
   it('completes the connect modal when the device flow modal completes', async () => {
