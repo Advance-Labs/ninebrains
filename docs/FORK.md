@@ -58,7 +58,7 @@ passed 67/67 on the immediate re-run. Upstream CI skips the browser projects for
 | `pnpm typecheck` | pass, 9 projects |
 | `pnpm lint` | pass, 9 projects |
 | `pnpm run licenses` | pass: 11 unit tests; 763 production package versions, 1,414 installed versions walked; 5 reviewed exceptions |
-| `pnpm test` | FINAL_TEST_RESULT |
+| `pnpm test` | pass. Packages as baseline (chat-ui now loads 26/26 files, 280 tests). Desktop: node 3165 + main-db 365 + migrations 69 + scripts 75 tests pass; browser 246/249 on a loaded machine, and the 3 failures (5 files) pass 9/9 on re-run (Vite/contention flakes, see above) |
 
 ## Launch the dev app
 
