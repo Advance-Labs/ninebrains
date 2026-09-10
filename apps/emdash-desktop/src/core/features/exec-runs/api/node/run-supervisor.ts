@@ -125,10 +125,9 @@ export class ExecRunSupervisor {
   async killAll(): Promise<void> {
     this.latched = true;
     this.emit({ type: 'stop-latched', activeRuns: this.active.size });
-    const runs = [...this.active.keys()].map((id) => {
-      const run = this.active.get(id);
+    const runs = [...this.active.entries()].map(([id, run]) => {
       void this.terminate(id, 'killed');
-      return run?.done.catch(() => undefined);
+      return run.done.catch(() => undefined);
     });
     const deadline = new Promise((r) => setTimeout(r, this.graceMs + KILL_ALL_SLACK_MS));
     await Promise.race([Promise.all(runs), deadline]);
