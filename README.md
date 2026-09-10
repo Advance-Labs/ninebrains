@@ -1,109 +1,31 @@
-<img alt="Emdash" src="https://github.com/user-attachments/assets/a2ecaf3c-9d84-40ca-9a8e-d4f612cc1c6f" />
+# Ninebrains
 
-<div align="center">
+Ninebrains is an open-source desktop workbench for running parallel Claude Code and Codex agents.
+Each agent gets its own git worktree, terminal, editor and browser.
 
-[Download](https://emdash.sh/download) · [Docs](https://emdash.sh/docs) · [Releases](https://github.com/generalaction/emdash/releases/latest) · [Discord](https://discord.gg/f2fv7YxuR2) · [Contributing](CONTRIBUTING.md)
+**Status:** early fork, not released. It is not ready for daily use yet.
 
-<br />
+## Relationship to Emdash
 
-[![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-555555.svg?labelColor=333333&color=666666)](./LICENSE.md)
-[![Downloads](https://img.shields.io/github/downloads/generalaction/emdash/total?labelColor=333333&color=666666)](https://github.com/generalaction/emdash/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/generalaction/emdash?labelColor=333333&color=666666&logo=github)](https://github.com/generalaction/emdash)
-[![Last Commit](https://img.shields.io/github/last-commit/generalaction/emdash?labelColor=333333&color=666666)](https://github.com/generalaction/emdash/commits/main)
-[![Commit Activity](https://img.shields.io/github/commit-activity/m/generalaction/emdash?labelColor=333333&color=666666)](https://github.com/generalaction/emdash/graphs/commit-activity)
+Ninebrains is a fork of [Emdash](https://github.com/generalaction/emdash) by General Action, Inc.,
+used under the Apache License 2.0. It is not affiliated with or endorsed by General Action.
 
-[![Discord](https://img.shields.io/badge/Discord-join-%235462eb?labelColor=%235462eb&logo=discord&logoColor=%23f5f5f5)](https://discord.gg/f2fv7YxuR2)
-<a href="https://www.ycombinator.com"><img src="https://img.shields.io/badge/Y%20Combinator-W26-orange" alt="Y Combinator W26"></a>
-[![Follow @emdashsh on X](https://img.shields.io/twitter/follow/emdashsh?logo=X&color=%23f5f5f5)](https://twitter.com/intent/follow?screen_name=emdashsh)
+Unlike upstream, Ninebrains ships with no telemetry endpoint, no hosted account, no feedback relay,
+and no update feed pointed at Emdash's servers. [docs/FORK.md](docs/FORK.md) covers the fork
+baseline and CI. [docs/UPSTREAM-PATCHES.md](docs/UPSTREAM-PATCHES.md) lists every change to
+upstream files.
 
-</div>
-
-Emdash is a desktop app for running AI coding agents in parallel. Each task runs in its
-own Git worktree, so you can explore multiple fixes or features at once, review the
-diffs, and merge what works.
-
-It works with local projects and remote machines over SSH. Bring the CLI agents you
-already use: Claude Code, Codex, OpenCode, Amp, and more.
-
-<img alt="Emdash product screenshot" src="https://emdash.sh/media/blog/public-v1-beta/v1beta.jpg" />
-
-## What You Can Do
-
-- Run multiple coding agents at once without juggling terminals.
-- Keep every agent isolated in its own Git worktree and branch.
-- Send issues and tickets from Linear, GitHub, Jira, GitLab, Asana, Featurebase,
-  Monday.com, Forgejo, or Plain into an agent.
-- Review diffs, create pull requests, inspect CI checks, and merge from one place.
-- Work locally or on your own remote machines over SSH/SFTP.
-
-## A Poem for Parallel Exploration
-
-```
-Multiple paths wind through the forest deep,
-Each trail diverging where the wild things creep,
-Isolated journeys through the woods they roam,
-Discoveries blooming far away from home.
-
-What thrives persists, what withers falls away,
-Parallel futures guide us day by day,
-Merge the best pathways where the sunlight flows,
-A symphony of nature where the river goes.
-```
-
-## Installation
-
-| Platform | Install |
-| --- | --- |
-| macOS | `brew install --cask emdash` · [Apple Silicon](https://github.com/generalaction/emdash/releases/latest/download/emdash-arm64.dmg) · [Intel](https://github.com/generalaction/emdash/releases/latest/download/emdash-x64.dmg) |
-| Windows | [Installer](https://github.com/generalaction/emdash/releases/latest/download/emdash-x64.msi) · [Portable](https://github.com/generalaction/emdash/releases/latest/download/emdash-x64.exe) |
-| Linux x64 | [AppImage](https://github.com/generalaction/emdash/releases/latest/download/emdash-x86_64.AppImage) · [DEB](https://github.com/generalaction/emdash/releases/latest/download/emdash-amd64.deb) · [RPM](https://github.com/generalaction/emdash/releases/latest/download/emdash-x86_64.rpm) |
-| Linux ARM64 | [AppImage](https://github.com/generalaction/emdash/releases/latest/download/emdash-arm64.AppImage) · [DEB](https://github.com/generalaction/emdash/releases/latest/download/emdash-arm64.deb) · [RPM](https://github.com/generalaction/emdash/releases/latest/download/emdash-aarch64.rpm) |
-
-See the [latest release](https://github.com/generalaction/emdash/releases/latest) for
-all desktop builds.
-
-## Agents
-
-Emdash detects installed provider CLIs automatically. It supports agents like Claude
-Code, Codex, Cursor, OpenCode, Amp, Devin, Qwen Code, Droid, and GitHub
-Copilot.
-
-For agents with lifecycle-hook support, Emdash installs marker-tagged entries in the agent's
-user-level config. These hooks let Emdash track status, notifications, and resumable sessions, and
-silently do nothing when the agent runs outside an Emdash session.
-
-See [Providers](https://emdash.sh/docs/providers) for the full list, setup commands,
-and provider-specific behavior.
-
-## Remote Projects
-
-Connect to remote machines with SSH/SFTP and run the same parallel workflow on remote
-codebases. Emdash supports SSH agent, key, and password authentication, with credentials
-stored in your OS keychain.
-
-See [Remote Projects](https://emdash.sh/docs/remote-projects) for setup details.
-
-## Privacy
-
-Emdash is local-first. App state is stored in a local SQLite database, and Emdash does
-not send your code or chats to Emdash servers.
-
-Agent CLIs may send code, prompts, and context to their own providers. Their data
-handling depends on the provider you choose.
-
-Telemetry is optional and can be disabled in Settings or by launching with:
+## Development
 
 ```bash
-TELEMETRY_ENABLED=false
+pnpm install
+pnpm run dev
 ```
 
-See [Telemetry](https://emdash.sh/docs/telemetry) for details.
-
-## Contributing
-
-Contributions are welcome. Read the [Contributing Guide](CONTRIBUTING.md), open an
-issue, or join the [Discord](https://discord.gg/f2fv7YxuR2).
+See [docs/FORK.md](docs/FORK.md) for the tested toolchain and [CONTRIBUTING.md](CONTRIBUTING.md)
+(inherited from Emdash) for the full developer guide.
 
 ## License
 
-Licensed under the [Apache-2.0 license](LICENSE.md).
+Apache-2.0. See [LICENSE.md](LICENSE.md) and [NOTICE](NOTICE).
+Copyright 2026 Advance Labs Inc. Portions copyright General Action, Inc.
