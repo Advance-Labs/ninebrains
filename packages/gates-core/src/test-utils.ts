@@ -81,6 +81,7 @@ export function makeContext(
       captureScreenshot: notMocked('captureScreenshot'),
       runCommand: notMocked('runCommand'),
       spawnReviewer: notMocked('spawnReviewer'),
+      prepareReviewCheckout: notMocked('prepareReviewCheckout'),
       fetchText: notMocked('fetchText'),
       readWorktreeFile: notMocked('readWorktreeFile'),
       ...opts.capabilities,

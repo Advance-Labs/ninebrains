@@ -4,18 +4,21 @@ import { SelfHealLoop, decideSelfHeal } from './self-heal';
 import type { JobKind } from './types';
 
 describe('decideSelfHeal', () => {
-  const fail = { pass: false, feedback: 'tests failed' };
-  const pass = { pass: true, feedback: '' };
+  const fail = { status: 'failed', feedback: 'tests failed' } as const;
+  const pass = { status: 'passed', feedback: '' } as const;
+  const unverified = { status: 'unverified', feedback: '' } as const;
 
   it.each([
-    [pass, 1, 'pass'],
-    [pass, 3, 'pass'],
-    [fail, 1, 'retry'],
-    [fail, 2, 'retry'],
-    [fail, 3, 'block'],
-    [fail, 4, 'block'],
-  ] as const)('verdict pass=%j at attempt %i → %s', (verdict, attempt, action) => {
-    expect(decideSelfHeal(verdict, attempt).action).toBe(action);
+    [pass, 1, { action: 'pass', verified: true }],
+    [pass, 3, { action: 'pass', verified: true }],
+    [unverified, 1, { action: 'pass', verified: false }],
+    [unverified, 3, { action: 'pass', verified: false }],
+    [fail, 1, { action: 'retry', nextAttempt: 2 }],
+    [fail, 2, { action: 'retry', nextAttempt: 3 }],
+    [fail, 3, { action: 'block' }],
+    [fail, 4, { action: 'block' }],
+  ] as const)('%j at attempt %i → %j', (verdict, attempt, expected) => {
+    expect(decideSelfHeal(verdict, attempt)).toMatchObject(expected);
   });
 
   it('carries the feedback forward on retry and into the block reason', () => {

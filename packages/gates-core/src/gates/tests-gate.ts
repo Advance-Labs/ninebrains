@@ -1,8 +1,17 @@
+/**
+ * Tests gate: the only gate that executes the lane's code.
+ *
+ * SEC-20: the command runs scripts the lane controls (a lane can rewrite its
+ * `package.json` test script), so the app's `runCommand` must sandbox it with a
+ * scrubbed env and kill its process group on abort. The command itself must
+ * come from app config the user set, never from a job record or a worktree file.
+ */
+
 import type { Gate, GateJob } from '../types';
 import { errorMessage, tailLines } from '../util';
 
 export interface TestsGateOptions {
-  /** Shell command run in the worktree, e.g. "pnpm test". */
+  /** Shell command run in the worktree, e.g. "pnpm test". From user-set app config only. */
   command: string;
   timeoutMs?: number;
   appliesTo?: (job: GateJob) => boolean;

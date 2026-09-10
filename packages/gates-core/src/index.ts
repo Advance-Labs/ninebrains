@@ -11,7 +11,9 @@ export type {
   GateContext,
   GateResult,
   GateJob,
+  PrepareReviewCheckout,
   ReadWorktreeFile,
+  ReviewCheckout,
   RunCommand,
   ScreenshotCapture,
   SpawnReviewer,
@@ -27,6 +29,7 @@ export {
   type OpenEvidenceStoreOptions,
 } from './evidence-store';
 export {
+  COMPLETE_JOB_TOOL,
   DEFAULT_GATE_TIMEOUT_MS,
   composeFeedback,
   runGates,
@@ -35,6 +38,7 @@ export {
   type GateRunReport,
   type GateStatus,
   type RunGatesOptions,
+  type RunStatus,
 } from './run-gates';
 export {
   MAX_ATTEMPTS,
@@ -57,7 +61,9 @@ export {
   screenshotGate,
   type ScreenshotGateOptions,
 } from './gates/screenshot-gate';
+export { createFence, escapeNonce, type Fence } from './untrusted';
 export {
+  defaultDiffArgs,
   reviewerGate,
   securityReviewGate,
   type ReviewFocus,

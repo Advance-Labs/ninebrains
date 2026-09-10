@@ -20,7 +20,18 @@ export interface GateOutcome extends GateResult {
   durationMs: number;
 }
 
+/**
+ * `unverified` means no gate applied, so nothing but the worker judged the
+ * work. It still unblocks the job (rigor 0 is a legitimate user choice), but it
+ * must never be displayed or stored as `passed`.
+ */
+export type RunStatus = 'passed' | 'failed' | 'unverified';
+
 export interface GateRunReport {
+  status: RunStatus;
+  /** False when no gate applied. `pass && !verified` is the unverified case. */
+  verified: boolean;
+  /** True for `passed` and `unverified`: the job may leave `verifying`. */
   pass: boolean;
   results: GateOutcome[];
   /** Ids of gates whose appliesTo() returned false. */
@@ -40,6 +51,9 @@ export type GateRunContext = Omit<GateContext, 'job'>;
 
 export const DEFAULT_GATE_TIMEOUT_MS = 10 * 60 * 1000;
 const FEEDBACK_PER_GATE = 1500;
+
+/** The Brain MCP tool a worker calls to resubmit. Feedback names it; keep it in one place. */
+export const COMPLETE_JOB_TOOL = 'complete_job';
 
 function outcome(
   gate: Pick<Gate, 'id' | 'title'>,
@@ -125,7 +139,9 @@ const STATUS_LABEL: Record<GateStatus, string> = {
 
 /** Feedback for the worker agent. Short, failures only, in gate order. */
 export function composeFeedback(job: GateJob, results: GateOutcome[]): string {
-  if (results.length === 0) return 'No verification gates applied to this job.';
+  if (results.length === 0) {
+    return 'No verification gates applied to this job, so its result is unverified.';
+  }
   const failed = results.filter((r) => !r.pass);
   if (failed.length === 0) return `All ${results.length} verification gates passed.`;
 
@@ -135,7 +151,7 @@ export function composeFeedback(job: GateJob, results: GateOutcome[]): string {
   );
   return [
     `Verification failed on attempt ${job.attempt}: ${failed.length} of ${results.length} ` +
-      'gates did not pass. Fix the issues below, then call complete_task again.',
+      `gates did not pass. Fix the issues below, then call ${COMPLETE_JOB_TOOL} again.`,
     ...sections,
   ].join('\n\n');
 }
@@ -183,8 +199,12 @@ export async function runGates(
   });
   await Promise.all(workers);
 
+  const verified = results.length > 0;
+  const pass = results.every((r) => r.pass);
   return {
-    pass: results.every((r) => r.pass),
+    status: !verified ? 'unverified' : pass ? 'passed' : 'failed',
+    verified,
+    pass,
     results,
     skipped,
     evidence: results.flatMap((r) => r.evidence),
