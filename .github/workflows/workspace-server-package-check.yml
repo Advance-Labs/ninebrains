@@ -1,26 +1,7 @@
 name: Workspace Server Package Check
 
+# Ninebrains: packaging checks run on demand only, to save Actions minutes on the private repo.
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/workspace-server/**'
-      - 'packages/core/**'
-      - 'packages/plugins/**'
-      - 'packages/shared/**'
-      - 'packages/wire/**'
-      - '.nvmrc'
-      - 'pnpm-lock.yaml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/workspace-server/**'
-      - 'packages/core/**'
-      - 'packages/plugins/**'
-      - 'packages/shared/**'
-      - 'packages/wire/**'
-      - '.nvmrc'
-      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 permissions:

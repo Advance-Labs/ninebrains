@@ -3,6 +3,9 @@ name: Code Consistency Check
 on:
   pull_request:
     branches: [main]
+  # Ninebrains: also runs on push to main (lint, typecheck, test on ubuntu-latest only).
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
