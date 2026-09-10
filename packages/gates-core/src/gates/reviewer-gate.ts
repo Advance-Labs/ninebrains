@@ -1,7 +1,7 @@
 /**
  * Reviewer gate: a separate, read-only reviewer run judges the diff.
  *
- * The reviewer gets the task, the diff against the lane's base commit, the
+ * The reviewer gets the job, the diff against the lane's base commit, the
  * names of new untracked files, and the evidence gathered so far. Its reply
  * must be a strict JSON verdict; anything else fails the gate.
  */
@@ -9,11 +9,11 @@
 import {
   VERDICT_INSTRUCTIONS,
   describeEvidence,
-  describeTask,
+  describeJob,
   formatIssues,
   parseReviewerVerdict,
 } from '../reviewer-verdict';
-import type { Gate, GateTask } from '../types';
+import type { Gate, GateJob } from '../types';
 import { errorMessage, tailLines, truncate } from '../util';
 
 export type ReviewFocus = 'general' | 'security';
@@ -23,19 +23,19 @@ export interface ReviewerGateOptions {
   title?: string;
   focus?: ReviewFocus;
   /** Builds the diff command. Default `git diff --no-color <baseRef|HEAD>`. */
-  diffCommand?: (task: GateTask) => string;
+  diffCommand?: (job: GateJob) => string;
   /** Lists new files. Default `git ls-files --others --exclude-standard`; null to skip. */
   untrackedCommand?: string | null;
   /** Diff characters included in the prompt. The full diff is stored as evidence. Default 60000. */
   maxDiffChars?: number;
-  appliesTo?: (task: GateTask) => boolean;
+  appliesTo?: (job: GateJob) => boolean;
 }
 
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}$/;
 
 const FOCUS: Record<ReviewFocus, string> = {
   general:
-    'Decide whether the change fully and correctly satisfies the task. Reproduce the result ' +
+    'Decide whether the change fully and correctly satisfies the job. Reproduce the result ' +
     'where you can (run the tests, open the URL). Look for regressions, missing edge cases and ' +
     'unfinished work.',
   security:
@@ -54,7 +54,7 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
     title: options.title ?? 'Reviewer',
     appliesTo: options.appliesTo ?? (() => true),
     async run(ctx) {
-      const base = ctx.task.baseRef ?? 'HEAD';
+      const base = ctx.job.baseRef ?? 'HEAD';
       if (!options.diffCommand && (!SAFE_REF.test(base) || base.includes('..'))) {
         return {
           pass: false,
@@ -65,7 +65,7 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
       const run = (command: string) =>
         ctx.capabilities.runCommand(command, { cwd: ctx.worktreePath, signal: ctx.signal });
 
-      const diffCommand = options.diffCommand?.(ctx.task) ?? `git diff --no-color ${base}`;
+      const diffCommand = options.diffCommand?.(ctx.job) ?? `git diff --no-color ${base}`;
       let diff: string;
       let untracked = '';
       try {
@@ -110,7 +110,7 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
 
       const prompt = [
         `You are an independent reviewer. ${FOCUS[focus]}`,
-        describeTask(ctx.task),
+        describeJob(ctx.job),
         `# Diff against ${base}\n\`\`\`diff\n${truncate(diff, maxDiffChars)}\n\`\`\``,
         untracked ? `# New untracked files\n${untracked}` : '',
         describeEvidence(attachments),
@@ -184,7 +184,7 @@ export function securityReviewGate(options: Omit<ReviewerGateOptions, 'focus'> =
   return reviewerGate({
     id: 'security-review',
     title: 'Security review',
-    appliesTo: (task) => task.kind === 'code' || task.kind === 'ui',
+    appliesTo: (job) => job.kind === 'code' || job.kind === 'ui',
     ...options,
     focus: 'security',
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeContext, makeTask } from '../test-utils';
+import { makeContext, makeJob } from '../test-utils';
 import type { CommandResult } from '../types';
 import { TESTS_LOG_LINES, testsGate } from './tests-gate';
 
@@ -10,7 +10,7 @@ function withCommand(result: CommandResult | Error) {
     if (result instanceof Error) throw result;
     return result;
   });
-  return { runCommand, ctx: makeContext({ task: { kind: 'code' }, capabilities: { runCommand } }) };
+  return { runCommand, ctx: makeContext({ job: { kind: 'code' }, capabilities: { runCommand } }) };
 }
 
 describe('testsGate', () => {
@@ -57,10 +57,10 @@ describe('testsGate', () => {
     expect(result.feedback).toContain('spawn ENOENT');
   });
 
-  it('applies to code and UI tasks by default and needs a command', () => {
+  it('applies to code and UI jobs by default and needs a command', () => {
     const gate = testsGate({ command: 'npm test' });
-    expect(gate.appliesTo(makeTask({ kind: 'code' }))).toBe(true);
-    expect(gate.appliesTo(makeTask({ kind: 'research' }))).toBe(false);
+    expect(gate.appliesTo(makeJob({ kind: 'code' }))).toBe(true);
+    expect(gate.appliesTo(makeJob({ kind: 'research' }))).toBe(false);
     expect(() => testsGate({ command: '  ' })).toThrow();
   });
 });

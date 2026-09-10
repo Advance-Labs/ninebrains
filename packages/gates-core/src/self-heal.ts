@@ -1,5 +1,5 @@
 /**
- * Self-heal policy: after a verdict, pass, send the task back, or block it.
+ * Self-heal policy: after a verdict, pass, send the job back, or block it.
  *
  * Pure on purpose. The Brain's state machine (`verifying → running` on failure,
  * `blocked` at the cap) applies the decision; this only makes it, so the

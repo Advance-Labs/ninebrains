@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runGates } from './run-gates';
-import { makeContext, makeTask } from './test-utils';
+import { makeContext, makeJob } from './test-utils';
 import type { Gate, GateResult } from './types';
 
 function gate(id: string, run: Gate['run'], appliesTo: Gate['appliesTo'] = () => true): Gate {
@@ -14,12 +14,12 @@ const failing = (id: string, feedback = `${id} broke`) =>
 
 describe('runGates', () => {
   it('passes only when every applicable gate passes', async () => {
-    const task = makeTask();
-    const ok = await runGates(task, [passing('a'), passing('b')], makeContext());
+    const job = makeJob();
+    const ok = await runGates(job, [passing('a'), passing('b')], makeContext());
     expect(ok.pass).toBe(true);
     expect(ok.feedback).toBe('All 2 verification gates passed.');
 
-    const bad = await runGates(task, [passing('a'), failing('b', 'fix the header')], makeContext());
+    const bad = await runGates(job, [passing('a'), failing('b', 'fix the header')], makeContext());
     expect(bad.pass).toBe(false);
     expect(bad.results.map((r) => r.status)).toEqual(['pass', 'fail']);
     expect(bad.feedback).toContain('1 of 2 gates did not pass');
@@ -27,14 +27,14 @@ describe('runGates', () => {
     expect(bad.feedback).not.toContain('a ok');
   });
 
-  it('skips gates that do not apply, and a task with none passes vacuously', async () => {
+  it('skips gates that do not apply, and a job with none passes vacuously', async () => {
     const report = await runGates(
-      makeTask(),
+      makeJob(),
       [failing('x')].map((g) => ({ ...g, appliesTo: () => false })),
       makeContext()
     );
     expect(report).toMatchObject({ pass: true, skipped: ['x'], results: [] });
-    expect(report.feedback).toBe('No verification gates applied to this task.');
+    expect(report.feedback).toBe('No verification gates applied to this job.');
   });
 
   it('fails a gate that times out, and aborts its signal', async () => {
@@ -43,7 +43,7 @@ describe('runGates', () => {
       ctx.signal.addEventListener('abort', () => (aborted = true));
       return new Promise<GateResult>(() => undefined);
     });
-    const report = await runGates(makeTask(), [hang, passing('ok')], makeContext(), {
+    const report = await runGates(makeJob(), [hang, passing('ok')], makeContext(), {
       timeoutMs: 20,
     });
     expect(report.pass).toBe(false);
@@ -59,7 +59,7 @@ describe('runGates', () => {
     const async_ = gate('async', async () => {
       throw new Error('kaboom');
     });
-    const report = await runGates(makeTask(), [sync, async_], makeContext());
+    const report = await runGates(makeJob(), [sync, async_], makeContext());
     expect(report.results.map((r) => r.status)).toEqual(['error', 'error']);
     expect(report.results[0].feedback).toContain('boom');
     expect(report.results[1].feedback).toContain('kaboom');
@@ -70,14 +70,14 @@ describe('runGates', () => {
       'picky',
       async () => ({ pass: true, evidence: [], feedback: '' }),
       () => {
-        throw new Error('bad task');
+        throw new Error('bad job');
       }
     );
     const sloppy = gate('sloppy', async () => ({ pass: 'yes' }) as unknown as GateResult);
-    const report = await runGates(makeTask(), [picky, sloppy], makeContext());
+    const report = await runGates(makeJob(), [picky, sloppy], makeContext());
     expect(report.pass).toBe(false);
     expect(report.results.map((r) => r.status)).toEqual(['error', 'error']);
-    expect(report.results[0].feedback).toContain('bad task');
+    expect(report.results[0].feedback).toContain('bad job');
     expect(report.results[1].feedback).toMatch(/malformed/);
   });
 
@@ -93,7 +93,7 @@ describe('runGates', () => {
         return { pass: true, evidence: [], feedback: id };
       });
     const report = await runGates(
-      makeTask(),
+      makeJob(),
       [slow('a', 30), slow('b', 5), slow('c', 5), slow('d', 5)],
       makeContext(),
       { concurrency: 2 }
@@ -106,7 +106,7 @@ describe('runGates', () => {
     const controller = new AbortController();
     const hang = gate('hang', () => new Promise<GateResult>(() => undefined));
     const pending = runGates(
-      makeTask(),
+      makeJob(),
       [hang, passing('later')],
       makeContext({ signal: controller.signal }),
       {
@@ -125,7 +125,7 @@ describe('runGates', () => {
       evidence: [{ kind: 'log', path: '/x/e.log', label: 'log' }],
       feedback: '',
     }));
-    const report = await runGates(makeTask(), [withEvidence, withEvidence], makeContext());
+    const report = await runGates(makeJob(), [withEvidence, withEvidence], makeContext());
     expect(report.evidence).toHaveLength(2);
   });
 });

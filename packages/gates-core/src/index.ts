@@ -10,13 +10,13 @@ export type {
   GateCapabilities,
   GateContext,
   GateResult,
-  GateTask,
+  GateJob,
   ReadWorktreeFile,
   RunCommand,
   ScreenshotCapture,
   SpawnReviewer,
   SpawnReviewerOptions,
-  TaskKind,
+  JobKind,
   Viewport,
 } from './types';
 export {

@@ -8,7 +8,7 @@
  * what to fix and stays short.
  */
 
-import type { Evidence, Gate, GateContext, GateResult, GateTask } from './types';
+import type { Evidence, Gate, GateContext, GateResult, GateJob } from './types';
 import { errorMessage, truncate } from './util';
 
 export type GateStatus = 'pass' | 'fail' | 'timeout' | 'error' | 'cancelled';
@@ -36,7 +36,7 @@ export interface RunGatesOptions {
   concurrency?: number;
 }
 
-export type GateRunContext = Omit<GateContext, 'task'>;
+export type GateRunContext = Omit<GateContext, 'job'>;
 
 export const DEFAULT_GATE_TIMEOUT_MS = 10 * 60 * 1000;
 const FEEDBACK_PER_GATE = 1500;
@@ -124,8 +124,8 @@ const STATUS_LABEL: Record<GateStatus, string> = {
 };
 
 /** Feedback for the worker agent. Short, failures only, in gate order. */
-export function composeFeedback(task: GateTask, results: GateOutcome[]): string {
-  if (results.length === 0) return 'No verification gates applied to this task.';
+export function composeFeedback(job: GateJob, results: GateOutcome[]): string {
+  if (results.length === 0) return 'No verification gates applied to this job.';
   const failed = results.filter((r) => !r.pass);
   if (failed.length === 0) return `All ${results.length} verification gates passed.`;
 
@@ -134,21 +134,21 @@ export function composeFeedback(task: GateTask, results: GateOutcome[]): string 
       `## ${r.title} (${r.gateId}) ${STATUS_LABEL[r.status]}\n${truncate(r.feedback.trim(), FEEDBACK_PER_GATE)}`
   );
   return [
-    `Verification failed on attempt ${task.attempt}: ${failed.length} of ${results.length} ` +
-      'gates did not pass. Fix the issues below, then complete the task again.',
+    `Verification failed on attempt ${job.attempt}: ${failed.length} of ${results.length} ` +
+      'gates did not pass. Fix the issues below, then call complete_task again.',
     ...sections,
   ].join('\n\n');
 }
 
 export async function runGates(
-  task: GateTask,
+  job: GateJob,
   gates: Gate[],
   ctx: GateRunContext,
   options: RunGatesOptions = {}
 ): Promise<GateRunReport> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_GATE_TIMEOUT_MS;
   const concurrency = Math.max(1, options.concurrency ?? 2);
-  const context: GateContext = { ...ctx, task };
+  const context: GateContext = { ...ctx, job };
 
   const skipped: string[] = [];
   const planned: Array<{ index: number; run: () => Promise<GateOutcome> }> = [];
@@ -157,7 +157,7 @@ export async function runGates(
   for (const gate of gates) {
     let applies: boolean;
     try {
-      applies = gate.appliesTo(task);
+      applies = gate.appliesTo(job);
     } catch (error) {
       const started = Date.now();
       const failed = outcome(gate, 'error', started, {
@@ -188,6 +188,6 @@ export async function runGates(
     results,
     skipped,
     evidence: results.flatMap((r) => r.evidence),
-    feedback: composeFeedback(task, results),
+    feedback: composeFeedback(job, results),
   };
 }

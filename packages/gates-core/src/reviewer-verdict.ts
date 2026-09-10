@@ -8,7 +8,7 @@
  * reply fails the gate.
  */
 
-import type { Evidence, GateTask } from './types';
+import type { Evidence, GateJob } from './types';
 
 export interface ReviewIssue {
   message: string;
@@ -94,8 +94,8 @@ export const VERDICT_INSTRUCTIONS =
   'Set "pass" to false only for problems that must be fixed; list every such problem as an issue. ' +
   'Do not modify any files.';
 
-export function describeTask(task: GateTask): string {
-  return `# Task\n${task.title}\n\n${task.body.trim()}`;
+export function describeJob(job: GateJob): string {
+  return `# Job\n${job.title}\n\n${job.body.trim()}`;
 }
 
 export function describeEvidence(evidence: Evidence[]): string {

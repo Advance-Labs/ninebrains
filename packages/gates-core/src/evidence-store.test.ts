@@ -17,8 +17,8 @@ afterEach(async () => {
 });
 
 describe('FsEvidenceStore', () => {
-  it('writes files under <root>/<taskId>/<attempt>/ with a JSON manifest', async () => {
-    const store = await FsEvidenceStore.open({ root, taskId: 'task-42', attempt: 2 });
+  it('writes files under <root>/<jobId>/<attempt>/ with a JSON manifest', async () => {
+    const store = await FsEvidenceStore.open({ root, jobId: 'job-42', attempt: 2 });
     const evidence = await store.put({
       kind: 'log',
       label: 'Test log',
@@ -26,7 +26,7 @@ describe('FsEvidenceStore', () => {
       data: 'ok\n',
     });
 
-    expect(store.dir.endsWith(path.join('task-42', '2'))).toBe(true);
+    expect(store.dir.endsWith(path.join('job-42', '2'))).toBe(true);
     expect(evidence).toEqual({
       kind: 'log',
       label: 'Test log',
@@ -36,14 +36,14 @@ describe('FsEvidenceStore', () => {
 
     const manifest = JSON.parse(await readFile(path.join(store.dir, 'manifest.json'), 'utf8'));
     expect(manifest).toMatchObject({
-      taskId: 'task-42',
+      jobId: 'job-42',
       attempt: 2,
       evidence: [{ kind: 'log', label: 'Test log', file: 'tests.log', bytes: 3 }],
     });
   });
 
   it('keeps traversal attempts in file names inside the attempt directory', async () => {
-    const store = await FsEvidenceStore.open({ root, taskId: 't', attempt: 1 });
+    const store = await FsEvidenceStore.open({ root, jobId: 't', attempt: 1 });
     const a = await store.put({
       kind: 'text',
       label: 'x',
@@ -57,8 +57,18 @@ describe('FsEvidenceStore', () => {
     expect(await readdir(path.join(root, '..'))).toEqual(['evidence']);
   });
 
+  it('re-opening an attempt after a crash keeps old files and writes beside them', async () => {
+    const crashed = await FsEvidenceStore.open({ root, jobId: 'j', attempt: 1 });
+    const old = await crashed.put({ kind: 'log', label: 'old', fileName: 'tests.log', data: 'a' });
+    const rerun = await FsEvidenceStore.open({ root, jobId: 'j', attempt: 1 });
+    const fresh = await rerun.put({ kind: 'log', label: 'new', fileName: 'tests.log', data: 'b' });
+    expect(path.basename(fresh.path)).toBe('tests-1.log');
+    expect(await readFile(old.path, 'utf8')).toBe('a');
+    expect(await readFile(fresh.path, 'utf8')).toBe('b');
+  });
+
   it('de-duplicates names and never overwrites the manifest', async () => {
-    const store = await FsEvidenceStore.open({ root, taskId: 't', attempt: 1 });
+    const store = await FsEvidenceStore.open({ root, jobId: 't', attempt: 1 });
     const one = await store.put({ kind: 'json', label: 'a', fileName: 'report.json', data: '{}' });
     const two = await store.put({ kind: 'json', label: 'b', fileName: 'report.json', data: '{}' });
     const three = await store.put({
@@ -75,29 +85,29 @@ describe('FsEvidenceStore', () => {
     expect(store.list()).toHaveLength(3);
   });
 
-  it('rejects task ids that could escape the root', async () => {
-    for (const taskId of ['../escape', 'a/b', '..', '.hidden', '', 'a..b']) {
-      await expect(FsEvidenceStore.open({ root, taskId, attempt: 1 })).rejects.toThrow(
+  it('rejects job ids that could escape the root', async () => {
+    for (const jobId of ['../escape', 'a/b', '..', '.hidden', '', 'a..b']) {
+      await expect(FsEvidenceStore.open({ root, jobId, attempt: 1 })).rejects.toThrow(
         EvidencePathError
       );
     }
   });
 
   it('rejects a non-positive or fractional attempt', async () => {
-    await expect(FsEvidenceStore.open({ root, taskId: 't', attempt: 0 })).rejects.toThrow(
+    await expect(FsEvidenceStore.open({ root, jobId: 't', attempt: 0 })).rejects.toThrow(
       EvidencePathError
     );
-    await expect(FsEvidenceStore.open({ root, taskId: 't', attempt: 1.5 })).rejects.toThrow(
+    await expect(FsEvidenceStore.open({ root, jobId: 't', attempt: 1.5 })).rejects.toThrow(
       EvidencePathError
     );
   });
 
-  it('refuses a task directory that is a symlink out of the root', async () => {
+  it('refuses a job directory that is a symlink out of the root', async () => {
     const outside = path.join(tmp, 'outside');
     await mkdir(outside);
     await mkdir(root, { recursive: true });
-    await symlink(outside, path.join(root, 'task-link'), 'dir');
-    await expect(FsEvidenceStore.open({ root, taskId: 'task-link', attempt: 1 })).rejects.toThrow(
+    await symlink(outside, path.join(root, 'job-link'), 'dir');
+    await expect(FsEvidenceStore.open({ root, jobId: 'job-link', attempt: 1 })).rejects.toThrow(
       /outside the root/
     );
     expect(await readdir(outside)).toEqual([]);

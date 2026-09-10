@@ -1,7 +1,7 @@
 /** Test helpers. Not exported from the package entry. */
 
 import { PNG } from 'pngjs';
-import type { Evidence, EvidenceStore, GateCapabilities, GateContext, GateTask } from './types';
+import type { Evidence, EvidenceStore, GateCapabilities, GateContext, GateJob } from './types';
 
 export function solidPng(
   width: number,
@@ -25,9 +25,9 @@ export function solidPng(
   return new Uint8Array(PNG.sync.write(png));
 }
 
-export function makeTask(overrides: Partial<GateTask> = {}): GateTask {
+export function makeJob(overrides: Partial<GateJob> = {}): GateJob {
   return {
-    id: 'task-1',
+    id: 'job-1',
     title: 'Add a pricing table',
     body: 'Show three plans side by side; stack them on mobile.',
     kind: 'ui',
@@ -65,14 +65,14 @@ function notMocked(name: string) {
 
 export function makeContext(
   opts: {
-    task?: Partial<GateTask>;
+    job?: Partial<GateJob>;
     previewUrl?: string;
     capabilities?: Partial<GateCapabilities>;
     signal?: AbortSignal;
   } = {}
 ): GateContext & { evidence: MemoryEvidenceStore } {
   return {
-    task: makeTask(opts.task),
+    job: makeJob(opts.job),
     worktreePath: '/work/lane-1',
     previewUrl: opts.previewUrl,
     evidence: memoryEvidence(),

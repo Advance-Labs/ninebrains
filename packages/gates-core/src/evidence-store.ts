@@ -1,11 +1,11 @@
 /**
- * Filesystem evidence store: `<root>/<taskId>/<attempt>/`.
+ * Filesystem evidence store: `<root>/<jobId>/<attempt>/`.
  *
  * Evidence file names come from gates, and gates relay text from agents, so a
  * name is treated as a suggestion: reduced to a basename, stripped to a safe
- * alphabet, de-duplicated, and resolved with a containment check. Task ids come
+ * alphabet, de-duplicated, and resolved with a containment check. Job ids come
  * from the app and are validated rather than sanitised — a malformed id is a
- * bug worth surfacing. The root is compared by realpath, so a symlinked task
+ * bug worth surfacing. The root is compared by realpath, so a symlinked job
  * directory cannot redirect writes outside it.
  */
 
@@ -20,7 +20,7 @@ export class EvidencePathError extends Error {
   }
 }
 
-const TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const MANIFEST = 'manifest.json';
 const MAX_NAME = 100;
 
@@ -60,7 +60,7 @@ interface ManifestEntry {
 
 export interface OpenEvidenceStoreOptions {
   root: string;
-  taskId: string;
+  jobId: string;
   attempt: number;
 }
 
@@ -72,30 +72,30 @@ export class FsEvidenceStore implements EvidenceStore {
 
   private constructor(
     readonly dir: string,
-    private readonly taskId: string,
+    private readonly jobId: string,
     private readonly attempt: number
   ) {}
 
-  static async open({ root, taskId, attempt }: OpenEvidenceStoreOptions): Promise<FsEvidenceStore> {
-    if (!TASK_ID.test(taskId) || taskId.includes('..')) {
-      throw new EvidencePathError(`invalid task id for evidence path: ${JSON.stringify(taskId)}`);
+  static async open({ root, jobId, attempt }: OpenEvidenceStoreOptions): Promise<FsEvidenceStore> {
+    if (!JOB_ID.test(jobId) || jobId.includes('..')) {
+      throw new EvidencePathError(`invalid job id for evidence path: ${JSON.stringify(jobId)}`);
     }
     if (!Number.isInteger(attempt) || attempt < 1) {
       throw new EvidencePathError(`attempt must be a positive integer, got ${attempt}`);
     }
     await mkdir(root, { recursive: true });
     const realRoot = await realpath(root);
-    // Check the task directory before creating anything beneath it, so a
-    // symlinked task directory is refused without writing through it.
-    const taskDir = resolveInside(realRoot, taskId);
-    await mkdir(taskDir, { recursive: true });
-    const realTaskDir = await realpath(taskDir);
-    if (!isInside(realRoot, realTaskDir)) {
-      throw new EvidencePathError(`task directory resolves outside the root: ${realTaskDir}`);
+    // Check the job directory before creating anything beneath it, so a
+    // symlinked job directory is refused without writing through it.
+    const jobDir = resolveInside(realRoot, jobId);
+    await mkdir(jobDir, { recursive: true });
+    const realJobDir = await realpath(jobDir);
+    if (!isInside(realRoot, realJobDir)) {
+      throw new EvidencePathError(`job directory resolves outside the root: ${realJobDir}`);
     }
-    const dir = resolveInside(realTaskDir, String(attempt));
+    const dir = resolveInside(realJobDir, String(attempt));
     await mkdir(dir, { recursive: true });
-    return new FsEvidenceStore(dir, taskId, attempt);
+    return new FsEvidenceStore(dir, jobId, attempt);
   }
 
   private claimName(requested: string): string {
@@ -116,11 +116,21 @@ export class FsEvidenceStore implements EvidenceStore {
   }
 
   async put(input: EvidenceInput): Promise<Evidence> {
-    const file = this.claimName(input.fileName);
-    const target = resolveInside(this.dir, file);
     const data = typeof input.data === 'string' ? Buffer.from(input.data, 'utf8') : input.data;
-    // 'wx' refuses to follow or clobber anything already at the path.
-    await writeFile(target, data, { flag: 'wx' });
+    let file: string;
+    let target: string;
+    for (;;) {
+      file = this.claimName(input.fileName);
+      target = resolveInside(this.dir, file);
+      try {
+        // 'wx' refuses to follow or clobber anything already at the path.
+        await writeFile(target, data, { flag: 'wx' });
+        break;
+      } catch (error) {
+        // A file left by a crashed run of the same attempt: keep it, take the next name.
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    }
 
     const evidence: Evidence = { kind: input.kind, path: target, label: input.label };
     this.entries.push(evidence);
@@ -141,7 +151,7 @@ export class FsEvidenceStore implements EvidenceStore {
 
   private flushManifest(): Promise<void> {
     const body = JSON.stringify(
-      { taskId: this.taskId, attempt: this.attempt, evidence: this.manifest },
+      { jobId: this.jobId, attempt: this.attempt, evidence: this.manifest },
       null,
       2
     );

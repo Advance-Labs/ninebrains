@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rigorToGates } from './rigor';
 import { SelfHealLoop, decideSelfHeal } from './self-heal';
-import type { TaskKind } from './types';
+import type { JobKind } from './types';
 
 describe('decideSelfHeal', () => {
   const fail = { pass: false, feedback: 'tests failed' };
@@ -42,7 +42,7 @@ describe('decideSelfHeal', () => {
 });
 
 describe('rigorToGates', () => {
-  it.each<[number, number, TaskKind, string[]]>([
+  it.each<[number, number, JobKind, string[]]>([
     [0, 0, 'ui', []],
     [2, 5, 'code', []],
     [3, 0, 'code', ['tests']],
@@ -69,8 +69,6 @@ describe('rigorToGates', () => {
     expect(() => rigorToGates({ testing: -1, security: 0 }, 'code')).toThrow(RangeError);
     expect(() => rigorToGates({ testing: 3.5, security: 0 }, 'code')).toThrow(RangeError);
     expect(() => rigorToGates({ testing: 3, security: Number.NaN }, 'code')).toThrow(RangeError);
-    expect(() => rigorToGates({ testing: 3, security: 0 }, 'video' as TaskKind)).toThrow(
-      RangeError
-    );
+    expect(() => rigorToGates({ testing: 3, security: 0 }, 'video' as JobKind)).toThrow(RangeError);
   });
 });

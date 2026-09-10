@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseReviewerVerdict } from '../reviewer-verdict';
-import { makeContext, makeTask } from '../test-utils';
+import { makeContext, makeJob } from '../test-utils';
 import type { CommandResult } from '../types';
 import { reviewerGate, securityReviewGate } from './reviewer-gate';
 
 const DIFF = 'diff --git a/src/app.ts b/src/app.ts\n+export const plans = 3;\n';
 
-function setup(reply: string, commands: Record<string, Partial<CommandResult>> = {}, task = {}) {
+function setup(reply: string, commands: Record<string, Partial<CommandResult>> = {}, job = {}) {
   const runCommand = vi.fn(async (command: string) => ({
     exitCode: 0,
     stdout: '',
@@ -16,14 +16,14 @@ function setup(reply: string, commands: Record<string, Partial<CommandResult>> =
   }));
   const spawnReviewer = vi.fn(async () => ({ text: reply }));
   const ctx = makeContext({
-    task: { kind: 'code', ...task },
+    job: { kind: 'code', ...job },
     capabilities: { runCommand, spawnReviewer },
   });
   return { ctx, runCommand, spawnReviewer };
 }
 
 describe('reviewerGate', () => {
-  it('sends task, diff and evidence to a read-only reviewer and passes on approval', async () => {
+  it('sends job, diff and evidence to a read-only reviewer and passes on approval', async () => {
     const { ctx, runCommand, spawnReviewer } = setup('{"pass": true, "issues": []}');
     const result = await reviewerGate().run(ctx);
 
@@ -42,7 +42,7 @@ describe('reviewerGate', () => {
     expect(result.evidence.map((e) => e.kind)).toEqual(['diff', 'json']);
   });
 
-  it('diffs against the task baseRef and lists untracked files', async () => {
+  it('diffs against the job baseRef and lists untracked files', async () => {
     const { ctx, runCommand, spawnReviewer } = setup(
       '{"pass": true, "issues": []}',
       {
@@ -96,7 +96,7 @@ describe('reviewerGate', () => {
     const { ctx, spawnReviewer } = setup('{"pass": true, "issues": []}');
     const gate = securityReviewGate();
     expect(gate.id).toBe('security-review');
-    expect(gate.appliesTo(makeTask({ kind: 'research' }))).toBe(false);
+    expect(gate.appliesTo(makeJob({ kind: 'research' }))).toBe(false);
     await gate.run(ctx);
     const [prompt, opts] = spawnReviewer.mock.calls[0] as unknown as [string, { purpose: string }];
     expect(prompt).toMatch(/security problems only/);

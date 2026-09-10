@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeContext, makeTask } from '../test-utils';
+import { makeContext, makeJob } from '../test-utils';
 import { factCheckGate } from './fact-check-gate';
 
 const PAGE =
@@ -19,7 +19,7 @@ function setup(
     return typeof claims === 'string' ? claims : JSON.stringify(claims);
   });
   const ctx = makeContext({
-    task: { kind: 'research' },
+    job: { kind: 'research' },
     capabilities: { fetchText, readWorktreeFile },
   });
   return { ctx, fetchText, readWorktreeFile };
@@ -134,12 +134,12 @@ describe('factCheckGate', () => {
     expect(fetchText).not.toHaveBeenCalled();
   });
 
-  it('validates its configuration and applies to research and SEO tasks', () => {
+  it('validates its configuration and applies to research and SEO jobs', () => {
     expect(() => factCheckGate({ claimsPath: '../claims.json' })).toThrow();
     expect(() => factCheckGate({ claimsPath: '/etc/claims.json' })).toThrow();
     expect(() => factCheckGate({ mode: 'sources' })).toThrow();
     const gate = factCheckGate();
-    expect(gate.appliesTo(makeTask({ kind: 'seo' }))).toBe(true);
-    expect(gate.appliesTo(makeTask({ kind: 'ui' }))).toBe(false);
+    expect(gate.appliesTo(makeJob({ kind: 'seo' }))).toBe(true);
+    expect(gate.appliesTo(makeJob({ kind: 'ui' }))).toBe(false);
   });
 });

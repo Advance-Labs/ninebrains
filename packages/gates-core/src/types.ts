@@ -9,13 +9,13 @@
 
 import type { FetchText } from '@emdash/citations';
 
-export type TaskKind = 'code' | 'ui' | 'research' | 'seo' | 'docs';
+export type JobKind = 'code' | 'ui' | 'research' | 'seo' | 'docs';
 
-export interface GateTask {
+export interface GateJob {
   id: string;
   title: string;
   body: string;
-  kind: TaskKind;
+  kind: JobKind;
   /** 1-based attempt number being verified. */
   attempt: number;
   /** Commit the lane started from; reviewers diff against it. Defaults to HEAD. */
@@ -116,14 +116,14 @@ export interface EvidenceInput {
 }
 
 export interface EvidenceStore {
-  /** Absolute directory for this task attempt. */
+  /** Absolute directory for this job attempt. */
   readonly dir: string;
   put(input: EvidenceInput): Promise<Evidence>;
   list(): Evidence[];
 }
 
 export interface GateContext {
-  task: GateTask;
+  job: GateJob;
   worktreePath: string;
   previewUrl?: string;
   evidence: EvidenceStore;
@@ -134,6 +134,6 @@ export interface GateContext {
 export interface Gate {
   id: string;
   title: string;
-  appliesTo(task: GateTask): boolean;
+  appliesTo(job: GateJob): boolean;
   run(ctx: GateContext): Promise<GateResult>;
 }

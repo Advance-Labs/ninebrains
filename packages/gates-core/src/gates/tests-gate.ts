@@ -1,11 +1,11 @@
-import type { Gate, GateTask } from '../types';
+import type { Gate, GateJob } from '../types';
 import { errorMessage, tailLines } from '../util';
 
 export interface TestsGateOptions {
   /** Shell command run in the worktree, e.g. "pnpm test". */
   command: string;
   timeoutMs?: number;
-  appliesTo?: (task: GateTask) => boolean;
+  appliesTo?: (job: GateJob) => boolean;
 }
 
 export const TESTS_LOG_LINES = 200;
@@ -18,7 +18,7 @@ export function testsGate(options: TestsGateOptions): Gate {
   return {
     id: 'tests',
     title: 'Tests',
-    appliesTo: options.appliesTo ?? ((task) => task.kind === 'code' || task.kind === 'ui'),
+    appliesTo: options.appliesTo ?? ((job) => job.kind === 'code' || job.kind === 'ui'),
     async run(ctx) {
       const started = Date.now();
       let result;

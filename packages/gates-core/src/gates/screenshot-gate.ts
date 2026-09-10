@@ -1,7 +1,7 @@
 /**
  * Screenshot gate: capture the lane's preview at three widths, fail on console
  * errors and failed same-origin requests, optionally pixel-diff against a
- * baseline, then ask a separate reviewer whether the page satisfies the task.
+ * baseline, then ask a separate reviewer whether the page satisfies the job.
  *
  * The deterministic checks run first and short-circuit: a page that throws in
  * the console has failed already, and a reviewer run costs real money.
@@ -11,11 +11,11 @@ import { pixelDiff } from '../pixel-diff';
 import {
   VERDICT_INSTRUCTIONS,
   describeEvidence,
-  describeTask,
+  describeJob,
   formatIssues,
   parseReviewerVerdict,
 } from '../reviewer-verdict';
-import type { Evidence, Gate, GateTask, Viewport } from '../types';
+import type { Evidence, Gate, GateJob, Viewport } from '../types';
 import { errorMessage } from '../util';
 
 export const DEFAULT_VIEWPORTS: Viewport[] = [
@@ -27,14 +27,14 @@ export const DEFAULT_VIEWPORTS: Viewport[] = [
 export interface ScreenshotGateOptions {
   viewports?: Viewport[];
   /** Returns the approved baseline PNG for a viewport, or undefined to skip the diff. */
-  loadBaseline?: (viewport: Viewport, task: GateTask) => Promise<Uint8Array | undefined>;
+  loadBaseline?: (viewport: Viewport, job: GateJob) => Promise<Uint8Array | undefined>;
   /** pixelmatch per-pixel tolerance. Default 0.1. */
   diffThreshold?: number;
   /** Largest share of differing pixels still accepted. Default 0.01. */
   maxDiffRatio?: number;
   /** Ask a reviewer for a vision verdict. Default true. */
   reviewer?: boolean;
-  appliesTo?: (task: GateTask) => boolean;
+  appliesTo?: (job: GateJob) => boolean;
 }
 
 const MAX_LISTED = 20;
@@ -54,7 +54,7 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
   return {
     id: 'screenshot',
     title: 'Screenshot',
-    appliesTo: options.appliesTo ?? ((task) => task.kind === 'ui'),
+    appliesTo: options.appliesTo ?? ((job) => job.kind === 'ui'),
     async run(ctx) {
       const previewUrl = ctx.previewUrl;
       if (!previewUrl) {
@@ -107,7 +107,7 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
 
         let diffRatio: number | undefined;
         const baseline = options.loadBaseline
-          ? await options.loadBaseline(viewport, ctx.task)
+          ? await options.loadBaseline(viewport, ctx.job)
           : undefined;
         if (baseline) {
           const diff = pixelDiff(baseline, capture.png, { threshold: options.diffThreshold });
@@ -179,8 +179,8 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
       const prompt = [
         'You are verifying a UI change. The attached screenshots show the page at desktop, ' +
           `tablet and mobile widths (${previewUrl}). Decide whether what is visible satisfies ` +
-          'the task. Check layout at every width, missing or broken content, and overflow.',
-        describeTask(ctx.task),
+          'the job. Check layout at every width, missing or broken content, and overflow.',
+        describeJob(ctx.job),
         describeEvidence(shots),
         VERDICT_INSTRUCTIONS,
       ].join('\n\n');

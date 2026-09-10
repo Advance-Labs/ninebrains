@@ -20,7 +20,7 @@ import {
   type Source,
   type ValidationResult,
 } from '@emdash/citations';
-import type { Gate, GateContext, GateTask } from '../types';
+import type { Gate, GateContext, GateJob } from '../types';
 import { errorMessage, isSafeRelativePath } from '../util';
 
 export interface FactCheckGateOptions {
@@ -31,7 +31,7 @@ export interface FactCheckGateOptions {
   loadSources?: (ctx: GateContext) => Promise<Source[]>;
   fuzzyThreshold?: number;
   looseThreshold?: number;
-  appliesTo?: (task: GateTask) => boolean;
+  appliesTo?: (job: GateJob) => boolean;
 }
 
 const MAX_LISTED = 10;
@@ -72,7 +72,7 @@ export function factCheckGate(options: FactCheckGateOptions = {}): Gate {
   return {
     id: 'fact-check',
     title: 'Fact check',
-    appliesTo: options.appliesTo ?? ((task) => task.kind === 'research' || task.kind === 'seo'),
+    appliesTo: options.appliesTo ?? ((job) => job.kind === 'research' || job.kind === 'seo'),
     async run(ctx) {
       let raw: string;
       try {

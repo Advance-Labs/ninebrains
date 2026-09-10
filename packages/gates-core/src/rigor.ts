@@ -3,7 +3,7 @@
  * the two in step.
  */
 
-import type { TaskKind } from './types';
+import type { JobKind } from './types';
 
 export const GATE_IDS = {
   tests: 'tests',
@@ -30,8 +30,8 @@ export const RIGOR_THRESHOLDS = {
   reviewer: 7,
 } as const;
 
-const CODE_KINDS: ReadonlySet<TaskKind> = new Set(['code', 'ui']);
-const CLAIM_KINDS: ReadonlySet<TaskKind> = new Set(['research', 'seo']);
+const CODE_KINDS: ReadonlySet<JobKind> = new Set(['code', 'ui']);
+const CLAIM_KINDS: ReadonlySet<JobKind> = new Set(['research', 'seo']);
 const KINDS: ReadonlySet<string> = new Set(['code', 'ui', 'research', 'seo', 'docs']);
 
 function assertLevel(name: string, value: number): void {
@@ -40,25 +40,25 @@ function assertLevel(name: string, value: number): void {
   }
 }
 
-export function rigorToGates(rigor: Rigor, taskKind: TaskKind): GateId[] {
+export function rigorToGates(rigor: Rigor, jobKind: JobKind): GateId[] {
   assertLevel('testing', rigor.testing);
   assertLevel('security', rigor.security);
-  if (!KINDS.has(taskKind)) throw new RangeError(`unknown task kind: ${taskKind}`);
+  if (!KINDS.has(jobKind)) throw new RangeError(`unknown job kind: ${jobKind}`);
 
   const gates: GateId[] = [];
-  if (rigor.testing >= RIGOR_THRESHOLDS.tests && CODE_KINDS.has(taskKind)) {
+  if (rigor.testing >= RIGOR_THRESHOLDS.tests && CODE_KINDS.has(jobKind)) {
     gates.push(GATE_IDS.tests);
   }
-  if (rigor.testing >= RIGOR_THRESHOLDS.factCheck && CLAIM_KINDS.has(taskKind)) {
+  if (rigor.testing >= RIGOR_THRESHOLDS.factCheck && CLAIM_KINDS.has(jobKind)) {
     gates.push(GATE_IDS.factCheck);
   }
-  if (rigor.testing >= RIGOR_THRESHOLDS.screenshot && taskKind === 'ui') {
+  if (rigor.testing >= RIGOR_THRESHOLDS.screenshot && jobKind === 'ui') {
     gates.push(GATE_IDS.screenshot);
   }
   if (rigor.testing >= RIGOR_THRESHOLDS.reviewer) {
     gates.push(GATE_IDS.reviewer);
   }
-  if (rigor.security >= RIGOR_THRESHOLDS.securityReview && CODE_KINDS.has(taskKind)) {
+  if (rigor.security >= RIGOR_THRESHOLDS.securityReview && CODE_KINDS.has(jobKind)) {
     gates.push(GATE_IDS.securityReview);
   }
   return gates;
