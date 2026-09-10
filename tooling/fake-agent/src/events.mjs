@@ -13,6 +13,8 @@ const MODEL_ALIASES = {
 };
 export const resolveModel = (m) => MODEL_ALIASES[m] ?? m ?? 'claude-sonnet-5';
 
+// FAKE_AGENT_USAGE (e.g. {"output_tokens":400}) overrides the per-message usage
+// so token-budget tests have something to count. Read at call time.
 const zeroUsage = () => ({
   input_tokens: 0,
   cache_creation_input_tokens: 0,
@@ -20,6 +22,7 @@ const zeroUsage = () => ({
   output_tokens: 0,
   server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 },
   service_tier: 'standard',
+  ...(process.env.FAKE_AGENT_USAGE ? JSON.parse(process.env.FAKE_AGENT_USAGE) : {}),
 });
 
 export function initEvent({ cwd, sessionId, tools, mcpServers, model, permissionMode }) {
