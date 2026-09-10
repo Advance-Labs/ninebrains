@@ -25,6 +25,8 @@ const VALUE = {
   '--settings': 'settings',
   '--setting-sources': 'settingSources',
   '--fallback-model': 'fallbackModel',
+  '--max-budget-usd': 'maxBudgetUsd',
+  '--permission-prompts': 'permissionPrompts',
   '--name': 'name',
   '-n': 'name',
 };

@@ -2,10 +2,12 @@
 //   { "say": "text" }                         assistant text; {{prompt}} and {{lastToolResult}} interpolate
 //   { "callTool": { "server", "tool", "args" } }  real MCP call via --mcp-config
 //   { "writeFile": { "path", "content" } }    emits a Write tool_use and writes the file under cwd
+//   { "bash": "command" }                     emits a Bash tool_use and runs it with /bin/sh in cwd
 //   { "sleep": ms }
 //   { "waitForInput": true }                  interactive only: end this turn, wait for the next line
 //   { "exit": code }                          end the run with this exit code
 // The `ui` object decides how each step is rendered (stream-json vs. terminal).
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
@@ -95,6 +97,14 @@ function writeFileStep(ctx, { path, content = '' }) {
   return { content: msg, raw: { type: existed ? 'update' : 'create', filePath: target, content } };
 }
 
+// Real claude would run this inside its sandbox; the fake has none, so tests
+// that script `bash` must rely on the tool being denied, not on isolation.
+function bashStep(ctx, command) {
+  const r = spawnSync('/bin/sh', ['-c', command], { cwd: ctx.cwd, encoding: 'utf8' });
+  const output = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+  return { content: output, isError: r.status !== 0, raw: { stdout: r.stdout, stderr: r.stderr } };
+}
+
 /**
  * Runs steps from `start`. Returns { next, exitCode?, maxTurns?, waitForInput? }
  * where `next` is the index to resume from after waitForInput.
@@ -115,6 +125,10 @@ export async function runSteps(ctx, steps, ui, start = 0) {
     } else if (step.writeFile) {
       const input = { file_path: step.writeFile.path, content: step.writeFile.content ?? '' };
       const r = await runTool(ctx, ui, 'Write', input, async () => writeFileStep(ctx, step.writeFile));
+      if (r.maxTurns) return { next: i, maxTurns: true };
+    } else if ('bash' in step) {
+      const command = String(step.bash);
+      const r = await runTool(ctx, ui, 'Bash', { command }, async () => bashStep(ctx, command));
       if (r.maxTurns) return { next: i, maxTurns: true };
     } else if ('sleep' in step) {
       await new Promise((r) => setTimeout(r, Number(step.sleep)));
