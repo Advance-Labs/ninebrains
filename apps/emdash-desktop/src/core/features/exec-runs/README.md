@@ -92,8 +92,7 @@ codex exec --json --cd <wt> --sandbox workspace-write|read-only -c approval_poli
    and adding it would touch the lockfile, a hot spot. The `lookup` option is the socket's
    connect-time resolver, which gives the same guarantee.
 3. **Upstream patch:** `packages/core` now exports `./primitives/agent-env/api`, in `package.json`
-   exports and as a `tsdown` entry. It is additive. There is no `docs/UPSTREAM-PATCHES.md` yet;
-   log it there when that file exists.
+   exports and as a `tsdown` entry. It is additive, and it is logged in `docs/UPSTREAM-PATCHES.md` §5.
 4. **Reviewer uses `--permission-mode=dontAsk`** (per the brief), not `plan` (threat model). The
    restriction comes from `--tools`, `--disallowedTools` and a sandbox with no writable path.
 5. **The prompt always goes on stdin**, never `-p "<prompt>"` (SEC-17 overrides the spike's recipe).

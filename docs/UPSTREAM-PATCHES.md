@@ -77,10 +77,17 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
 
+## 5. Exec runs and gate capabilities (W2)
+
+| File | What | Why |
+|---|---|---|
+| `packages/core/package.json`, `packages/core/tsdown.config.ts` | New export and build entry `./primitives/agent-env/api` (additive) | The unattended runner builds its env from upstream `buildAllowlistedAgentEnv` / `mergeAgentEnvLayers`, which the desktop app could not import before (SEC-13) |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
 `tooling/scripts/check-licenses.mjs`, `tooling/scripts/check-licenses.test.mjs`,
 `tooling/scripts/allowlist-exceptions.json`, `.github/workflows/licenses.yml`,
 `.github/workflows/build-matrix.yml`, `src/core/primitives/app-identity/api/fork-flags.ts`,
-`src/main/db/default-path.test.ts`.
+`src/main/db/default-path.test.ts`, `src/core/features/exec-runs/**`,
+`src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`).
