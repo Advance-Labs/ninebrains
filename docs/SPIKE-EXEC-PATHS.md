@@ -25,7 +25,7 @@ before the zero-token variadic probe), Codex CLI **0.154.0** (via
 | Multi-account | One `CLAUDE_CONFIG_DIR` per account. An empty dir reports `loggedIn: false` even though the default dir is logged in via the macOS Keychain, so credentials are scoped per dir **[verified]**. Codex: `CODEX_HOME` **[verified]** |
 | Usage meter | Attended: statusline JSON `rate_limits.five_hour/seven_day.used_percentage` **[verified]**. Unattended: `rate_limit_event` in stream-json **[verified]**. Codex: app-server `account/rateLimits/read` + `account/rateLimits/updated` **[verified exists, needs login]** |
 | Codex | Attended `codex -c mcp_servers.brain.command=... --cd <wt> --no-alt-screen`; unattended `codex exec --json ...`; or `codex app-server` (JSON-RPC stdio) with per-thread `config` **[verified up to auth]** |
-| Fake agent | `spikes/fake-agent/`, zero deps, 35 `node --test` tests passing, event shapes checked against 3 real captures |
+| Fake agent | `tooling/fake-agent/`, zero deps, 35 `node --test` tests passing, event shapes checked against 3 real captures |
 
 ## 1. Claude attended path (PTY)
 
@@ -164,7 +164,7 @@ it on stdin when it is long (avoids argv length limits and shell quoting). For a
 no argv prompt: paste it after `SessionStart` (§1). The fake agent reproduces the swallowing, so
 tests catch a regression.
 
-### Event stream [verified, fixtures in `spikes/fake-agent/fixtures/`]
+### Event stream [verified, fixtures in `tooling/fake-agent/fixtures/`]
 
 `system/init` (has `session_id`, `tools`, `mcp_servers: [{name, status: "connected"}]`, `model`,
 `permissionMode`, `apiKeySource`) → `rate_limit_event` → `system/thinking_tokens`* → `assistant`
@@ -360,7 +360,7 @@ path: typed, resumable, and it exposes rate limits.
     **[verified]**. Record `init.claude_code_version` for every run and re-run the fixture shape tests
     after upgrades.
 
-## 11. Fake agent (`spikes/fake-agent/`)
+## 11. Fake agent (`tooling/fake-agent/`)
 
 Zero-dependency Node ESM CLI, `bin/fake-claude.mjs`. Run `npm test` in that dir: **35 tests, all
 passing** (`node --test "test/*.test.mjs"`). One test talks to the SDK-based stub in
@@ -397,4 +397,4 @@ passing** (`node --test "test/*.test.mjs"`). One test talks to the SDK-based stu
 
 `spikes/exec-paths/` (own `package.json`; `npm install`, then gotcha 1): stub, attended, unattended,
 variadic and Codex app-server probes, hook and statusline loggers, fixture sanitiser.
-`spikes/fake-agent/`: `bin/`, `src/`, `test/`, `fixtures/` (sanitised real captures).
+`tooling/fake-agent/`: `bin/`, `src/`, `test/`, `fixtures/` (sanitised real captures).

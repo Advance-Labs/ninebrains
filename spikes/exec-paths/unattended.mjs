@@ -5,7 +5,7 @@
 //
 // Usage: node unattended.mjs <workdir> <outdir>
 // Real claude spends tokens (haiku, one short run). Set CLAUDE_BIN to the fake
-// agent (../fake-agent/bin/fake-claude.mjs) plus FAKE_AGENT_SCRIPT to run free.
+// agent (../../tooling/fake-agent/bin/fake-claude.mjs) plus FAKE_AGENT_SCRIPT to run free.
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

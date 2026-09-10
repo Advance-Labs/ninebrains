@@ -8,7 +8,7 @@ export const BIN = fileURLToPath(new URL('../bin/fake-claude.mjs', import.meta.u
 export const ECHO_SERVER = fileURLToPath(new URL('./fixtures/echo-mcp-server.mjs', import.meta.url));
 export const HOOK_RECORDER = fileURLToPath(new URL('./fixtures/hook-recorder.mjs', import.meta.url));
 export const FIXTURES = fileURLToPath(new URL('../fixtures/', import.meta.url));
-export const EXEC_PATHS = fileURLToPath(new URL('../../exec-paths/', import.meta.url));
+export const EXEC_PATHS = fileURLToPath(new URL('../../../spikes/exec-paths/', import.meta.url));
 
 export const tempDir = () => mkdtempSync(join(tmpdir(), 'fake-agent-test-'));
 
