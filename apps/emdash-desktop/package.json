@@ -51,6 +51,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.1.0",
     "@emdash/chat-ui": "workspace:*",
+    "@emdash/citations": "workspace:*",
     "@emdash/core": "workspace:*",
     "@emdash/gates-core": "workspace:*",
     "@emdash/plugins": "workspace:*",

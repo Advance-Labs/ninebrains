@@ -26,6 +26,9 @@ importers:
       '@emdash/chat-ui':
         specifier: workspace:*
         version: link:../../packages/chat-ui
+      '@emdash/citations':
+        specifier: workspace:*
+        version: link:../../packages/citations
       '@emdash/core':
         specifier: workspace:*
         version: link:../../packages/core

@@ -90,16 +90,32 @@ The SEO team writes `seo-findings.json` (the contract is in every SEO role promp
 tool, exact args, and the numbers cited), a `crawl` (URL + observation) or a `citation` (URL +
 exact quote).
 
-The gate spawns a read-only reviewer with the SEO pack's MCP servers, which re-runs each query and
-re-fetches each URL, then replies with strict JSON: `confirmed | contradicted | unverifiable` per
-finding. The gate fails on any contradicted finding, or when more than 20% are unverifiable
-(`maxUnverifiableRatio`). A malformed reply fails. Feedback names each failing finding.
+How a review runs:
 
-**Requirement on the app:** `spawnReviewer` must honour an extra `mcpServers` option
-(`SeoReviewerOptions = SpawnReviewerOptions & { mcpServers?: McpServerEntry[] }`) by writing them
-into the reviewer's `--mcp-config=`. gates-core is unchanged; the wider type lives in this slice.
-An app that ignores the option leaves the reviewer unable to query, which shows up as
-`unverifiable` and fails the gate, never as a false pass.
+1. **Isolation (SEC-18).** The reviewer runs in a disposable checkout from
+   `prepareReviewCheckout(job)`, never in the lane worktree, with `tools: 'read-only'`. The
+   checkout is disposed in `finally`, whatever the outcome. If no checkout can be prepared, the
+   gate fails without spawning anything.
+2. **Pages are fetched by the gate.** A read-only reviewer has no network, so the gate fetches
+   every crawl and citation URL itself through the app's SSRF-safe `fetchText` (up to 20 pages).
+   It hands the readable text to the reviewer.
+3. **Citation quotes are checked deterministically** with `@emdash/citations` `matchQuote`. A quote
+   that isn't on its page makes the finding `contradicted`, whatever the reviewer says.
+4. **Untrusted content is fenced (SEC-19).** The findings go in one `createFence` block per call,
+   and that block holds every title, observation, quote, tool name, argument and cited number.
+   Each fetched page gets its own block. The prompt states that fenced content is data, never
+   instructions, and that tool arguments are only the query to re-run. A test proves that a
+   finding containing a forged closing delimiter plus "confirmed" stays inside its block.
+5. **The reviewer re-runs each query** on the SEO pack's MCP servers and replies with strict JSON:
+   `confirmed | contradicted | unverifiable` per finding. The gate fails on any contradicted
+   finding, or when more than 20% are unverifiable (`maxUnverifiableRatio`). A malformed reply
+   fails. Feedback names each failing finding.
+
+**Requirement on the app:** `spawnReviewer` must honour the optional `mcpServers` option
+(`SeoReviewerOptions = SpawnReviewerOptions & { mcpServers?: McpServerEntry[] }`) by writing the
+servers into the reviewer's `--mcp-config=`. The gates-core contract permits the field, and says
+an implementation that cannot honour it **must throw**. The gate turns that throw into a failure
+("the evidence reviewer could not run"), never a false pass.
 
 ## Bundled packs
 
@@ -164,8 +180,9 @@ This slice does not touch `services.ts` or `wiring.ts`. To finish wiring:
    only), so the settings page works, but every secret shows as missing.
 2. The Phase-2 launch builder calls `packs.resolvePackLaunch(projectId, roleId)` and merges
    `mcpServers` into the lane's `mcp.json` next to brain-mcp (using `--mcp-config=<path>`).
-3. The gate runner registers `packs.createGates()` alongside the gates-core built-ins, and the
-   app's `spawnReviewer` honours `mcpServers` (above).
+3. The gate runner registers `packs.createGates()` alongside the gates-core built-ins. The app's
+   `spawnReviewer` honours `mcpServers` or throws (above). `prepareReviewCheckout` and `fetchText`
+   come from the same gate capabilities the built-in gates use.
 
 ## Upstream files touched (append-only registrations)
 
