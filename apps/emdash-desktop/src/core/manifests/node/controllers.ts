@@ -42,6 +42,11 @@ import type { PromptLibraryService } from '@core/features/library/node/prompt-li
 import { createPromptLibraryWireController } from '@core/features/library/node/wire-controller';
 import { createMachinesWireController } from '@core/features/machines/node/wire-controller';
 import { createMcpWireController } from '@core/features/mcp/node/wire-controller';
+import {
+  createFallbackPacksService,
+  type PacksService,
+} from '@core/features/packs/node/packs-service';
+import { createPacksWireController } from '@core/features/packs/node/wire-controller';
 import type { PreviewServerAccessOperations } from '@core/features/preview-servers/node/preview-server-access-service';
 import { createPreviewServersWireController } from '@core/features/preview-servers/node/wire-controller';
 import type { ProjectAttachmentManager } from '@core/features/projects/api/node/project-attachment-manager';
@@ -160,6 +165,8 @@ export type DesktopControllerContext = {
   readonly workspaceIdentity: WorkspaceIdentityService;
   readonly workspacePlacement: WorkspacePlacementResolver;
   readonly workspaces: Omit<CreateWorkspacesWireControllerOptions, 'db' | 'mutations'>;
+  /** Ninebrains packs. Optional until boot wiring passes one (features/packs/README.md). */
+  readonly packs?: PacksService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -447,6 +454,16 @@ export const desktopNodeControllers = {
   },
   host: {
     create: ({ hostOperations }) => createDesktopHostWireController(hostOperations),
+  },
+  packs: {
+    create: ({ packs, runtimeClients, runtimes }) =>
+      createPacksWireController(
+        packs ??
+          createFallbackPacksService({
+            runtimes,
+            getMementosRuntimeClient: runtimeClients.getMementosRuntimeClient,
+          })
+      ),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

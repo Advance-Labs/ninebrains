@@ -15,6 +15,7 @@ export const settingsPageTabSchema = z.enum([
   'clis-models',
   'mcp',
   'skills',
+  'packs',
   'connections',
   'docs',
 ]);
