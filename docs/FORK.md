@@ -109,9 +109,17 @@ License file is MIT). `pnpm check` runs it between typecheck and test.
 
 ## Open items for later waves
 
-1. **GitHub device flow still uses Emdash's GitHub OAuth App.** The consent page on github.com
-   says "Emdash", so the modal copy still says Emdash on purpose. Lucas needs to register a
-   Ninebrains OAuth App (github.com → Settings → Developer settings) and swap the client ID.
+1. **GitHub device-flow sign-in is off until Lucas registers a Ninebrains OAuth App.** Emdash's
+   client ID was removed. Until an ID is built in, "Connect GitHub" offers GitHub CLI import only and
+   explains why. To turn it on:
+   1. Create the app under the Advance-Labs org (Organization settings → Developer settings → OAuth
+      Apps → New OAuth App), or under your account (Settings → Developer settings → OAuth Apps).
+   2. Name `Ninebrains`, homepage `https://github.com/Advance-Labs/ninebrains`. Device flow does
+      not use a callback, but the form requires one, so enter the homepage URL.
+   3. Tick **Enable Device Flow** and register. Copy the **Client ID**. It is public; no client
+      secret is needed, so never generate or commit one.
+   4. Build with `NINEBRAINS_GITHUB_OAUTH_CLIENT_ID=<client id> pnpm run build`. For CI, set it as a
+      repository *variable* (not a secret); `build-matrix.yml` already passes it through.
 2. **Feature flags are empty.** Upstream fetched them from PostHog `/decide`; with telemetry cut,
    every `useFeatureFlag` is `false` outside dev (`FLAG_*` env overrides still work in dev).
 3. **Auto-update is off** (`UPDATES_ENABLED`). Turn it on with the first signed release (plan 7.1/7.2).

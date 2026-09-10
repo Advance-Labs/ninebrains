@@ -48,6 +48,14 @@ const workspacePackages = [
   '@emdash/wire',
 ];
 
+// Ninebrains: GitHub OAuth App client ID for device-flow sign-in, baked in at build time.
+// Empty by default, which turns device flow off (docs/FORK.md).
+const githubOAuthClientIdDefine = {
+  'import.meta.env.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID': JSON.stringify(
+    process.env.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID ?? ''
+  ),
+};
+
 export default defineConfig({
   main: {
     root: 'src/main',
@@ -58,6 +66,7 @@ export default defineConfig({
     // makes the branch dead code so the bundle builds.
     define: {
       'global.GENTLY': 'false',
+      ...githubOAuthClientIdDefine,
     },
     build: {
       externalizeDeps: {
@@ -103,6 +112,7 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     plugins: [react(), tailwindcss()],
+    define: githubOAuthClientIdDefine,
     resolve: {
       alias: {
         '@': resolve('src'),

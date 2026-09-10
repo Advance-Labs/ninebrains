@@ -1,4 +1,5 @@
 import { createOAuthDeviceAuth } from '@octokit/auth-oauth-device';
+import { GITHUB_OAUTH_APP_REQUIRED_MESSAGE } from '@core/primitives/app-identity/api/github-oauth-app';
 import type { GitHubEvent, GitHubUser } from '@core/primitives/github/api';
 import {
   upsertGitHubAccount,
@@ -43,6 +44,11 @@ export class GitHubDeviceFlowService {
   ) {}
 
   async start(): Promise<GitHubDeviceFlowResult> {
+    // Ninebrains: without our own GitHub OAuth App there is no client ID, so fail before
+    // contacting GitHub (docs/FORK.md).
+    if (!this.deps.config.clientId) {
+      return { success: false, error: GITHUB_OAUTH_APP_REQUIRED_MESSAGE };
+    }
     this.deviceFlowAbortController = new AbortController();
     const { signal } = this.deviceFlowAbortController;
 

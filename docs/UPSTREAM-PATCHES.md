@@ -34,6 +34,20 @@ or are root files.
 
 Left in place on purpose: MCP catalog entries for the PostHog and Sentry MCP servers, skills.sh and GitHub skill sources. These are third-party services the user opts into, not Emdash infrastructure.
 
+## 1b. GitHub OAuth App (branch `w0/gh-oauth`)
+
+| File | What | Why |
+|---|---|---|
+| `packages/plugins/src/integrations/impl/github/index.ts` | `oauth-device` `clientId` `'Ov23…'` → `''` | Emdash's GitHub OAuth App client ID is another company's credential, and GitHub's consent page would say "Emdash" |
+| `src/core/primitives/app-identity/api/github-oauth-app.ts` (new) | `readGitHubOAuthClientId()` from `import.meta.env.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID`; shared "needs a Ninebrains OAuth App" message | One source for the client ID and the fallback copy |
+| `electron.vite.config.ts` | `define` bakes `NINEBRAINS_GITHUB_OAUTH_CLIENT_ID` (default `''`) into the main and renderer bundles | Build-time, empty by default |
+| `src/main/bootstrap/boot/phases/services.ts` | Device-flow service gets `readGitHubOAuthClientId()` instead of the plugin's ID | Same |
+| `src/core/features/github/node/services/github-device-flow-service.ts` | `start()` returns the "needs a Ninebrains OAuth App" error without calling GitHub when the ID is empty | Fail closed |
+| `src/core/features/settings/browser/components/github-connect-modal.tsx` | Device-flow card hidden when the ID is empty; message shown; GitHub CLI import stays (upstream has no PAT flow) | Clean fallback |
+| `src/core/features/settings/browser/github-device-flow-modal.tsx` | "Authorize Emdash" copy → Ninebrains | The consent page now names our app |
+| `.github/workflows/build-matrix.yml` | Passes `vars.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID` to builds | CI builds pick up the ID once it exists |
+| Tests | New `github-device-flow-service.test.ts` (empty ID refuses without contacting GitHub; env read and trim); `github-connect-resume.test.tsx` stubs an ID for device-flow cases and asserts the empty-ID fallback | Regression guards |
+
 ## 2. State isolation: never share Emdash's data (task 0.5 follow-up)
 
 | File | What | Why |
@@ -64,7 +78,7 @@ Directories, package names and TS identifiers are unchanged (`apps/emdash-deskto
 | 32 source files | User-visible "Emdash" strings → "Ninebrains" (recovery dialogs and `recovery.html`, notifications, settings copy, theme names, quit dialogs, tray labels, etc.). Exact list: `git diff dbf690c --stat -- apps/emdash-desktop/src` |
 | `src/core/services/notifications/node/producers/update-producer.test.ts`, `project-availability-presentation.test.ts`, `settings-search.test.ts`, `renderer/tests/browser/github-connect-resume.test.tsx` | Assertions follow the new copy and the hidden OAuth / telemetry entries |
 
-Left as "Emdash" on purpose: copy that is only reachable through the gated account UI; the legacy-import screens, which describe importing data from a previous *Emdash* install; and the GitHub device-flow modal, which still authorises Emdash's GitHub OAuth App (see FORK.md).
+Left as "Emdash" on purpose: copy that is only reachable through the gated account UI; and the legacy-import screens, which describe importing data from a previous *Emdash* install.
 
 ## 4. CI and repo files
 
