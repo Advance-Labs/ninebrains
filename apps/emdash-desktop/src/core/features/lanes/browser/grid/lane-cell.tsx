@@ -40,6 +40,7 @@ export function LaneCell({
       data-testid="lane-cell"
       data-slot={slot}
       data-focused={focused}
+      data-dimmed={dimmed}
       aria-label={
         lane ? `Lane ${slot + 1}: ${lane.projectName ?? 'project'}` : `Empty slot ${slot + 1}`
       }

@@ -22,16 +22,21 @@ import { LANE_SLOT_COUNT, type Lane, type LaneSlot, type LaneStatus } from '../.
 import { laneStatusLabel, LaneStatusLight } from '../status-light';
 import { runLaneAction } from '../use-lanes';
 
+// Lower-priority header actions fold into the lane menu when the cell is narrow.
+const SECONDARY = 'hidden @[30rem]:inline-flex';
+
 const PROVIDER_LABELS: Record<Lane['provider'], string> = { claude: 'Claude', codex: 'Codex' };
 
 function HeaderButton({
   label,
   pressed,
+  className,
   onClick,
   children,
 }: {
   label: string;
   pressed?: boolean;
+  className?: string;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -41,7 +46,7 @@ function HeaderButton({
         <Button
           variant="ghost"
           size="sm"
-          className={cn('size-6 p-0', pressed && 'bg-(--em-accent-3)')}
+          className={cn('size-6 shrink-0 p-0', pressed && 'bg-(--em-accent-3)', className)}
           aria-label={label}
           aria-pressed={pressed}
           onClick={onClick}
@@ -84,14 +89,14 @@ export function LaneHeader({
     <header className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-background-secondary px-2">
       <LaneStatusLight status={status} />
       <span className="sr-only">{laneStatusLabel(status)}</span>
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="truncate text-sm font-medium text-foreground">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <span className="min-w-0 truncate text-sm font-medium text-foreground">
           {lane.projectName ?? 'Project'}
         </span>
         <span className="hidden truncate font-mono text-xs text-foreground-muted @[22rem]:inline">
           {lane.branch}
         </span>
-        <Badge variant="outline" tone="neutral">
+        <Badge variant="outline" tone="neutral" className="hidden shrink-0 @[20rem]:inline-flex">
           {PROVIDER_LABELS[lane.provider]}
         </Badge>
         {hooksMissing && (
@@ -125,12 +130,14 @@ export function LaneHeader({
         </HeaderButton>
         <HeaderButton
           label="Open in editor"
+          className={SECONDARY}
           onClick={() => navigate(taskViewDef({ projectId: lane.projectId, taskId: lane.taskId }))}
         >
           <FilePen className="h-3.5 w-3.5" />
         </HeaderButton>
         <HeaderButton
           label="Jobs, done and notes"
+          className={SECONDARY}
           pressed={sidePanelOpen}
           onClick={onToggleSidePanel}
         >
@@ -138,6 +145,7 @@ export function LaneHeader({
         </HeaderButton>
         <HeaderButton
           label="Sleep (keeps the agent running)"
+          className={SECONDARY}
           onClick={() =>
             void runLaneAction('Could not put the lane to sleep', (c) => c.sleepLane(laneKey))
           }
@@ -164,6 +172,23 @@ export function LaneHeader({
               }
             >
               Relaunch agent
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onClick={() =>
+                navigate(taskViewDef({ projectId: lane.projectId, taskId: lane.taskId }))
+              }
+            >
+              Open in editor
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onClick={onToggleSidePanel}>
+              {sidePanelOpen ? 'Hide jobs, done and notes' : 'Show jobs, done and notes'}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onClick={() =>
+                void runLaneAction('Could not put the lane to sleep', (c) => c.sleepLane(laneKey))
+              }
+            >
+              Sleep (keeps the agent running)
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             {Array.from({ length: LANE_SLOT_COUNT }, (_, slot) => slot as LaneSlot)

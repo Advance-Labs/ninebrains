@@ -1,11 +1,12 @@
 import { observer } from 'mobx-react-lite';
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { workbenchPanelLayoutsMemento } from '@core/features/workbench/contributions/mementos';
 import { createLayoutStorage } from '@core/primitives/mementos/browser/layout-storage';
 import { useSubjectSpace } from '@core/primitives/mementos/react';
 import { appSubject } from '@core/primitives/subjects/api';
 import { disabled, enabled, type ViewScopeImpl } from '@core/primitives/view-scopes/api';
-import { useViewScope } from '@core/primitives/view-scopes/react';
+import { scopes } from '@core/primitives/view-scopes/browser';
+import { useViewScope, ViewScopeInstanceProvider } from '@core/primitives/view-scopes/react';
 import type { LaneSlot, LaneTab } from '../../api';
 import { lanesViewScope } from '../../contributions/scopes';
 import { useLaneStatuses } from '../use-lanes';
@@ -34,34 +35,43 @@ export const LanesGrid = observer(function LanesGrid({ tab }: { tab: LaneTab }) 
       execute: () => setMaximizedSlot((current) => (current === focusedSlot ? null : focusedSlot)),
     }),
   } satisfies ViewScopeImpl<typeof lanesViewScope>;
-  const { attachRef } = useViewScope(lanesViewScope({}), implementation);
+  const { attachRef, instance } = useViewScope(lanesViewScope({}), implementation);
+
+  // Logical scopes bind shortcuts only once activated (as the settings view does).
+  useLayoutEffect(() => {
+    if (instance) scopes.activate(instance);
+  }, [instance]);
 
   if (!appSpace.isHydrated) return null;
   return (
-    <div
-      ref={attachRef}
-      data-testid="lanes-grid"
-      className="h-full w-full bg-background p-1"
-      tabIndex={-1}
-    >
-      <LanesGridLayout
-        tab={tab}
-        storage={storage}
-        maximizedSlot={maximizedSlot}
-        renderCell={({ slot, lane, dimmed }) => (
-          <LaneCell
-            tabId={tab.tabId}
-            slot={slot}
-            lane={lane}
-            status={lane ? (statuses[lane.laneId] ?? lane.status) : null}
-            focused={focusedSlot === slot}
-            dimmed={dimmed}
-            maximized={maximizedSlot === slot}
-            onFocus={() => setFocusedSlot(slot)}
-            onToggleMaximize={() => setMaximizedSlot((current) => (current === slot ? null : slot))}
-          />
-        )}
-      />
-    </div>
+    <ViewScopeInstanceProvider instance={instance}>
+      <div
+        ref={attachRef}
+        data-testid="lanes-grid"
+        className="h-full w-full bg-background p-1"
+        tabIndex={-1}
+      >
+        <LanesGridLayout
+          tab={tab}
+          storage={storage}
+          maximizedSlot={maximizedSlot}
+          renderCell={({ slot, lane, dimmed }) => (
+            <LaneCell
+              tabId={tab.tabId}
+              slot={slot}
+              lane={lane}
+              status={lane ? (statuses[lane.laneId] ?? lane.status) : null}
+              focused={focusedSlot === slot}
+              dimmed={dimmed}
+              maximized={maximizedSlot === slot}
+              onFocus={() => setFocusedSlot(slot)}
+              onToggleMaximize={() =>
+                setMaximizedSlot((current) => (current === slot ? null : slot))
+              }
+            />
+          )}
+        />
+      </div>
+    </ViewScopeInstanceProvider>
   );
 });
