@@ -1,0 +1,53 @@
+/**
+ * Paths under `<userData>/ninebrains/runs` and the SEC-14 id rule.
+ */
+import { lstat, mkdir, realpath } from 'node:fs/promises';
+import { isAbsolute, join, relative, sep } from 'node:path';
+
+/** SEC-14: ids used in paths are plain segments: no `.`, `..`, `:`, slashes or long names. */
+const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function assertSafeId(id: string, what = 'id'): string {
+  if (!SAFE_ID.test(id)) throw new Error(`Unsafe ${what}: ${JSON.stringify(id)}`);
+  return id;
+}
+
+export function ninebrainsDir(userDataDir: string): string {
+  if (!isAbsolute(userDataDir)) throw new Error('userDataDir must be absolute');
+  return join(userDataDir, 'ninebrains');
+}
+
+export function runsDir(userDataDir: string): string {
+  return join(ninebrainsDir(userDataDir), 'runs');
+}
+
+/** `<runs>/<runId>.jsonl` plus a per-run config dir `<runs>/<runId>/` (settings, mcp.json). */
+export function runPaths(userDataDir: string, runId: string) {
+  const root = runsDir(userDataDir);
+  const id = assertSafeId(runId, 'runId');
+  return { root, transcript: join(root, `${id}.jsonl`), configDir: join(root, id) };
+}
+
+/** Creates `dir` (and parents) with mode 0700. */
+export async function ensurePrivateDir(dir: string): Promise<void> {
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+}
+
+/**
+ * SEC-31: the run directory must be inside one of the allowed roots (compared by realpath),
+ * and a root that is itself a symlink is refused. Fails closed: no `process.cwd()` fallback.
+ * Returns the realpath to spawn in.
+ */
+export async function resolveRunCwd(cwd: string, allowedRoots: readonly string[]): Promise<string> {
+  if (!isAbsolute(cwd)) throw new Error(`Run cwd must be absolute: ${cwd}`);
+  const real = await realpath(cwd);
+  for (const root of allowedRoots) {
+    if (!isAbsolute(root)) continue;
+    const info = await lstat(root).catch(() => undefined);
+    if (!info || info.isSymbolicLink() || !info.isDirectory()) continue;
+    const realRoot = await realpath(root);
+    const rel = relative(realRoot, real);
+    if (rel !== '' && !rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel)) return real;
+  }
+  throw new Error(`Run cwd ${cwd} is not inside an allowed worktree root`);
+}
