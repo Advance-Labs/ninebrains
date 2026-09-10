@@ -3,8 +3,9 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { STORES, tempDir } from '../../test/helpers';
-import type { Run, Job } from '../types';
-import { LATEST_SCHEMA_VERSION, MIGRATIONS, migrate } from './sqlite/migrations';
+import type { Job, Run } from '../types';
+import { openNodeSqliteConnection } from './sqlite/connection';
+import { CORE_MIGRATIONS_TABLE, LATEST_SCHEMA_VERSION, MIGRATIONS, migrate, migrationTag } from './sqlite/migrations';
 import { DEFAULT_DB_FILENAME, SqliteBrainStore, resolveBrainDbPath } from './sqlite/sqlite-store';
 
 const job = (id: string, createdAt: number): Job => ({
@@ -48,7 +49,7 @@ describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
         throw new Error('boom');
       })
     ).toThrow('boom');
-    expect(store.listJobs().map((t) => t.id)).toEqual(['kept']);
+    expect(store.listJobs().map((j) => j.id)).toEqual(['kept']);
   });
 
   it('joins nested transactions to the outer one', () => {
@@ -81,11 +82,11 @@ describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
     store.insertJob(job('b', 2));
     store.insertJob(job('a', 1));
     store.insertJob({ ...job('c', 3), state: 'done', laneId: 'L' });
-    expect(store.listJobs().map((t) => t.id)).toEqual(['a', 'b', 'c']);
-    expect(store.listJobs({ states: ['done'] }).map((t) => t.id)).toEqual(['c']);
+    expect(store.listJobs().map((j) => j.id)).toEqual(['a', 'b', 'c']);
+    expect(store.listJobs({ states: ['done'] }).map((j) => j.id)).toEqual(['c']);
     expect(store.listJobs({ states: [] })).toEqual([]);
-    expect(store.listJobs({ laneId: 'L' }).map((t) => t.id)).toEqual(['c']);
-    expect(store.listJobs({ limit: 1 }).map((t) => t.id)).toEqual(['a']);
+    expect(store.listJobs({ laneId: 'L' }).map((j) => j.id)).toEqual(['c']);
+    expect(store.listJobs({ limit: 1 }).map((j) => j.id)).toEqual(['a']);
   });
 
   it('throws when updating a missing job or run', () => {
@@ -118,7 +119,15 @@ describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
 
   it('upserts lanes', () => {
     const store = createStore();
-    const lane = { id: 'A', projectId: 'p1', provider: 'claude' as const, status: 'idle' as const, recentFiles: [], activeJobId: null, updatedAt: 1 };
+    const lane = {
+      id: 'A',
+      projectId: 'p1',
+      provider: 'claude' as const,
+      status: 'idle' as const,
+      recentFiles: [],
+      activeJobId: null,
+      updatedAt: 1,
+    };
     store.upsertLane(lane);
     store.upsertLane({ ...lane, status: 'running', recentFiles: ['x.ts'] });
     expect(store.listLanes()).toEqual([{ ...lane, status: 'running', recentFiles: ['x.ts'] }]);
@@ -145,27 +154,6 @@ describe('SqliteBrainStore', () => {
     raw.close();
   });
 
-  it('applies migrations once and tolerates re-opening', () => {
-    const file = path.join(tempDir(), 'brain.sqlite');
-    const db = new DatabaseSync(file);
-    expect(migrate(db)).toEqual(MIGRATIONS.map((m) => m.version));
-    expect(migrate(db)).toEqual([]);
-    const extra = [...MIGRATIONS, { version: 99, name: 'extra', sql: 'CREATE TABLE extra (x INTEGER) STRICT' }];
-    expect(migrate(db, extra)).toEqual([99]);
-    // An older binary ignores newer applied versions instead of failing.
-    expect(migrate(db)).toEqual([]);
-    db.close();
-  });
-
-  it('rolls back a failed migration completely', () => {
-    const file = path.join(tempDir(), 'brain.sqlite');
-    const db = new DatabaseSync(file);
-    const broken = [...MIGRATIONS, { version: 2, name: 'broken', sql: 'CREATE TABLE ok (x) ; NOT VALID SQL' }];
-    expect(() => migrate(db, broken)).toThrow();
-    expect(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('jobs','ok')").get()).toEqual({ n: 0 });
-    db.close();
-  });
-
   it('persists data across reopen and close is idempotent', () => {
     const dir = tempDir();
     const store = SqliteBrainStore.open(dir);
@@ -185,10 +173,51 @@ describe('SqliteBrainStore', () => {
     writer.insertJob(job('visible', 1));
     writer.transaction(() => {
       writer.insertJob(job('pending', 2));
-      expect(reader.listJobs().map((t) => t.id)).toEqual(['visible']);
+      expect(reader.listJobs().map((j) => j.id)).toEqual(['visible']);
     });
-    expect(reader.listJobs().map((t) => t.id)).toEqual(['visible', 'pending']);
+    expect(reader.listJobs().map((j) => j.id)).toEqual(['visible', 'pending']);
     writer.close();
     reader.close();
+  });
+
+  it('does not close a connection it was handed', () => {
+    const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
+    migrate(connection);
+    const store = SqliteBrainStore.fromConnection(connection);
+    store.insertJob(job('t', 1));
+    store.close();
+    expect(connection.get<{ n: number }>('SELECT count(*) AS n FROM jobs')).toEqual({ n: 1 });
+    connection.close();
+  });
+});
+
+describe('brain migration runner', () => {
+  it('applies migrations once and tolerates newer versions', () => {
+    const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
+    expect(migrate(connection)).toEqual(MIGRATIONS.map((m) => m.version));
+    expect(migrate(connection)).toEqual([]);
+    const extra = [...MIGRATIONS, { version: 99, name: 'extra', when: 0, sql: 'CREATE TABLE extra (x INTEGER) STRICT' }];
+    expect(migrate(connection, extra)).toEqual([99]);
+    // An older binary ignores newer applied versions instead of failing.
+    expect(migrate(connection)).toEqual([]);
+    connection.close();
+  });
+
+  it('rolls back a failed migration completely', () => {
+    const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
+    const broken = [...MIGRATIONS, { version: 2, name: 'broken', when: 0, sql: 'CREATE TABLE ok (x) ; NOT VALID SQL' }];
+    expect(() => migrate(connection, broken)).toThrow();
+    expect(connection.get("SELECT count(*) AS n FROM sqlite_schema WHERE name IN ('jobs','ok')")).toEqual({ n: 0 });
+    connection.close();
+  });
+
+  it('treats migrations recorded by core runner as applied', () => {
+    const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
+    migrate(connection);
+    connection.exec('DROP TABLE brain_migrations');
+    connection.exec(`CREATE TABLE ${CORE_MIGRATIONS_TABLE} (tag TEXT PRIMARY KEY, hash TEXT NOT NULL, applied_at INTEGER NOT NULL)`);
+    connection.run(`INSERT INTO ${CORE_MIGRATIONS_TABLE} VALUES (?, 'h', 0)`, [migrationTag(MIGRATIONS[0]!)]);
+    expect(migrate(connection)).toEqual([]);
+    connection.close();
   });
 });

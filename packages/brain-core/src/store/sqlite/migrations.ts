@@ -1,19 +1,25 @@
-import type { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
+import type { SqliteConnectionLike } from './connection';
 
 export interface Migration {
   version: number;
   name: string;
+  /** Fixed creation time in ms; core's runner calls this `when`. Never change it. */
+  when: number;
   sql: string;
 }
 
 /**
  * Ordered, append-only schema history. Never edit a shipped migration: add a
- * new one with the next version number.
+ * new one with the next version. Both runners consume this list: brain-core's
+ * own (direct/headless mode) and core's `defineDurableSqliteStore` in the app
+ * (via `BRAIN_BUNDLED_MIGRATIONS`).
  */
 export const MIGRATIONS: readonly Migration[] = [
   {
     version: 1,
     name: 'initial',
+    when: 1_789_056_000_000,
     sql: `
       CREATE TABLE jobs (
         id TEXT PRIMARY KEY,
@@ -121,39 +127,69 @@ export const MIGRATIONS: readonly Migration[] = [
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
 
+/** Core's bookkeeping table (`@emdash/core` sqlite-store `STORE_TABLE`). */
+export const CORE_MIGRATIONS_TABLE = '__emdash_migrations';
+
+export function migrationTag(migration: Pick<Migration, 'version' | 'name'>): string {
+  return `${String(migration.version).padStart(4, '0')}_${migration.name}`;
+}
+
 /**
- * Applies pending migrations inside one `BEGIN IMMEDIATE` transaction, so
- * several processes opening a fresh file at once serialize: the first one
- * migrates, the rest see the work done and apply nothing. Versions newer
- * than this binary knows are tolerated (a downgraded app keeps working on
- * additive changes).
+ * The same history in core's `BundledMigration` shape, for the app:
+ *
+ *   defineDurableSqliteStore({ name: 'brain', driver: betterSqlite3Driver,
+ *     migrations: BRAIN_BUNDLED_MIGRATIONS })
+ *
+ * `hash` is SHA-256 of the raw SQL, as core's runner verifies.
  */
-export function migrate(db: DatabaseSync, migrations: readonly Migration[] = MIGRATIONS): number[] {
-  db.exec('BEGIN IMMEDIATE');
+export const BRAIN_BUNDLED_MIGRATIONS = MIGRATIONS.map((migration) => ({
+  idx: migration.version - 1,
+  tag: migrationTag(migration),
+  when: migration.when,
+  hash: createHash('sha256').update(migration.sql, 'utf8').digest('hex'),
+  sql: migration.sql,
+}));
+
+/**
+ * brain-core's own runner (direct/headless mode). Applies pending migrations
+ * in one `BEGIN IMMEDIATE` transaction, so several processes opening a fresh
+ * file serialize: the first migrates, the rest apply nothing. Versions newer
+ * than this binary are tolerated (additive downgrade). A file already managed
+ * by core's runner (the app DB) counts core's applied tags as applied, so
+ * direct mode can open it without re-running DDL.
+ */
+export function migrate(connection: SqliteConnectionLike, migrations: readonly Migration[] = MIGRATIONS): number[] {
+  connection.exec('BEGIN IMMEDIATE');
   try {
-    db.exec(
+    connection.exec(
       'CREATE TABLE IF NOT EXISTS brain_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL) STRICT'
     );
     const applied = new Set(
-      (db.prepare('SELECT version FROM brain_migrations').all() as Array<{ version: number }>).map(
-        (row) => row.version
-      )
+      connection.all<{ version: number }>('SELECT version FROM brain_migrations').map((row) => Number(row.version))
     );
+    const coreManaged =
+      connection.get("SELECT 1 AS present FROM sqlite_schema WHERE type = 'table' AND name = ?", [CORE_MIGRATIONS_TABLE]) !==
+      undefined;
+    const coreTags = coreManaged
+      ? new Set(connection.all<{ tag: string }>(`SELECT tag FROM ${CORE_MIGRATIONS_TABLE}`).map((row) => row.tag))
+      : new Set<string>();
+
     const ran: number[] = [];
-    const record = db.prepare(
-      'INSERT INTO brain_migrations (version, name, applied_at) VALUES (?, ?, ?)'
-    );
     for (const migration of [...migrations].sort((a, b) => a.version - b.version)) {
-      if (applied.has(migration.version)) continue;
-      db.exec(migration.sql);
-      record.run(migration.version, migration.name, Date.now());
+      if (applied.has(migration.version) || coreTags.has(migrationTag(migration))) continue;
+      connection.exec(migration.sql);
+      connection.run('INSERT INTO brain_migrations (version, name, applied_at) VALUES (?, ?, ?)', [
+        migration.version,
+        migration.name,
+        Date.now(),
+      ]);
       ran.push(migration.version);
     }
-    db.exec('COMMIT');
+    connection.exec('COMMIT');
     return ran;
   } catch (error) {
     try {
-      db.exec('ROLLBACK');
+      connection.exec('ROLLBACK');
     } catch {}
     throw error;
   }

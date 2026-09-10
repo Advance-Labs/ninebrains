@@ -347,6 +347,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@emdash/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^24.13.1
         version: 24.13.1

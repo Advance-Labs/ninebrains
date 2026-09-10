@@ -18,7 +18,21 @@ export {
   resolveBrainDbPath,
   type SqliteBrainStoreOptions,
 } from './store/sqlite/sqlite-store';
-export { LATEST_SCHEMA_VERSION, MIGRATIONS, migrate, type Migration } from './store/sqlite/migrations';
+export {
+  BRAIN_BUNDLED_MIGRATIONS,
+  CORE_MIGRATIONS_TABLE,
+  LATEST_SCHEMA_VERSION,
+  MIGRATIONS,
+  migrate,
+  migrationTag,
+  type Migration,
+} from './store/sqlite/migrations';
+export {
+  nodeSqliteDriver,
+  openNodeSqliteConnection,
+  type SqliteConnectionLike,
+  type SqliteRunResultLike,
+} from './store/sqlite/connection';
 export { Brain, type BrainOptions } from './brain/brain';
 export type { CreateJobInput } from './brain/jobs';
 export type { SendMessageInput } from './brain/mailbox';

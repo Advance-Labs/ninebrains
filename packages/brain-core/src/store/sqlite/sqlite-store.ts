@@ -1,28 +1,14 @@
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
-import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite';
 import type { BrainEvent, StoredBrainEvent } from '../../events';
 import { NotFoundError } from '../../errors';
-import type { DoneEntry, JobEdge, Lane, LaneId, Message, Note, ProjectId, Run, Job, JobId } from '../../types';
-import type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from '../store';
+import type { DoneEntry, Job, JobEdge, JobId, Lane, LaneId, Message, Note, ProjectId, Run } from '../../types';
+import type { BrainStore, JobEdgeFilter, JobFilter, MessageFilter, RunFilter } from '../store';
+import { type SqliteConnectionLike, openNodeSqliteConnection } from './connection';
 import { migrate } from './migrations';
-import {
-  type Row,
-  JOB_COLUMNS,
-  jobParams,
-  toDone,
-  toEdge,
-  toLane,
-  toMessage,
-  toNote,
-  toRun,
-  toJob,
-} from './rows';
+import { JOB_COLUMNS, type Row, jobParams, toDone, toEdge, toJob, toLane, toMessage, toNote, toRun } from './rows';
 
 export const DEFAULT_DB_FILENAME = 'brain.sqlite';
-
-const requireBuiltin = createRequire(import.meta.url);
 
 export interface SqliteBrainStoreOptions {
   /** How long a writer waits for another process's lock before failing. */
@@ -34,38 +20,60 @@ export function resolveBrainDbPath(dirOrFile: string): string {
   return /\.(sqlite3?|db)$/i.test(dirOrFile) ? dirOrFile : path.join(dirOrFile, DEFAULT_DB_FILENAME);
 }
 
+type Param = string | number | null;
+
 /**
- * SQLite-backed store on `node:sqlite` (built into Node >= 22.13 and
- * Electron >= 35; no native addon, so no ABI to match). Many processes may
- * open the same file: WAL lets readers run beside the single writer,
- * `busy_timeout` makes writers queue instead of failing, and every
- * transaction is `BEGIN IMMEDIATE`, so claim-style read-modify-write
- * sequences are serialized across processes.
+ * SQLite-backed store over any `SqliteConnectionLike`.
+ *
+ * - `open(dirOrFile)`: direct/headless mode. node:sqlite, WAL, busy_timeout,
+ *   brain-core's own migration runner. Several processes may share the file.
+ * - `fromConnection(connection)`: the app. Main opens the file through core's
+ *   `defineDurableSqliteStore` with `BRAIN_BUNDLED_MIGRATIONS`; core owns the
+ *   pragmas, migrations and backups, and this class only reads and writes.
+ *
+ * Every transaction is `BEGIN IMMEDIATE`, so read-modify-write sequences such
+ * as a claim are serialized even across processes.
  */
 export class SqliteBrainStore implements BrainStore {
-  readonly path: string;
-  private readonly db: DatabaseSync;
-  private readonly statements = new Map<string, StatementSync>();
+  readonly path: string | null;
+  private readonly connection: SqliteConnectionLike;
+  private readonly ownsConnection: boolean;
   private depth = 0;
+  private closed = false;
 
   static open(dirOrFile: string, options: SqliteBrainStoreOptions = {}): SqliteBrainStore {
     const file = resolveBrainDbPath(dirOrFile);
     mkdirSync(path.dirname(file), { recursive: true });
-    return new SqliteBrainStore(file, options);
+    const busyTimeoutMs = Math.trunc(options.busyTimeoutMs ?? 10_000);
+    const connection = openNodeSqliteConnection(file, { busyTimeoutMs });
+    try {
+      connection.exec('PRAGMA journal_mode = WAL');
+      connection.exec(`PRAGMA busy_timeout = ${busyTimeoutMs}`);
+      connection.exec('PRAGMA synchronous = NORMAL');
+      connection.exec('PRAGMA foreign_keys = ON');
+      migrate(connection);
+    } catch (error) {
+      connection.close();
+      throw error;
+    }
+    return new SqliteBrainStore(connection, { path: file, ownsConnection: true });
   }
 
-  private constructor(file: string, options: SqliteBrainStoreOptions) {
-    const busyTimeoutMs = options.busyTimeoutMs ?? 10_000;
-    this.path = file;
-    // Loaded on first open, not at import: importing brain-core stays cheap and
-    // side-effect free, and a host can filter node:sqlite's warning first.
-    const { DatabaseSync: Database } = requireBuiltin('node:sqlite') as { DatabaseSync: typeof DatabaseSync };
-    this.db = new Database(file, { timeout: busyTimeoutMs });
-    this.db.exec('PRAGMA journal_mode = WAL');
-    this.db.exec(`PRAGMA busy_timeout = ${Math.trunc(busyTimeoutMs)}`);
-    this.db.exec('PRAGMA synchronous = NORMAL');
-    this.db.exec('PRAGMA foreign_keys = ON');
-    migrate(this.db);
+  /**
+   * Wraps a connection that is already configured and migrated (by core's
+   * store primitive). The store never closes a connection it does not own.
+   */
+  static fromConnection(
+    connection: SqliteConnectionLike,
+    options: { path?: string; ownsConnection?: boolean } = {}
+  ): SqliteBrainStore {
+    return new SqliteBrainStore(connection, { path: options.path ?? null, ownsConnection: options.ownsConnection ?? false });
+  }
+
+  private constructor(connection: SqliteConnectionLike, options: { path: string | null; ownsConnection: boolean }) {
+    this.connection = connection;
+    this.path = options.path;
+    this.ownsConnection = options.ownsConnection;
   }
 
   transaction<T>(fn: () => T): T {
@@ -77,16 +85,16 @@ export class SqliteBrainStore implements BrainStore {
         this.depth--;
       }
     }
-    this.db.exec('BEGIN IMMEDIATE');
+    this.connection.exec('BEGIN IMMEDIATE');
     this.depth = 1;
     try {
       const result = fn();
       if (result instanceof Promise) throw new TypeError('transaction callbacks must be synchronous');
-      this.db.exec('COMMIT');
+      this.connection.exec('COMMIT');
       return result;
     } catch (error) {
       try {
-        this.db.exec('ROLLBACK');
+        this.connection.exec('ROLLBACK');
       } catch {}
       throw error;
     } finally {
@@ -100,56 +108,44 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   findJobByPlanNode(planId: string, planNodeId: string): Job | undefined {
-    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE plan_id = ? AND plan_node_id = ?`, [
-      planId,
-      planNodeId,
-    ]);
+    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE plan_id = ? AND plan_node_id = ?`, [planId, planNodeId]);
     return row && toJob(row);
   }
 
   listJobs(filter: JobFilter = {}): Job[] {
-    const where: string[] = [];
-    const params: SQLInputValue[] = [];
-    if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
-    if (filter.laneId !== undefined) add(where, params, 'lane_id = ?', filter.laneId);
-    if (filter.planId !== undefined) add(where, params, 'plan_id = ?', filter.planId);
+    const where = new Where();
+    where.eq('project_id', filter.projectId).eq('lane_id', filter.laneId).eq('plan_id', filter.planId);
     if (filter.states !== undefined) {
       if (filter.states.length === 0) return [];
-      where.push(`state IN (${filter.states.map(() => '?').join(', ')})`);
-      params.push(...filter.states);
+      where.add(`state IN (${filter.states.map(() => '?').join(', ')})`, ...filter.states);
     }
-    if (!filter.includeArchived) where.push('archived_at IS NULL');
-    return this.all(
-      `SELECT ${JOB_COLUMNS} FROM jobs ${clause(where)} ORDER BY created_at, rowid ${limit(filter.limit)}`,
-      params
-    ).map(toJob);
+    if (!filter.includeArchived) where.add('archived_at IS NULL');
+    return this.all(`SELECT ${JOB_COLUMNS} FROM jobs ${where.sql} ORDER BY created_at, rowid ${limit(filter.limit)}`, where.params).map(
+      toJob
+    );
   }
 
   insertJob(job: Job): void {
-    this.run(
-      `INSERT INTO jobs (${JOB_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      jobParams(job)
-    );
+    const placeholders = JOB_COLUMNS.split(', ')
+      .map(() => '?')
+      .join(', ');
+    this.run(`INSERT INTO jobs (${JOB_COLUMNS}) VALUES (${placeholders})`, jobParams(job));
   }
 
   updateJob(job: Job): void {
     const [id, ...rest] = jobParams(job);
     const sets = JOB_COLUMNS.split(', ')
       .slice(1)
-      .map((c) => `${c} = ?`)
+      .map((column) => `${column} = ?`)
       .join(', ');
     const result = this.run(`UPDATE jobs SET ${sets} WHERE id = ?`, [...rest, id!]);
     if (Number(result.changes) === 0) throw new NotFoundError('job', job.id);
   }
 
   listEdges(filter: JobEdgeFilter = {}): JobEdge[] {
-    const where: string[] = [];
-    const params: SQLInputValue[] = [];
-    if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
-    if (filter.from !== undefined) add(where, params, 'from_id = ?', filter.from);
-    if (filter.to !== undefined) add(where, params, 'to_id = ?', filter.to);
-    if (filter.planId !== undefined) add(where, params, 'plan_id = ?', filter.planId);
-    return this.all(`SELECT * FROM job_edges ${clause(where)} ORDER BY rowid`, params).map(toEdge);
+    const where = new Where();
+    where.eq('project_id', filter.projectId).eq('from_id', filter.from).eq('to_id', filter.to).eq('plan_id', filter.planId);
+    return this.all(`SELECT * FROM job_edges ${where.sql} ORDER BY rowid`, where.params).map(toEdge);
   }
 
   insertEdge(edge: JobEdge): void {
@@ -172,15 +168,13 @@ export class SqliteBrainStore implements BrainStore {
 
   listMessages(filter: MessageFilter): Message[] {
     const unread = filter.unreadOnly ? 'AND read_at IS NULL' : '';
-    return this.all(
-      `SELECT * FROM messages WHERE to_addr = ? ${unread} ORDER BY seq ${limit(filter.limit)}`,
-      [filter.to]
-    ).map(toMessage);
+    return this.all(`SELECT * FROM messages WHERE to_addr = ? ${unread} ORDER BY seq ${limit(filter.limit)}`, [filter.to]).map(
+      toMessage
+    );
   }
 
   markMessagesRead(ids: readonly string[], at: number): void {
-    const mark = this.statement('UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL');
-    for (const id of ids) mark.run(at, id);
+    for (const id of ids) this.run('UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL', [at, id]);
   }
 
   insertRun(r: Run): void {
@@ -204,45 +198,46 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   listRuns(filter: RunFilter = {}): Run[] {
-    const where: string[] = [];
-    const params: SQLInputValue[] = [];
-    if (filter.laneId !== undefined) add(where, params, 'lane_id = ?', filter.laneId);
-    if (filter.jobId !== undefined) add(where, params, 'job_id = ?', filter.jobId);
-    if (filter.since !== undefined) add(where, params, 'started_at >= ?', filter.since);
-    return this.all(
-      `SELECT * FROM runs ${clause(where)} ORDER BY started_at DESC, seq DESC ${limit(filter.limit)}`,
-      params
-    ).map(toRun);
+    const where = new Where();
+    where.eq('lane_id', filter.laneId).eq('job_id', filter.jobId);
+    if (filter.since !== undefined) where.add('started_at >= ?', filter.since);
+    return this.all(`SELECT * FROM runs ${where.sql} ORDER BY started_at DESC, seq DESC ${limit(filter.limit)}`, where.params).map(
+      toRun
+    );
   }
 
   insertNote(n: Note): void {
-    this.run(
-      'INSERT INTO notes (id, project_id, job_id, author, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [n.id, n.projectId, n.jobId, n.author, n.body, n.createdAt]
-    );
+    this.run('INSERT INTO notes (id, project_id, job_id, author, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', [
+      n.id,
+      n.projectId,
+      n.jobId,
+      n.author,
+      n.body,
+      n.createdAt,
+    ]);
   }
 
   listNotes(filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {
-    const where: string[] = [];
-    const params: SQLInputValue[] = [];
-    if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
-    if (filter.jobId !== undefined) add(where, params, 'job_id = ?', filter.jobId);
-    return this.all(`SELECT * FROM notes ${clause(where)} ORDER BY seq ${limit(filter.limit)}`, params).map(
-      toNote
-    );
+    const where = new Where();
+    where.eq('project_id', filter.projectId).eq('job_id', filter.jobId);
+    return this.all(`SELECT * FROM notes ${where.sql} ORDER BY seq ${limit(filter.limit)}`, where.params).map(toNote);
   }
 
   insertDone(d: DoneEntry): void {
-    this.run(
-      'INSERT INTO done_log (id, job_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [d.id, d.jobId, d.projectId, d.laneId, d.summary, JSON.stringify(d.artifacts), d.at]
-    );
+    this.run('INSERT INTO done_log (id, job_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+      d.id,
+      d.jobId,
+      d.projectId,
+      d.laneId,
+      d.summary,
+      JSON.stringify(d.artifacts),
+      d.at,
+    ]);
   }
 
   listDone(filter: { projectId?: ProjectId; limit?: number } = {}): DoneEntry[] {
-    const where = filter.projectId === undefined ? '' : 'WHERE project_id = ?';
-    const params = filter.projectId === undefined ? [] : [filter.projectId];
-    return this.all(`SELECT * FROM done_log ${where} ORDER BY seq ${limit(filter.limit)}`, params).map(toDone);
+    const where = new Where().eq('project_id', filter.projectId);
+    return this.all(`SELECT * FROM done_log ${where.sql} ORDER BY seq ${limit(filter.limit)}`, where.params).map(toDone);
   }
 
   upsertLane(l: Lane): void {
@@ -262,9 +257,8 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   listLanes(filter: { projectId?: ProjectId } = {}): Lane[] {
-    const where = filter.projectId === undefined ? '' : 'WHERE project_id = ?';
-    const params = filter.projectId === undefined ? [] : [filter.projectId];
-    return this.all(`SELECT * FROM lanes ${where} ORDER BY rowid`, params).map(toLane);
+    const where = new Where().eq('project_id', filter.projectId);
+    return this.all(`SELECT * FROM lanes ${where.sql} ORDER BY rowid`, where.params).map(toLane);
   }
 
   appendEvent(event: BrainEvent, at: number): number {
@@ -278,52 +272,50 @@ export class SqliteBrainStore implements BrainStore {
 
   readEvents(afterSeq: number, max = 500): StoredBrainEvent[] {
     return this.all('SELECT * FROM event_log WHERE seq > ? ORDER BY seq LIMIT ?', [afterSeq, max]).map(
-      (r) =>
-        ({
-          seq: Number(r.seq),
-          at: Number(r.at),
-          type: r.type,
-          payload: JSON.parse(r.payload as string),
-        }) as StoredBrainEvent
+      (r) => ({ seq: Number(r.seq), at: Number(r.at), type: r.type, payload: JSON.parse(r.payload as string) }) as StoredBrainEvent
     );
   }
 
   close(): void {
-    this.statements.clear();
-    if (this.db.isOpen) this.db.close();
+    if (this.closed) return;
+    this.closed = true;
+    if (this.ownsConnection) this.connection.close();
   }
 
-  private statement(sql: string): StatementSync {
-    let stmt = this.statements.get(sql);
-    if (!stmt) {
-      stmt = this.db.prepare(sql);
-      this.statements.set(sql, stmt);
-    }
-    return stmt;
+  private get(sql: string, params: Param[]): Row | undefined {
+    return this.connection.get<Row>(sql, params);
   }
 
-  private get(sql: string, params: SQLInputValue[]): Row | undefined {
-    return this.statement(sql).get(...params) as Row | undefined;
+  private all(sql: string, params: Param[]): Row[] {
+    return this.connection.all<Row>(sql, params);
   }
 
-  private all(sql: string, params: SQLInputValue[]): Row[] {
-    return this.statement(sql).all(...params) as Row[];
-  }
-
-  private run(sql: string, params: SQLInputValue[]) {
-    return this.statement(sql).run(...params);
+  private run(sql: string, params: Param[]) {
+    return this.connection.run(sql, params);
   }
 }
 
-function clause(where: string[]): string {
-  return where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
+/** Builds a WHERE clause from optional equality filters. */
+class Where {
+  private readonly clauses: string[] = [];
+  readonly params: Param[] = [];
+
+  eq(column: string, value: Param | undefined): this {
+    if (value !== undefined) this.add(`${column} = ?`, value);
+    return this;
+  }
+
+  add(clause: string, ...params: Param[]): this {
+    this.clauses.push(clause);
+    this.params.push(...params);
+    return this;
+  }
+
+  get sql(): string {
+    return this.clauses.length === 0 ? '' : `WHERE ${this.clauses.join(' AND ')}`;
+  }
 }
 
 function limit(n: number | undefined): string {
   return n === undefined ? '' : `LIMIT ${Math.max(0, Math.trunc(n))}`;
-}
-
-function add(where: string[], params: SQLInputValue[], condition: string, value: SQLInputValue): void {
-  where.push(condition);
-  params.push(value);
 }
