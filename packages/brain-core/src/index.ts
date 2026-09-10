@@ -35,6 +35,7 @@ export {
   type SqliteRunResultLike,
 } from './store/sqlite/connection';
 export { Brain, type BrainOptions } from './brain/brain';
+export type { GateFloorResolver } from './brain/context';
 export type { CreateJobInput } from './brain/jobs';
 export type { SendMessageInput } from './brain/mailbox';
 export type { CompileResult, PlanInput, PlanNode } from './brain/plan';

@@ -22,7 +22,7 @@ import type {
 } from '../types';
 import { LANE_STATUSES, PROVIDERS } from '../types';
 import { loadVisibleJob, requireBrain, scopeProject } from './authz';
-import { type BrainContext, mutate } from './context';
+import { type BrainContext, type GateFloorResolver, mutate } from './context';
 import { addNote, broadcast, readInbox, sendMessage, type SendMessageInput } from './mailbox';
 import { type CompileResult, type PlanInput, compilePlan } from './plan';
 import * as jobs from './jobs';
@@ -33,6 +33,8 @@ export interface BrainOptions {
   newId?: () => string;
   /** Called when an event listener throws. Defaults to ignoring it. */
   onListenerError?: (error: unknown) => void;
+  /** SEC-08: minimum gates per project and job kind, from the app's rigor settings. Defaults to none. */
+  resolveGateFloor?: GateFloorResolver;
 }
 
 /**
@@ -52,6 +54,7 @@ export class Brain {
       emitter: this.events,
       now: options.now ?? Date.now,
       newId: options.newId ?? randomUUID,
+      resolveGateFloor: options.resolveGateFloor ?? (() => []),
     };
   }
 

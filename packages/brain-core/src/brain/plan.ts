@@ -5,7 +5,7 @@ import { LIMITS } from '../limits';
 import type { GateSpec, Identity, ProjectId, Job, JobHints, JobId } from '../types';
 import { addressOf } from '../types';
 import { requireBrain } from './authz';
-import { type BrainContext, type Tx, checkText, checkTitle, touch } from './context';
+import { type BrainContext, type Tx, checkText, checkTitle, touch, withGateFloor } from './context';
 import { settle } from './jobs';
 
 export interface PlanNode {
@@ -74,7 +74,7 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
     const content = {
       title: node.title,
       body: node.body ?? '',
-      gateSpec: node.gateSpec ?? null,
+      gateSpec: withGateFloor(ctx, input.projectId, node.hints?.kind ?? 'work', node.gateSpec ?? null),
       hints: node.hints ?? {},
     };
     if (!existing) {

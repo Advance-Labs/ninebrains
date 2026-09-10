@@ -3,13 +3,15 @@ import type { BrainEmitter, BrainEvent } from '../events';
 import { LIMITS, utf8Bytes } from '../limits';
 import { assertTransition } from '../state-machine';
 import type { BrainStore } from '../store/store';
-import type { Job, JobState } from '../types';
+import type { GateSpec, Job, JobKind, JobState, ProjectId } from '../types';
 
 export interface BrainContext {
   store: BrainStore;
   emitter: BrainEmitter;
   now: () => number;
   newId: () => string;
+  /** SEC-08: the app's minimum gates for a project and job kind. Callers can only add to it. */
+  resolveGateFloor: GateFloorResolver;
 }
 
 /** Events raised inside one transaction; persisted with it, emitted after commit. */
@@ -71,4 +73,23 @@ export function checkText(label: string, value: string, maxBytes: number, requir
 export function checkTitle(title: string): void {
   if (title.trim().length === 0) throw new InvalidInputError('title must not be empty');
   if (title.length > LIMITS.titleChars) throw new InvalidInputError(`title exceeds ${LIMITS.titleChars} characters`);
+}
+
+/** Returns the gates a job must pass at minimum (from the project's rigor settings). */
+export type GateFloorResolver = (projectId: ProjectId, kind: JobKind) => readonly string[];
+
+/**
+ * SEC-08: effective gates = union(floor, requested), floor first. A caller can
+ * add gates but never remove or replace the floor, so `gates: []` still gets
+ * it. Only a project whose floor is empty (rigor 0) can have no gates at all.
+ */
+export function withGateFloor(
+  ctx: BrainContext,
+  projectId: ProjectId,
+  kind: JobKind,
+  requested: GateSpec | null
+): GateSpec | null {
+  const gates = [...new Set([...ctx.resolveGateFloor(projectId, kind), ...(requested?.gates ?? [])])];
+  if (gates.length === 0 && requested === null) return null;
+  return { ...requested, gates };
 }

@@ -6,7 +6,7 @@ import { MAX_ATTEMPTS } from '../state-machine';
 import type { JobEdge, GateSpec, Identity, LaneId, ProjectId, Job, JobHints, JobId } from '../types';
 import { addressOf, laneAddress } from '../types';
 import { loadLiveJob, requireBrain, requireHolder, requireLane } from './authz';
-import { type BrainContext, type Tx, checkText, checkTitle, transition } from './context';
+import { type BrainContext, type Tx, checkText, checkTitle, transition, withGateFloor } from './context';
 
 export interface CreateJobInput {
   projectId: ProjectId;
@@ -47,7 +47,7 @@ export function createJob(ctx: BrainContext, tx: Tx, identity: Identity, input: 
     state: 'proposed',
     laneId: null,
     attempts: 0,
-    gateSpec: input.gateSpec ?? null,
+    gateSpec: withGateFloor(ctx, input.projectId, input.hints?.kind ?? 'work', input.gateSpec ?? null),
     hints: input.hints ?? {},
     result: null,
     reason: null,
