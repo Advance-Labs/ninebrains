@@ -1,82 +1,65 @@
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from './config';
 import { brainMcpServerEntry } from './launch';
 
-const direct = { NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: '/data/ninebrains' };
+const TOKEN = 'a'.repeat(43);
+const base = { NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100', NINEBRAINS_TOKEN: TOKEN };
 
-describe('loadConfig: forward mode (default)', () => {
-  it('needs only the URL and token; identity is decided by the app', () => {
-    expect(
-      loadConfig({ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100', NINEBRAINS_TOKEN: 'tok', NINEBRAINS_LANE_ID: 'A' })
-    ).toEqual({ mode: 'forward', role: 'lane', url: 'http://127.0.0.1:4100', token: 'tok' });
-    expect(
-      loadConfig({ NINEBRAINS_ROLE: 'brain', NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: 't' }).role
-    ).toBe('brain');
+describe('loadConfig', () => {
+  it('reads only the URL, the token and an optional lane hint', () => {
+    expect(loadConfig(base)).toEqual({ url: 'http://127.0.0.1:4100', token: TOKEN, laneHint: null });
+    expect(loadConfig({ ...base, NINEBRAINS_LANE_ID: 'lane-1' }).laneHint).toBe('lane-1');
+  });
+
+  it('SEC-01/SEC-02: role, mode and DB settings in env have no effect', () => {
+    const config = loadConfig({
+      ...base,
+      NINEBRAINS_ROLE: 'brain',
+      NINEBRAINS_MODE: 'direct',
+      NINEBRAINS_BRAIN_DB: '/tmp/brain.sqlite',
+      NINEBRAINS_PROJECT_ID: 'p1',
+    });
+    expect(config).toEqual({ url: 'http://127.0.0.1:4100', token: TOKEN, laneHint: null });
+  });
+
+  it('direct mode is not reachable through env: a DB path without a URL is still an error', () => {
+    expect(() => loadConfig({ NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: '/tmp/brain.sqlite' })).toThrow(
+      /NINEBRAINS_BRAIN_URL is required/
+    );
   });
 
   it.each([
-    [{}, /NINEBRAINS_BRAIN_URL is required.*NINEBRAINS_MODE=direct/],
-    [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1' }, /NINEBRAINS_TOKEN is required/],
-    [{ NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: 't' }, /127\.0\.0\.1/],
-    [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: 't', NINEBRAINS_MODE: 'turbo' }, /"forward" or "direct"/],
-    [{ NINEBRAINS_ROLE: 'admin' }, /"lane" or "brain"/],
+    [{}, /NINEBRAINS_BRAIN_URL is required/],
+    [{ NINEBRAINS_BRAIN_URL: 'http://localhost:4100', NINEBRAINS_TOKEN: TOKEN }, /127\.0\.0\.1/],
+    [{ NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: TOKEN }, /127\.0\.0\.1/],
+    [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100' }, /NINEBRAINS_TOKEN is missing or malformed/],
+    [{ ...base, NINEBRAINS_TOKEN: 'short' }, /NINEBRAINS_TOKEN is missing or malformed/],
+    [{ ...base, NINEBRAINS_LANE_ID: 'a:b' }, /NINEBRAINS_LANE_ID must be/],
+    [{ ...base, NINEBRAINS_LANE_ID: '..' }, /NINEBRAINS_LANE_ID must be/],
   ])('rejects bad env %#', (env, message) => {
     expect(() => loadConfig(env as NodeJS.ProcessEnv)).toThrow(ConfigError);
     expect(() => loadConfig(env as NodeJS.ProcessEnv)).toThrow(message);
   });
-});
 
-describe('loadConfig: direct mode (flagged)', () => {
-  it('builds a lane grant from env and resolves the db directory', () => {
-    expect(
-      loadConfig({
-        ...direct,
-        NINEBRAINS_LANE_ID: 'lane-1',
-        NINEBRAINS_PROJECT_ID: 'proj',
-        NINEBRAINS_PROJECT_DIR: '/work/proj',
-        NINEBRAINS_EVIDENCE_DIR: '/data/evidence',
-      })
-    ).toEqual({
-      mode: 'direct',
-      role: 'lane',
-      dbPath: path.join('/data/ninebrains', 'brain.sqlite'),
-      grant: {
-        identity: { role: 'lane', laneId: 'lane-1', projectId: 'proj' },
-        projectId: 'proj',
-        attachmentRoots: ['/work/proj', '/data/evidence'],
-      },
-    });
-  });
-
-  it('defaults the brain id to main and keeps an explicit db file', () => {
-    const config = loadConfig({ NINEBRAINS_MODE: 'direct', NINEBRAINS_ROLE: 'brain', NINEBRAINS_BRAIN_DB: '/x/custom.db' });
-    expect(config).toMatchObject({ dbPath: '/x/custom.db', grant: { identity: { role: 'brain', brainId: 'main' } } });
-  });
-
-  it.each([
-    [{ NINEBRAINS_MODE: 'direct' }, /NINEBRAINS_BRAIN_DB is required/],
-    [{ NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: 'rel/db' }, /absolute/],
-    [{ ...direct, NINEBRAINS_PROJECT_ID: 'p' }, /NINEBRAINS_LANE_ID is required/],
-    [{ ...direct, NINEBRAINS_LANE_ID: 'a' }, /NINEBRAINS_PROJECT_ID is required/],
-    [{ ...direct, NINEBRAINS_LANE_ID: 'a b', NINEBRAINS_PROJECT_ID: 'p' }, /must match/],
-    [{ ...direct, NINEBRAINS_ROLE: 'brain', NINEBRAINS_PROJECT_DIR: 'rel' }, /absolute/],
-  ])('rejects bad env %#', (env, message) => {
-    expect(() => loadConfig(env as NodeJS.ProcessEnv)).toThrow(message);
+  it('never echoes a malformed token', () => {
+    const secretish = 'my-secret-token-with-a-typo!';
+    try {
+      loadConfig({ ...base, NINEBRAINS_TOKEN: secretish });
+    } catch (error) {
+      expect((error as Error).message).not.toContain(secretish);
+    }
   });
 });
 
 describe('brainMcpServerEntry', () => {
-  it('forward mode: Electron as Node, URL + token in env', () => {
+  it('runs the bin through Electron as Node, with only URL, token and hint in env', () => {
     expect(
       brainMcpServerEntry({
-        mode: 'forward',
         binPath: '/app/brain-mcp/bin.mjs',
         runtime: { kind: 'electron', execPath: '/Applications/Ninebrains.app/Contents/MacOS/Ninebrains' },
-        role: 'lane',
         url: 'http://127.0.0.1:4100',
-        token: 'secret-token',
-        laneId: 'lane-1',
+        token: TOKEN,
+        laneHint: 'lane-1',
       })
     ).toEqual({
       type: 'stdio',
@@ -84,29 +67,20 @@ describe('brainMcpServerEntry', () => {
       args: ['/app/brain-mcp/bin.mjs'],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
-        NINEBRAINS_MODE: 'forward',
-        NINEBRAINS_ROLE: 'lane',
         NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100',
-        NINEBRAINS_TOKEN: 'secret-token',
+        NINEBRAINS_TOKEN: TOKEN,
         NINEBRAINS_LANE_ID: 'lane-1',
       },
     });
   });
 
-  it('direct mode on plain node: no ELECTRON_RUN_AS_NODE, identity env', () => {
+  it('omits ELECTRON_RUN_AS_NODE and the hint when not needed', () => {
     const entry = brainMcpServerEntry({
-      mode: 'direct',
       binPath: '/b.mjs',
       runtime: { kind: 'node', execPath: '/usr/bin/node' },
-      role: 'brain',
-      dbPath: '/d',
-      brainId: 'b1',
+      url: 'http://127.0.0.1:1',
+      token: TOKEN,
     });
-    expect(entry.env).toEqual({
-      NINEBRAINS_MODE: 'direct',
-      NINEBRAINS_ROLE: 'brain',
-      NINEBRAINS_BRAIN_DB: '/d',
-      NINEBRAINS_BRAIN_ID: 'b1',
-    });
+    expect(entry.env).toEqual({ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: TOKEN });
   });
 });

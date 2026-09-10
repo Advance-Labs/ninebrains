@@ -1,26 +1,34 @@
 #!/usr/bin/env node
-// Keep first: in direct mode it must run before anything loads node:sqlite.
-import './quiet-warnings';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { openBackend } from './backend';
+import { forwardBackend } from './backend';
 import { ConfigError, loadConfig } from './config';
 import { createBrainMcpServer } from './server';
+import { SessionError, discoverSession } from './session';
+
+function fail(code: number, message: string): never {
+  process.stderr.write(`ninebrains-brain-mcp: ${message}\n`);
+  process.exit(code);
+}
 
 async function main(): Promise<void> {
   let config;
   try {
     config = loadConfig();
   } catch (error) {
-    if (error instanceof ConfigError) {
-      process.stderr.write(`ninebrains-brain-mcp: ${error.message}\n`);
-      process.exit(2);
-    }
+    if (error instanceof ConfigError) fail(2, error.message);
     throw error;
   }
 
-  const backend = openBackend(config);
-  const server = createBrainMcpServer({ backend, role: config.role });
+  const backend = forwardBackend(config);
+  let session;
+  try {
+    session = await discoverSession(backend);
+  } catch (error) {
+    if (error instanceof SessionError) fail(1, error.message);
+    throw error;
+  }
 
+  const server = createBrainMcpServer({ backend, role: session.role });
   let closing = false;
   const shutdown = () => {
     if (closing) return;
@@ -38,6 +46,5 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`ninebrains-brain-mcp: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
-  process.exit(1);
+  fail(1, error instanceof Error ? error.message : String(error));
 });

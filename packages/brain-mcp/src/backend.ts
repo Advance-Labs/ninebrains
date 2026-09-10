@@ -1,38 +1,27 @@
-import {
-  Brain,
-  type BrainGrant,
-  type BrainRequest,
-  type BrainResponse,
-  SqliteBrainStore,
-  createHttpBrainClient,
-  executeBrainRequest,
-} from '@ninebrains/brain-core';
-import type { BrainMcpConfig } from './config';
+import { type BrainRequest, type BrainResponse, createHttpBrainClient } from '@ninebrains/brain-core';
 
-/** Where tool calls go. Both implementations speak the same brain-core contract. */
+/** Where tool calls go. */
 export interface BrainBackend {
   call(request: BrainRequest): Promise<BrainResponse>;
   close(): void;
 }
 
-/** Forward mode: POST to the app's main process over localhost with the lane's token. */
-export function forwardBackend(url: string, token: string): BrainBackend {
-  const client = createHttpBrainClient({ url, token });
+/**
+ * The only backend the shim ships with (SEC-01): every call is POSTed to
+ * main over 127.0.0.1 with this session's token. Main is the only process
+ * that opens the Brain DB, and it decides identity from the token.
+ */
+export function forwardBackend(options: {
+  url: string;
+  token: string;
+  laneHint?: string | null;
+  timeoutMs?: number;
+}): BrainBackend {
+  const client = createHttpBrainClient({
+    url: options.url,
+    token: options.token,
+    laneHint: options.laneHint ?? undefined,
+    timeoutMs: options.timeoutMs,
+  });
   return { call: (request) => client.call(request), close: () => {} };
-}
-
-/** Direct mode: run the request in-process against a Brain this process owns (or shares, in tests). */
-export function directBackend(brain: Brain, grant: BrainGrant, options: { ownsBrain?: boolean } = {}): BrainBackend {
-  return {
-    call: async (request) => executeBrainRequest(brain, grant, request),
-    close: () => {
-      if (options.ownsBrain) brain.close();
-    },
-  };
-}
-
-export function openBackend(config: BrainMcpConfig): BrainBackend {
-  if (config.mode === 'forward') return forwardBackend(config.url, config.token);
-  const brain = new Brain({ store: SqliteBrainStore.open(config.dbPath) });
-  return directBackend(brain, config.grant, { ownsBrain: true });
 }

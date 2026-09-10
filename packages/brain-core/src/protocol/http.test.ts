@@ -256,15 +256,20 @@ describe('reference server and client', () => {
   });
 
   it('SEC-06 endpoint limits: 100 rapid calls from one token hit 429', async () => {
-    server = await startBrainHttpServer({ brain: makeBrain(new InMemoryBrainStore()) });
+    // A frozen clock makes the budget exact: the burst of 60, then no refill.
+    // Refill at 20 req/s is covered with a fake clock in tokens.test.ts.
+    server = await startBrainHttpServer({
+      brain: makeBrain(new InMemoryBrainStore()),
+      limiter: createTokenBucketLimiter({ now: () => 0 }),
+    });
     const client = createHttpBrainClient({ url: server.url, token: server.issueToken(laneA) });
     const codes: string[] = [];
     for (let i = 0; i < 100; i++) {
       const response = await client.call({ v: 1, op: 'whoami', args: {} });
       codes.push(response.ok ? 'ok' : response.error.code);
     }
-    expect(codes.slice(0, 60).every((c) => c === 'ok')).toBe(true);
-    expect(codes.filter((c) => c === 'RATE_LIMITED').length).toBeGreaterThanOrEqual(30);
+    expect(codes.slice(0, 60)).toEqual(Array(60).fill('ok'));
+    expect(codes.slice(60)).toEqual(Array(40).fill('RATE_LIMITED'));
   });
 
   it('SEC-06 endpoint limits: a slow-loris client is cut at the header timeout', async () => {

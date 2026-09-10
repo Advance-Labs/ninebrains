@@ -1,6 +1,6 @@
-import { ENV, type Role } from './config';
+import { ENV } from './config';
 
-interface CommonLaunch {
+export interface LaunchOptions {
   /** Absolute path to the built `bin.mjs`. */
   binPath: string;
   /**
@@ -8,30 +8,13 @@ interface CommonLaunch {
    * (`process.execPath` in main): users then need no global Node.
    */
   runtime: { kind: 'electron'; execPath: string } | { kind: 'node'; execPath: string };
-  role: Role;
+  /** Main's Brain endpoint, `http://127.0.0.1:<port>`. */
+  url: string;
+  /** The token main minted for this launch. It is the identity and the role. */
+  token: string;
+  /** Optional cross-check; main rejects every call if it does not match the token. */
+  laneHint?: string;
 }
-
-export type LaunchOptions = CommonLaunch &
-  (
-    | {
-        mode: 'forward';
-        /** Main's Brain endpoint base URL (loopback only). */
-        url: string;
-        /** The per-lane token main minted for this lane. It is the identity. */
-        token: string;
-        /** Informational only in forward mode; main trusts the token, not this. */
-        laneId?: string;
-      }
-    | {
-        mode: 'direct';
-        dbPath: string;
-        projectId?: string;
-        laneId?: string;
-        brainId?: string;
-        projectDir?: string;
-        evidenceDir?: string;
-      }
-  );
 
 export interface StdioServerEntry {
   type: 'stdio';
@@ -41,26 +24,14 @@ export interface StdioServerEntry {
 }
 
 /**
- * The `mcpServers.<name>` entry for a lane's MCP config file. The identity
- * travels only in env inside the entry; the agent never chooses it.
+ * The `mcpServers.brain` entry for a session's MCP config file. The same
+ * entry serves lanes and Brain sessions: only the token differs. Write the
+ * file under the app's userData with 0600 permissions (SEC-10), never into
+ * the worktree.
  */
 export function brainMcpServerEntry(options: LaunchOptions): StdioServerEntry {
-  const env: Record<string, string> = { [ENV.mode]: options.mode, [ENV.role]: options.role };
+  const env: Record<string, string> = { [ENV.url]: options.url, [ENV.token]: options.token };
   if (options.runtime.kind === 'electron') env.ELECTRON_RUN_AS_NODE = '1';
-  const set = (key: string, value: string | undefined) => {
-    if (value) env[key] = value;
-  };
-  if (options.mode === 'forward') {
-    set(ENV.url, options.url);
-    set(ENV.token, options.token);
-    set(ENV.laneId, options.laneId);
-  } else {
-    set(ENV.db, options.dbPath);
-    set(ENV.projectId, options.projectId);
-    set(ENV.laneId, options.laneId);
-    set(ENV.brainId, options.brainId);
-    set(ENV.projectDir, options.projectDir);
-    set(ENV.evidenceDir, options.evidenceDir);
-  }
+  if (options.laneHint) env[ENV.laneHint] = options.laneHint;
   return { type: 'stdio', command: options.runtime.execPath, args: [options.binPath], env };
 }

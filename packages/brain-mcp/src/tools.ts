@@ -12,7 +12,9 @@ import {
 } from '@ninebrains/brain-core';
 import type { z } from 'zod';
 import type { BrainBackend } from './backend';
-import type { Role } from './config';
+
+/** Decided by main from the token (whoami), never by env. */
+export type Role = 'lane' | 'brain';
 
 export const LANE_TOOLS = LANE_OPS;
 export const BRAIN_TOOLS = BRAIN_OPS;
@@ -28,7 +30,7 @@ const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> =
   block_job: () =>
     'Stop work on a job you hold because you cannot proceed (missing access, unclear requirement, broken dependency). The Brain is notified and can requeue it. Say exactly what would unblock you.',
   send_message: () =>
-    'Send a message to another lane (lane:<id>) or to a Brain session (brain:<id>). It is stored until the recipient reads it, even if that lane is asleep. Attach files as {"kind":"file","path":...} or screenshots as {"kind":"screenshot","ref":...}; paths must be inside the project or evidence directory.',
+    'Send a message to another lane ({"kind":"lane","id":"<laneId>"}) or to a Brain session ({"kind":"brain","id":"<brainId>"}). It is stored until the recipient reads it, even if that lane is asleep. Attach files as {"kind":"file","path":...} or screenshots as {"kind":"screenshot","ref":...}; paths must be inside the project or evidence directory.',
   read_inbox: (role) =>
     role === 'brain'
       ? 'Read unread messages in your Brain inbox (or, with address, any lane or brain inbox), oldest first, and mark them read. Lanes report progress and problems here.'

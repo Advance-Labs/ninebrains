@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BrainBackend } from './backend';
-import type { Role } from './config';
+import type { Role } from './tools';
 import { registerTools } from './tools';
 
 export const SERVER_NAME = 'ninebrains-brain';
