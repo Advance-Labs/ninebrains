@@ -16,7 +16,8 @@ export type WorkspaceServerLayout = {
 
 export function workspaceServerLayout(home: string): WorkspaceServerLayout {
   validateRemoteHome(home);
-  const root = path.posix.join(home, '.emdash/workspace-server');
+  // Ninebrains: a separate root, so a remote host that also runs Emdash keeps its own server.
+  const root = path.posix.join(home, '.ninebrains/workspace-server');
   const versionsDirectory = path.posix.join(root, 'versions');
   const currentLink = path.posix.join(root, 'current');
 

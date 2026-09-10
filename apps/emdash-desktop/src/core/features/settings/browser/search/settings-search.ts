@@ -1,5 +1,10 @@
 import type { SettingsPageTab } from '@core/features/settings/contributions/views';
 import { settingsPageContributions } from '@core/manifests/browser/settings-page-contributions';
+import {
+  HOSTED_ACCOUNT_ENABLED,
+  TELEMETRY_SETTINGS_ENABLED,
+  UPDATES_ENABLED,
+} from '@core/primitives/app-identity/api/fork-flags';
 import { detectPlatformContext } from '@core/primitives/keybindings/api';
 
 export type SettingsSearchEntry = {
@@ -23,10 +28,20 @@ export function slugifySettingLabel(label: string): string {
 
 const trayIconLabel =
   detectPlatformContext().os === 'mac'
-    ? 'Show Emdash in the menu bar'
-    : 'Show Emdash in the system tray';
+    ? 'Show Ninebrains in the menu bar'
+    : 'Show Ninebrains in the system tray';
 
-export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
+// Ninebrains: settings hidden by fork-flags drop out of search with them.
+function withoutForkHiddenEntries(entries: SettingsSearchEntry[]): SettingsSearchEntry[] {
+  const hidden = new Set([
+    ...(UPDATES_ENABLED ? [] : ['version']),
+    ...(TELEMETRY_SETTINGS_ENABLED ? [] : ['privacy-telemetry']),
+    ...(HOSTED_ACCOUNT_ENABLED ? [] : ['emdash-account']),
+  ]);
+  return entries.filter((entry) => !hidden.has(entry.id));
+}
+
+export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEntries([
   // General
   {
     id: 'version',
@@ -39,7 +54,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     id: 'privacy-telemetry',
     label: 'Privacy & Telemetry',
     tab: 'general',
-    description: 'Help improve Emdash by sending anonymous usage data.',
+    description: 'Help improve Ninebrains by sending anonymous usage data.',
     keywords: ['analytics', 'posthog', 'usage data', 'tracking'],
   },
   {
@@ -236,14 +251,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     id: slugifySettingLabel(trayIconLabel),
     label: trayIconLabel,
     tab: 'interface',
-    description: 'Keep quick access to Emdash while agents run in the background.',
+    description: 'Keep quick access to Ninebrains while agents run in the background.',
     keywords: ['menu bar', 'system tray', 'task bar', 'icon', 'hide', 'disable'],
   },
   {
     id: 'color-mode',
     label: 'Color mode',
     tab: 'interface',
-    description: 'Choose how Emdash looks.',
+    description: 'Choose how Ninebrains looks.',
     keywords: ['theme', 'dark mode', 'light mode', 'appearance', 'system'],
   },
   {
@@ -341,7 +356,8 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     id: 'disable-cors-for-localhost',
     label: 'Disable CORS for localhost',
     tab: 'browser',
-    description: 'Allow localhost pages in Emdash browser tabs to call APIs without CORS headers.',
+    description:
+      'Allow localhost pages in Ninebrains browser tabs to call APIs without CORS headers.',
     keywords: ['cross-origin'],
   },
   {
@@ -358,7 +374,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description: 'Clear cookies, cached files, and site data from the in-app browser.',
     keywords: ['cookies', 'cache', 'clear', 'site data'],
   },
-];
+]);
 
 function normalizeQuery(query: string): string[] {
   return query.toLowerCase().split(/\s+/).filter(Boolean);

@@ -8,13 +8,13 @@ export function TrayIconSettingsRow() {
   const { value, update, isLoading, isSaving, isFieldOverridden, resetField } =
     useAppSettingsKey('interface');
   const location = detectPlatformContext().os === 'mac' ? 'menu bar' : 'system tray';
-  const title = `Show Emdash in the ${location}`;
+  const title = `Show Ninebrains in the ${location}`;
   const disabled = isLoading || isSaving;
 
   return (
     <SettingRow
       title={title}
-      description={`Quick access to Emdash from the ${location}.`}
+      description={`Quick access to Ninebrains from the ${location}.`}
       control={
         <>
           <ResetToDefaultButton

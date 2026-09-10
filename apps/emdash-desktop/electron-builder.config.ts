@@ -2,28 +2,24 @@ import type { Configuration } from 'electron-builder';
 import {
   APP_ID,
   ARTIFACT_PREFIX,
+  COPYRIGHT,
   PRODUCT_NAME,
-  R2_BASE_URL,
-  UPDATE_CHANNEL,
 } from './src/core/primitives/app-identity/api/app-identity.ts';
 
 const config: Configuration = {
   appId: APP_ID,
   productName: PRODUCT_NAME,
   executableName: PRODUCT_NAME,
+  copyright: COPYRIGHT,
   directories: { output: 'release' },
   artifactName: `${ARTIFACT_PREFIX}-\${arch}.\${ext}`,
+  // Ninebrains: GitHub Releases only. Emdash's R2 generic feed is removed.
   publish: [
     {
       provider: 'github',
-      owner: 'generalaction',
-      repo: 'emdash',
+      owner: 'Advance-Labs',
+      repo: 'ninebrains',
       releaseType: 'draft',
-    },
-    {
-      provider: 'generic',
-      url: R2_BASE_URL,
-      channel: UPDATE_CHANNEL,
     },
   ],
   generateUpdatesFilesForAllChannels: false,
@@ -42,9 +38,9 @@ const config: Configuration = {
     entitlementsInherit: 'build/entitlements.mac.plist',
     extendInfo: {
       NSMicrophoneUsageDescription:
-        'Emdash needs microphone access for voice dictation and voice mode features.',
+        'Ninebrains needs microphone access for voice dictation and voice mode features.',
       NSLocalNetworkUsageDescription:
-        'Emdash needs local network access to connect to SSH hosts on your network.',
+        'Ninebrains needs local network access to connect to SSH hosts on your network.',
     },
     target: [
       { target: 'dmg', arch: ['arm64'] },
@@ -77,12 +73,8 @@ const config: Configuration = {
       { target: 'nsis', arch: ['x64'] },
       { target: 'msi', arch: ['x64'] },
     ],
-    azureSignOptions: {
-      publisherName: 'General Action, Inc.',
-      endpoint: 'https://eus.codesigning.azure.net/',
-      certificateProfileName: 'emdash-public',
-      codeSigningAccountName: 'emdash',
-    },
+    // Ninebrains: Emdash's Azure Trusted Signing profile is removed. Builds ship unsigned until
+    // plan task 7.1 wires up our own signing.
   },
   msi: {
     oneClick: false,

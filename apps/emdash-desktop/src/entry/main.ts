@@ -25,7 +25,7 @@ async function start(): Promise<void> {
       await app.whenReady();
       dialog.showErrorBox(
         'Something went wrong',
-        `Emdash could not start recovery mode.\n\n${
+        `Ninebrains could not start recovery mode.\n\n${
           recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
         }`
       );

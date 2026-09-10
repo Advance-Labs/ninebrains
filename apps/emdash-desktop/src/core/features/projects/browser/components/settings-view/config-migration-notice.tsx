@@ -20,7 +20,7 @@ export function ConfigMigrationNotice({
         disabled={disabled}
         className="text-foreground hover:underline"
       >
-        Import into Emdash
+        Import into Ninebrains
       </button>
     </p>
   );

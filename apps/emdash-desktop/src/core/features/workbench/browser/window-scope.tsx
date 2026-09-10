@@ -14,6 +14,7 @@ import { useWorkspaceLayoutContext } from '@core/features/workbench/contribution
 import { openModal } from '@core/manifests/browser/modal-api';
 import { projectAvailabilityUi } from '@core/manifests/browser/project-availability-ui';
 import { windowScope } from '@core/manifests/browser/scope-catalog';
+import { openExternal } from '@core/primitives/desktop-host/browser/host-client';
 import { confirmRegistry } from '@core/primitives/keybindings/browser';
 import {
   useViewParams,
@@ -25,6 +26,7 @@ import {
 } from '@core/primitives/navigation/browser/navigation-selectors';
 import { toggleSettingsView } from '@core/primitives/navigation/browser/settings-toggle';
 import { openInCommandRegistry } from '@core/primitives/open-in-apps/browser/open-in-command-registry';
+import { EMDASH_ISSUES_NEW_URL } from '@core/primitives/urls/api/urls';
 import { disabled, enabled, hidden, type ViewScopeImpl } from '@core/primitives/view-scopes/api';
 import { scopes } from '@core/primitives/view-scopes/browser';
 import { useViewScope, ViewScopeInstanceProvider } from '@core/primitives/view-scopes/react';
@@ -69,9 +71,10 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
         }
       },
     }),
+    // Ninebrains: feedback opens a GitHub issue; Emdash's feedback relay is cut.
     'app.giveFeedback': () => ({
       execute: () => {
-        void openModal('feedbackModal', {});
+        void openExternal(EMDASH_ISSUES_NEW_URL);
       },
     }),
     'app.toggleTheme': () => ({

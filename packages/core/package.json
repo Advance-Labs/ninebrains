@@ -70,6 +70,11 @@
       "types": "./dist/primitives-exec-api.d.mts",
       "default": "./dist/primitives-exec-api.mjs"
     },
+    "./primitives/agent-env/api": {
+      "development": "./src/primitives/agent-env/api/index.ts",
+      "types": "./dist/primitives-agent-env-api.d.mts",
+      "default": "./dist/primitives-agent-env-api.mjs"
+    },
     "./primitives/host-dependencies/api": {
       "development": "./src/primitives/host-dependencies/api/index.ts",
       "types": "./dist/primitives-host-dependencies-api.d.mts",

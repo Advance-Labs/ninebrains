@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-default_base_url=https://releases.emdash.sh/workspace-server
+# Ninebrains: Emdash's R2 bucket is not used; no workspace-server release is published yet.
+default_base_url=https://github.com/Advance-Labs/ninebrains/releases/download/workspace-server
 base_url=$default_base_url
 version=
 sha256=

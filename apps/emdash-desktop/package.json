@@ -1,7 +1,7 @@
 {
   "name": "@emdash/emdash-desktop",
   "version": "1.2.4",
-  "description": "A cross-platform Electron app that orchestrates multiple coding agents in parallel",
+  "description": "Ninebrains: a desktop workbench for parallel coding agents (a fork of Emdash)",
   "keywords": [
     "claude",
     "coding-agents",
@@ -9,11 +9,11 @@
     "git",
     "openai"
   ],
-  "homepage": "https://emdash.sh",
+  "homepage": "https://github.com/Advance-Labs/ninebrains",
   "license": "Apache-2.0",
   "author": {
-    "name": "Emdash Contributors",
-    "email": "support@emdash.sh"
+    "name": "Advance Labs Inc.",
+    "email": "lucas@advancelabs.dev"
   },
   "type": "module",
   "main": "./out/main/index.js",

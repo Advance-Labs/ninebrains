@@ -10,6 +10,7 @@ import { confirmOpenExternalLink } from '@core/features/workbench/api/browser/op
 import { Onboarding } from '@core/features/workbench/browser/onboarding/onboarding';
 import { FramelessTitlebarOverlay } from '@core/features/workbench/browser/window-controls';
 import { WorkspaceLayoutContextProvider } from '@core/features/workbench/contributions/browser/layout-provider';
+import { HOSTED_ACCOUNT_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import { ExternalLinkProvider } from '@core/primitives/external-links/browser';
 import { queryClient } from '@core/primitives/query/browser/query-client';
 import { HostRecoveryWakeups } from '@core/services/hosts/browser/recovery-wakeups';
@@ -53,7 +54,7 @@ function AppContent() {
   useEffect(() => {
     if (!isLoading && view === 'onboarding' && frozenSteps === null) {
       const computed: OnboardingStep[] = [];
-      if (!session?.isSignedIn) computed.push('sign-in');
+      if (HOSTED_ACCOUNT_ENABLED && !session?.isSignedIn) computed.push('sign-in');
       const needsImport = legacyStatus?.hasImportSources && !legacyStatus.portStatus;
       if (needsImport) computed.push('import');
       setFrozenSteps(computed);

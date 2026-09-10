@@ -123,7 +123,8 @@ describe('SETTINGS_SEARCH_INDEX integrity', () => {
   });
 
   it('routes well-known queries to the expected tabs', () => {
-    expect(matchedTabsForQuery('telemetry')).toEqual(['general']);
+    // Ninebrains hides the telemetry card (fork-flags), so its search entry is gone too.
+    expect(matchedTabsForQuery('telemetry')).toEqual([]);
     expect(matchedTabsForQuery('jira')).toEqual(['integrations']);
     expect(matchedTabsForQuery('ssh')).toContain('connections');
     expect(matchedTabsForQuery('dark mode')).toEqual(['interface']);
@@ -136,7 +137,6 @@ describe('SETTINGS_SEARCH_INDEX integrity', () => {
     // These entries correspond to SettingRow titles rendered as plain strings,
     // so their id must equal slugifySettingLabel(label) for stable search targets.
     const rowBackedIds = [
-      'privacy-telemetry',
       'auto-generate-task-names',
       'enable-tmux',
       'terminal-font-size',

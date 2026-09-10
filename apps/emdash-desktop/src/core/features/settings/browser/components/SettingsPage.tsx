@@ -175,7 +175,9 @@ export const SettingsPage = observer(function SettingsPage({
               <button
                 type="button"
                 className="flex h-8 w-full items-center gap-2 rounded-md px-3 text-sm font-normal text-foreground-muted transition-colors hover:bg-background-1 hover:text-foreground"
-                onClick={() => void openExternal('https://docs.emdash.sh')}
+                onClick={() =>
+                  void openExternal('https://github.com/Advance-Labs/ninebrains#readme')
+                }
               >
                 <Icon name="external-link" size="sm" />
                 <span>View Docs</span>

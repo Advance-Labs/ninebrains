@@ -6,6 +6,7 @@ import _electronUpdater, {
 } from 'electron-updater';
 import { updateEvents } from '@core/features/updates/node';
 import { IS_CANARY, UPDATE_CHANNEL } from '@core/primitives/app-identity/api/app-identity';
+import { UPDATES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import { resolveAppVersion } from '@main/core/app/utils';
 import { log } from '@main/lib/logger';
 import { formatUpdaterError, sanitizeUpdaterLogArgs } from './utils';
@@ -70,7 +71,8 @@ class UpdateService implements Disposable {
 
     this.updateState.currentVersion = await resolveAppVersion();
 
-    if (import.meta.env.DEV) return;
+    // Ninebrains: no feed is polled until the first Advance-Labs/ninebrains release exists.
+    if (import.meta.env.DEV || !UPDATES_ENABLED) return;
 
     this.setupAutoUpdater();
     this.setupEventListeners();
@@ -91,7 +93,9 @@ class UpdateService implements Disposable {
   private setupAutoUpdater(): void {
     const autoUpdater = getAutoUpdater();
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    // Ninebrains: never install silently on quit. Builds are unsigned until plan task 7.1, so
+    // any install stays an explicit user action (download + "restart to update").
+    autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.autoRunAppAfterInstall = true;
     autoUpdater.allowPrerelease = ALLOW_PRERELEASE;
     autoUpdater.allowDowngrade = ALLOW_DOWNGRADE;
@@ -337,7 +341,7 @@ class UpdateService implements Disposable {
       if (!version) return null;
 
       const response = await fetch(
-        `https://api.github.com/repos/generalaction/emdash/releases/tags/v${version}`
+        `https://api.github.com/repos/Advance-Labs/ninebrains/releases/tags/v${version}`
       );
 
       if (response.ok) {

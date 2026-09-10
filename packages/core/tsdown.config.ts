@@ -9,6 +9,7 @@ export default defineConfig({
     'primitives-skills-api': 'src/primitives/skills/api/index.ts',
     'primitives-mcp-api': 'src/primitives/mcp/api/index.ts',
     'primitives-exec-api': 'src/primitives/exec/api/index.ts',
+    'primitives-agent-env-api': 'src/primitives/agent-env/api/index.ts',
     'primitives-host-dependencies-api': 'src/primitives/host-dependencies/api/index.ts',
     'primitives-kv-api': 'src/primitives/kv/api/index.ts',
     'primitives-terminal-shell-api': 'src/primitives/terminal-shell/api/index.ts',

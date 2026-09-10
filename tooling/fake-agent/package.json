@@ -1,0 +1,17 @@
+{
+  "name": "fake-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Zero-dependency stand-in for the `claude` CLI, so lane and Brain tests never spend real credits.",
+  "bin": {
+    "fake-claude": "bin/fake-claude.mjs"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

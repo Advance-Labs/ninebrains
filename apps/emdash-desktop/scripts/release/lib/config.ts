@@ -9,8 +9,8 @@ export {
 
 export const RELEASE_DIR = 'release';
 export const NATIVE_MODULES = ['better-sqlite3', 'node-pty', '@parcel/watcher'];
-export const GITHUB_OWNER = 'generalaction';
-export const GITHUB_REPO = 'emdash';
+export const GITHUB_OWNER = 'Advance-Labs';
+export const GITHUB_REPO = 'ninebrains';
 
 export function requireEnv(name: string): string {
   const val = process.env[name];

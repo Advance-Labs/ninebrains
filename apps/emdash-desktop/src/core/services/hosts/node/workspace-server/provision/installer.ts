@@ -10,8 +10,9 @@ import type { SshClientProxy } from '@core/primitives/ssh/api/node/ssh-client-pr
 import { validateWorkspaceServerVersion, type WorkspaceServerLayout } from '../layout';
 import type { WorkspaceServerSshPort } from '../ports';
 
+// Ninebrains: see hostSettingsContribution in ../../settings.ts. No release is published yet.
 export const DEFAULT_WORKSPACE_SERVER_INSTALL_BASE_URL =
-  'https://releases.emdash.sh/workspace-server';
+  'https://github.com/Advance-Labs/ninebrains/releases/download/workspace-server';
 
 export type WorkspaceServerInstallErrorCode =
   | 'unsupported-platform'

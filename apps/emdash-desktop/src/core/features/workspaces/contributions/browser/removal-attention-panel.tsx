@@ -44,7 +44,7 @@ export function WorkspaceRemovalAttentionPanel({
       } else {
         await registry.abandonWorkspaceRemoval({ workspaceId });
         toast('Workspace untracked', {
-          description: 'Emdash dropped the pending removal without deleting files on the host.',
+          description: 'Ninebrains dropped the pending removal without deleting files on the host.',
         });
       }
     } catch (error) {

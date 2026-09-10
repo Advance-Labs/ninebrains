@@ -103,6 +103,6 @@ export function isMissingGitExecutableError(error: unknown): boolean {
 
 export function missingGitExecutableError(): Error {
   return new Error(
-    'Git is not installed or Emdash cannot find it. Install Git, then restart Emdash.'
+    'Git is not installed or Ninebrains cannot find it. Install Git, then restart Ninebrains.'
   );
 }

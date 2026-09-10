@@ -106,7 +106,7 @@ export const PreviewServerPill = observer(function PreviewServerPill({
           }}
         >
           <Globe className="size-3.5" />
-          Open in Emdash Browser
+          Open in Ninebrains Browser
         </DropdownMenu.Item>
         <DropdownMenu.Item
           disabled={!canOpen || Boolean(liveActionDisabledReason)}

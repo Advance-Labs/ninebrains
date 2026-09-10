@@ -1,0 +1,60 @@
+name: Build Matrix
+
+# Ninebrains: desktop builds on macOS, Windows and Linux run on demand only, because Actions
+# minutes on the private repo are limited. Nothing here publishes, signs, or reads secrets;
+# the app is packaged unpacked (--dir) with --publish never.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            package-flags: --mac --dir
+            windows-native: 'false'
+          - os: windows-2022
+            package-flags: --win --dir
+            windows-native: 'true'
+          - os: ubuntu-22.04
+            package-flags: --linux --dir
+            windows-native: 'false'
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsecret-1-dev pkg-config
+
+      - name: Setup build environment
+        uses: ./.github/actions/setup-build
+        with:
+          windows-native: ${{ matrix.windows-native }}
+
+      - name: Build workspace
+        shell: bash
+        run: pnpm run build
+
+      - name: Install Playwright browser for renderer tests
+        shell: bash
+        run: pnpm --dir apps/emdash-desktop exec playwright install --with-deps chromium-headless-shell
+
+      - name: Test
+        shell: bash
+        run: pnpm run test
+
+      - name: Package unpacked app (no publish, no signing)
+        if: ${{ !cancelled() }}
+        shell: bash
+        working-directory: apps/emdash-desktop
+        run: pnpm exec electron-builder ${{ matrix.package-flags }} --publish never --config electron-builder.config.ts

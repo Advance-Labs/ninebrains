@@ -34,12 +34,15 @@ export type WorktreeRootContext = {
   pathProfile?: PathProfile;
 };
 
-/** The built-in (last) worktree-root layer: `<home>/emdash/worktrees`. */
+/**
+ * The built-in (last) worktree-root layer: `<home>/ninebrains/worktrees`. Ninebrains never uses
+ * Emdash's `<home>/emdash/worktrees`, so the two apps cannot collide on worktree paths.
+ */
 export function builtInWorktreeRootFor(homeDirectory: string, pathProfile?: PathProfile): string {
   const profile = pathProfile ?? pathProfileFor(homeDirectory);
   const home = parseAbsolute(homeDirectory, { profile });
   if (!home.success) return homeDirectory;
-  const builtIn = joinAbsolute(home.data, 'emdash', 'worktrees');
+  const builtIn = joinAbsolute(home.data, 'ninebrains', 'worktrees');
   if (!builtIn.success) return homeDirectory;
   return formatForProfile(builtIn.data, profile);
 }

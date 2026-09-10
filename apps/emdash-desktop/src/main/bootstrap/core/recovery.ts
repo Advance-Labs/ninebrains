@@ -30,7 +30,7 @@ export async function enterSafeMode(error: unknown): Promise<void> {
     log.error('Failed to open recovery window', { error: windowError });
     dialog.showErrorBox(
       'Something went wrong',
-      `Emdash could not start or open recovery mode.\n\n${errorMessage}`
+      `Ninebrains could not start or open recovery mode.\n\n${errorMessage}`
     );
   }
 }
