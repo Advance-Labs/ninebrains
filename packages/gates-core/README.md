@@ -8,8 +8,8 @@ The package has no framework dependencies: no Electron, no React. Gates depend o
 
 | Export | Purpose |
 |---|---|
-| `runGates(job, gates, ctx, { timeoutMs, concurrency })` | Runs the gates that apply to the job, each with its own timeout. Returns `{ pass, results, skipped, evidence, feedback }`. |
-| `decideSelfHeal(verdict, attempt, max = 3)` / `SelfHealLoop` | Pure decision: `pass`, `retry(feedback, nextAttempt)` or `block(reason)`. |
+| `runGates(job, gates, ctx, { timeoutMs, concurrency })` | Runs the gates that apply to the job, each with its own timeout. Returns `{ status, verified, pass, results, skipped, evidence, feedback }`. |
+| `decideSelfHeal(verdict, attempt, max = 3)` / `SelfHealLoop` | Pure decision from `{ status, feedback }`: `pass(verified)`, `retry(feedback, nextAttempt)` or `block(reason)`. |
 | `rigorToGates({ testing, security }, jobKind)` | Pure. Returns the default gate IDs for a job (table below). |
 | `FsEvidenceStore.open({ root, jobId, attempt })` | Stores evidence under `<root>/<jobId>/<attempt>/` with a `manifest.json`. The app passes `root = <userData>/ninebrains/evidence` (SEAMS §3.11), never a path inside the worktree. Re-opening an attempt after a crash is safe: existing files are kept and new ones take the next free name. |
 | `pixelDiff(a, b, { threshold })` | Compares two PNGs using pixelmatch (ISC) and pngjs (MIT). |
@@ -21,7 +21,16 @@ The package has no framework dependencies: no Electron, no React. Gates depend o
 - Every gate that applies must pass.
 - A gate that throws, times out, returns a malformed result or is cancelled counts as a fail. Its `status` records which: `error`, `timeout` or `cancelled`.
 - When a gate times out, its signal is aborted.
-- A job that no gate applies to passes vacuously. The caller decides whether that is acceptable.
+- `status` is `passed`, `failed` or **`unverified`**. A job that no gate applies to (for example rigor 0) is `unverified`: `pass: true` so it still leaves `verifying`, but `verified: false`. Our promise is that no agent grades its own work, so the UI must show an "unverified" badge and must never store or display this as `passed`.
+
+### Self-heal decision table
+
+| Run status | Attempt | Decision |
+|---|---|---|
+| `passed` | any | `pass`, `verified: true` |
+| `unverified` | any | `pass`, `verified: false` (show the badge) |
+| `failed` | below 3 | `retry`, `nextAttempt = attempt + 1`, with the feedback |
+| `failed` | 3 or more | `block`, with the last feedback |
 - `feedback` is written for the worker agent. It covers failures only, in gate order, with at most 1500 characters per gate.
 
 ## Rigor mapping
@@ -37,6 +46,10 @@ The package has no framework dependencies: no Electron, no React. Gates depend o
 Levels must be integers from 0 to 10; anything else throws `RangeError`. The thresholds are exported as `RIGOR_THRESHOLDS`.
 
 ## Capabilities the app must implement
+
+**This contract is final input for the app.** The app implements these five signatures as written. Future changes are additive only: new *optional* fields on the options objects, never a new required field or a changed type. Adding an optional field to an options interface compiles against existing implementations, so it is not breaking.
+
+**One addition is already planned.** `SpawnReviewerOptions` is expected to gain an optional `mcpServers` field, which the packs agent needs for the SEO red-team gate so the reviewer can re-run the cited GSC/GA4 queries. When it lands, an implementation that cannot honour a set option **must throw** rather than ignore it. A red-team review that silently ran without its data would report a pass it never checked.
 
 | Capability | Contract |
 |---|---|
@@ -73,4 +86,5 @@ Each of these was a judgement call. Change any of them here if you disagree.
 4. **An empty `claims.json` fails the fact-check gate.** A research job that makes no claims most likely skipped the step.
 5. **A reviewer reply of `pass: false` with no issues is treated as malformed.** It gives the worker nothing to fix.
 6. **A reviewer diff with an unsafe `baseRef` is refused.** The ref must match `^[A-Za-z0-9][A-Za-z0-9._/~^-]*$` and must not contain `..`. This guards against shell injection through the job record.
-7. **`GateJob.kind`** is one of `code | ui | research | seo | docs`. The Brain's unit of work is a *Job*; in Emdash a "Task" is a worktree session. The only "task" left in this package is the Brain MCP tool `complete_task`, which the worker feedback names.
+7. **`GateJob.kind`** is one of `code | ui | research | seo | docs`. The Brain's unit of work is a *Job*; in Emdash a "Task" is a worktree session. Worker feedback names the Brain MCP tool through the exported constant `COMPLETE_JOB_TOOL` (`complete_job`), so the name can't drift. Change it there if brain-mcp renames the tool again.
+8. **No applicable gates means `unverified`, not a pass.** Decided by the team lead on 2026-09-10. Self-heal returns `pass` with `verified: false`, so the job unblocks and the result stays distinguishable.

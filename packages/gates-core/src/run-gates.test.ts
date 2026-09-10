@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { runGates } from './run-gates';
+import { COMPLETE_JOB_TOOL, runGates } from './run-gates';
+import { decideSelfHeal } from './self-heal';
 import { makeContext, makeJob } from './test-utils';
 import type { Gate, GateResult } from './types';
 
@@ -16,25 +17,35 @@ describe('runGates', () => {
   it('passes only when every applicable gate passes', async () => {
     const job = makeJob();
     const ok = await runGates(job, [passing('a'), passing('b')], makeContext());
-    expect(ok.pass).toBe(true);
+    expect(ok).toMatchObject({ status: 'passed', verified: true, pass: true });
     expect(ok.feedback).toBe('All 2 verification gates passed.');
 
     const bad = await runGates(job, [passing('a'), failing('b', 'fix the header')], makeContext());
-    expect(bad.pass).toBe(false);
+    expect(bad).toMatchObject({ status: 'failed', verified: true, pass: false });
+    expect(bad.feedback).toContain(`then call ${COMPLETE_JOB_TOOL} again`);
+    expect(COMPLETE_JOB_TOOL).toBe('complete_job');
     expect(bad.results.map((r) => r.status)).toEqual(['pass', 'fail']);
     expect(bad.feedback).toContain('1 of 2 gates did not pass');
     expect(bad.feedback).toContain('## B (b) failed\nfix the header');
     expect(bad.feedback).not.toContain('a ok');
   });
 
-  it('skips gates that do not apply, and a job with none passes vacuously', async () => {
+  it('returns unverified, not passed, when no gate applies, and self-heal keeps it distinct', async () => {
     const report = await runGates(
       makeJob(),
       [failing('x')].map((g) => ({ ...g, appliesTo: () => false })),
       makeContext()
     );
-    expect(report).toMatchObject({ pass: true, skipped: ['x'], results: [] });
-    expect(report.feedback).toBe('No verification gates applied to this job.');
+    expect(report).toMatchObject({
+      status: 'unverified',
+      verified: false,
+      pass: true,
+      skipped: ['x'],
+      results: [],
+    });
+    expect(report.feedback).toMatch(/unverified/);
+    // The job still unblocks, but the decision carries the flag for the UI badge.
+    expect(decideSelfHeal(report, 1)).toEqual({ action: 'pass', verified: false });
   });
 
   it('fails a gate that times out, and aborts its signal', async () => {

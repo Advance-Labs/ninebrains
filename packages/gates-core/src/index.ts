@@ -27,6 +27,7 @@ export {
   type OpenEvidenceStoreOptions,
 } from './evidence-store';
 export {
+  COMPLETE_JOB_TOOL,
   DEFAULT_GATE_TIMEOUT_MS,
   composeFeedback,
   runGates,
@@ -35,6 +36,7 @@ export {
   type GateRunReport,
   type GateStatus,
   type RunGatesOptions,
+  type RunStatus,
 } from './run-gates';
 export {
   MAX_ATTEMPTS,

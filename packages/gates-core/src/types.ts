@@ -20,7 +20,7 @@ export interface GateJob {
   attempt: number;
   /** Commit the lane started from; reviewers diff against it. Defaults to HEAD. */
   baseRef?: string;
-  /** Worktree-relative paths the worker reported with complete_task. */
+  /** Worktree-relative paths the worker reported with complete_job. */
   artifacts?: string[];
 }
 
@@ -77,6 +77,12 @@ export type RunCommand = (
   opts: { cwd: string; signal: AbortSignal; timeoutMs?: number }
 ) => Promise<CommandResult>;
 
+/**
+ * Final contract for the app. It only ever grows by OPTIONAL fields, which is
+ * not a breaking change for implementations or callers. Planned: `mcpServers`,
+ * for the SEO red-team gate. An implementation that cannot honour an option
+ * that is set must throw rather than ignore it.
+ */
 export interface SpawnReviewerOptions {
   signal: AbortSignal;
   cwd: string;
