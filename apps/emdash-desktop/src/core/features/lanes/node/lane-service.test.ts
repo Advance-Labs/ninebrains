@@ -17,7 +17,9 @@ function createHarness(options: { persisted?: LanesGridConfig } = {}) {
   const sessions = new Map<string, TuiSessionStatus>();
   const calls: string[] = [];
   const ports = {
-    projects: { get: vi.fn(async (id: string) => [LOCAL, SSH].find((p) => p.projectId === id) ?? null) },
+    projects: {
+      get: vi.fn(async (id: string) => [LOCAL, SSH].find((p) => p.projectId === id) ?? null),
+    },
     tasks: {
       createWorktreeTask: vi.fn(async (_input: { baseRef: string; branchName: string }) => {
         calls.push('createTask');
@@ -243,7 +245,9 @@ describe('LaneService removal and persistence', () => {
     expect(harness.ports.tasks.deleteTask).toHaveBeenCalledWith('p1', expect.any(String), {
       deleteWorktree: true,
     });
-    expect(harness.service.boardSnapshot().tabs[0]!.slots.every((slot) => slot === null)).toBe(true);
+    expect(harness.service.boardSnapshot().tabs[0]!.slots.every((slot) => slot === null)).toBe(
+      true
+    );
   });
 
   it('restores lanes as stopped and resumes them on start', async () => {

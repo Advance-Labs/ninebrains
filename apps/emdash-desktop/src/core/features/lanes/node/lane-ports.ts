@@ -34,7 +34,11 @@ export interface LaneTasksPort {
    * activates the current task, so four live lanes need four explicit calls.
    */
   provision(taskId: string): Promise<Result<{ path: string }, string>>;
-  deleteTask(projectId: string, taskId: string, options: { deleteWorktree: boolean }): Promise<void>;
+  deleteTask(
+    projectId: string,
+    taskId: string,
+    options: { deleteWorktree: boolean }
+  ): Promise<void>;
 }
 
 export interface LaneConversationsPort {

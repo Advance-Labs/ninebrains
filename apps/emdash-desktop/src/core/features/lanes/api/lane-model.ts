@@ -6,7 +6,11 @@ export const LANE_SLOT_COUNT = 4;
 export const laneProviderSchema = z.enum(['claude', 'codex']);
 export type LaneProvider = z.infer<typeof laneProviderSchema>;
 
-export const laneSlotSchema = z.number().int().min(0).max(LANE_SLOT_COUNT - 1);
+export const laneSlotSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(LANE_SLOT_COUNT - 1);
 export type LaneSlot = z.infer<typeof laneSlotSchema>;
 
 /**

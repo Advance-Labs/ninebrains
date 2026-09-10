@@ -108,6 +108,7 @@ export function createDesktopWireOptions(
     },
     hostIsReachable: services.hostIsReachable,
     issueProviders: services.issueProviders,
+    lanes: services.ninebrains.lanes,
     legacyPortOperations,
     logger: log,
     loggingOperations: {

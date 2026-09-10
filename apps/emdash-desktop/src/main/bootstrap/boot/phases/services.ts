@@ -19,6 +19,8 @@ import { ProviderTokenDispatcher } from '@core/features/account/node/services/pr
 import { getPluginMetadata } from '@core/features/agents/api/node/plugin-registry';
 import { AutomationsService } from '@core/features/automations/api/node/automations-service';
 import { buildAutomationDeployment } from '@core/features/automations/node/deployment-builder';
+import { createConversation } from '@core/features/conversations/node/createConversation';
+import { launchTuiConversation } from '@core/features/conversations/node/launch-tui-conversation';
 import { createConversationDeletionSweepKind } from '@core/features/conversations/node/sweep/conversation-deletion-sweep';
 import { ConversationBackfillService } from '@core/features/conversations/node/sync/conversation-backfill';
 import { ConversationSyncService } from '@core/features/conversations/node/sync/conversation-sync-service';
@@ -50,6 +52,10 @@ import {
 import { IntegrationCredentialStore } from '@core/features/integrations/node/integration-credential-store';
 import { setIntegrationCredentialStore } from '@core/features/integrations/node/integration-credential-store-instance';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
+import {
+  createNinebrainsServices,
+  type NinebrainsServices,
+} from '@core/features/lanes/node/ninebrains-services';
 import {
   createPromptLibraryService,
   type PromptLibraryKV,
@@ -123,6 +129,7 @@ import { sweepSessionHygiene } from '@main/core/runtime/operations/session-hygie
 import { createDesktopSessionIntentStores } from '@main/core/runtime/session-intent-stores';
 import { executeOAuthFlow } from '@main/core/shared/oauth-flow';
 import { getTerminalColorEnv } from '@main/core/terminal-shell/color-env';
+import { withCompensation } from '@main/core/utils/compensation';
 import { runLocalCommand } from '@main/core/utils/exec';
 import { KV } from '@main/db/kv';
 import { cleanupLegacyOperationsDatabases } from '@main/db/legacy-operations-cleanup';
@@ -163,6 +170,7 @@ export type ServicesBundle = {
   };
   readonly gitCredentials: GitCredentialsService;
   readonly issueProviders: ReturnType<typeof createIssueProviderRegistry>;
+  readonly ninebrains: NinebrainsServices;
   readonly hostIsReachable: HostReachabilityProbe;
   readonly hostAttachments: HostAttachmentRegistry;
   readonly notifications: ReturnType<typeof createNotificationService>;
@@ -272,6 +280,9 @@ export async function bootServices(
     // this phase; sessions only call this after boot completes.
     resolveSessionGitCredentials: (params: { projectId: string; host: HostRef }) =>
       gitCredentials.resolveSessionSpec(params),
+    // Late-bound: Ninebrains lanes are constructed after the task service.
+    resolveLaneLaunch: (conversationId: string) =>
+      ninebrains.lanes.resolveLaneLaunch(conversationId),
   };
   const projectAttachmentAdapter = createProjectAttachmentAdapter({
     db,
@@ -392,6 +403,35 @@ export async function bootServices(
       getMementosRuntimeClient,
       telemetry: telemetryService,
       evictFileSearchRoot: fileSearchRuntime.evictRoot,
+    },
+  });
+  // Ninebrains (docs/UPSTREAM-PATCHES.md): lanes and later the Brain.
+  const ninebrains = createNinebrainsServices({
+    db,
+    runtimes,
+    scope: appScope,
+    logger: log,
+    taskService,
+    workspaceIdentity,
+    getMementosRuntimeClient,
+    conversations: {
+      create: (params) =>
+        createConversation(params, {
+          db,
+          telemetry: telemetryService,
+          taskSessions: taskSessionManager,
+          withCompensation,
+          runtimes,
+          hostIsReachable,
+          workspaceIdentity,
+        }),
+      launch: (input) =>
+        launchTuiConversation({
+          ...input,
+          database: db,
+          telemetry: telemetryService,
+          taskSessions: taskSessionManager,
+        }),
     },
   });
   const searchService = createSearchService({
@@ -812,6 +852,7 @@ export async function bootServices(
     hostIsReachable,
     hostAttachments,
     issueProviders,
+    ninebrains,
     notifications: notificationService,
     previewServerAccess,
     promptLibrary: promptLibraryService,

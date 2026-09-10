@@ -1,8 +1,5 @@
 import { LOCAL_HOST_REF } from '@emdash/core/primitives/host/api';
-import {
-  tuiAgentsContract,
-  type TuiAgentStateStatus,
-} from '@emdash/core/runtimes/tui-agents/api';
+import { tuiAgentsContract, type TuiAgentStateStatus } from '@emdash/core/runtimes/tui-agents/api';
 import type { RuntimeBroker } from '@emdash/core/services/runtime-broker/api';
 import { createScope } from '@emdash/shared/concurrency';
 import { observe, remote } from '@emdash/wire/state';

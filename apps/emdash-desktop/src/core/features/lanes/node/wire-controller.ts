@@ -1,5 +1,5 @@
-import { expose } from '@emdash/wire/state';
 import type { ContractImpl } from '@emdash/wire/rpc';
+import { expose } from '@emdash/wire/state';
 import { lanesContract } from '../api';
 import { lanesEvents } from './event-host';
 import type { LaneService } from './lane-service';
