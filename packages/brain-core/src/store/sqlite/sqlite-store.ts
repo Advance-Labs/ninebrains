@@ -4,20 +4,20 @@ import path from 'node:path';
 import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite';
 import type { BrainEvent, StoredBrainEvent } from '../../events';
 import { NotFoundError } from '../../errors';
-import type { DoneEntry, Edge, Lane, LaneId, Message, Note, ProjectId, Run, Task, TaskId } from '../../types';
-import type { BrainStore, EdgeFilter, MessageFilter, RunFilter, TaskFilter } from '../store';
+import type { DoneEntry, JobEdge, Lane, LaneId, Message, Note, ProjectId, Run, Job, JobId } from '../../types';
+import type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from '../store';
 import { migrate } from './migrations';
 import {
   type Row,
-  TASK_COLUMNS,
-  taskParams,
+  JOB_COLUMNS,
+  jobParams,
   toDone,
   toEdge,
   toLane,
   toMessage,
   toNote,
   toRun,
-  toTask,
+  toJob,
 } from './rows';
 
 export const DEFAULT_DB_FILENAME = 'brain.sqlite';
@@ -94,20 +94,20 @@ export class SqliteBrainStore implements BrainStore {
     }
   }
 
-  getTask(id: TaskId): Task | undefined {
-    const row = this.get(`SELECT ${TASK_COLUMNS} FROM tasks WHERE id = ?`, [id]);
-    return row && toTask(row);
+  getJob(id: JobId): Job | undefined {
+    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE id = ?`, [id]);
+    return row && toJob(row);
   }
 
-  findTaskByPlanNode(planId: string, planNodeId: string): Task | undefined {
-    const row = this.get(`SELECT ${TASK_COLUMNS} FROM tasks WHERE plan_id = ? AND plan_node_id = ?`, [
+  findJobByPlanNode(planId: string, planNodeId: string): Job | undefined {
+    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE plan_id = ? AND plan_node_id = ?`, [
       planId,
       planNodeId,
     ]);
-    return row && toTask(row);
+    return row && toJob(row);
   }
 
-  listTasks(filter: TaskFilter = {}): Task[] {
+  listJobs(filter: JobFilter = {}): Job[] {
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
@@ -120,47 +120,47 @@ export class SqliteBrainStore implements BrainStore {
     }
     if (!filter.includeArchived) where.push('archived_at IS NULL');
     return this.all(
-      `SELECT ${TASK_COLUMNS} FROM tasks ${clause(where)} ORDER BY created_at, rowid ${limit(filter.limit)}`,
+      `SELECT ${JOB_COLUMNS} FROM jobs ${clause(where)} ORDER BY created_at, rowid ${limit(filter.limit)}`,
       params
-    ).map(toTask);
+    ).map(toJob);
   }
 
-  insertTask(task: Task): void {
+  insertJob(job: Job): void {
     this.run(
-      `INSERT INTO tasks (${TASK_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      taskParams(task)
+      `INSERT INTO jobs (${JOB_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      jobParams(job)
     );
   }
 
-  updateTask(task: Task): void {
-    const [id, ...rest] = taskParams(task);
-    const sets = TASK_COLUMNS.split(', ')
+  updateJob(job: Job): void {
+    const [id, ...rest] = jobParams(job);
+    const sets = JOB_COLUMNS.split(', ')
       .slice(1)
       .map((c) => `${c} = ?`)
       .join(', ');
-    const result = this.run(`UPDATE tasks SET ${sets} WHERE id = ?`, [...rest, id!]);
-    if (Number(result.changes) === 0) throw new NotFoundError('task', task.id);
+    const result = this.run(`UPDATE jobs SET ${sets} WHERE id = ?`, [...rest, id!]);
+    if (Number(result.changes) === 0) throw new NotFoundError('job', job.id);
   }
 
-  listEdges(filter: EdgeFilter = {}): Edge[] {
+  listEdges(filter: JobEdgeFilter = {}): JobEdge[] {
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
     if (filter.from !== undefined) add(where, params, 'from_id = ?', filter.from);
     if (filter.to !== undefined) add(where, params, 'to_id = ?', filter.to);
     if (filter.planId !== undefined) add(where, params, 'plan_id = ?', filter.planId);
-    return this.all(`SELECT * FROM task_edges ${clause(where)} ORDER BY rowid`, params).map(toEdge);
+    return this.all(`SELECT * FROM job_edges ${clause(where)} ORDER BY rowid`, params).map(toEdge);
   }
 
-  insertEdge(edge: Edge): void {
+  insertEdge(edge: JobEdge): void {
     this.run(
-      'INSERT OR IGNORE INTO task_edges (from_id, to_id, project_id, plan_id, created_at) VALUES (?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO job_edges (from_id, to_id, project_id, plan_id, created_at) VALUES (?, ?, ?, ?, ?)',
       [edge.from, edge.to, edge.projectId, edge.planId, edge.createdAt]
     );
   }
 
-  deleteEdge(from: TaskId, to: TaskId): void {
-    this.run('DELETE FROM task_edges WHERE from_id = ? AND to_id = ?', [from, to]);
+  deleteEdge(from: JobId, to: JobId): void {
+    this.run('DELETE FROM job_edges WHERE from_id = ? AND to_id = ?', [from, to]);
   }
 
   insertMessage(m: Message): void {
@@ -185,15 +185,15 @@ export class SqliteBrainStore implements BrainStore {
 
   insertRun(r: Run): void {
     this.run(
-      'INSERT INTO runs (id, task_id, lane_id, mode, started_at, ended_at, exit_code, transcript_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [r.id, r.taskId, r.laneId, r.mode, r.startedAt, r.endedAt, r.exitCode, r.transcriptPath]
+      'INSERT INTO runs (id, job_id, lane_id, mode, started_at, ended_at, exit_code, transcript_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [r.id, r.jobId, r.laneId, r.mode, r.startedAt, r.endedAt, r.exitCode, r.transcriptPath]
     );
   }
 
   updateRun(r: Run): void {
     const result = this.run(
-      'UPDATE runs SET task_id = ?, lane_id = ?, mode = ?, started_at = ?, ended_at = ?, exit_code = ?, transcript_path = ? WHERE id = ?',
-      [r.taskId, r.laneId, r.mode, r.startedAt, r.endedAt, r.exitCode, r.transcriptPath, r.id]
+      'UPDATE runs SET job_id = ?, lane_id = ?, mode = ?, started_at = ?, ended_at = ?, exit_code = ?, transcript_path = ? WHERE id = ?',
+      [r.jobId, r.laneId, r.mode, r.startedAt, r.endedAt, r.exitCode, r.transcriptPath, r.id]
     );
     if (Number(result.changes) === 0) throw new NotFoundError('run', r.id);
   }
@@ -207,7 +207,7 @@ export class SqliteBrainStore implements BrainStore {
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     if (filter.laneId !== undefined) add(where, params, 'lane_id = ?', filter.laneId);
-    if (filter.taskId !== undefined) add(where, params, 'task_id = ?', filter.taskId);
+    if (filter.jobId !== undefined) add(where, params, 'job_id = ?', filter.jobId);
     if (filter.since !== undefined) add(where, params, 'started_at >= ?', filter.since);
     return this.all(
       `SELECT * FROM runs ${clause(where)} ORDER BY started_at DESC, seq DESC ${limit(filter.limit)}`,
@@ -217,16 +217,16 @@ export class SqliteBrainStore implements BrainStore {
 
   insertNote(n: Note): void {
     this.run(
-      'INSERT INTO notes (id, project_id, task_id, author, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [n.id, n.projectId, n.taskId, n.author, n.body, n.createdAt]
+      'INSERT INTO notes (id, project_id, job_id, author, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [n.id, n.projectId, n.jobId, n.author, n.body, n.createdAt]
     );
   }
 
-  listNotes(filter: { projectId?: ProjectId; taskId?: TaskId; limit?: number } = {}): Note[] {
+  listNotes(filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     if (filter.projectId !== undefined) add(where, params, 'project_id = ?', filter.projectId);
-    if (filter.taskId !== undefined) add(where, params, 'task_id = ?', filter.taskId);
+    if (filter.jobId !== undefined) add(where, params, 'job_id = ?', filter.jobId);
     return this.all(`SELECT * FROM notes ${clause(where)} ORDER BY seq ${limit(filter.limit)}`, params).map(
       toNote
     );
@@ -234,8 +234,8 @@ export class SqliteBrainStore implements BrainStore {
 
   insertDone(d: DoneEntry): void {
     this.run(
-      'INSERT INTO done_log (id, task_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [d.id, d.taskId, d.projectId, d.laneId, d.summary, JSON.stringify(d.artifacts), d.at]
+      'INSERT INTO done_log (id, job_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [d.id, d.jobId, d.projectId, d.laneId, d.summary, JSON.stringify(d.artifacts), d.at]
     );
   }
 
@@ -247,12 +247,12 @@ export class SqliteBrainStore implements BrainStore {
 
   upsertLane(l: Lane): void {
     this.run(
-      `INSERT INTO lanes (id, project_id, provider, status, recent_files, active_task_id, updated_at)
+      `INSERT INTO lanes (id, project_id, provider, status, recent_files, active_job_id, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, provider = excluded.provider,
          status = excluded.status, recent_files = excluded.recent_files,
-         active_task_id = excluded.active_task_id, updated_at = excluded.updated_at`,
-      [l.id, l.projectId, l.provider, l.status, JSON.stringify(l.recentFiles), l.activeTaskId, l.updatedAt]
+         active_job_id = excluded.active_job_id, updated_at = excluded.updated_at`,
+      [l.id, l.projectId, l.provider, l.status, JSON.stringify(l.recentFiles), l.activeJobId, l.updatedAt]
     );
   }
 

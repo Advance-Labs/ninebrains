@@ -1,10 +1,10 @@
-import type { Lane, Message, Task, TaskState } from './types';
+import type { Lane, Message, Job, JobState } from './types';
 
 export interface BrainEventMap {
-  /** Any change to a task: state, assignment, content or archival. */
-  taskChanged: { task: Task; previousState: TaskState | null };
-  /** A task hit the attempt cap or was blocked by a lane or the Brain. */
-  taskBlocked: { task: Task; reason: string };
+  /** Any change to a job: state, assignment, content or archival. */
+  jobChanged: { job: Job; previousState: JobState | null };
+  /** A job hit the attempt cap or was blocked by a lane or the Brain. */
+  jobBlocked: { job: Job; reason: string };
   messageSent: { message: Message };
   laneChanged: { lane: Lane };
 }

@@ -1,15 +1,15 @@
 import type {
   Address,
   DoneEntry,
-  Edge,
+  JobEdge,
   Lane,
   Message,
   Note,
   Provider,
   Run,
   RunMode,
-  Task,
-  TaskState,
+  Job,
+  JobState,
   LaneStatus,
 } from '../../types';
 
@@ -22,13 +22,13 @@ const num = (v: unknown): number => Number(v);
 const numOrNull = (v: unknown): number | null => (v === null ? null : Number(v));
 const json = <T>(v: unknown, fallback: T): T => (v === null ? fallback : (JSON.parse(v as string) as T));
 
-export function toTask(r: Row): Task {
+export function toJob(r: Row): Job {
   return {
     id: str(r.id),
     projectId: str(r.project_id),
     title: str(r.title),
     body: str(r.body),
-    state: r.state as TaskState,
+    state: r.state as JobState,
     laneId: strOrNull(r.lane_id),
     attempts: num(r.attempts),
     gateSpec: json(r.gate_spec, null),
@@ -44,7 +44,7 @@ export function toTask(r: Row): Task {
   };
 }
 
-export function taskParams(t: Task): Array<string | number | null> {
+export function jobParams(t: Job): Array<string | number | null> {
   return [
     t.id,
     t.projectId,
@@ -66,10 +66,10 @@ export function taskParams(t: Task): Array<string | number | null> {
   ];
 }
 
-export const TASK_COLUMNS =
+export const JOB_COLUMNS =
   'id, project_id, title, body, state, lane_id, attempts, gate_spec, hints, result, reason, created_by, plan_id, plan_node_id, archived_at, created_at, updated_at';
 
-export function toEdge(r: Row): Edge {
+export function toEdge(r: Row): JobEdge {
   return {
     from: str(r.from_id),
     to: str(r.to_id),
@@ -94,7 +94,7 @@ export function toMessage(r: Row): Message {
 export function toRun(r: Row): Run {
   return {
     id: str(r.id),
-    taskId: str(r.task_id),
+    jobId: str(r.job_id),
     laneId: str(r.lane_id),
     mode: r.mode as RunMode,
     startedAt: num(r.started_at),
@@ -108,7 +108,7 @@ export function toNote(r: Row): Note {
   return {
     id: str(r.id),
     projectId: str(r.project_id),
-    taskId: strOrNull(r.task_id),
+    jobId: strOrNull(r.job_id),
     author: r.author as Address,
     body: str(r.body),
     createdAt: num(r.created_at),
@@ -118,7 +118,7 @@ export function toNote(r: Row): Note {
 export function toDone(r: Row): DoneEntry {
   return {
     id: str(r.id),
-    taskId: str(r.task_id),
+    jobId: str(r.job_id),
     projectId: str(r.project_id),
     laneId: strOrNull(r.lane_id),
     summary: str(r.summary),
@@ -134,7 +134,7 @@ export function toLane(r: Row): Lane {
     provider: r.provider as Provider,
     status: r.status as LaneStatus,
     recentFiles: json(r.recent_files, []),
-    activeTaskId: strOrNull(r.active_task_id),
+    activeJobId: strOrNull(r.active_job_id),
     updatedAt: num(r.updated_at),
   };
 }

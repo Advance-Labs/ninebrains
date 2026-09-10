@@ -3,7 +3,7 @@ import type { BrainEmitter, BrainEvent } from '../events';
 import { LIMITS, utf8Bytes } from '../limits';
 import { assertTransition } from '../state-machine';
 import type { BrainStore } from '../store/store';
-import type { Task, TaskState } from '../types';
+import type { Job, JobState } from '../types';
 
 export interface BrainContext {
   store: BrainStore;
@@ -40,26 +40,26 @@ export function mutate<T>(ctx: BrainContext, fn: (tx: Tx) => T): T {
   return result;
 }
 
-/** Moves a task along a legal edge of the state machine and records the change. */
+/** Moves a job along a legal edge of the state machine and records the change. */
 export function transition(
   ctx: BrainContext,
   tx: Tx,
-  task: Task,
-  to: TaskState,
-  patch: Partial<Omit<Task, 'id' | 'state'>> = {}
-): Task {
-  assertTransition(task.id, task.state, to);
-  const next: Task = { ...task, ...patch, state: to, updatedAt: ctx.now() };
-  ctx.store.updateTask(next);
-  tx.raise({ type: 'taskChanged', payload: { task: next, previousState: task.state } });
+  job: Job,
+  to: JobState,
+  patch: Partial<Omit<Job, 'id' | 'state'>> = {}
+): Job {
+  assertTransition(job.id, job.state, to);
+  const next: Job = { ...job, ...patch, state: to, updatedAt: ctx.now() };
+  ctx.store.updateJob(next);
+  tx.raise({ type: 'jobChanged', payload: { job: next, previousState: job.state } });
   return next;
 }
 
 /** Writes a non-state change (content, archival) and records it. */
-export function touch(ctx: BrainContext, tx: Tx, task: Task, patch: Partial<Omit<Task, 'id' | 'state'>>): Task {
-  const next: Task = { ...task, ...patch, updatedAt: ctx.now() };
-  ctx.store.updateTask(next);
-  tx.raise({ type: 'taskChanged', payload: { task: next, previousState: task.state } });
+export function touch(ctx: BrainContext, tx: Tx, job: Job, patch: Partial<Omit<Job, 'id' | 'state'>>): Job {
+  const next: Job = { ...job, ...patch, updatedAt: ctx.now() };
+  ctx.store.updateJob(next);
+  tx.raise({ type: 'jobChanged', payload: { job: next, previousState: job.state } });
   return next;
 }
 

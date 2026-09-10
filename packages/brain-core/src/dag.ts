@@ -1,4 +1,4 @@
-import type { TaskId } from './types';
+import type { JobId } from './types';
 
 export interface EdgeLike {
   from: string;
@@ -87,11 +87,11 @@ export function pathBetween(edges: readonly EdgeLike[], start: string, goal: str
   return null;
 }
 
-/** Every task `taskId` transitively depends on (its dependency chain). */
-export function ancestors(edges: readonly EdgeLike[], taskId: TaskId): Set<TaskId> {
+/** Every job `jobId` transitively depends on (its dependency chain). */
+export function ancestors(edges: readonly EdgeLike[], jobId: JobId): Set<JobId> {
   const inbound = adjacency(edges, 'to');
-  const seen = new Set<TaskId>();
-  const queue = [...(inbound.get(taskId) ?? [])];
+  const seen = new Set<JobId>();
+  const queue = [...(inbound.get(jobId) ?? [])];
   while (queue.length > 0) {
     const node = queue.shift()!;
     if (seen.has(node)) continue;

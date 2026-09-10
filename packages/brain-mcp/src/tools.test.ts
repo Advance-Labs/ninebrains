@@ -98,42 +98,42 @@ describe('lane and brain tools', () => {
     const laneA = await connect(laneConfig('A'));
     const laneB = await connect(laneConfig('B'));
 
-    const first = (await hub('create_task', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })).json as {
+    const first = (await hub('create_job', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })).json as {
       id: string;
       state: string;
       body: string;
     };
     expect(first.state).toBe('ready');
     expect(first.body.endsWith('...')).toBe(true);
-    const second = (await hub('create_task', { title: 'Review login', dependsOn: [first.id], kind: 'review' })).json as {
+    const second = (await hub('create_job', { title: 'Review login', dependsOn: [first.id], kind: 'review' })).json as {
       id: string;
       state: string;
     };
     expect(second.state).toBe('proposed');
 
-    const listed = (await laneA('list_tasks', { states: ['ready'] })).json as Array<{ id: string }>;
+    const listed = (await laneA('list_jobs', { states: ['ready'] })).json as Array<{ id: string }>;
     expect(listed.map((t) => t.id)).toEqual([first.id]);
 
-    const claimed = (await laneA('claim_task')).json as { id: string; state: string; body: string; gates: string[] };
+    const claimed = (await laneA('claim_job')).json as { id: string; state: string; body: string; gates: string[] };
     expect(claimed).toMatchObject({ id: first.id, state: 'running', gates: ['tests'] });
     expect(claimed.body).toHaveLength(400);
 
-    const stolen = await laneB('claim_task', { taskId: first.id });
+    const stolen = await laneB('claim_job', { jobId: first.id });
     expect(stolen.isError).toBe(true);
     expect(stolen.text).toMatch(/^ILLEGAL_TRANSITION/);
-    expect((await laneB('claim_task')).json).toMatchObject({ claimed: null });
+    expect((await laneB('claim_job')).json).toMatchObject({ claimed: null });
 
-    const forbidden = await laneB('complete_task', { taskId: first.id, summary: 'not mine' });
+    const forbidden = await laneB('complete_job', { jobId: first.id, summary: 'not mine' });
     expect(forbidden).toMatchObject({ isError: true });
     expect(forbidden.text).toMatch(/^FORBIDDEN/);
 
-    const done = await laneA('complete_task', {
-      taskId: first.id,
+    const done = await laneA('complete_job', {
+      jobId: first.id,
       summary: 'login works, tests pass',
       artifacts: ['notes.md', path.join(dir, 'evidence', 'shot.png')],
     });
     expect(done.json).toMatchObject({ state: 'verifying' });
-    expect(brain.getTask({ role: 'brain', brainId: 'main' }, first.id).result?.artifacts).toEqual([
+    expect(brain.getJob({ role: 'brain', brainId: 'main' }, first.id).result?.artifacts).toEqual([
       path.join(dir, 'project', 'notes.md'),
       path.join(dir, 'evidence', 'shot.png'),
     ]);
@@ -155,59 +155,59 @@ describe('lane and brain tools', () => {
   it('returns validation and authorization failures as tool errors', async () => {
     const laneA = await connect(laneConfig('A'));
     const hub = await connect(brainConfig());
-    const task = (await hub('create_task', { title: 'T' })).json as { id: string };
-    await laneA('claim_task', { taskId: task.id });
+    const job = (await hub('create_job', { title: 'T' })).json as { id: string };
+    await laneA('claim_job', { jobId: job.id });
 
     const cases: Array<[string, Record<string, unknown>, RegExp]> = [
       ['send_message', { to: 'B', body: 'hi' }, /address|lane:<id>/],
       ['send_message', { to: 'lane:B', body: 'x'.repeat(32 * 1024 + 1) }, /32768 bytes/],
       ['send_message', { to: 'lane:B', body: 'hi', attachments: [{ kind: 'file', path: '../../etc/passwd' }] }, /outside|does not exist/],
-      ['complete_task', { taskId: task.id, summary: 'x', artifacts: ['/etc/hosts'] }, /outside/],
-      ['complete_task', { taskId: 'bad id!', summary: 'x' }, /ids are/],
-      ['list_tasks', { states: ['nope'] }, /Invalid|invalid/],
-      ['block', { taskId: task.id, reason: '' }, /Invalid|too_small|at least/i],
+      ['complete_job', { jobId: job.id, summary: 'x', artifacts: ['/etc/hosts'] }, /outside/],
+      ['complete_job', { jobId: 'bad id!', summary: 'x' }, /ids are/],
+      ['list_jobs', { states: ['nope'] }, /Invalid|invalid/],
+      ['block_job', { jobId: job.id, reason: '' }, /Invalid|too_small|at least/i],
     ];
     for (const [name, args, message] of cases) {
       const result = await laneA(name, args);
       expect(result.isError, `${name} ${JSON.stringify(args).slice(0, 60)}`).toBe(true);
       expect(result.text).toMatch(message);
     }
-    // Nothing above changed the task.
-    expect(brain.getTask({ role: 'brain', brainId: 'main' }, task.id).state).toBe('running');
+    // Nothing above changed the job.
+    expect(brain.getJob({ role: 'brain', brainId: 'main' }, job.id).state).toBe('running');
   });
 
   it('a lane cannot read another inbox or reach another project', async () => {
     const hub = await connect(brainConfig());
     const laneX = await connect(laneConfig('X', 'p2'));
-    const task = (await hub('create_task', { title: 'p1 only' })).json as { id: string };
-    const claim = await laneX('claim_task', { taskId: task.id });
+    const job = (await hub('create_job', { title: 'p1 only' })).json as { id: string };
+    const claim = await laneX('claim_job', { jobId: job.id });
     expect(claim.text).toMatch(/^NOT_FOUND/);
-    expect((await laneX('list_tasks')).json).toEqual([]);
-    const note = await laneX('add_note', { body: 'hi', taskId: task.id });
+    expect((await laneX('list_jobs')).json).toEqual([]);
+    const note = await laneX('add_note', { body: 'hi', jobId: job.id });
     expect(note.text).toMatch(/^NOT_FOUND/);
   });
 
   it('brain tools: link cycles, assign, block, requeue, lanes, broadcast, notes', async () => {
     const hub = await connect(brainConfig());
     const laneB = await connect(laneConfig('B'));
-    const a = (await hub('create_task', { title: 'A' })).json as { id: string };
-    const b = (await hub('create_task', { title: 'B', dependsOn: [a.id] })).json as { id: string };
+    const a = (await hub('create_job', { title: 'A' })).json as { id: string };
+    const b = (await hub('create_job', { title: 'B', dependsOn: [a.id] })).json as { id: string };
 
-    const cycle = await hub('link_tasks', { from: b.id, to: a.id });
+    const cycle = await hub('link_jobs', { from: b.id, to: a.id });
     expect(cycle.isError).toBe(true);
     expect(cycle.text).toContain(`CYCLE: dependency cycle: ${b.id} -> ${a.id} -> ${b.id}`);
 
-    expect((await hub('assign_task', { taskId: a.id, laneId: 'B' })).json).toMatchObject({ state: 'claimed', laneId: 'B' });
-    expect((await laneB('block', { taskId: a.id, reason: 'need an API key' })).json).toMatchObject({
+    expect((await hub('assign_job', { jobId: a.id, laneId: 'B' })).json).toMatchObject({ state: 'claimed', laneId: 'B' });
+    expect((await laneB('block_job', { jobId: a.id, reason: 'need an API key' })).json).toMatchObject({
       state: 'blocked',
       reason: 'need an API key',
     });
-    expect((await hub('requeue_task', { taskId: a.id })).json).toMatchObject({ state: 'ready', attempts: 0 });
+    expect((await hub('requeue_job', { jobId: a.id })).json).toMatchObject({ state: 'ready', attempts: 0 });
 
-    const lanes = (await hub('list_lanes')).json as Array<{ id: string; activeTaskId: string | null }>;
+    const lanes = (await hub('list_lanes')).json as Array<{ id: string; activeJobId: string | null }>;
     expect(lanes.map((l) => l.id)).toEqual(['A', 'B']);
     expect((await hub('broadcast', { body: 'standup at 10' })).json).toEqual(['lane:A', 'lane:B']);
-    expect((await hub('list_tasks', { states: ['proposed'] })).json).toMatchObject([{ id: b.id }]);
+    expect((await hub('list_jobs', { states: ['proposed'] })).json).toMatchObject([{ id: b.id }]);
     expect((await hub('add_note', { body: 'decided on OAuth' })).json).toMatchObject({ projectId: 'p1' });
     expect(((await hub('read_inbox', { address: 'lane:A' })).json as unknown[]).length).toBe(1);
   });

@@ -1,4 +1,4 @@
-import type { TaskId, TaskState } from './types';
+import type { JobId, JobState } from './types';
 
 export type BrainErrorCode =
   | 'ILLEGAL_TRANSITION'
@@ -19,16 +19,16 @@ export class BrainError extends Error {
 }
 
 export class IllegalTransitionError extends BrainError {
-  readonly taskId: TaskId;
-  readonly from: TaskState;
-  readonly to: TaskState;
+  readonly jobId: JobId;
+  readonly from: JobState;
+  readonly to: JobState;
 
-  constructor(taskId: TaskId, from: TaskState, to: TaskState, detail?: string) {
+  constructor(jobId: JobId, from: JobState, to: JobState, detail?: string) {
     super(
       'ILLEGAL_TRANSITION',
-      `task ${taskId}: cannot move ${from} -> ${to}${detail ? ` (${detail})` : ''}`
+      `job ${jobId}: cannot move ${from} -> ${to}${detail ? ` (${detail})` : ''}`
     );
-    this.taskId = taskId;
+    this.jobId = jobId;
     this.from = from;
     this.to = to;
   }

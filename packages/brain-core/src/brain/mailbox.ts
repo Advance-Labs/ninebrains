@@ -1,8 +1,8 @@
 import { ForbiddenError, InvalidInputError } from '../errors';
 import { LIMITS } from '../limits';
-import type { Address, Attachment, Identity, Message, Note, ProjectId, TaskId } from '../types';
+import type { Address, Attachment, Identity, Message, Note, ProjectId, JobId } from '../types';
 import { addressOf, parseAddress } from '../types';
-import { inboxAddress, loadVisibleTask, requireBrain } from './authz';
+import { inboxAddress, loadVisibleJob, requireBrain } from './authz';
 import { type BrainContext, type Tx, checkText } from './context';
 
 export interface SendMessageInput {
@@ -63,22 +63,22 @@ export function readInbox(
 export function addNote(
   ctx: BrainContext,
   identity: Identity,
-  input: { body: string; taskId?: TaskId; projectId?: ProjectId }
+  input: { body: string; jobId?: JobId; projectId?: ProjectId }
 ): Note {
   checkText('body', input.body, LIMITS.bodyBytes);
   let projectId = identity.role === 'lane' ? identity.projectId : input.projectId;
-  if (input.taskId !== undefined) {
-    const task = loadVisibleTask(ctx.store, identity, input.taskId);
-    projectId = task.projectId;
+  if (input.jobId !== undefined) {
+    const job = loadVisibleJob(ctx.store, identity, input.jobId);
+    projectId = job.projectId;
   }
-  if (projectId === undefined) throw new InvalidInputError('a note needs a projectId or taskId');
+  if (projectId === undefined) throw new InvalidInputError('a note needs a projectId or jobId');
   if (identity.role === 'lane' && projectId !== identity.projectId) {
     throw new ForbiddenError('a lane can only add notes to its own project');
   }
   const note: Note = {
     id: ctx.newId(),
     projectId,
-    taskId: input.taskId ?? null,
+    jobId: input.jobId ?? null,
     author: addressOf(identity),
     body: input.body,
     createdAt: ctx.now(),

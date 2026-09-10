@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { IllegalTransitionError, isBrainError } from './errors';
 import { allowedTransitions, assertTransition, canTransition, isTerminal, MAX_ATTEMPTS } from './state-machine';
-import { TASK_STATES, type TaskState } from './types';
+import { JOB_STATES, type JobState } from './types';
 
-const LEGAL: Record<TaskState, TaskState[]> = {
+const LEGAL: Record<JobState, JobState[]> = {
   proposed: ['ready', 'blocked', 'failed'],
   ready: ['proposed', 'claimed', 'blocked', 'failed'],
   claimed: ['running', 'ready', 'blocked', 'failed'],
@@ -14,10 +14,10 @@ const LEGAL: Record<TaskState, TaskState[]> = {
   failed: ['ready', 'proposed'],
 };
 
-describe('task state machine', () => {
+describe('job state machine', () => {
   it('allows exactly the documented transitions (all 64 pairs)', () => {
-    for (const from of TASK_STATES) {
-      for (const to of TASK_STATES) {
+    for (const from of JOB_STATES) {
+      for (const to of JOB_STATES) {
         expect(canTransition(from, to), `${from} -> ${to}`).toBe(LEGAL[from].includes(to));
       }
     }
@@ -34,7 +34,7 @@ describe('task state machine', () => {
     expect(isBrainError(caught)).toBe(true);
     const error = caught as IllegalTransitionError;
     expect(error.code).toBe('ILLEGAL_TRANSITION');
-    expect([error.taskId, error.from, error.to]).toEqual(['t1', 'ready', 'done']);
+    expect([error.jobId, error.from, error.to]).toEqual(['t1', 'ready', 'done']);
     expect(error.name).toBe('IllegalTransitionError');
   });
 
@@ -43,13 +43,13 @@ describe('task state machine', () => {
   });
 
   it('never allows self-transitions or skipping verification', () => {
-    for (const state of TASK_STATES) expect(canTransition(state, state)).toBe(false);
+    for (const state of JOB_STATES) expect(canTransition(state, state)).toBe(false);
     expect(canTransition('running', 'done')).toBe(false);
     expect(canTransition('claimed', 'verifying')).toBe(false);
   });
 
   it('treats done as the only terminal state', () => {
-    expect(TASK_STATES.filter(isTerminal)).toEqual(['done']);
+    expect(JOB_STATES.filter(isTerminal)).toEqual(['done']);
     expect(allowedTransitions('done')).toEqual([]);
   });
 

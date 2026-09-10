@@ -3,11 +3,11 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { STORES, tempDir } from '../../test/helpers';
-import type { Run, Task } from '../types';
+import type { Run, Job } from '../types';
 import { LATEST_SCHEMA_VERSION, MIGRATIONS, migrate } from './sqlite/migrations';
 import { DEFAULT_DB_FILENAME, SqliteBrainStore, resolveBrainDbPath } from './sqlite/sqlite-store';
 
-const task = (id: string, createdAt: number): Task => ({
+const job = (id: string, createdAt: number): Job => ({
   id,
   projectId: 'p1',
   title: id,
@@ -29,7 +29,7 @@ const task = (id: string, createdAt: number): Task => ({
 
 const run = (id: string, laneId: string, startedAt: number): Run => ({
   id,
-  taskId: 't',
+  jobId: 't',
   laneId,
   mode: 'attended',
   startedAt,
@@ -41,25 +41,25 @@ const run = (id: string, laneId: string, startedAt: number): Run => ({
 describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
   it('commits a transaction and rolls back a throwing one', () => {
     const store = createStore();
-    store.transaction(() => store.insertTask(task('kept', 1)));
+    store.transaction(() => store.insertJob(job('kept', 1)));
     expect(() =>
       store.transaction(() => {
-        store.insertTask(task('lost', 2));
+        store.insertJob(job('lost', 2));
         throw new Error('boom');
       })
     ).toThrow('boom');
-    expect(store.listTasks().map((t) => t.id)).toEqual(['kept']);
+    expect(store.listJobs().map((t) => t.id)).toEqual(['kept']);
   });
 
   it('joins nested transactions to the outer one', () => {
     const store = createStore();
     expect(() =>
       store.transaction(() => {
-        store.transaction(() => store.insertTask(task('inner', 1)));
+        store.transaction(() => store.insertJob(job('inner', 1)));
         throw new Error('outer fails');
       })
     ).toThrow('outer fails');
-    expect(store.listTasks()).toEqual([]);
+    expect(store.listJobs()).toEqual([]);
   });
 
   it('rejects async transaction callbacks', () => {
@@ -69,35 +69,35 @@ describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
 
   it('returns copies, not live references', () => {
     const store = createStore();
-    store.insertTask(task('t', 1));
-    const read = store.getTask('t')!;
+    store.insertJob(job('t', 1));
+    const read = store.getJob('t')!;
     read.title = 'mutated';
     read.hints.paths = ['x'];
-    expect(store.getTask('t')).toMatchObject({ title: 't', hints: {} });
+    expect(store.getJob('t')).toMatchObject({ title: 't', hints: {} });
   });
 
-  it('orders tasks by creation and filters them', () => {
+  it('orders jobs by creation and filters them', () => {
     const store = createStore();
-    store.insertTask(task('b', 2));
-    store.insertTask(task('a', 1));
-    store.insertTask({ ...task('c', 3), state: 'done', laneId: 'L' });
-    expect(store.listTasks().map((t) => t.id)).toEqual(['a', 'b', 'c']);
-    expect(store.listTasks({ states: ['done'] }).map((t) => t.id)).toEqual(['c']);
-    expect(store.listTasks({ states: [] })).toEqual([]);
-    expect(store.listTasks({ laneId: 'L' }).map((t) => t.id)).toEqual(['c']);
-    expect(store.listTasks({ limit: 1 }).map((t) => t.id)).toEqual(['a']);
+    store.insertJob(job('b', 2));
+    store.insertJob(job('a', 1));
+    store.insertJob({ ...job('c', 3), state: 'done', laneId: 'L' });
+    expect(store.listJobs().map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    expect(store.listJobs({ states: ['done'] }).map((t) => t.id)).toEqual(['c']);
+    expect(store.listJobs({ states: [] })).toEqual([]);
+    expect(store.listJobs({ laneId: 'L' }).map((t) => t.id)).toEqual(['c']);
+    expect(store.listJobs({ limit: 1 }).map((t) => t.id)).toEqual(['a']);
   });
 
-  it('throws when updating a missing task or run', () => {
+  it('throws when updating a missing job or run', () => {
     const store = createStore();
-    expect(() => store.updateTask(task('ghost', 1))).toThrow();
+    expect(() => store.updateJob(job('ghost', 1))).toThrow();
     expect(() => store.updateRun(run('ghost', 'A', 1))).toThrow();
   });
 
   it('treats insertEdge as idempotent', () => {
     const store = createStore();
-    store.insertTask(task('a', 1));
-    store.insertTask(task('b', 2));
+    store.insertJob(job('a', 1));
+    store.insertJob(job('b', 2));
     const edge = { from: 'a', to: 'b', projectId: 'p1', planId: null, createdAt: 1 };
     store.insertEdge(edge);
     store.insertEdge(edge);
@@ -118,7 +118,7 @@ describe.each(STORES)('BrainStore contract (%s)', (_name, createStore) => {
 
   it('upserts lanes', () => {
     const store = createStore();
-    const lane = { id: 'A', projectId: 'p1', provider: 'claude' as const, status: 'idle' as const, recentFiles: [], activeTaskId: null, updatedAt: 1 };
+    const lane = { id: 'A', projectId: 'p1', provider: 'claude' as const, status: 'idle' as const, recentFiles: [], activeJobId: null, updatedAt: 1 };
     store.upsertLane(lane);
     store.upsertLane({ ...lane, status: 'running', recentFiles: ['x.ts'] });
     expect(store.listLanes()).toEqual([{ ...lane, status: 'running', recentFiles: ['x.ts'] }]);
@@ -162,18 +162,18 @@ describe('SqliteBrainStore', () => {
     const db = new DatabaseSync(file);
     const broken = [...MIGRATIONS, { version: 2, name: 'broken', sql: 'CREATE TABLE ok (x) ; NOT VALID SQL' }];
     expect(() => migrate(db, broken)).toThrow();
-    expect(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('tasks','ok')").get()).toEqual({ n: 0 });
+    expect(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('jobs','ok')").get()).toEqual({ n: 0 });
     db.close();
   });
 
   it('persists data across reopen and close is idempotent', () => {
     const dir = tempDir();
     const store = SqliteBrainStore.open(dir);
-    store.insertTask(task('t', 1));
+    store.insertJob(job('t', 1));
     store.close();
     store.close();
     const again = SqliteBrainStore.open(dir);
-    expect(again.getTask('t')?.title).toBe('t');
+    expect(again.getJob('t')?.title).toBe('t');
     again.close();
     expect(existsSync(path.join(dir, DEFAULT_DB_FILENAME))).toBe(true);
   });
@@ -182,12 +182,12 @@ describe('SqliteBrainStore', () => {
     const dir = tempDir();
     const writer = SqliteBrainStore.open(dir);
     const reader = SqliteBrainStore.open(dir);
-    writer.insertTask(task('visible', 1));
+    writer.insertJob(job('visible', 1));
     writer.transaction(() => {
-      writer.insertTask(task('pending', 2));
-      expect(reader.listTasks().map((t) => t.id)).toEqual(['visible']);
+      writer.insertJob(job('pending', 2));
+      expect(reader.listJobs().map((t) => t.id)).toEqual(['visible']);
     });
-    expect(reader.listTasks().map((t) => t.id)).toEqual(['visible', 'pending']);
+    expect(reader.listJobs().map((t) => t.id)).toEqual(['visible', 'pending']);
     writer.close();
     reader.close();
   });

@@ -55,9 +55,9 @@ export function makeBrain(store: BrainStore, options: { lanes?: boolean } = {}):
   return brain;
 }
 
-/** Drives a ready task all the way to done through lane `lane`. */
-export function finish(brain: Brain, lane: Identity, taskId: string): void {
-  brain.claimTask(lane, taskId, { start: true });
-  brain.completeTask(lane, taskId, { summary: `did ${taskId}` });
-  brain.recordGateResult(BRAIN, taskId, { pass: true });
+/** Drives a ready job all the way to done through lane `lane`. */
+export function finish(brain: Brain, lane: Identity, jobId: string): void {
+  brain.claimJob(lane, jobId, { start: true });
+  brain.completeJob(lane, jobId, { summary: `did ${jobId}` });
+  brain.recordGateResult(BRAIN, jobId, { pass: true });
 }

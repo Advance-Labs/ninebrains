@@ -2,31 +2,31 @@ import type { BrainEvent, StoredBrainEvent } from '../events';
 import type {
   Address,
   DoneEntry,
-  Edge,
+  JobEdge,
   Lane,
   LaneId,
   Message,
   Note,
   ProjectId,
   Run,
-  Task,
-  TaskId,
-  TaskState,
+  Job,
+  JobId,
+  JobState,
 } from '../types';
 
-export interface TaskFilter {
+export interface JobFilter {
   projectId?: ProjectId;
-  states?: readonly TaskState[];
+  states?: readonly JobState[];
   laneId?: LaneId;
   planId?: string;
   includeArchived?: boolean;
   limit?: number;
 }
 
-export interface EdgeFilter {
+export interface JobEdgeFilter {
   projectId?: ProjectId;
-  from?: TaskId;
-  to?: TaskId;
+  from?: JobId;
+  to?: JobId;
   planId?: string;
 }
 
@@ -38,7 +38,7 @@ export interface MessageFilter {
 
 export interface RunFilter {
   laneId?: LaneId;
-  taskId?: TaskId;
+  jobId?: JobId;
   since?: number;
   limit?: number;
 }
@@ -54,22 +54,22 @@ export interface RunFilter {
  *   process. If `fn` throws, nothing it wrote survives. Nested calls join the
  *   outer transaction.
  * - Reads return copies; mutating a returned object never changes the store.
- * - Ordering: tasks by (createdAt, insertion); messages, notes and done
+ * - Ordering: jobs by (createdAt, insertion); messages, notes and done
  *   entries oldest first; runs newest first (so `limit` means "most recent").
  * - `insertEdge` is idempotent on (from, to).
  */
 export interface BrainStore {
   transaction<T>(fn: () => T): T;
 
-  getTask(id: TaskId): Task | undefined;
-  findTaskByPlanNode(planId: string, planNodeId: string): Task | undefined;
-  listTasks(filter?: TaskFilter): Task[];
-  insertTask(task: Task): void;
-  updateTask(task: Task): void;
+  getJob(id: JobId): Job | undefined;
+  findJobByPlanNode(planId: string, planNodeId: string): Job | undefined;
+  listJobs(filter?: JobFilter): Job[];
+  insertJob(job: Job): void;
+  updateJob(job: Job): void;
 
-  listEdges(filter?: EdgeFilter): Edge[];
-  insertEdge(edge: Edge): void;
-  deleteEdge(from: TaskId, to: TaskId): void;
+  listEdges(filter?: JobEdgeFilter): JobEdge[];
+  insertEdge(edge: JobEdge): void;
+  deleteEdge(from: JobId, to: JobId): void;
 
   insertMessage(message: Message): void;
   listMessages(filter: MessageFilter): Message[];
@@ -81,7 +81,7 @@ export interface BrainStore {
   listRuns(filter?: RunFilter): Run[];
 
   insertNote(note: Note): void;
-  listNotes(filter?: { projectId?: ProjectId; taskId?: TaskId; limit?: number }): Note[];
+  listNotes(filter?: { projectId?: ProjectId; jobId?: JobId; limit?: number }): Note[];
 
   insertDone(entry: DoneEntry): void;
   listDone(filter?: { projectId?: ProjectId; limit?: number }): DoneEntry[];

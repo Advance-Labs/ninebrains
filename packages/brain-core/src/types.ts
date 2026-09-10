@@ -3,12 +3,12 @@
  * can cross IPC, the MCP protocol and the SQLite boundary unchanged.
  */
 
-export type TaskId = string;
+export type JobId = string;
 export type LaneId = string;
 export type ProjectId = string;
 export type BrainId = string;
 
-export const TASK_STATES = [
+export const JOB_STATES = [
   'proposed',
   'ready',
   'claimed',
@@ -18,7 +18,7 @@ export const TASK_STATES = [
   'blocked',
   'failed',
 ] as const;
-export type TaskState = (typeof TASK_STATES)[number];
+export type JobState = (typeof JOB_STATES)[number];
 
 export const LANE_STATUSES = [
   'idle',
@@ -38,55 +38,55 @@ export type RunMode = 'attended' | 'unattended';
 /** `lane:<id>` or `brain:<id>`. */
 export type Address = `lane:${string}` | `brain:${string}`;
 
-/** Which gates run when the task reaches `verifying`. Interpreted by the gate runner. */
+/** Which gates run when the job reaches `verifying`. Interpreted by the gate runner. */
 export interface GateSpec {
   gates: string[];
   [option: string]: unknown;
 }
 
 /** Optional routing hints consumed by `pickLane`. */
-export interface TaskHints {
-  /** `review` tasks prefer a lane whose provider differs from `authorProvider`. */
+export interface JobHints {
+  /** `review` jobs prefer a lane whose provider differs from `authorProvider`. */
   kind?: 'work' | 'review';
   authorProvider?: Provider;
-  /** Files or directories the task is expected to touch. */
+  /** Files or directories the job is expected to touch. */
   paths?: string[];
 }
 
-export interface TaskResult {
+export interface JobResult {
   summary: string;
   artifacts: string[];
 }
 
-export interface Task {
-  id: TaskId;
+export interface Job {
+  id: JobId;
   projectId: ProjectId;
   title: string;
   body: string;
-  state: TaskState;
+  state: JobState;
   laneId: LaneId | null;
-  /** Failed gate runs so far. Reaching `MAX_ATTEMPTS` blocks the task. */
+  /** Failed gate runs so far. Reaching `MAX_ATTEMPTS` blocks the job. */
   attempts: number;
   gateSpec: GateSpec | null;
-  hints: TaskHints;
-  /** Latest `complete_task` report, kept while the task is verified. */
-  result: TaskResult | null;
-  /** Why the task is blocked or failed, if it is. */
+  hints: JobHints;
+  /** Latest `complete_job` report, kept while the job is verified. */
+  result: JobResult | null;
+  /** Why the job is blocked or failed, if it is. */
   reason: string | null;
   createdBy: Address;
-  /** Set when the task came from `compilePlan`: the stable key for idempotent upserts. */
+  /** Set when the job came from `compilePlan`: the stable key for idempotent upserts. */
   planId: string | null;
   planNodeId: string | null;
-  /** Archived tasks were removed from their plan. They are kept, never deleted. */
+  /** Archived jobs were removed from their plan. They are kept, never deleted. */
   archivedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
 
 /** `to` depends on `from`: `to` cannot become ready until `from` is done. */
-export interface Edge {
-  from: TaskId;
-  to: TaskId;
+export interface JobEdge {
+  from: JobId;
+  to: JobId;
   projectId: ProjectId;
   planId: string | null;
   createdAt: number;
@@ -106,7 +106,7 @@ export interface Message {
 
 export interface Run {
   id: string;
-  taskId: TaskId;
+  jobId: JobId;
   laneId: LaneId;
   mode: RunMode;
   startedAt: number;
@@ -118,7 +118,7 @@ export interface Run {
 export interface Note {
   id: string;
   projectId: ProjectId;
-  taskId: TaskId | null;
+  jobId: JobId | null;
   author: Address;
   body: string;
   createdAt: number;
@@ -126,7 +126,7 @@ export interface Note {
 
 export interface DoneEntry {
   id: string;
-  taskId: TaskId;
+  jobId: JobId;
   projectId: ProjectId;
   laneId: LaneId | null;
   summary: string;
@@ -140,7 +140,7 @@ export interface Lane {
   provider: Provider;
   status: LaneStatus;
   recentFiles: string[];
-  activeTaskId: TaskId | null;
+  activeJobId: JobId | null;
   updatedAt: number;
 }
 

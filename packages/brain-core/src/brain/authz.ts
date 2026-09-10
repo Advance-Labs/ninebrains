@@ -1,13 +1,13 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import type { BrainStore } from '../store/store';
-import type { Address, Identity, ProjectId, Task, TaskId } from '../types';
+import type { Address, Identity, ProjectId, Job, JobId } from '../types';
 import { addressOf } from '../types';
 
 /**
  * Lane-scoped authorization. The rules:
  * - `brain` may do anything.
- * - A lane sees and claims only tasks in its own project.
- * - A lane completes, blocks or releases only tasks it holds (`task.laneId`).
+ * - A lane sees and claims only jobs in its own project.
+ * - A lane completes, blocks or releases only jobs it holds (`job.laneId`).
  * - A lane reads only its own inbox.
  */
 
@@ -19,26 +19,26 @@ export function requireLane(identity: Identity, action: string): asserts identit
   if (identity.role !== 'lane') throw new ForbiddenError(`${action} is a lane action`);
 }
 
-/** Loads a live (non-archived) task the caller may see. Lanes cannot see other projects' tasks. */
-export function loadVisibleTask(store: BrainStore, identity: Identity, taskId: TaskId): Task {
-  const task = store.getTask(taskId);
-  // A lane gets NOT_FOUND for other projects' tasks, so it cannot probe for ids.
-  if (!task || (identity.role === 'lane' && task.projectId !== identity.projectId)) {
-    throw new NotFoundError('task', taskId);
+/** Loads a live (non-archived) job the caller may see. Lanes cannot see other projects' jobs. */
+export function loadVisibleJob(store: BrainStore, identity: Identity, jobId: JobId): Job {
+  const job = store.getJob(jobId);
+  // A lane gets NOT_FOUND for other projects' jobs, so it cannot probe for ids.
+  if (!job || (identity.role === 'lane' && job.projectId !== identity.projectId)) {
+    throw new NotFoundError('job', jobId);
   }
-  return task;
+  return job;
 }
 
-export function loadLiveTask(store: BrainStore, identity: Identity, taskId: TaskId): Task {
-  const task = loadVisibleTask(store, identity, taskId);
-  if (task.archivedAt !== null) throw new NotFoundError('task', taskId);
-  return task;
+export function loadLiveJob(store: BrainStore, identity: Identity, jobId: JobId): Job {
+  const job = loadVisibleJob(store, identity, jobId);
+  if (job.archivedAt !== null) throw new NotFoundError('job', jobId);
+  return job;
 }
 
-export function requireHolder(identity: Identity, task: Task, action: string): void {
+export function requireHolder(identity: Identity, job: Job, action: string): void {
   if (identity.role === 'brain') return;
-  if (task.laneId !== identity.laneId) {
-    throw new ForbiddenError(`lane ${identity.laneId} cannot ${action} task ${task.id}: it is not held by this lane`);
+  if (job.laneId !== identity.laneId) {
+    throw new ForbiddenError(`lane ${identity.laneId} cannot ${action} job ${job.id}: it is not held by this lane`);
   }
 }
 

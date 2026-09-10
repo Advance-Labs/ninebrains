@@ -1,11 +1,11 @@
 import { findCycle } from '../dag';
 import { CycleError, InvalidInputError } from '../errors';
 import { LIMITS } from '../limits';
-import type { GateSpec, Identity, ProjectId, Task, TaskHints, TaskId } from '../types';
+import type { GateSpec, Identity, ProjectId, Job, JobHints, JobId } from '../types';
 import { addressOf } from '../types';
 import { requireBrain } from './authz';
 import { type BrainContext, type Tx, checkText, checkTitle, touch } from './context';
-import { settle } from './tasks';
+import { settle } from './jobs';
 
 export interface PlanNode {
   /** Stable id from the planner canvas. The upsert key. */
@@ -13,7 +13,7 @@ export interface PlanNode {
   title: string;
   body?: string;
   gateSpec?: GateSpec | null;
-  hints?: TaskHints;
+  hints?: JobHints;
 }
 
 export interface PlanInput {
@@ -25,23 +25,23 @@ export interface PlanInput {
 }
 
 export interface CompileResult {
-  /** Plan node id -> task id. */
-  taskIds: Record<string, TaskId>;
-  created: TaskId[];
-  updated: TaskId[];
-  unchanged: TaskId[];
-  archived: TaskId[];
+  /** Plan node id -> job id. */
+  jobIds: Record<string, JobId>;
+  created: JobId[];
+  updated: JobId[];
+  unchanged: JobId[];
+  archived: JobId[];
   edgesAdded: number;
   edgesRemoved: number;
 }
 
 /**
- * Upserts a plan into tasks + edges, idempotently:
- * - Tasks are keyed by (planId, node id). Re-running never duplicates; it
- *   updates title/body/gate/hints in place and never touches task state.
+ * Upserts a plan into jobs + edges, idempotently:
+ * - Jobs are keyed by (planId, node id). Re-running never duplicates; it
+ *   updates title/body/gate/hints in place and never touches job state.
  * - Nodes missing from the new plan are archived (kept, not deleted) and
  *   their plan edges removed. A node that comes back is unarchived.
- * - Plan edges are replaced by the new set. Edges added by `link_tasks`
+ * - Plan edges are replaced by the new set. Edges added by `link_jobs`
  *   outside the plan are kept.
  * - A cycle, in the plan or in the plan plus the project's other edges,
  *   rejects the whole compile with the cycle path; nothing is written.
@@ -57,7 +57,7 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
   if (planCycle) throw new CycleError(planCycle);
 
   const result: CompileResult = {
-    taskIds: {},
+    jobIds: {},
     created: [],
     updated: [],
     unchanged: [],
@@ -66,10 +66,10 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
     edgesRemoved: 0,
   };
   const now = ctx.now();
-  const touched: Task[] = [];
+  const touched: Job[] = [];
 
   for (const node of input.nodes) {
-    const existing = ctx.store.findTaskByPlanNode(input.planId, node.id);
+    const existing = ctx.store.findJobByPlanNode(input.planId, node.id);
     const content = {
       title: node.title,
       body: node.body ?? '',
@@ -77,7 +77,7 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
       hints: node.hints ?? {},
     };
     if (!existing) {
-      const task: Task = {
+      const job: Job = {
         id: ctx.newId(),
         projectId: input.projectId,
         ...content,
@@ -93,10 +93,10 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
         createdAt: now,
         updatedAt: now,
       };
-      ctx.store.insertTask(task);
-      tx.raise({ type: 'taskChanged', payload: { task, previousState: null } });
-      result.created.push(task.id);
-      touched.push(task);
+      ctx.store.insertJob(job);
+      tx.raise({ type: 'jobChanged', payload: { job, previousState: null } });
+      result.created.push(job.id);
+      touched.push(job);
     } else {
       if (existing.projectId !== input.projectId) {
         throw new InvalidInputError(`plan ${input.planId} already belongs to project ${existing.projectId}`);
@@ -107,29 +107,29 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
         existing.body !== content.body ||
         JSON.stringify(existing.gateSpec) !== JSON.stringify(content.gateSpec) ||
         JSON.stringify(existing.hints) !== JSON.stringify(content.hints);
-      const task = changed ? touch(ctx, tx, existing, { ...content, archivedAt: null }) : existing;
-      (changed ? result.updated : result.unchanged).push(task.id);
-      touched.push(task);
+      const job = changed ? touch(ctx, tx, existing, { ...content, archivedAt: null }) : existing;
+      (changed ? result.updated : result.unchanged).push(job.id);
+      touched.push(job);
     }
-    result.taskIds[node.id] = touched[touched.length - 1]!.id;
+    result.jobIds[node.id] = touched[touched.length - 1]!.id;
   }
 
-  const keep = new Set(Object.values(result.taskIds));
-  for (const task of ctx.store.listTasks({ planId: input.planId })) {
-    if (keep.has(task.id)) continue;
-    for (const edge of [...ctx.store.listEdges({ from: task.id }), ...ctx.store.listEdges({ to: task.id })]) {
+  const keep = new Set(Object.values(result.jobIds));
+  for (const job of ctx.store.listJobs({ planId: input.planId })) {
+    if (keep.has(job.id)) continue;
+    for (const edge of [...ctx.store.listEdges({ from: job.id }), ...ctx.store.listEdges({ to: job.id })]) {
       if (edge.planId === input.planId) {
         ctx.store.deleteEdge(edge.from, edge.to);
         result.edgesRemoved++;
       }
     }
-    touch(ctx, tx, task, { archivedAt: now });
-    result.archived.push(task.id);
+    touch(ctx, tx, job, { archivedAt: now });
+    result.archived.push(job.id);
   }
 
   const wanted = new Map(
     input.edges.map((e) => {
-      const edge = { from: result.taskIds[e.from]!, to: result.taskIds[e.to]! };
+      const edge = { from: result.jobIds[e.from]!, to: result.jobIds[e.to]! };
       return [`${edge.from}>${edge.to}`, edge];
     })
   );
@@ -147,18 +147,18 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
   }
 
   const projectEdges = ctx.store.listEdges({ projectId: input.projectId });
-  const liveIds = ctx.store.listTasks({ projectId: input.projectId }).map((t) => t.id);
+  const liveIds = ctx.store.listJobs({ projectId: input.projectId }).map((t) => t.id);
   const cycle = findCycle(liveIds, projectEdges);
   if (cycle) throw new CycleError(cycle);
 
   for (const id of keep) {
-    const task = ctx.store.getTask(id);
-    if (task) settle(ctx, tx, task);
+    const job = ctx.store.getJob(id);
+    if (job) settle(ctx, tx, job);
   }
-  // Archiving a node can unblock tasks that depended on it outside the plan.
+  // Archiving a node can unblock jobs that depended on it outside the plan.
   for (const id of result.archived) {
     for (const edge of ctx.store.listEdges({ from: id })) {
-      const dependent = ctx.store.getTask(edge.to);
+      const dependent = ctx.store.getJob(edge.to);
       if (dependent) settle(ctx, tx, dependent);
     }
   }

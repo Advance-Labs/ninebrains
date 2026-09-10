@@ -1,11 +1,11 @@
 import type { BrainEvent, StoredBrainEvent } from '../events';
 import { NotFoundError } from '../errors';
-import type { DoneEntry, Edge, Lane, LaneId, Message, Note, ProjectId, Run, Task, TaskId } from '../types';
-import type { BrainStore, EdgeFilter, MessageFilter, RunFilter, TaskFilter } from './store';
+import type { DoneEntry, JobEdge, Lane, LaneId, Message, Note, ProjectId, Run, Job, JobId } from '../types';
+import type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from './store';
 
 interface State {
-  tasks: Task[];
-  edges: Edge[];
+  jobs: Job[];
+  edges: JobEdge[];
   messages: Message[];
   runs: Run[];
   notes: Note[];
@@ -27,7 +27,7 @@ function take<T>(rows: T[], limit: number | undefined): T[] {
  */
 export class InMemoryBrainStore implements BrainStore {
   private state: State = {
-    tasks: [],
+    jobs: [],
     edges: [],
     messages: [],
     runs: [],
@@ -62,18 +62,18 @@ export class InMemoryBrainStore implements BrainStore {
     }
   }
 
-  getTask(id: TaskId): Task | undefined {
-    const task = this.state.tasks.find((t) => t.id === id);
-    return task && clone(task);
+  getJob(id: JobId): Job | undefined {
+    const job = this.state.jobs.find((t) => t.id === id);
+    return job && clone(job);
   }
 
-  findTaskByPlanNode(planId: string, planNodeId: string): Task | undefined {
-    const task = this.state.tasks.find((t) => t.planId === planId && t.planNodeId === planNodeId);
-    return task && clone(task);
+  findJobByPlanNode(planId: string, planNodeId: string): Job | undefined {
+    const job = this.state.jobs.find((t) => t.planId === planId && t.planNodeId === planNodeId);
+    return job && clone(job);
   }
 
-  listTasks(filter: TaskFilter = {}): Task[] {
-    const rows = this.state.tasks.filter(
+  listJobs(filter: JobFilter = {}): Job[] {
+    const rows = this.state.jobs.filter(
       (t) =>
         (filter.projectId === undefined || t.projectId === filter.projectId) &&
         (filter.states === undefined || filter.states.includes(t.state)) &&
@@ -88,18 +88,18 @@ export class InMemoryBrainStore implements BrainStore {
     return clone(take(sorted, filter.limit));
   }
 
-  insertTask(task: Task): void {
-    if (this.state.tasks.some((t) => t.id === task.id)) throw new Error(`duplicate task ${task.id}`);
-    this.state.tasks.push(clone(task));
+  insertJob(job: Job): void {
+    if (this.state.jobs.some((t) => t.id === job.id)) throw new Error(`duplicate job ${job.id}`);
+    this.state.jobs.push(clone(job));
   }
 
-  updateTask(task: Task): void {
-    const index = this.state.tasks.findIndex((t) => t.id === task.id);
-    if (index < 0) throw new NotFoundError('task', task.id);
-    this.state.tasks[index] = clone(task);
+  updateJob(job: Job): void {
+    const index = this.state.jobs.findIndex((t) => t.id === job.id);
+    if (index < 0) throw new NotFoundError('job', job.id);
+    this.state.jobs[index] = clone(job);
   }
 
-  listEdges(filter: EdgeFilter = {}): Edge[] {
+  listEdges(filter: JobEdgeFilter = {}): JobEdge[] {
     return clone(
       this.state.edges.filter(
         (e) =>
@@ -111,12 +111,12 @@ export class InMemoryBrainStore implements BrainStore {
     );
   }
 
-  insertEdge(edge: Edge): void {
+  insertEdge(edge: JobEdge): void {
     if (this.state.edges.some((e) => e.from === edge.from && e.to === edge.to)) return;
     this.state.edges.push(clone(edge));
   }
 
-  deleteEdge(from: TaskId, to: TaskId): void {
+  deleteEdge(from: JobId, to: JobId): void {
     this.state.edges = this.state.edges.filter((e) => !(e.from === from && e.to === to));
   }
 
@@ -157,7 +157,7 @@ export class InMemoryBrainStore implements BrainStore {
       .filter(
         ({ r }) =>
           (filter.laneId === undefined || r.laneId === filter.laneId) &&
-          (filter.taskId === undefined || r.taskId === filter.taskId) &&
+          (filter.jobId === undefined || r.jobId === filter.jobId) &&
           (filter.since === undefined || r.startedAt >= filter.since)
       )
       .sort((a, b) => b.r.startedAt - a.r.startedAt || b.i - a.i)
@@ -169,11 +169,11 @@ export class InMemoryBrainStore implements BrainStore {
     this.state.notes.push(clone(note));
   }
 
-  listNotes(filter: { projectId?: ProjectId; taskId?: TaskId; limit?: number } = {}): Note[] {
+  listNotes(filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {
     const rows = this.state.notes.filter(
       (n) =>
         (filter.projectId === undefined || n.projectId === filter.projectId) &&
-        (filter.taskId === undefined || n.taskId === filter.taskId)
+        (filter.jobId === undefined || n.jobId === filter.jobId)
     );
     return clone(take(rows, filter.limit));
   }

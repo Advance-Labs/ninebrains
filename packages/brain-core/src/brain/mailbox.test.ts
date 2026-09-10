@@ -82,16 +82,16 @@ describe.each(STORES)('mailbox (%s store)', (_name, createStore) => {
 
   it('stores notes scoped to the project', () => {
     const brain = makeBrain(createStore());
-    const task = brain.createTask(BRAIN, { projectId: 'p1', title: 'T' });
+    const job = brain.createJob(BRAIN, { projectId: 'p1', title: 'T' });
     brain.addNote(LANE_A, { body: 'uses port 3001' });
-    brain.addNote(LANE_A, { body: 'flaky test', taskId: task.id });
+    brain.addNote(LANE_A, { body: 'flaky test', jobId: job.id });
     brain.addNote(BRAIN, { body: 'brain note', projectId: 'p2' });
     expect(() => brain.addNote(BRAIN, { body: 'where?' })).toThrow(InvalidInputError);
-    expect(brain.listNotes(LANE_A).map((n) => [n.author, n.body, n.taskId])).toEqual([
+    expect(brain.listNotes(LANE_A).map((n) => [n.author, n.body, n.jobId])).toEqual([
       ['lane:A', 'uses port 3001', null],
-      ['lane:A', 'flaky test', task.id],
+      ['lane:A', 'flaky test', job.id],
     ]);
-    expect(brain.listNotes(BRAIN, { taskId: task.id })).toHaveLength(1);
+    expect(brain.listNotes(BRAIN, { jobId: job.id })).toHaveLength(1);
   });
 });
 

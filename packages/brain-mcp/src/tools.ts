@@ -4,7 +4,7 @@ import {
   type Attachment,
   type Brain,
   InvalidInputError,
-  type Task,
+  type Job,
   isBrainError,
 } from '@ninebrains/brain-core';
 import type { z } from 'zod';
@@ -13,26 +13,26 @@ import { resolveAttachmentPath } from './paths';
 import { shapes } from './schemas';
 
 export const LANE_TOOLS = [
-  'claim_task',
-  'complete_task',
-  'block',
+  'claim_job',
+  'complete_job',
+  'block_job',
   'send_message',
   'read_inbox',
-  'list_tasks',
+  'list_jobs',
   'add_note',
 ] as const;
 
 export const BRAIN_TOOLS = [
-  'complete_task',
-  'block',
+  'complete_job',
+  'block_job',
   'send_message',
   'read_inbox',
-  'list_tasks',
+  'list_jobs',
   'add_note',
-  'create_task',
-  'link_tasks',
-  'assign_task',
-  'requeue_task',
+  'create_job',
+  'link_jobs',
+  'assign_job',
+  'requeue_job',
   'list_lanes',
   'broadcast',
 ] as const;
@@ -54,28 +54,28 @@ function fail(error: unknown): CallToolResult {
   return { isError: true, content: [{ type: 'text', text }] };
 }
 
-function summary(task: Task) {
+function summary(job: Job) {
   return {
-    id: task.id,
-    title: task.title,
-    state: task.state,
-    laneId: task.laneId,
-    attempts: task.attempts,
-    ...(task.reason ? { reason: task.reason } : {}),
-    body: task.body.length > PREVIEW_CHARS ? `${task.body.slice(0, PREVIEW_CHARS)}...` : task.body,
+    id: job.id,
+    title: job.title,
+    state: job.state,
+    laneId: job.laneId,
+    attempts: job.attempts,
+    ...(job.reason ? { reason: job.reason } : {}),
+    body: job.body.length > PREVIEW_CHARS ? `${job.body.slice(0, PREVIEW_CHARS)}...` : job.body,
   };
 }
 
-function full(task: Task) {
+function full(job: Job) {
   return {
-    id: task.id,
-    title: task.title,
-    body: task.body,
-    state: task.state,
-    attempts: task.attempts,
-    gates: task.gateSpec?.gates ?? [],
-    hints: task.hints,
-    ...(task.reason ? { reason: task.reason } : {}),
+    id: job.id,
+    title: job.title,
+    body: job.body,
+    state: job.state,
+    attempts: job.attempts,
+    gates: job.gateSpec?.gates ?? [],
+    hints: job.hints,
+    ...(job.reason ? { reason: job.reason } : {}),
   };
 }
 
@@ -119,38 +119,38 @@ export function registerTools(server: McpServer, brain: Brain, config: BrainMcpC
 
   if (!isBrain) {
     tool(
-      'claim_task',
-      'Claim a ready task in your project and start working on it. Pass taskId to take a specific task, or omit it to take the oldest ready task. A task can be held by only one lane: if another lane got it first you receive ILLEGAL_TRANSITION, so pick another. Returns the full task (title, body, gates). When you finish, call complete_task; if you cannot finish, call block.',
-      shapes.claimTask,
-      ({ taskId }) => {
-        if (taskId) return full(brain.claimTask(me, taskId, { start: true }));
-        for (const task of brain.listTasks(me, { states: ['ready'] })) {
+      'claim_job',
+      'Claim a ready job in your project and start working on it. Pass jobId to take a specific job, or omit it to take the oldest ready job. A job can be held by only one lane: if another lane got it first you receive ILLEGAL_TRANSITION, so pick another. Returns the full job (title, body, gates). When you finish, call complete_job; if you cannot finish, call block.',
+      shapes.claimJob,
+      ({ jobId }) => {
+        if (jobId) return full(brain.claimJob(me, jobId, { start: true }));
+        for (const job of brain.listJobs(me, { states: ['ready'] })) {
           try {
-            return full(brain.claimTask(me, task.id, { start: true }));
+            return full(brain.claimJob(me, job.id, { start: true }));
           } catch (error) {
             if (!isBrainError(error) || error.code !== 'ILLEGAL_TRANSITION') throw error;
           }
         }
-        return { claimed: null, message: 'No ready tasks in this project. Check read_inbox, or wait.' };
+        return { claimed: null, message: 'No ready jobs in this project. Check read_inbox, or wait.' };
       }
     );
   }
 
   tool(
-    'complete_task',
-    'Report a task you hold as finished. It moves to "verifying": gates (tests, screenshots, a reviewer) now check your work. If a gate fails, the feedback arrives in your inbox and the task comes back to you; after 3 failed attempts it is blocked. summary: what changed and how you verified it. artifacts: paths to evidence (screenshots, logs, reports) inside the project or evidence directory.',
-    shapes.completeTask,
-    ({ taskId, summary: text, artifacts }) => {
+    'complete_job',
+    'Report a job you hold as finished. It moves to "verifying": gates (tests, screenshots, a reviewer) now check your work. If a gate fails, the feedback arrives in your inbox and the job comes back to you; after 3 failed attempts it is blocked. summary: what changed and how you verified it. artifacts: paths to evidence (screenshots, logs, reports) inside the project or evidence directory.',
+    shapes.completeJob,
+    ({ jobId, summary: text, artifacts }) => {
       const resolved = artifacts.map((p) => resolveAttachmentPath(p, config.attachmentRoots));
-      return summary(brain.completeTask(me, taskId, { summary: text, artifacts: resolved }));
+      return summary(brain.completeJob(me, jobId, { summary: text, artifacts: resolved }));
     }
   );
 
   tool(
-    'block',
-    'Stop work on a task you hold because you cannot proceed (missing access, unclear requirement, broken dependency). The Brain is notified and can requeue it. Say exactly what would unblock you.',
+    'block_job',
+    'Stop work on a job you hold because you cannot proceed (missing access, unclear requirement, broken dependency). The Brain is notified and can requeue it. Say exactly what would unblock you.',
     shapes.block,
-    ({ taskId, reason }) => summary(brain.blockTask(me, taskId, reason))
+    ({ jobId, reason }) => summary(brain.blockJob(me, jobId, reason))
   );
 
   tool(
@@ -172,49 +172,49 @@ export function registerTools(server: McpServer, brain: Brain, config: BrainMcpC
       false
     );
     tool(
-      'list_tasks',
-      'List tasks, filtered by project, lane and state. States: proposed (waiting on dependencies), ready, claimed, running, verifying, done, blocked, failed. Bodies are truncated.',
-      shapes.listTasksBrain,
+      'list_jobs',
+      'List jobs, filtered by project, lane and state. States: proposed (waiting on dependencies), ready, claimed, running, verifying, done, blocked, failed. Bodies are truncated.',
+      shapes.listJobsBrain,
       ({ states, projectId, laneId, limit }) =>
-        brain.listTasks(me, { states, projectId: projectId ?? config.projectId ?? undefined, laneId, limit }).map(summary),
+        brain.listJobs(me, { states, projectId: projectId ?? config.projectId ?? undefined, laneId, limit }).map(summary),
       true
     );
   } else {
     tool(
       'read_inbox',
-      'Read your unread messages, oldest first, and mark them read. Check it when you start, after you complete a task, and whenever you are told you have mail: the Brain sends instructions and gate feedback here.',
+      'Read your unread messages, oldest first, and mark them read. Check it when you start, after you complete a job, and whenever you are told you have mail: the Brain sends instructions and gate feedback here.',
       shapes.readInbox,
       ({ limit }) => brain.readInbox(me, { limit })
     );
     tool(
-      'list_tasks',
-      'List tasks in your project. Filter by states (proposed = waiting on dependencies, ready = claimable, claimed/running = held by a lane, verifying = being checked, done, blocked, failed) or mine=true for tasks you hold. Bodies are truncated; claim_task returns the full body.',
-      shapes.listTasks,
+      'list_jobs',
+      'List jobs in your project. Filter by states (proposed = waiting on dependencies, ready = claimable, claimed/running = held by a lane, verifying = being checked, done, blocked, failed) or mine=true for jobs you hold. Bodies are truncated; claim_job returns the full body.',
+      shapes.listJobs,
       ({ states, mine, limit }) =>
-        brain.listTasks(me, { states, limit, laneId: mine && me.role === 'lane' ? me.laneId : undefined }).map(summary),
+        brain.listJobs(me, { states, limit, laneId: mine && me.role === 'lane' ? me.laneId : undefined }).map(summary),
       true
     );
   }
 
   tool(
     'add_note',
-    'Leave a durable note for your project or one task: a discovery, a gotcha, a decision. Other lanes and the Brain can read notes. Use send_message instead when someone has to act.',
+    'Leave a durable note for your project or one job: a discovery, a gotcha, a decision. Other lanes and the Brain can read notes. Use send_message instead when someone has to act.',
     shapes.addNote,
-    ({ body, taskId }) => {
-      const note = brain.addNote(me, { body, taskId, projectId: config.projectId ?? undefined });
-      return { id: note.id, projectId: note.projectId, taskId: note.taskId };
+    ({ body, jobId }) => {
+      const note = brain.addNote(me, { body, jobId, projectId: config.projectId ?? undefined });
+      return { id: note.id, projectId: note.projectId, jobId: note.jobId };
     }
   );
 
   if (!isBrain) return;
 
   tool(
-    'create_task',
-    'Create a task. With dependsOn it stays "proposed" until every dependency is done, then becomes "ready" and the dispatcher hands it to a free lane. gates picks the verification that runs on completion. kind "review" plus paths help routing (reviews prefer a different model than the author).',
-    shapes.createTask,
+    'create_job',
+    'Create a job. With dependsOn it stays "proposed" until every dependency is done, then becomes "ready" and the dispatcher hands it to a free lane. gates picks the verification that runs on completion. kind "review" plus paths help routing (reviews prefer a different model than the author).',
+    shapes.createJob,
     ({ title, body, projectId, dependsOn, gates, kind, paths }) =>
       summary(
-        brain.createTask(me, {
+        brain.createJob(me, {
           projectId: project(projectId),
           title,
           body,
@@ -226,29 +226,29 @@ export function registerTools(server: McpServer, brain: Brain, config: BrainMcpC
   );
 
   tool(
-    'link_tasks',
-    'Make task `to` wait until task `from` is done. Idempotent. Rejected, with the cycle path, if it would create a dependency cycle.',
-    shapes.linkTasks,
-    ({ from, to }) => brain.linkTasks(me, from, to)
+    'link_jobs',
+    'Make job `to` wait until job `from` is done. Idempotent. Rejected, with the cycle path, if it would create a dependency cycle.',
+    shapes.linkJobs,
+    ({ from, to }) => brain.linkJobs(me, from, to)
   );
 
   tool(
-    'assign_task',
-    'Hand a ready task to a specific lane in the same project, instead of letting the dispatcher route it.',
-    shapes.assignTask,
-    ({ taskId, laneId }) => summary(brain.assignTask(me, taskId, laneId))
+    'assign_job',
+    'Hand a ready job to a specific lane in the same project, instead of letting the dispatcher route it.',
+    shapes.assignJob,
+    ({ jobId, laneId }) => summary(brain.assignJob(me, jobId, laneId))
   );
 
   tool(
-    'requeue_task',
-    'Put a blocked or failed task back in the queue with a fresh 3-attempt budget. Read its reason first (list_tasks) and fix the cause or message the lane.',
-    shapes.requeueTask,
-    ({ taskId }) => summary(brain.requeueTask(me, taskId))
+    'requeue_job',
+    'Put a blocked or failed job back in the queue with a fresh 3-attempt budget. Read its reason first (list_jobs) and fix the cause or message the lane.',
+    shapes.requeueJob,
+    ({ jobId }) => summary(brain.requeueJob(me, jobId))
   );
 
   tool(
     'list_lanes',
-    'List lanes with their status (idle, running, waiting, verifying, blocked, asleep), provider (claude or codex) and the task they hold.',
+    'List lanes with their status (idle, running, waiting, verifying, blocked, asleep), provider (claude or codex) and the job they hold.',
     shapes.listLanes,
     ({ projectId }) => brain.listLanes(me, { projectId: projectId ?? config.projectId ?? undefined }),
     true

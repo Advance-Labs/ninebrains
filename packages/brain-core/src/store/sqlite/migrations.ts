@@ -15,7 +15,7 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 1,
     name: 'initial',
     sql: `
-      CREATE TABLE tasks (
+      CREATE TABLE jobs (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
         title TEXT NOT NULL,
@@ -35,20 +35,20 @@ export const MIGRATIONS: readonly Migration[] = [
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       ) STRICT;
-      CREATE INDEX tasks_project_state ON tasks (project_id, state);
-      CREATE INDEX tasks_lane ON tasks (lane_id);
-      CREATE UNIQUE INDEX tasks_plan_node ON tasks (plan_id, plan_node_id) WHERE plan_id IS NOT NULL;
+      CREATE INDEX jobs_project_state ON jobs (project_id, state);
+      CREATE INDEX jobs_lane ON jobs (lane_id);
+      CREATE UNIQUE INDEX jobs_plan_node ON jobs (plan_id, plan_node_id) WHERE plan_id IS NOT NULL;
 
-      CREATE TABLE task_edges (
-        from_id TEXT NOT NULL REFERENCES tasks (id),
-        to_id TEXT NOT NULL REFERENCES tasks (id),
+      CREATE TABLE job_edges (
+        from_id TEXT NOT NULL REFERENCES jobs (id),
+        to_id TEXT NOT NULL REFERENCES jobs (id),
         project_id TEXT NOT NULL,
         plan_id TEXT,
         created_at INTEGER NOT NULL,
         PRIMARY KEY (from_id, to_id)
       ) STRICT;
-      CREATE INDEX task_edges_to ON task_edges (to_id);
-      CREATE INDEX task_edges_project ON task_edges (project_id);
+      CREATE INDEX job_edges_to ON job_edges (to_id);
+      CREATE INDEX job_edges_project ON job_edges (project_id);
 
       CREATE TABLE messages (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,7 +65,7 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE TABLE runs (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
         id TEXT NOT NULL UNIQUE,
-        task_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
         lane_id TEXT NOT NULL,
         mode TEXT NOT NULL CHECK (mode IN ('attended','unattended')),
         started_at INTEGER NOT NULL,
@@ -74,13 +74,13 @@ export const MIGRATIONS: readonly Migration[] = [
         transcript_path TEXT
       ) STRICT;
       CREATE INDEX runs_lane ON runs (lane_id, started_at);
-      CREATE INDEX runs_task ON runs (task_id);
+      CREATE INDEX runs_job ON runs (job_id);
 
       CREATE TABLE notes (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
         id TEXT NOT NULL UNIQUE,
         project_id TEXT NOT NULL,
-        task_id TEXT,
+        job_id TEXT,
         author TEXT NOT NULL,
         body TEXT NOT NULL,
         created_at INTEGER NOT NULL
@@ -90,7 +90,7 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE TABLE done_log (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
         id TEXT NOT NULL UNIQUE,
-        task_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
         project_id TEXT NOT NULL,
         lane_id TEXT,
         summary TEXT NOT NULL,
@@ -105,7 +105,7 @@ export const MIGRATIONS: readonly Migration[] = [
         provider TEXT NOT NULL,
         status TEXT NOT NULL,
         recent_files TEXT NOT NULL DEFAULT '[]',
-        active_task_id TEXT,
+        active_job_id TEXT,
         updated_at INTEGER NOT NULL
       ) STRICT;
 

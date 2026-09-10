@@ -1,7 +1,7 @@
 {
   "name": "@ninebrains/brain-core",
   "version": "0.1.0",
-  "description": "Ninebrains Brain: task DAG, state machine, mailbox, routing and SQLite store. Framework-free.",
+  "description": "Ninebrains Brain: job DAG, state machine, mailbox, routing and SQLite store. Framework-free.",
   "license": "Apache-2.0",
   "author": {
     "name": "Advance Labs Inc.",

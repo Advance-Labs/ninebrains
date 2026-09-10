@@ -78,17 +78,17 @@ describe('built stdio server', () => {
     const laneB = await launch({ runtime: node, role: 'lane', laneId: 'B', projectId: 'p1', projectDir: path.join(dir, 'project') });
 
     expect(laneA.client.getServerVersion()?.name).toBe('ninebrains-brain');
-    expect(laneA.client.getInstructions()).toContain('claim_task');
+    expect(laneA.client.getInstructions()).toContain('claim_job');
 
-    const task = (await hub.call('create_task', { title: 'Write the report' })).json as { id: string };
-    const claimed = await laneA.call('claim_task', { taskId: task.id });
-    expect(claimed.json).toMatchObject({ id: task.id, state: 'running' });
+    const job = (await hub.call('create_job', { title: 'Write the report' })).json as { id: string };
+    const claimed = await laneA.call('claim_job', { jobId: job.id });
+    expect(claimed.json).toMatchObject({ id: job.id, state: 'running' });
 
-    const loser = await laneB.call('claim_task', { taskId: task.id });
+    const loser = await laneB.call('claim_job', { jobId: job.id });
     expect(loser.isError).toBe(true);
     expect(loser.text).toMatch(/^ILLEGAL_TRANSITION/);
 
-    const complete = await laneA.call('complete_task', { taskId: task.id, summary: 'written', artifacts: ['report.md'] });
+    const complete = await laneA.call('complete_job', { jobId: job.id, summary: 'written', artifacts: ['report.md'] });
     expect(complete.json).toMatchObject({ state: 'verifying' });
 
     await laneA.call('send_message', { to: 'lane:B', body: 'report is in', attachments: [{ kind: 'file', path: 'report.md' }] });
@@ -96,7 +96,7 @@ describe('built stdio server', () => {
     expect(inbox).toHaveLength(1);
     expect(inbox[0]!.attachments[0]!.path).toBe(path.join(dir, 'project', 'report.md'));
 
-    expect((await hub.call('list_tasks', { states: ['verifying'] })).json).toMatchObject([{ id: task.id, laneId: 'A' }]);
+    expect((await hub.call('list_jobs', { states: ['verifying'] })).json).toMatchObject([{ id: job.id, laneId: 'A' }]);
   });
 
   it('exits with a clear error when its identity env is missing', () => {
@@ -125,7 +125,7 @@ describe('built stdio server', () => {
   it.skipIf(!electron)('runs under the pinned Electron binary with ELECTRON_RUN_AS_NODE=1', async () => {
     const lane = await launch({ runtime: { kind: 'electron', execPath: electron! }, role: 'lane', laneId: 'E', projectId: 'p1' });
     const { tools } = await lane.client.listTools();
-    expect(tools.map((t) => t.name)).toContain('claim_task');
-    expect((await lane.call('claim_task')).json).toMatchObject({ claimed: null });
+    expect(tools.map((t) => t.name)).toContain('claim_job');
+    expect((await lane.call('claim_job')).json).toMatchObject({ claimed: null });
   });
 });

@@ -1,4 +1,4 @@
-import { LIMITS, TASK_STATES, utf8Bytes } from '@ninebrains/brain-core';
+import { LIMITS, JOB_STATES, utf8Bytes } from '@ninebrains/brain-core';
 import { z } from 'zod';
 
 /**
@@ -28,14 +28,14 @@ export const attachment = z.union([
 
 export const attachments = z.array(attachment).max(LIMITS.attachments);
 
-export const taskState = z.enum(TASK_STATES);
+export const jobState = z.enum(JOB_STATES);
 
 export const shapes = {
-  claimTask: {
-    taskId: id.optional().describe('Task to claim. Omit to take the oldest ready task in your project.'),
+  claimJob: {
+    jobId: id.optional().describe('Job to claim. Omit to take the oldest ready job in your project.'),
   },
-  completeTask: {
-    taskId: id,
+  completeJob: {
+    jobId: id,
     summary: bytes(LIMITS.summaryBytes, 'summary')
       .refine((v) => v.trim().length > 0, { message: 'summary must not be empty' })
       .describe('What you did and how you verified it. The reviewer and the done log read this.'),
@@ -46,7 +46,7 @@ export const shapes = {
       .describe('Paths (inside the project or evidence dir) that prove the work: screenshots, logs, reports.'),
   },
   block: {
-    taskId: id,
+    jobId: id,
     reason: z.string().min(1).max(LIMITS.reasonChars).describe('What is blocking you and what would unblock it.'),
   },
   sendMessage: {
@@ -61,40 +61,40 @@ export const shapes = {
     limit: z.number().int().min(1).max(200).default(50),
     address: address.optional().describe('Inbox to read. Defaults to your own brain inbox.'),
   },
-  listTasks: {
-    states: z.array(taskState).max(TASK_STATES.length).optional().describe('Only tasks in these states.'),
-    mine: z.boolean().default(false).describe('Only tasks held by this lane.'),
+  listJobs: {
+    states: z.array(jobState).max(JOB_STATES.length).optional().describe('Only jobs in these states.'),
+    mine: z.boolean().default(false).describe('Only jobs held by this lane.'),
     limit: z.number().int().min(1).max(500).default(100),
   },
-  listTasksBrain: {
-    states: z.array(taskState).max(TASK_STATES.length).optional(),
+  listJobsBrain: {
+    states: z.array(jobState).max(JOB_STATES.length).optional(),
     projectId: id.optional().describe('Defaults to this session\'s project.'),
     laneId: id.optional(),
     limit: z.number().int().min(1).max(500).default(100),
   },
   addNote: {
     body,
-    taskId: id.optional().describe('Attach the note to a task. Omit for a project-wide note.'),
+    jobId: id.optional().describe('Attach the note to a job. Omit for a project-wide note.'),
   },
-  createTask: {
+  createJob: {
     title: z.string().trim().min(1).max(LIMITS.titleChars),
     body: bytes(LIMITS.bodyBytes, 'body').default(''),
     projectId: id.optional().describe('Defaults to this session\'s project.'),
-    dependsOn: z.array(id).max(100).default([]).describe('Task ids that must be done before this one is ready.'),
+    dependsOn: z.array(id).max(100).default([]).describe('Job ids that must be done before this one is ready.'),
     gates: z
       .array(z.string().min(1).max(64))
       .max(10)
       .optional()
       .describe('Verification gates to run on completion, e.g. ["tests", "screenshot", "reviewer"].'),
     kind: z.enum(['work', 'review']).optional(),
-    paths: z.array(z.string().min(1).max(LIMITS.pathChars)).max(100).optional().describe('Files the task will touch; used for routing.'),
+    paths: z.array(z.string().min(1).max(LIMITS.pathChars)).max(100).optional().describe('Files the job will touch; used for routing.'),
   },
-  linkTasks: {
-    from: id.describe('The prerequisite task.'),
-    to: id.describe('The task that must wait for `from` to be done.'),
+  linkJobs: {
+    from: id.describe('The prerequisite job.'),
+    to: id.describe('The job that must wait for `from` to be done.'),
   },
-  assignTask: { taskId: id, laneId: id },
-  requeueTask: { taskId: id },
+  assignJob: { jobId: id, laneId: id },
+  requeueJob: { jobId: id },
   listLanes: { projectId: id.optional() },
   broadcast: {
     body,
