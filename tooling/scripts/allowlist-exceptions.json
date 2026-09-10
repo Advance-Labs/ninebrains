@@ -1,0 +1,35 @@
+{
+  "$comment": "Reviewed exceptions to the licence allowlist in check-licenses.mjs. Each entry matches one package name AND the exact licence string pnpm reports, so a licence change re-opens review. Blocked packages and forbidden licences (AGPL, GPL, SSPL, Elastic, BUSL, Commons Clause) cannot be listed here.",
+  "exceptions": [
+    {
+      "package": "@fontsource-variable/inter",
+      "license": "OFL-1.1",
+      "reviewed": "2026-09-10",
+      "reason": "Font files bundled into the renderer. OFL-1.1 allows bundling and redistribution with software; it only bars selling the font on its own and reusing the reserved font name. It does not touch the licence of our code."
+    },
+    {
+      "package": "@fontsource-variable/jetbrains-mono",
+      "license": "OFL-1.1",
+      "reviewed": "2026-09-10",
+      "reason": "Monospace font files bundled into the renderer. Same OFL-1.1 terms as Inter: redistribution with software is allowed and our code keeps its own licence."
+    },
+    {
+      "package": "elkjs",
+      "license": "EPL-2.0",
+      "reviewed": "2026-09-10",
+      "reason": "Graph layout engine that beautiful-mermaid uses to lay out diagrams in chat-ui. EPL-2.0 is weak, file-level copyleft like MPL-2.0: we ship it unmodified and our code keeps its own licence. Any change to elkjs source files must be published under EPL-2.0."
+    },
+    {
+      "package": "caniuse-lite",
+      "license": "CC-BY-4.0",
+      "reviewed": "2026-09-10",
+      "reason": "Browser-support data table reached through browserslist and @babel/core, which @vanilla-extract/vite-plugin (a chat-ui production dependency) runs at build time. It is data, not code, and CC-BY-4.0 only requires the attribution its LICENSE file already carries."
+    },
+    {
+      "package": "require-like",
+      "license": "Unknown",
+      "reviewed": "2026-09-10",
+      "reason": "package.json has no licence field, but the package ships a License file with the MIT text (Copyright (c) 2011 Felix Geisendörfer), checked 2026-09-10. Build-time only: reached through eval via @vanilla-extract/integration."
+    }
+  ]
+}
