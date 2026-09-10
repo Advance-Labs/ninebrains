@@ -93,7 +93,9 @@ class UpdateService implements Disposable {
   private setupAutoUpdater(): void {
     const autoUpdater = getAutoUpdater();
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    // Ninebrains: never install silently on quit. Builds are unsigned until plan task 7.1, so
+    // any install stays an explicit user action (download + "restart to update").
+    autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.autoRunAppAfterInstall = true;
     autoUpdater.allowPrerelease = ALLOW_PRERELEASE;
     autoUpdater.allowDowngrade = ALLOW_DOWNGRADE;
