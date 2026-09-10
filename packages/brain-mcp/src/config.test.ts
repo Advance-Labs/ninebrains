@@ -11,14 +11,14 @@ describe('loadConfig: forward mode (default)', () => {
       loadConfig({ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100', NINEBRAINS_TOKEN: 'tok', NINEBRAINS_LANE_ID: 'A' })
     ).toEqual({ mode: 'forward', role: 'lane', url: 'http://127.0.0.1:4100', token: 'tok' });
     expect(
-      loadConfig({ NINEBRAINS_ROLE: 'brain', NINEBRAINS_BRAIN_URL: 'http://localhost:1', NINEBRAINS_TOKEN: 't' }).role
+      loadConfig({ NINEBRAINS_ROLE: 'brain', NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: 't' }).role
     ).toBe('brain');
   });
 
   it.each([
     [{}, /NINEBRAINS_BRAIN_URL is required.*NINEBRAINS_MODE=direct/],
     [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1' }, /NINEBRAINS_TOKEN is required/],
-    [{ NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: 't' }, /loopback/],
+    [{ NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: 't' }, /127\.0\.0\.1/],
     [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: 't', NINEBRAINS_MODE: 'turbo' }, /"forward" or "direct"/],
     [{ NINEBRAINS_ROLE: 'admin' }, /"lane" or "brain"/],
   ])('rejects bad env %#', (env, message) => {

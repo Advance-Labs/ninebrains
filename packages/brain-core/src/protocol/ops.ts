@@ -37,6 +37,7 @@ export const jobStateSchema = z.enum(JOB_STATES);
 
 /** Argument schema per operation. The `describe()` texts double as MCP parameter docs. */
 export const opArgs = {
+  whoami: z.object({}),
   claim_job: z.object({
     jobId: idSchema.optional().describe('Job to claim. Omit to take the oldest ready job in your project.'),
   }),
@@ -134,6 +135,9 @@ export const BRAIN_OPS = [
   'broadcast',
 ] as const satisfies readonly BrainOp[];
 
+/** Session operations: the shim calls these itself; they are not MCP tools. */
+export const SESSION_OPS = ['whoami'] as const satisfies readonly BrainOp[];
+
 /** Argument fields only meaningful for the brain role; the lane tool surface hides them. */
 export const BRAIN_ONLY_FIELDS: Partial<Record<BrainOp, readonly string[]>> = {
   read_inbox: ['address'],
@@ -145,6 +149,7 @@ const request = <O extends BrainOp>(op: O) =>
   z.object({ v: z.literal(BRAIN_PROTOCOL_VERSION), op: z.literal(op), args: opArgs[op] });
 
 export const brainRequestSchema = z.discriminatedUnion('op', [
+  request('whoami'),
   request('claim_job'),
   request('complete_job'),
   request('block_job'),
@@ -175,6 +180,7 @@ export const BRAIN_ERROR_CODES = [
   // Transport and envelope failures.
   'BAD_REQUEST',
   'UNAUTHORIZED',
+  'RATE_LIMITED',
   'UNAVAILABLE',
   'INTERNAL',
 ] as const;

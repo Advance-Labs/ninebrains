@@ -20,7 +20,7 @@ export const BRAIN_TOOLS = BRAIN_OPS;
 const READ_ONLY = new Set<BrainOp>(['list_jobs', 'list_lanes']);
 
 /** What the agent reads. Written for the model: when to call, what happens, what to do next. */
-const DESCRIPTIONS: Record<BrainOp, (role: Role) => string> = {
+const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> = {
   claim_job: () =>
     'Claim a ready job in your project and start working on it. Pass jobId to take a specific job, or omit it to take the oldest ready job. A job can be held by only one lane: if another lane got it first you receive ILLEGAL_TRANSITION, so pick another. Returns the full job (title, body, gates). When you finish, call complete_job; if you cannot finish, call block_job.',
   complete_job: () =>

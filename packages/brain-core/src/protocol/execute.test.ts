@@ -6,7 +6,7 @@ import { BRAIN, makeBrain } from '../../test/helpers';
 import type { Brain } from '../brain/brain';
 import { InMemoryBrainStore } from '../store/memory-store';
 import { type BrainGrant, executeBrainRequest } from './execute';
-import { BRAIN_OPS, type BrainOp, type BrainOpInput, LANE_OPS, opArgs } from './ops';
+import { BRAIN_OPS, type BrainOp, type BrainOpInput, LANE_OPS, SESSION_OPS, opArgs } from './ops';
 import { opResults } from './results';
 
 let dir: string;
@@ -55,6 +55,7 @@ describe('executeBrainRequest', () => {
 
     const first = track('hub', 'create_job', { title: 'Build', body: 'b'.repeat(300), gates: ['tests'], paths: ['src'] });
     const second = track('hub', 'create_job', { title: 'Review', kind: 'review' });
+    expect(track('A', 'whoami', {})).toEqual({ role: 'lane', laneId: 'A', projectId: 'p1' });
     expect(track('hub', 'link_jobs', { from: first.id, to: second.id })).toMatchObject({ from: first.id, to: second.id });
     expect(track('A', 'list_jobs', { states: ['ready'] }).map((j: { id: string }) => j.id)).toEqual([first.id]);
     expect(track('A', 'claim_job', {})).toMatchObject({ id: first.id, state: 'running', gates: ['tests'] });
@@ -75,7 +76,7 @@ describe('executeBrainRequest', () => {
     expect(track('hub', 'list_lanes', {}).map((l: { id: string }) => l.id)).toEqual(['A', 'B']);
     expect(track('hub', 'broadcast', { body: 'hello' })).toEqual([{ kind: 'lane', id: 'A' }, { kind: 'lane', id: 'B' }]);
 
-    expect([...covered].sort()).toEqual([...new Set([...LANE_OPS, ...BRAIN_OPS])].sort());
+    expect([...covered].sort()).toEqual([...new Set([...LANE_OPS, ...BRAIN_OPS, ...SESSION_OPS])].sort());
     expect(Object.keys(opArgs).sort()).toEqual([...covered].sort());
   });
 
@@ -119,7 +120,7 @@ describe('executeBrainRequest', () => {
     expect(response).toMatchObject({ ok: false, error: { code: 'INVALID', message: expect.stringContaining('projectId') } });
   });
 
-  it('turns unexpected exceptions into INTERNAL', () => {
+  it('SEC-07 errors do not leak internals: unexpected exceptions become a bare INTERNAL', () => {
     const store = new InMemoryBrainStore();
     store.listLanes = () => {
       throw new Error('disk on fire');
@@ -127,7 +128,7 @@ describe('executeBrainRequest', () => {
     const broken = makeBrain(store, { lanes: false });
     expect(executeBrainRequest(broken, grants.hub, { v: 1, op: 'list_lanes', args: {} })).toEqual({
       ok: false,
-      error: { code: 'INTERNAL', message: 'disk on fire' },
+      error: { code: 'INTERNAL', message: 'internal error' },
     });
   });
 });

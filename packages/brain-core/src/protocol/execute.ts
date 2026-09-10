@@ -4,37 +4,53 @@ import { InvalidInputError, isBrainError } from '../errors';
 import type { Attachment, Identity, ProjectId } from '../types';
 import { type BrainResponse, type ParsedBrainRequest, brainFailure, brainRequestSchema } from './ops';
 import { resolveAttachmentPath } from './paths';
-import { jobDetail, jobSummary } from './results';
+import { jobDetail, jobSummary, messageView } from './results';
 
 /**
- * What a token (forward mode) or the spawn env (direct mode) grants: who the
- * caller is, its default project, and where its attachments may live.
+ * What a token grants (SEC-02): who the caller is, its default project, where
+ * its attachments may live, and optionally the run it belongs to. Main holds
+ * these in its `TokenRegistry`; nothing in a request can change them.
  */
 export interface BrainGrant {
   identity: Identity;
   projectId: ProjectId | null;
   attachmentRoots: readonly string[];
+  runId?: string;
+}
+
+export interface ExecuteOptions {
+  /** Receives unexpected errors for main's logs. The caller only ever sees a bare INTERNAL. */
+  onInternalError?: (error: unknown) => void;
 }
 
 /**
- * Validates and runs one request against a Brain. Never throws: every
- * failure, including malformed input and unexpected bugs, comes back as an
- * `{ ok: false }` response. This is the single implementation of the
- * operations; main's HTTP endpoint and brain-mcp's direct mode both call it.
+ * Validates and runs one request against a Brain. Never throws: malformed
+ * input, Brain rule violations and unexpected bugs all come back as
+ * `{ ok: false }`. This is the single implementation of every operation.
  */
-export function executeBrainRequest(brain: Brain, grant: BrainGrant, input: unknown): BrainResponse {
+export function executeBrainRequest(
+  brain: Brain,
+  grant: BrainGrant,
+  input: unknown,
+  options: ExecuteOptions = {}
+): BrainResponse {
   const parsed = brainRequestSchema.safeParse(input);
   if (!parsed.success) return brainFailure('BAD_REQUEST', z.prettifyError(parsed.error));
   try {
     return { ok: true, result: run(brain, grant, parsed.data) };
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, options);
   }
 }
 
-export function errorResponse(error: unknown): BrainResponse {
+/**
+ * SEC-07: Brain errors keep their code and message (written for agents).
+ * Anything else becomes a bare INTERNAL: no stack, file path or SQL.
+ */
+export function errorResponse(error: unknown, options: ExecuteOptions = {}): BrainResponse {
   if (isBrainError(error)) return brainFailure(error.code, error.message);
-  return brainFailure('INTERNAL', error instanceof Error ? error.message : String(error));
+  options.onInternalError?.(error);
+  return brainFailure('INTERNAL', 'internal error');
 }
 
 function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unknown {
@@ -51,6 +67,12 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
   };
 
   switch (request.op) {
+    case 'whoami': {
+      const run = grant.runId ? { runId: grant.runId } : {};
+      return me.role === 'lane'
+        ? { role: 'lane', laneId: me.laneId, projectId: grant.projectId, ...run }
+        : { role: 'brain', brainId: me.brainId, projectId: grant.projectId, ...run };
+    }
     case 'claim_job': {
       const { jobId } = request.args;
       if (jobId) return jobDetail(brain.claimJob(me, jobId, { start: true }));
@@ -76,10 +98,7 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
       return { id: message.id, to: message.to, delivered: true };
     }
     case 'read_inbox':
-      return brain.readInbox(me, {
-        limit: request.args.limit,
-        address: request.args.address,
-      });
+      return brain.readInbox(me, { limit: request.args.limit, address: request.args.address }).map(messageView);
     case 'list_jobs': {
       const { states, mine, projectId, laneId, limit } = request.args;
       const holder = mine && me.role === 'lane' ? me.laneId : laneId;
