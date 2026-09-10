@@ -71,10 +71,19 @@ export interface CommandResult {
   timedOut?: boolean;
 }
 
-/** Runs a shell command line. The app owns quoting, sandboxing and process cleanup. */
+/**
+ * Runs a command in `cwd`. Without `argv`, `command` is a shell line. With
+ * `argv`, `command` is the executable and nothing goes through a shell (the
+ * reviewer's git calls always use this).
+ *
+ * SEC-20: the tests gate runs lane-controlled scripts through this, so the app
+ * must run it under the lane sandbox with a scrubbed env (no NINEBRAINS_*, pack
+ * secrets or provider keys), kill the whole process group on abort or timeout,
+ * and cap output at 1 MiB.
+ */
 export type RunCommand = (
   command: string,
-  opts: { cwd: string; signal: AbortSignal; timeoutMs?: number }
+  opts: { cwd: string; signal: AbortSignal; timeoutMs?: number; argv?: readonly string[] }
 ) => Promise<CommandResult>;
 
 /**
@@ -85,9 +94,16 @@ export type RunCommand = (
  */
 export interface SpawnReviewerOptions {
   signal: AbortSignal;
+  /**
+   * A disposable review checkout from `prepareReviewCheckout` (SEC-18). Never
+   * the lane worktree: the reviewer must not be able to touch what it grades.
+   */
   cwd: string;
-  /** Always true: a reviewer must never write to the worktree it is judging. */
-  readOnly: true;
+  /**
+   * Read/Grep/Glob only: no Bash, no writes, no network (SEC-18). The reviewer
+   * never runs tests; the tests gate does, and its log arrives as evidence.
+   */
+  tools: 'read-only';
   attachments: Evidence[];
   /** Which gate is asking, for routing (e.g. a different model for security review). */
   purpose: string;
@@ -99,6 +115,24 @@ export type SpawnReviewer = (
   opts: SpawnReviewerOptions
 ) => Promise<{ text: string }>;
 
+export interface ReviewCheckout {
+  /** Absolute path of the checkout. */
+  path: string;
+  /** Deletes the checkout. Gates call it however the review ends. */
+  dispose(): Promise<void>;
+}
+
+/**
+ * Makes a disposable, detached checkout of the job's result in a temp dir
+ * (`git worktree add --detach <tmp> <commit>`, with untracked files copied in),
+ * so a reviewer can read the work without any path into the lane worktree
+ * (SEC-18).
+ */
+export type PrepareReviewCheckout = (
+  job: GateJob,
+  opts: { signal: AbortSignal }
+) => Promise<ReviewCheckout>;
+
 /** Reads a worktree-relative file. The app must confine it to the worktree. */
 export type ReadWorktreeFile = (
   relativePath: string,
@@ -109,6 +143,7 @@ export interface GateCapabilities {
   captureScreenshot: CaptureScreenshot;
   runCommand: RunCommand;
   spawnReviewer: SpawnReviewer;
+  prepareReviewCheckout: PrepareReviewCheckout;
   fetchText: FetchText;
   readWorktreeFile: ReadWorktreeFile;
 }

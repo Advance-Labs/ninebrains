@@ -11,7 +11,9 @@ export type {
   GateContext,
   GateResult,
   GateJob,
+  PrepareReviewCheckout,
   ReadWorktreeFile,
+  ReviewCheckout,
   RunCommand,
   ScreenshotCapture,
   SpawnReviewer,
@@ -59,7 +61,9 @@ export {
   screenshotGate,
   type ScreenshotGateOptions,
 } from './gates/screenshot-gate';
+export { createFence, escapeNonce, type Fence } from './untrusted';
 export {
+  defaultDiffArgs,
   reviewerGate,
   securityReviewGate,
   type ReviewFocus,

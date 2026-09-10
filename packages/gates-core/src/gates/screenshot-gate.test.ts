@@ -20,16 +20,21 @@ function setup(
     if (reply instanceof Error) throw reply;
     return { text: reply };
   });
+  const dispose = vi.fn(async () => undefined);
+  const prepareReviewCheckout = vi.fn(async () => ({
+    path: '/tmp/ninebrains-review-shots',
+    dispose,
+  }));
   const ctx = makeContext({
     previewUrl: PREVIEW,
-    capabilities: { captureScreenshot, spawnReviewer },
+    capabilities: { captureScreenshot, spawnReviewer, prepareReviewCheckout },
   });
-  return { ctx, captureScreenshot, spawnReviewer };
+  return { ctx, captureScreenshot, spawnReviewer, dispose };
 }
 
 describe('screenshotGate', () => {
   it('captures 1440, 768 and 390, then passes on a reviewer approval', async () => {
-    const { ctx, captureScreenshot, spawnReviewer } = setup();
+    const { ctx, captureScreenshot, spawnReviewer, dispose } = setup();
     const result = await screenshotGate().run(ctx);
 
     expect(result.pass).toBe(true);
@@ -37,11 +42,14 @@ describe('screenshotGate', () => {
     expect(result.evidence.filter((e) => e.kind === 'screenshot')).toHaveLength(3);
     const [prompt, opts] = spawnReviewer.mock.calls[0] as unknown as [
       string,
-      { readOnly: boolean; attachments: unknown[] },
+      { cwd: string; tools: string; attachments: unknown[] },
     ];
-    expect(prompt).toContain('Add a pricing table');
-    expect(opts.readOnly).toBe(true);
+    expect(prompt).toMatch(/<<<JOB-[0-9a-f]{16}>>>\nAdd a pricing table/);
+    // SEC-18: the visual reviewer also works from a disposable checkout.
+    expect(opts).toMatchObject({ cwd: '/tmp/ninebrains-review-shots', tools: 'read-only' });
+    expect(JSON.stringify([prompt, opts])).not.toContain(ctx.worktreePath);
     expect(opts.attachments).toHaveLength(3);
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
   it('fails on console errors without spending a reviewer run', async () => {
