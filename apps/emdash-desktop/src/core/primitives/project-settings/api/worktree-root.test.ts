@@ -4,15 +4,15 @@ import { builtInWorktreeRootFor, normalizeWorktreeRootPath } from './worktree-ro
 
 describe('builtInWorktreeRootFor', () => {
   it('derives the posix built-in root under the home directory', () => {
-    expect(builtInWorktreeRootFor('/home/me')).toBe('/home/me/emdash/worktrees');
+    expect(builtInWorktreeRootFor('/home/me')).toBe('/home/me/ninebrains/worktrees');
   });
 
   it('ignores a trailing separator on the home directory', () => {
-    expect(builtInWorktreeRootFor('/home/me/')).toBe('/home/me/emdash/worktrees');
+    expect(builtInWorktreeRootFor('/home/me/')).toBe('/home/me/ninebrains/worktrees');
   });
 
   it('derives the win32 built-in root with backslashes', () => {
-    expect(builtInWorktreeRootFor('C:\\Users\\me')).toBe('C:\\Users\\me\\emdash\\worktrees');
+    expect(builtInWorktreeRootFor('C:\\Users\\me')).toBe('C:\\Users\\me\\ninebrains\\worktrees');
   });
 });
 

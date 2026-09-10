@@ -14,7 +14,7 @@ export const localProjectSettingsContribution = defineSettingsContribution<
 >({
   ...localProjectSettingsSchemaContribution,
   defaults: () => ({
-    defaultProjectsDirectory: join(homedir(), 'emdash', 'repositories'),
+    defaultProjectsDirectory: join(homedir(), 'ninebrains', 'repositories'),
     defaultWorktreeDirectory: getDefaultLocalWorktreeDirectory(),
   }),
 });

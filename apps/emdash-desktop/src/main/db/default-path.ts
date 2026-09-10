@@ -3,11 +3,13 @@ import { join } from 'node:path';
 
 export const PREVIOUS_DB_FILENAME = 'emdash3.db';
 export const CURRENT_DB_FILENAME = 'emdash4.db';
-const USER_DATA_DIR_NAME = 'emdash';
+// Ninebrains: never the `emdash` directory, so dev scripts (db:reset, drizzle-kit) cannot touch a
+// real Emdash install's database.
+const USER_DATA_DIR_NAME = 'ninebrains';
 
 /**
  * Returns the platform-specific default userData directory without requiring
- * the Electron `app` module. This is pinned to the shared `emdash` directory
+ * the Electron `app` module. This is pinned to the shared `ninebrains` directory
  * regardless of product identity.
  *
  * Pass this result as `userDataPath` to `resolveDatabasePath()` when running

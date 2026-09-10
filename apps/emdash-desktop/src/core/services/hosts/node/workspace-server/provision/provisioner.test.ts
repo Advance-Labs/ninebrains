@@ -17,7 +17,7 @@ describe('WorkspaceServerProvisioner', () => {
     await expect(first).resolves.toMatchObject({
       kind: 'ssh',
       sshConnectionId: 'ssh-1',
-      socketPath: '/home/devuser/.emdash/workspace-server/run/workspace.sock',
+      socketPath: '/home/devuser/.ninebrains/workspace-server/run/workspace.sock',
     });
     await expect(second).resolves.toEqual(await first);
     expect(first).toBe(second);

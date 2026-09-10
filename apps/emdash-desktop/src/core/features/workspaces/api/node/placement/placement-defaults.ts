@@ -7,7 +7,8 @@ export type DeriveWorktreePoolPathOptions = {
 };
 
 export function defaultRepositoriesRoot(homeDirectory: string): string {
-  return joinHostPath(homeDirectory, 'emdash', 'repositories');
+  // Ninebrains: never Emdash's `~/emdash/repositories`.
+  return joinHostPath(homeDirectory, 'ninebrains', 'repositories');
 }
 
 // The built-in worktree root lives in the portable resolver module

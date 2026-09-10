@@ -5,14 +5,16 @@ describe('workspaceServerLayout', () => {
   it('derives every managed path from the remote home', () => {
     const layout = workspaceServerLayout('/home/dev user');
 
-    expect(layout.root).toBe('/home/dev user/.emdash/workspace-server');
+    expect(layout.root).toBe('/home/dev user/.ninebrains/workspace-server');
     expect(layout.versionDirectory('1.2.3-canary.1')).toBe(
-      '/home/dev user/.emdash/workspace-server/versions/1.2.3-canary.1'
+      '/home/dev user/.ninebrains/workspace-server/versions/1.2.3-canary.1'
     );
     expect(layout.currentLauncher).toBe(
-      '/home/dev user/.emdash/workspace-server/current/bin/emdash-workspace-server'
+      '/home/dev user/.ninebrains/workspace-server/current/bin/emdash-workspace-server'
     );
-    expect(layout.socketPath).toBe('/home/dev user/.emdash/workspace-server/run/workspace.sock');
+    expect(layout.socketPath).toBe(
+      '/home/dev user/.ninebrains/workspace-server/run/workspace.sock'
+    );
   });
 
   it('rejects unsafe homes and version components', () => {

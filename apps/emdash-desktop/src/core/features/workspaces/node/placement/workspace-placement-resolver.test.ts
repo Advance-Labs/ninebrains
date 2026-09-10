@@ -14,7 +14,7 @@ const project: LocalProject = {
   type: 'local',
   id: 'project-1',
   name: 'Emdash',
-  path: '/home/jona/emdash/repositories/emdash',
+  path: '/home/jona/ninebrains/repositories/emdash',
   baseRef: 'main',
   repositoryWorkspaceId: null,
   createdAt: '2026-01-01',
@@ -93,7 +93,7 @@ describe('WorkspacePlacementResolver', () => {
 
     await expect(resolver.resolveRepositoriesRoot(hostRef('remote', 'ssh-1'))).resolves.toEqual({
       success: true,
-      data: '/home/remote/emdash/repositories',
+      data: '/home/remote/ninebrains/repositories',
     });
   });
 
@@ -123,7 +123,7 @@ describe('WorkspacePlacementResolver', () => {
 
     await expect(resolver.resolveRepositoriesRoot(hostRef('remote', 'ssh-1'))).resolves.toEqual({
       success: true,
-      data: '/home/remote/emdash/repositories',
+      data: '/home/remote/ninebrains/repositories',
     });
   });
 
@@ -144,7 +144,7 @@ describe('WorkspacePlacementResolver', () => {
 
     await expect(resolver.resolveWorktreePool(project)).resolves.toEqual({
       success: true,
-      data: '/home/jona/emdash/worktrees/emdash-ba5cbeaf',
+      data: '/home/jona/ninebrains/worktrees/emdash-e620467c',
     });
     await resolver.resolveWorktreePool(project);
     expect(getHomeDir).toHaveBeenCalledTimes(1);
@@ -225,7 +225,7 @@ describe('WorkspacePlacementResolver', () => {
 
     expect(result).toMatchObject({
       success: true,
-      data: expect.stringMatching(/^\/home\/jona\/emdash\/worktrees\/emdash-[a-f0-9]{8}$/u),
+      data: expect.stringMatching(/^\/home\/jona\/ninebrains\/worktrees\/emdash-[a-f0-9]{8}$/u),
     });
   });
 
@@ -243,12 +243,12 @@ describe('WorkspacePlacementResolver', () => {
   it('treats a missing parent directory as an available candidate', async () => {
     const { resolver } = makeResolver({
       home: '/home/jona',
-      missingParents: ['/home/jona/emdash/repositories'],
+      missingParents: ['/home/jona/ninebrains/repositories'],
     });
 
     await expect(resolver.resolveRepositoryDestination(LOCAL_HOST_REF, 'api')).resolves.toEqual({
       success: true,
-      data: '/home/jona/emdash/repositories/api',
+      data: '/home/jona/ninebrains/repositories/api',
     });
   });
 
@@ -282,7 +282,7 @@ describe('WorkspacePlacementResolver', () => {
 
     await expect(
       resolver.resolveRepositoryDestination(hostRef('remote', 'ssh-1'), 'api')
-    ).resolves.toEqual({ success: true, data: '/home/remote/emdash/repositories/api' });
+    ).resolves.toEqual({ success: true, data: '/home/remote/ninebrains/repositories/api' });
   });
 
   it('allocates local Windows drive and UNC destinations without desktop path semantics', async () => {
@@ -291,7 +291,7 @@ describe('WorkspacePlacementResolver', () => {
       drive.resolver.resolveRepositoryDestination(LOCAL_HOST_REF, 'api')
     ).resolves.toEqual({
       success: true,
-      data: 'C:\\Users\\dev\\emdash\\repositories\\api',
+      data: 'C:\\Users\\dev\\ninebrains\\repositories\\api',
     });
 
     const unc = makeResolver({ home: '\\\\server\\share\\Users\\dev' });
