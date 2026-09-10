@@ -2,7 +2,7 @@
   "id": "seo",
   "version": "0.1.0",
   "title": "SEO audit",
-  "description": "An SEO audit team on the AEO Toolkit MCP servers. A lead plans and splits the audit, specialists work in parallel, and a fact-checker reviews the findings. Every recommendation must cite search data, a crawl finding or a source, and the seo-evidence gate re-runs each cited query before the work counts as done.",
+  "description": "An SEO audit team on the AEO Toolkit MCP servers. A lead plans and splits the audit, specialists work in parallel, and a fact-checker reviews the findings. Every recommendation must cite search data, a crawl finding or a source, and the seo-evidence gate re-runs each cited query before the work counts as done. Off until you enable it: with the default AEO_MCP_BASE_URL, your Google access token and your search data go to Advance Labs' hosted endpoint. Self-host the Apache-2.0 servers to avoid that.",
   "license": "Apache-2.0",
   "roles": [
     {
@@ -71,9 +71,9 @@
   "mcpServers": [
     {
       "name": "aeo-search",
-      "description": "AEO Toolkit search server: Google Search Console, GA4 and Bing Webmaster data (19 tools). Hosted by Advance Labs. Your Google token and Bing key travel per request and the server does not persist them.",
+      "description": "AEO Toolkit search server: Google Search Console, GA4 and Bing Webmaster data (19 tools). Runs at AEO_MCP_BASE_URL: Advance Labs' hosted endpoint by default, or your own deployment.",
       "transport": "http",
-      "url": "https://aeo.advancelabs.dev/api/mcp/search/mcp",
+      "url": "{{AEO_MCP_BASE_URL}}/search/mcp",
       "headers": {
         "Authorization": {
           "secret": "GOOGLE_ACCESS_TOKEN",
@@ -92,7 +92,7 @@
       "name": "aeo-visibility",
       "description": "AEO Toolkit visibility server: how AI answer engines cite a site, plus an AEO readiness crawl (5 tools). Its tools take a Perplexity API key as an argument.",
       "transport": "http",
-      "url": "https://aeo.advancelabs.dev/api/mcp/ai-visibility/mcp",
+      "url": "{{AEO_MCP_BASE_URL}}/ai-visibility/mcp",
       "headers": {},
       "optional": false,
       "homepage": "https://github.com/Advance-Labs/aeo-toolkit",
@@ -102,7 +102,7 @@
       "name": "aeo-backlink",
       "description": "AEO Toolkit backlink server: mentions, link prospects and link verification from free sources (7 tools). Needs no key.",
       "transport": "http",
-      "url": "https://aeo.advancelabs.dev/api/mcp/backlink/mcp",
+      "url": "{{AEO_MCP_BASE_URL}}/backlink/mcp",
       "headers": {},
       "optional": false,
       "homepage": "https://github.com/Advance-Labs/aeo-toolkit",
@@ -128,6 +128,14 @@
     }
   ],
   "gates": ["seo-evidence"],
+  "settings": [
+    {
+      "name": "AEO_MCP_BASE_URL",
+      "description": "Base URL of the AEO Toolkit MCP servers. Point it at your own deployment (https, or http on localhost) to keep search data off Advance Labs servers.",
+      "default": "https://aeo.advancelabs.dev/api/mcp",
+      "defaultDisclosure": "With the default AEO_MCP_BASE_URL (https://aeo.advancelabs.dev/api/mcp), lanes in projects that enable this pack send your Google access token, your Bing key if set, any Perplexity key they pass to the visibility tools, and your search queries and site data to Advance Labs' hosted endpoint. Advance Labs runs that endpoint; its code handles tokens per request, but you are trusting that deployment. To keep all of it on your own infrastructure, self-host the Apache-2.0 servers from github.com/Advance-Labs/aeo-toolkit and set AEO_MCP_BASE_URL. See Privacy in the packs README."
+    }
+  ],
   "requiredSecrets": [
     {
       "name": "GOOGLE_ACCESS_TOKEN",

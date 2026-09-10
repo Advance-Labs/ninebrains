@@ -34,6 +34,8 @@ function pack(overrides: Partial<PackSummary> = {}): PackSummary {
       { id: 'seo-traffic-drop', installId: 'nb-seo-seo-traffic-drop', source: 'aeo-toolkit' },
     ],
     gates: ['seo-evidence'],
+    settings: [],
+    disclosures: [],
     secrets: [
       {
         name: 'GOOGLE_ACCESS_TOKEN',

@@ -3,6 +3,7 @@ import { err, ok, type Result } from '@emdash/shared';
 import type { SkillsRuntimeBroker } from '@core/features/skills/api/runtime-adapter';
 import type { PacksError, PacksListing, PackSummary } from '../api/contract';
 import type { McpServerEntry, PackLaunch } from '../api/launch';
+import { normalizeBaseUrl } from '../api/pack-schema';
 import { bundledPacks as defaultBundledPacks, type BundledPack } from './bundled';
 import { KNOWN_GATE_IDS } from './gate-ids';
 import { seoEvidenceGate } from './gates/seo-evidence-gate';
@@ -70,14 +71,34 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
 
   async function summarize(pack: LoadedPack, enabled: boolean): Promise<PackSummary> {
     const { manifest } = pack;
+    const resolve = (name: string) => deps.secrets.resolve(name).catch(() => undefined);
     const secrets = await Promise.all(
       manifest.requiredSecrets.map(async (secret) => ({
         ...secret,
-        present: (await deps.secrets.resolve(secret.name).catch(() => undefined)) !== undefined,
+        present: (await resolve(secret.name)) !== undefined,
         location: deps.secrets.describeLocation(secret.name),
       }))
     );
+    const declared = manifest.settings ?? [];
+    const settings = await Promise.all(
+      declared.map(async (setting) => {
+        const value = await resolve(setting.name);
+        return {
+          name: setting.name,
+          description: setting.description,
+          default: setting.default,
+          location: deps.secrets.describeLocation(setting.name),
+          overridden:
+            value !== undefined && normalizeBaseUrl(value) !== normalizeBaseUrl(setting.default),
+        };
+      })
+    );
+    const disclosures = declared.flatMap((setting, i) =>
+      setting.defaultDisclosure && !settings[i].overridden ? [setting.defaultDisclosure] : []
+    );
     return {
+      settings,
+      disclosures,
       id: manifest.id,
       version: manifest.version,
       title: manifest.title,
@@ -123,6 +144,9 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
   };
 
   async function seoReviewerServers(): Promise<McpServerEntry[]> {
+    // Packs are off by default: no project enabled the SEO pack, so no SEO server (and no
+    // token sent to a hosted endpoint), and the gate reports a configuration problem.
+    if (!(await enabledAnywhere()).has('seo')) return [];
     const { packs } = await load();
     const seo = packs.filter((p) => p.manifest.id === 'seo');
     const launch = await resolvePackLaunch({

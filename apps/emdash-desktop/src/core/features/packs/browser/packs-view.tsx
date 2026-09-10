@@ -1,5 +1,5 @@
 import { PageLayout, SettingsRow, SettingsSection } from '@emdash/ui/react/patterns';
-import { Alert, Badge, Select, Switch } from '@emdash/ui/react/primitives';
+import { Alert, Badge, Button, Select, Switch } from '@emdash/ui/react/primitives';
 import { observer } from 'mobx-react-lite';
 import React, { useEffect, useState } from 'react';
 import {
@@ -61,6 +61,20 @@ function MissingSecrets({ pack }: { pack: PackSummary }) {
   );
 }
 
+function Disclosures({ pack }: { pack: PackSummary }) {
+  if (pack.disclosures.length === 0) return null;
+  return (
+    <Alert.Root status="warning">
+      <Alert.Title>Data sent to a hosted service</Alert.Title>
+      <Alert.Description>
+        {pack.disclosures.map((text) => (
+          <p key={text}>{text}</p>
+        ))}
+      </Alert.Description>
+    </Alert.Root>
+  );
+}
+
 function PackSection({
   pack,
   canToggle,
@@ -70,9 +84,15 @@ function PackSection({
   canToggle: boolean;
   onToggle: (enabled: boolean) => void;
 }) {
+  // Packs whose settings disclose a data flow need an explicit second step to enable.
+  const [confirming, setConfirming] = useState(false);
   const servers = pack.mcpServers
     .map((s) => `${s.name} (${s.license}${s.optional ? ', optional' : ''})`)
     .join(', ');
+  const request = (checked: boolean) => {
+    if (checked && pack.disclosures.length > 0) setConfirming(true);
+    else onToggle(checked);
+  };
   return (
     <div className="flex flex-col gap-2">
       <SettingsSection
@@ -91,8 +111,8 @@ function PackSection({
             <Switch
               aria-label={`Enable the ${pack.title} pack`}
               checked={pack.enabled}
-              disabled={!canToggle}
-              onCheckedChange={(checked) => onToggle(checked)}
+              disabled={!canToggle || confirming}
+              onCheckedChange={(checked) => request(checked)}
             />
           }
         />
@@ -104,6 +124,18 @@ function PackSection({
         {pack.mcpServers.length > 0 && (
           <SettingsRow label="MCP servers" description={servers} control={null} />
         )}
+        {pack.settings.map((s) => (
+          <SettingsRow
+            key={s.name}
+            label={s.name}
+            description={`${s.description} ${
+              s.overridden
+                ? `Overridden in ${s.location}.`
+                : `Using the default, ${s.default}. Override it in ${s.location}.`
+            }`}
+            control={null}
+          />
+        ))}
         {pack.skills.length > 0 && (
           <SettingsRow
             label="Skills"
@@ -120,6 +152,32 @@ function PackSection({
         )}
         <SettingsRow label="Default gates" description={pack.gates.join(', ')} control={null} />
       </SettingsSection>
+      {confirming ? (
+        <Alert.Root status="warning">
+          <Alert.Title>Enable the {pack.title} pack?</Alert.Title>
+          <Alert.Description>
+            {pack.disclosures.map((text) => (
+              <p key={text}>{text}</p>
+            ))}
+            <span className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setConfirming(false);
+                  onToggle(true);
+                }}
+              >
+                Enable and send this data
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </span>
+          </Alert.Description>
+        </Alert.Root>
+      ) : (
+        <Disclosures pack={pack} />
+      )}
       <MissingSecrets pack={pack} />
     </div>
   );
@@ -191,7 +249,7 @@ export function PacksPanel({ projects }: { projects: PacksProjectOption[] }) {
       <PageLayout.Header
         sticky
         title="Packs"
-        description="Discipline packs give a project's lanes roles, skills, MCP servers and gates"
+        description="Discipline packs give a project's lanes roles, skills, MCP servers and gates. Every pack is off until you enable it."
         actions={projectPicker}
       />
       {!projectId && (

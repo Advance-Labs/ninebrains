@@ -161,6 +161,38 @@ All role prompts were written for this project from scratch.
   installs a single SKILL.md, so the bundled copy would carry dead links. Revisit when the skills
   manager can install a directory.
 
+## Privacy
+
+**Every pack is off until you enable it for a project.** Nothing below happens for a project that
+has not enabled the SEO pack, and the seo-evidence gate gets no SEO servers unless some project
+has enabled it.
+
+**What leaves your machine with the SEO pack and the default `AEO_MCP_BASE_URL`**
+(`https://aeo.advancelabs.dev/api/mcp`): lanes and the evidence reviewer call Advance Labs' hosted
+AEO Toolkit endpoint. They send it:
+- your Google access token (as the `Authorization` header);
+- your Bing Webmaster key, if set;
+- any Perplexity key a lane passes to the visibility tools;
+- the queries, URLs and site data the tools work on.
+
+The endpoint's code handles tokens per request and its route documentation says it does not
+persist them, but you are trusting that deployment. The settings page shows this notice while the
+default is in use. Enabling the pack takes an explicit confirmation step ("Enable and send this
+data").
+
+**Self-hosting.** The three servers (`aeo-search`, `aeo-visibility`, `aeo-backlink`) are Apache-2.0
+in [`Advance-Labs/aeo-toolkit`](https://github.com/Advance-Labs/aeo-toolkit) (`apps/console`,
+routes under `/api/mcp/<slug>/mcp`; see its `docs/DEPLOYMENT.md`). Deploy them yourself and set
+`AEO_MCP_BASE_URL` to your base, e.g. `https://seo.example.com/api/mcp` or
+`http://localhost:3000/api/mcp`. It is read through the same `SecretResolver` as secrets, e.g.
+`NINEBRAINS_SECRET_AEO_MCP_BASE_URL` with the env resolver. Then no data goes to Advance Labs. At
+launch the filled-in URL is re-validated: anything other than https, or http on localhost, leaves
+the server out with a warning.
+
+**How a pack declares this.** `settings: [{ name, description, default, defaultDisclosure? }]`.
+An http server's `url` may use `{{NAME}}` placeholders for declared settings. `defaultDisclosure`
+is shown in the UI, and requires the confirmation step, only while the setting is at its default.
+
 ## Wiring (for the integrator)
 
 This slice does not touch `services.ts` or `wiring.ts`. To finish wiring:

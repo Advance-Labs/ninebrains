@@ -1,5 +1,14 @@
 import type { McpServerEntry, PackLaunch, PackLaunchRole, PackLaunchWarning } from '../api/launch';
-import type { PackMcpServer, PackRole, PackValue } from '../api/pack-schema';
+import {
+  fillUrlTemplate,
+  isAllowedServerUrl,
+  normalizeBaseUrl,
+  urlPlaceholders,
+  type PackMcpServer,
+  type PackRole,
+  type PackSetting,
+  type PackValue,
+} from '../api/pack-schema';
 import type { LoadedPack } from './loader';
 import type { SecretResolver } from './secrets';
 
@@ -46,8 +55,9 @@ function findRole(
 
 /**
  * Merges a project's enabled packs into one lane launch. Secrets resolve by
- * name; a server whose required secret is missing is left out with a warning,
- * so a lane never starts with a half-configured server.
+ * name; a server whose required secret is missing, or whose URL (after pack
+ * settings such as AEO_MCP_BASE_URL are filled in) is not https, is left out
+ * with a warning, so a lane never starts with a half-configured server.
  */
 export async function resolvePackLaunch(input: ResolvePackLaunchInput): Promise<PackLaunch> {
   const enabled = new Set(input.enabledPackIds);
@@ -81,12 +91,25 @@ export async function resolvePackLaunch(input: ResolvePackLaunchInput): Promise<
     return out;
   };
 
-  const toEntry = async (server: PackMcpServer, missing: string[]): Promise<McpServerEntry> => {
+  const resolveUrl = async (url: string, settings: readonly PackSetting[]) => {
+    const values: Record<string, string> = {};
+    for (const name of urlPlaceholders(url)) {
+      const fallback = settings.find((s) => s.name === name)?.default ?? '';
+      values[name] = normalizeBaseUrl((await lookup(name)) ?? fallback);
+    }
+    return fillUrlTemplate(url, values);
+  };
+
+  const toEntry = async (
+    server: PackMcpServer,
+    settings: readonly PackSetting[],
+    missing: string[]
+  ): Promise<McpServerEntry> => {
     if (server.transport === 'http') {
       return {
         name: server.name,
         type: 'http',
-        url: server.url,
+        url: await resolveUrl(server.url, settings),
         headers: await resolveRecord(server.headers, missing),
       };
     }
@@ -110,7 +133,7 @@ export async function resolvePackLaunch(input: ResolvePackLaunchInput): Promise<
   for (const pack of packs) {
     for (const server of pack.manifest.mcpServers) {
       const missing: string[] = [];
-      const entry = await toEntry(server, missing);
+      const entry = await toEntry(server, pack.manifest.settings ?? [], missing);
       const packId = pack.manifest.id;
       if (missing.length > 0) {
         warnings.push({
@@ -118,6 +141,16 @@ export async function resolvePackLaunch(input: ResolvePackLaunchInput): Promise<
           server: server.name,
           missingSecrets: uniq(missing),
           message: `${server.optional ? 'optional ' : ''}server "${server.name}" was left out: missing ${uniq(missing).join(', ')}`,
+        });
+        continue;
+      }
+      if (server.transport === 'http' && entry.type === 'http' && !isAllowedServerUrl(entry.url)) {
+        const names = urlPlaceholders(server.url).join(', ') || 'its url';
+        warnings.push({
+          packId,
+          server: server.name,
+          missingSecrets: [],
+          message: `server "${server.name}" was left out: its URL is not https (or http on localhost); check ${names}`,
         });
         continue;
       }

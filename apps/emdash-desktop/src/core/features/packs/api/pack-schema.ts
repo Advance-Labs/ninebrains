@@ -25,6 +25,7 @@ const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/;
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const GATE_ID = /^[a-z][a-z0-9-]{1,40}$/;
+const PLACEHOLDER = /\{\{([A-Z][A-Z0-9_]{1,63})\}\}/g;
 
 const slug = (what: string) =>
   z
@@ -46,6 +47,25 @@ function isAllowedUrl(value: string, allowLoopbackHttp: boolean): boolean {
   if (url.protocol === 'https:') return true;
   const loopback = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
   return allowLoopbackHttp && url.protocol === 'http:' && loopback;
+}
+
+/** https anywhere, or http on localhost (a self-hosted server on this machine). */
+export function isAllowedServerUrl(value: string): boolean {
+  return isAllowedUrl(value, true);
+}
+
+/** Names of the `{{NAME}}` settings a server URL uses. */
+export function urlPlaceholders(url: string): string[] {
+  return [...url.matchAll(PLACEHOLDER)].map((match) => match[1]);
+}
+
+/** Base URLs are joined with a path, so a trailing slash is dropped. */
+export function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
+
+export function fillUrlTemplate(url: string, values: Readonly<Record<string, string>>): string {
+  return url.replace(PLACEHOLDER, (_, name: string) => values[name] ?? '');
 }
 
 const httpsUrl = z
@@ -100,7 +120,8 @@ export const stdioServerSchema = z.strictObject({
 export const httpServerSchema = z.strictObject({
   ...serverBase,
   transport: z.literal('http'),
-  url: serverUrl,
+  /** May use `{{SETTING}}` placeholders; the filled URL is re-validated at launch. */
+  url: z.string().max(2048).regex(/^\S+$/, 'url must not contain whitespace'),
   headers: z.record(z.string().regex(HEADER_NAME), valueSchema),
 });
 
@@ -133,6 +154,19 @@ export const requiredSecretSchema = z.strictObject({
 });
 export type RequiredSecret = z.infer<typeof requiredSecretSchema>;
 
+/**
+ * A non-secret value the user may override (read through the same resolver as
+ * secrets), e.g. the base URL of a self-hosted server.
+ */
+export const packSettingSchema = z.strictObject({
+  name: z.string().regex(SECRET_NAME),
+  description: text(300),
+  default: serverUrl,
+  /** Shown in the UI while the default is in use: what leaves the machine, and to whom. */
+  defaultDisclosure: text(800).optional(),
+});
+export type PackSetting = z.infer<typeof packSettingSchema>;
+
 /** A hosted server the user connects to themselves (OAuth). Shown as a link only. */
 export const catalogLinkSchema = z.strictObject({
   name: text(80),
@@ -159,13 +193,14 @@ export const packSchema = z
     id: slug('pack id'),
     version: z.string().regex(SEMVER, 'version must be semver'),
     title: text(80),
-    description: text(600),
+    description: text(800),
     license: licenceSchema,
     roles: z.array(roleSchema).min(1).max(20),
     skills: z.array(packSkillSchema).max(40),
     mcpServers: z.array(packMcpServerSchema).max(20),
     gates: z.array(z.string().regex(GATE_ID)).max(10),
     requiredSecrets: z.array(requiredSecretSchema).max(20),
+    settings: z.array(packSettingSchema).max(10).optional(),
     catalogLinks: z.array(catalogLinkSchema).max(20).optional(),
   })
   .superRefine((pack, ctx) => {
@@ -174,6 +209,7 @@ export const packSchema = z
         ctx.addIssue({ code: 'custom', path: [path], message: `duplicate ${label} "${dup}"` });
       }
     };
+    const settings = pack.settings ?? [];
     unique(
       'role id',
       'roles',
@@ -189,13 +225,13 @@ export const packSchema = z
       'mcpServers',
       pack.mcpServers.map((s) => s.name)
     );
-    unique(
-      'secret',
-      'requiredSecrets',
-      pack.requiredSecrets.map((s) => s.name)
-    );
+    unique('secret or setting', 'requiredSecrets', [
+      ...pack.requiredSecrets.map((s) => s.name),
+      ...settings.map((s) => s.name),
+    ]);
 
     const declared = new Set(pack.requiredSecrets.map((s) => s.name));
+    const defaults = Object.fromEntries(settings.map((s) => [s.name, normalizeBaseUrl(s.default)]));
     for (const server of pack.mcpServers) {
       for (const ref of secretRefs(server)) {
         if (!declared.has(ref.secret)) {
@@ -205,6 +241,21 @@ export const packSchema = z
             message: `server "${server.name}" uses secret ${ref.secret}, which requiredSecrets does not declare`,
           });
         }
+      }
+      if (server.transport !== 'http') continue;
+      const unknown = urlPlaceholders(server.url).filter((name) => !(name in defaults));
+      if (unknown.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['mcpServers'],
+          message: `server "${server.name}" url uses ${unknown.join(', ')}, which settings does not declare`,
+        });
+      } else if (!isAllowedServerUrl(fillUrlTemplate(server.url, defaults))) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['mcpServers'],
+          message: `server "${server.name}" url must be https (or http on localhost)`,
+        });
       }
     }
   });

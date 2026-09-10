@@ -46,6 +46,18 @@ export const packSummarySchema = z.object({
   skills: z.array(z.object({ id: z.string(), installId: z.string(), source: z.string() })),
   gates: z.array(z.string()),
   secrets: z.array(packSecretStatusSchema),
+  /** Overridable settings such as AEO_MCP_BASE_URL. */
+  settings: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      default: z.string(),
+      location: z.string(),
+      overridden: z.boolean(),
+    })
+  ),
+  /** What leaves the machine with the current settings. Empty when nothing is disclosed. */
+  disclosures: z.array(z.string()),
 });
 
 export const packLoadErrorSchema = z.object({
