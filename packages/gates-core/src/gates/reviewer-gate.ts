@@ -1,9 +1,16 @@
 /**
  * Reviewer gate: a separate, read-only reviewer run judges the diff.
  *
- * The reviewer gets the job, the diff against the lane's base commit, the
- * names of new untracked files, and the evidence gathered so far. Its reply
- * must be a strict JSON verdict; anything else fails the gate.
+ * Isolation (SEC-18). The reviewer never gets a path into the lane worktree.
+ * The app's `prepareReviewCheckout` makes a disposable detached checkout of the
+ * job's result; the diff is computed there as argv (no shell), and the
+ * reviewer starts with that checkout as its cwd and read-only tools (no Bash).
+ * It does not run tests: the tests gate does, and its log reaches the reviewer
+ * as evidence. The checkout is disposed however the gate ends.
+ *
+ * Injection (SEC-19). The job, diff, untracked names and evidence all go into
+ * per-call nonce blocks the content cannot close, and the reply must be a
+ * strict JSON verdict.
  */
 
 import {
@@ -13,7 +20,8 @@ import {
   formatIssues,
   parseReviewerVerdict,
 } from '../reviewer-verdict';
-import type { Gate, GateJob } from '../types';
+import type { Gate, GateContext, GateJob, GateResult, ReviewCheckout } from '../types';
+import { createFence } from '../untrusted';
 import { errorMessage, tailLines, truncate } from '../util';
 
 export type ReviewFocus = 'general' | 'security';
@@ -22,10 +30,10 @@ export interface ReviewerGateOptions {
   id?: string;
   title?: string;
   focus?: ReviewFocus;
-  /** Builds the diff command. Default `git diff --no-color <baseRef|HEAD>`. */
-  diffCommand?: (job: GateJob) => string;
-  /** Lists new files. Default `git ls-files --others --exclude-standard`; null to skip. */
-  untrackedCommand?: string | null;
+  /** git arguments for the diff, run as argv in the review checkout. */
+  diffArgs?: (job: GateJob, base: string) => string[];
+  /** git arguments that list new files, run as argv; null to skip. */
+  untrackedArgs?: string[] | null;
   /** Diff characters included in the prompt. The full diff is stored as evidence. Default 60000. */
   maxDiffChars?: number;
   appliesTo?: (job: GateJob) => boolean;
@@ -33,148 +41,166 @@ export interface ReviewerGateOptions {
 
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}$/;
 
+/**
+ * Repository config is writable by the lane, so stop it from running programs
+ * during a diff (fsmonitor hooks, external diff drivers, pagers).
+ */
+const SAFE_GIT = ['-c', 'core.fsmonitor=false', '-c', 'diff.external=', '-c', 'core.pager=cat'];
+
+export function defaultDiffArgs(_job: GateJob, base: string): string[] {
+  return [...SAFE_GIT, 'diff', '--no-ext-diff', '--no-textconv', '--no-color', base, '--'];
+}
+
+const DEFAULT_UNTRACKED_ARGS = [...SAFE_GIT, 'ls-files', '--others', '--exclude-standard'];
+
 const FOCUS: Record<ReviewFocus, string> = {
   general:
-    'Decide whether the change fully and correctly satisfies the job. Reproduce the result ' +
-    'where you can (run the tests, open the URL). Look for regressions, missing edge cases and ' +
-    'unfinished work.',
+    'Decide whether the change fully and correctly satisfies the job. Judge from the diff, the ' +
+    'files in your working directory (a read-only copy of the result) and the evidence. Do not ' +
+    'run code or tests: the tests gate already has, and its log is in the evidence. Look for ' +
+    'regressions, missing edge cases and unfinished work.',
   security:
     'Review the change for security problems only: injection (shell, SQL, HTML), path ' +
     'traversal, SSRF, missing authorisation, secrets in code or logs, unsafe deserialisation, ' +
-    'and weakened input validation. Ignore style.',
+    'and weakened input validation. Ignore style. Do not run code.',
 };
+
+const fail = (feedback: string, evidence: GateResult['evidence'] = []): GateResult => ({
+  pass: false,
+  evidence,
+  feedback,
+});
 
 export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
   const id = options.id ?? 'reviewer';
+  const title = options.title ?? 'Reviewer';
   const focus = options.focus ?? 'general';
   const maxDiffChars = options.maxDiffChars ?? 60_000;
+  const diffArgs = options.diffArgs ?? defaultDiffArgs;
+
+  async function review(ctx: GateContext, checkout: ReviewCheckout, base: string) {
+    const git = (argv: string[]) =>
+      ctx.capabilities.runCommand('git', { argv, cwd: checkout.path, signal: ctx.signal });
+
+    let diff: string;
+    let untracked = '';
+    try {
+      const result = await git(diffArgs(ctx.job, base));
+      if (result.exitCode !== 0) {
+        return fail(
+          `Could not compute the diff: git exited with ${result.exitCode}.\n${tailLines(result.stderr, 10)}`
+        );
+      }
+      diff = result.stdout;
+      if (options.untrackedArgs !== null) {
+        const listed = await git(options.untrackedArgs ?? DEFAULT_UNTRACKED_ARGS);
+        if (listed.exitCode === 0) untracked = listed.stdout.trim();
+      }
+    } catch (error) {
+      return fail(`Could not compute the diff: ${errorMessage(error)}`);
+    }
+
+    if (diff.trim().length === 0 && untracked.length === 0) {
+      return fail(`No changes found against ${base}; there is nothing to review.`);
+    }
+
+    const diffEvidence = await ctx.evidence.put({
+      kind: 'diff',
+      label: `Diff against ${base}`,
+      fileName: 'changes.diff',
+      data: untracked ? `${diff}\n# untracked files\n${untracked}\n` : diff,
+    });
+    const attachments = ctx.evidence.list();
+
+    const fence = createFence();
+    const prompt = [
+      `You are an independent reviewer. ${FOCUS[focus]}`,
+      fence.preamble,
+      describeJob(ctx.job, fence),
+      `# Diff against ${base}\n${fence.wrap('DIFF', truncate(diff, maxDiffChars))}`,
+      untracked ? `# New untracked files\n${fence.wrap('UNTRACKED', untracked)}` : '',
+      describeEvidence(attachments, fence),
+      VERDICT_INSTRUCTIONS,
+    ]
+      .filter((part) => part.length > 0)
+      .join('\n\n');
+
+    let reply: string;
+    try {
+      ({ text: reply } = await ctx.capabilities.spawnReviewer(prompt, {
+        signal: ctx.signal,
+        cwd: checkout.path,
+        tools: 'read-only',
+        attachments,
+        purpose: id,
+      }));
+    } catch (error) {
+      return fail(`Reviewer failed to run: ${errorMessage(error)}`, [diffEvidence]);
+    }
+
+    const metrics = { diffChars: diff.length };
+    const parsed = parseReviewerVerdict(reply);
+    if (!parsed.ok) {
+      const raw = await ctx.evidence.put({
+        kind: 'text',
+        label: 'Malformed reviewer reply',
+        fileName: `${id}-reply.txt`,
+        data: reply,
+      });
+      return {
+        ...fail(
+          `The reviewer's reply was not a valid verdict (${parsed.error}), so the change is unverified.`,
+          [diffEvidence, raw]
+        ),
+        metrics,
+      };
+    }
+
+    const verdict = await ctx.evidence.put({
+      kind: 'json',
+      label: `${title} verdict`,
+      fileName: `${id}-verdict.json`,
+      data: JSON.stringify(parsed.verdict, null, 2),
+    });
+    const issues = formatIssues(parsed.verdict.issues);
+    const evidence = [diffEvidence, verdict];
+    const withIssues = { ...metrics, issues: parsed.verdict.issues.length };
+    return parsed.verdict.pass
+      ? {
+          pass: true,
+          evidence,
+          feedback: `Reviewer approved.${issues ? `\nNotes:\n${issues}` : ''}`,
+          metrics: withIssues,
+        }
+      : {
+          pass: false,
+          evidence,
+          feedback: `Reviewer rejected the change:\n${issues}`,
+          metrics: withIssues,
+        };
+  }
 
   return {
     id,
-    title: options.title ?? 'Reviewer',
+    title,
     appliesTo: options.appliesTo ?? (() => true),
     async run(ctx) {
       const base = ctx.job.baseRef ?? 'HEAD';
-      if (!options.diffCommand && (!SAFE_REF.test(base) || base.includes('..'))) {
-        return {
-          pass: false,
-          evidence: [],
-          feedback: `Refusing to diff against unsafe baseRef ${JSON.stringify(base)}.`,
-        };
+      if (!SAFE_REF.test(base) || base.includes('..')) {
+        return fail(`Refusing to diff against unsafe baseRef ${JSON.stringify(base)}.`);
       }
-      const run = (command: string) =>
-        ctx.capabilities.runCommand(command, { cwd: ctx.worktreePath, signal: ctx.signal });
 
-      const diffCommand = options.diffCommand?.(ctx.job) ?? `git diff --no-color ${base}`;
-      let diff: string;
-      let untracked = '';
+      let checkout: ReviewCheckout;
       try {
-        const result = await run(diffCommand);
-        if (result.exitCode !== 0) {
-          return {
-            pass: false,
-            evidence: [],
-            feedback: `Could not compute the diff: \`${diffCommand}\` exited with ${result.exitCode}.\n${tailLines(result.stderr, 10)}`,
-          };
-        }
-        diff = result.stdout;
-        if (options.untrackedCommand !== null) {
-          const listed = await run(
-            options.untrackedCommand ?? 'git ls-files --others --exclude-standard'
-          );
-          if (listed.exitCode === 0) untracked = listed.stdout.trim();
-        }
+        checkout = await ctx.capabilities.prepareReviewCheckout(ctx.job, { signal: ctx.signal });
       } catch (error) {
-        return {
-          pass: false,
-          evidence: [],
-          feedback: `Could not compute the diff: ${errorMessage(error)}`,
-        };
+        return fail(`Could not prepare an isolated checkout for review: ${errorMessage(error)}`);
       }
-
-      if (diff.trim().length === 0 && untracked.length === 0) {
-        return {
-          pass: false,
-          evidence: [],
-          feedback: `No changes found against ${base}; there is nothing to review.`,
-        };
-      }
-
-      const diffEvidence = await ctx.evidence.put({
-        kind: 'diff',
-        label: `Diff against ${base}`,
-        fileName: 'changes.diff',
-        data: untracked ? `${diff}\n# untracked files\n${untracked}\n` : diff,
-      });
-      const attachments = ctx.evidence.list();
-
-      const prompt = [
-        `You are an independent reviewer. ${FOCUS[focus]}`,
-        describeJob(ctx.job),
-        `# Diff against ${base}\n\`\`\`diff\n${truncate(diff, maxDiffChars)}\n\`\`\``,
-        untracked ? `# New untracked files\n${untracked}` : '',
-        describeEvidence(attachments),
-        VERDICT_INSTRUCTIONS,
-      ]
-        .filter((part) => part.length > 0)
-        .join('\n\n');
-
-      let reply: string;
       try {
-        ({ text: reply } = await ctx.capabilities.spawnReviewer(prompt, {
-          signal: ctx.signal,
-          cwd: ctx.worktreePath,
-          readOnly: true,
-          attachments,
-          purpose: id,
-        }));
-      } catch (error) {
-        return {
-          pass: false,
-          evidence: [diffEvidence],
-          feedback: `Reviewer failed to run: ${errorMessage(error)}`,
-        };
+        return await review(ctx, checkout, base);
+      } finally {
+        await checkout.dispose().catch(() => undefined);
       }
-
-      const metrics = { diffChars: diff.length };
-      const parsed = parseReviewerVerdict(reply);
-      if (!parsed.ok) {
-        const raw = await ctx.evidence.put({
-          kind: 'text',
-          label: 'Malformed reviewer reply',
-          fileName: `${id}-reply.txt`,
-          data: reply,
-        });
-        return {
-          pass: false,
-          evidence: [diffEvidence, raw],
-          feedback: `The reviewer's reply was not a valid verdict (${parsed.error}), so the change is unverified.`,
-          metrics,
-        };
-      }
-
-      const verdict = await ctx.evidence.put({
-        kind: 'json',
-        label: `${options.title ?? 'Reviewer'} verdict`,
-        fileName: `${id}-verdict.json`,
-        data: JSON.stringify(parsed.verdict, null, 2),
-      });
-      const issues = formatIssues(parsed.verdict.issues);
-      const evidence = [diffEvidence, verdict];
-      const withIssues = { ...metrics, issues: parsed.verdict.issues.length };
-      return parsed.verdict.pass
-        ? {
-            pass: true,
-            evidence,
-            feedback: `Reviewer approved.${issues ? `\nNotes:\n${issues}` : ''}`,
-            metrics: withIssues,
-          }
-        : {
-            pass: false,
-            evidence,
-            feedback: `Reviewer rejected the change:\n${issues}`,
-            metrics: withIssues,
-          };
     },
   };
 }

@@ -9,6 +9,7 @@
  */
 
 import type { Evidence, GateJob } from './types';
+import type { Fence } from './untrusted';
 
 export interface ReviewIssue {
   message: string;
@@ -92,13 +93,15 @@ export const VERDICT_INSTRUCTIONS =
   '{"pass": boolean, "issues": [{"message": string, "severity": "blocker"|"major"|"minor", ' +
   '"file"?: string}]}\n' +
   'Set "pass" to false only for problems that must be fixed; list every such problem as an issue. ' +
-  'Do not modify any files.';
+  'Do not modify any files and do not run any commands.';
 
-export function describeJob(job: GateJob): string {
-  return `# Job\n${job.title}\n\n${job.body.trim()}`;
+/** The job as a fenced block: its title and body can carry text from the web or a worker. */
+export function describeJob(job: GateJob, fence: Fence): string {
+  return `# Job\n${fence.wrap('JOB', `${job.title}\n\n${job.body.trim()}`)}`;
 }
 
-export function describeEvidence(evidence: Evidence[]): string {
+export function describeEvidence(evidence: Evidence[], fence: Fence): string {
   if (evidence.length === 0) return '# Evidence\n(none)';
-  return `# Evidence\n${evidence.map((e) => `- ${e.kind}: ${e.label} — ${e.path}`).join('\n')}`;
+  const lines = evidence.map((e) => `- ${e.kind}: ${e.label} — ${e.path}`).join('\n');
+  return `# Evidence\n${fence.wrap('EVIDENCE', lines)}`;
 }
