@@ -13,7 +13,7 @@ import {
   Square,
   TriangleAlert,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useAgentHooksStatus } from '@core/features/agents/api/browser/use-agent-hooks-status';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
 import { useNavigate } from '@core/primitives/navigation/browser/navigation-hooks';
@@ -22,31 +22,47 @@ import { LANE_SLOT_COUNT, type Lane, type LaneSlot, type LaneStatus } from '../.
 import { laneStatusLabel, LaneStatusLight } from '../status-light';
 import { runLaneAction } from '../use-lanes';
 
-// Lower-priority header actions fold into the lane menu when the cell is narrow.
-const SECONDARY = 'hidden @[30rem]:inline-flex';
+// Below this header width the lower-priority actions live only in the lane menu.
+const NARROW_HEADER_PX = 480;
+
+/** Tracks whether an element is narrower than `threshold`. Components own their display CSS, so this is JS. */
+function useIsNarrow(ref: RefObject<HTMLElement | null>, threshold: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setNarrow(entry.contentRect.width < threshold);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, threshold]);
+  return narrow;
+}
 
 const PROVIDER_LABELS: Record<Lane['provider'], string> = { claude: 'Claude', codex: 'Codex' };
 
 function HeaderButton({
   label,
   pressed,
-  className,
+  hidden,
   onClick,
   children,
 }: {
   label: string;
   pressed?: boolean;
-  className?: string;
+  hidden?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
+  if (hidden) return null;
   return (
     <Tooltip.Root>
       <Tooltip.Trigger>
         <Button
           variant="ghost"
           size="sm"
-          className={cn('size-6 shrink-0 p-0', pressed && 'bg-(--em-accent-3)', className)}
+          className={cn('size-6 shrink-0 p-0', pressed && 'bg-(--em-accent-3)')}
           aria-label={label}
           aria-pressed={pressed}
           onClick={onClick}
@@ -84,9 +100,14 @@ export function LaneHeader({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const live = lane.session === 'running' || lane.session === 'starting';
   const laneKey = { laneId: lane.laneId };
+  const headerRef = useRef<HTMLElement>(null);
+  const narrow = useIsNarrow(headerRef, NARROW_HEADER_PX);
 
   return (
-    <header className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-background-secondary px-2">
+    <header
+      ref={headerRef}
+      className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-background-secondary px-2"
+    >
       <LaneStatusLight status={status} />
       <span className="sr-only">{laneStatusLabel(status)}</span>
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -96,7 +117,7 @@ export function LaneHeader({
         <span className="hidden truncate font-mono text-xs text-foreground-muted @[22rem]:inline">
           {lane.branch}
         </span>
-        <Badge variant="outline" tone="neutral" className="hidden shrink-0 @[20rem]:inline-flex">
+        <Badge variant="outline" tone="neutral" className="shrink-0">
           {PROVIDER_LABELS[lane.provider]}
         </Badge>
         {hooksMissing && (
@@ -130,14 +151,14 @@ export function LaneHeader({
         </HeaderButton>
         <HeaderButton
           label="Open in editor"
-          className={SECONDARY}
+          hidden={narrow}
           onClick={() => navigate(taskViewDef({ projectId: lane.projectId, taskId: lane.taskId }))}
         >
           <FilePen className="h-3.5 w-3.5" />
         </HeaderButton>
         <HeaderButton
           label="Jobs, done and notes"
-          className={SECONDARY}
+          hidden={narrow}
           pressed={sidePanelOpen}
           onClick={onToggleSidePanel}
         >
@@ -145,7 +166,7 @@ export function LaneHeader({
         </HeaderButton>
         <HeaderButton
           label="Sleep (keeps the agent running)"
-          className={SECONDARY}
+          hidden={narrow}
           onClick={() =>
             void runLaneAction('Could not put the lane to sleep', (c) => c.sleepLane(laneKey))
           }
