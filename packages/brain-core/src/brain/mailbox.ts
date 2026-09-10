@@ -1,14 +1,20 @@
 import { ForbiddenError, InvalidInputError } from '../errors';
+import { assertId } from '../ids';
 import { LIMITS } from '../limits';
-import type { Address, Attachment, Identity, Message, Note, ProjectId, JobId } from '../types';
-import { addressOf, parseAddress } from '../types';
+import type { Address, Attachment, Identity, JobId, Message, Note, ProjectId } from '../types';
+import { ADDRESS_KINDS, addressOf, laneAddress } from '../types';
 import { inboxAddress, loadVisibleJob, requireBrain } from './authz';
 import { type BrainContext, type Tx, checkText } from './context';
 
 export interface SendMessageInput {
-  to: string;
+  to: Address;
   body: string;
   attachments?: Attachment[];
+}
+
+function checkAddress(to: Address): Address {
+  if (!ADDRESS_KINDS.includes(to.kind)) throw new InvalidInputError('address kind must be "lane" or "brain"');
+  return { kind: to.kind, id: assertId('address id', to.id) };
 }
 
 /**
@@ -17,13 +23,12 @@ export interface SendMessageInput {
  * message the Brain and lanes of its own project.
  */
 export function sendMessage(ctx: BrainContext, tx: Tx, identity: Identity, input: SendMessageInput): Message {
-  const to = parseAddress(input.to);
-  if (!to) throw new InvalidInputError(`invalid address ${input.to}: use lane:<id> or brain:<id>`);
+  const to = checkAddress(input.to);
   checkText('body', input.body, LIMITS.bodyBytes);
   const attachments = input.attachments ?? [];
   if (attachments.length > LIMITS.attachments) throw new InvalidInputError(`at most ${LIMITS.attachments} attachments`);
-  if (identity.role === 'lane' && to.startsWith('lane:')) {
-    const target = ctx.store.getLane(to.slice('lane:'.length));
+  if (identity.role === 'lane' && to.kind === 'lane') {
+    const target = ctx.store.getLane(to.id);
     if (target && target.projectId !== identity.projectId) {
       throw new ForbiddenError(`lane ${identity.laneId} cannot message a lane in another project`);
     }
@@ -43,7 +48,7 @@ export function broadcast(
   const from = addressOf(identity);
   return ctx.store
     .listLanes({ projectId: input.projectId })
-    .map((lane) => deliver(ctx, tx, from, `lane:${lane.id}`, input.body, input.attachments ?? []));
+    .map((lane) => deliver(ctx, tx, from, laneAddress(lane.id), input.body, input.attachments ?? []));
 }
 
 /** Returns unread messages and marks them read in the same transaction. */
@@ -87,14 +92,7 @@ export function addNote(
   return note;
 }
 
-function deliver(
-  ctx: BrainContext,
-  tx: Tx,
-  from: Address,
-  to: Address,
-  body: string,
-  attachments: Attachment[]
-): Message {
+function deliver(ctx: BrainContext, tx: Tx, from: Address, to: Address, body: string, attachments: Attachment[]): Message {
   const message: Message = { id: ctx.newId(), from, to, body, attachments, createdAt: ctx.now(), readAt: null };
   ctx.store.insertMessage(message);
   tx.raise({ type: 'messageSent', payload: { message } });

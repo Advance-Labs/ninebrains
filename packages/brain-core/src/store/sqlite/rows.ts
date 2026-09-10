@@ -1,26 +1,32 @@
 import type {
   Address,
+  AddressKind,
   DoneEntry,
+  Job,
   JobEdge,
+  JobState,
   Lane,
+  LaneStatus,
   Message,
   Note,
   Provider,
   Run,
   RunMode,
-  Job,
-  JobState,
-  LaneStatus,
 } from '../../types';
 
-/** Raw row as returned by node:sqlite. */
+/** Raw row as returned by the SQLite driver. */
 export type Row = Record<string, unknown>;
+export type Param = string | number | null;
 
 const str = (v: unknown): string => v as string;
 const strOrNull = (v: unknown): string | null => (v === null ? null : (v as string));
 const num = (v: unknown): number => Number(v);
 const numOrNull = (v: unknown): number | null => (v === null ? null : Number(v));
 const json = <T>(v: unknown, fallback: T): T => (v === null ? fallback : (JSON.parse(v as string) as T));
+const address = (kind: unknown, id: unknown): Address => ({ kind: kind as AddressKind, id: str(id) });
+
+export const JOB_COLUMNS =
+  'id, project_id, title, body, state, lane_id, attempts, gate_spec, hints, result, reason, created_by_kind, created_by_id, plan_id, plan_node_id, archived_at, created_at, updated_at';
 
 export function toJob(r: Row): Job {
   return {
@@ -35,7 +41,7 @@ export function toJob(r: Row): Job {
     hints: json(r.hints, {}),
     result: json(r.result, null),
     reason: strOrNull(r.reason),
-    createdBy: r.created_by as Address,
+    createdBy: address(r.created_by_kind, r.created_by_id),
     planId: strOrNull(r.plan_id),
     planNodeId: strOrNull(r.plan_node_id),
     archivedAt: numOrNull(r.archived_at),
@@ -44,30 +50,28 @@ export function toJob(r: Row): Job {
   };
 }
 
-export function jobParams(t: Job): Array<string | number | null> {
+export function jobParams(j: Job): Param[] {
   return [
-    t.id,
-    t.projectId,
-    t.title,
-    t.body,
-    t.state,
-    t.laneId,
-    t.attempts,
-    t.gateSpec === null ? null : JSON.stringify(t.gateSpec),
-    JSON.stringify(t.hints),
-    t.result === null ? null : JSON.stringify(t.result),
-    t.reason,
-    t.createdBy,
-    t.planId,
-    t.planNodeId,
-    t.archivedAt,
-    t.createdAt,
-    t.updatedAt,
+    j.id,
+    j.projectId,
+    j.title,
+    j.body,
+    j.state,
+    j.laneId,
+    j.attempts,
+    j.gateSpec === null ? null : JSON.stringify(j.gateSpec),
+    JSON.stringify(j.hints),
+    j.result === null ? null : JSON.stringify(j.result),
+    j.reason,
+    j.createdBy.kind,
+    j.createdBy.id,
+    j.planId,
+    j.planNodeId,
+    j.archivedAt,
+    j.createdAt,
+    j.updatedAt,
   ];
 }
-
-export const JOB_COLUMNS =
-  'id, project_id, title, body, state, lane_id, attempts, gate_spec, hints, result, reason, created_by, plan_id, plan_node_id, archived_at, created_at, updated_at';
 
 export function toEdge(r: Row): JobEdge {
   return {
@@ -79,16 +83,22 @@ export function toEdge(r: Row): JobEdge {
   };
 }
 
+export const MESSAGE_COLUMNS = 'id, from_kind, from_id, to_kind, to_id, body, attachments, created_at, read_at';
+
 export function toMessage(r: Row): Message {
   return {
     id: str(r.id),
-    from: r.from_addr as Address,
-    to: r.to_addr as Address,
+    from: address(r.from_kind, r.from_id),
+    to: address(r.to_kind, r.to_id),
     body: str(r.body),
     attachments: json(r.attachments, []),
     createdAt: num(r.created_at),
     readAt: numOrNull(r.read_at),
   };
+}
+
+export function messageParams(m: Message): Param[] {
+  return [m.id, m.from.kind, m.from.id, m.to.kind, m.to.id, m.body, JSON.stringify(m.attachments), m.createdAt, m.readAt];
 }
 
 export function toRun(r: Row): Run {
@@ -104,15 +114,21 @@ export function toRun(r: Row): Run {
   };
 }
 
+export const NOTE_COLUMNS = 'id, project_id, job_id, author_kind, author_id, body, created_at';
+
 export function toNote(r: Row): Note {
   return {
     id: str(r.id),
     projectId: str(r.project_id),
     jobId: strOrNull(r.job_id),
-    author: r.author as Address,
+    author: address(r.author_kind, r.author_id),
     body: str(r.body),
     createdAt: num(r.created_at),
   };
+}
+
+export function noteParams(n: Note): Param[] {
+  return [n.id, n.projectId, n.jobId, n.author.kind, n.author.id, n.body, n.createdAt];
 }
 
 export function toDone(r: Row): DoneEntry {
@@ -137,4 +153,12 @@ export function toLane(r: Row): Lane {
     activeJobId: strOrNull(r.active_job_id),
     updatedAt: num(r.updated_at),
   };
+}
+
+/** `?, ?, ...` for a column list. */
+export function placeholders(columns: string): string {
+  return columns
+    .split(', ')
+    .map(() => '?')
+    .join(', ');
 }

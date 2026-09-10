@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type DispatchState, type PlannedAssignment, dispatchTick } from '../dispatch/tick';
 import { InvalidInputError, NotFoundError } from '../errors';
+import { assertId } from '../ids';
 import { BrainEmitter, type StoredBrainEvent } from '../events';
 import type { BrainStore, JobFilter } from '../store/store';
 import type {
@@ -156,6 +157,8 @@ export class Brain {
   /** Registers or updates a lane. Owned by the app's main process (brain role). */
   upsertLane(identity: Identity, lane: Omit<Lane, 'updatedAt' | 'recentFiles' | 'activeJobId'> & Partial<Lane>): Lane {
     requireBrain(identity, 'upsert_lane');
+    assertId('lane id', lane.id);
+    assertId('projectId', lane.projectId);
     if (!PROVIDERS.includes(lane.provider)) throw new InvalidInputError(`unknown provider ${lane.provider}`);
     if (!LANE_STATUSES.includes(lane.status)) throw new InvalidInputError(`unknown lane status ${lane.status}`);
     return mutate(this.ctx, (tx) => {

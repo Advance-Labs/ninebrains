@@ -146,14 +146,14 @@ describe.each(MODES)('lane and brain tools (%s mode)', (_mode, backendFor) => {
     ]);
 
     await laneA('send_message', {
-      to: 'lane:B',
+      to: { kind: 'lane', id: 'B' },
       body: 'please review',
       attachments: [{ kind: 'screenshot', ref: path.join(dir, 'evidence', 'shot.png') }],
     });
-    expect((await laneB('read_inbox')).json).toMatchObject([{ from: 'lane:A', body: 'please review' }]);
+    expect((await laneB('read_inbox')).json).toMatchObject([{ from: { kind: 'lane', id: 'A' }, body: 'please review' }]);
     expect((await laneB('read_inbox')).json).toEqual([]);
 
-    await laneA('send_message', { to: 'brain:main', body: 'done with login' });
+    await laneA('send_message', { to: { kind: 'brain', id: 'main' }, body: 'done with login' });
     expect((await hub('read_inbox')).json.map((m: { body: string }) => m.body)).toEqual(['done with login']);
   });
 
@@ -164,9 +164,10 @@ describe.each(MODES)('lane and brain tools (%s mode)', (_mode, backendFor) => {
     await laneA('claim_job', { jobId: job.id });
 
     const cases: Array<[string, Record<string, unknown>, RegExp]> = [
-      ['send_message', { to: 'B', body: 'hi' }, /address|lane:<id>/],
-      ['send_message', { to: 'lane:B', body: 'x'.repeat(32 * 1024 + 1) }, /32768 bytes/],
-      ['send_message', { to: 'lane:B', body: 'hi', attachments: [{ kind: 'file', path: '../../etc/passwd' }] }, /outside|does not exist/],
+      ['send_message', { to: 'B', body: 'hi' }, /expected object|invalid/i],
+      ['send_message', { to: { kind: 'lane', id: '..' }, body: 'hi' }, /ids are/],
+      ['send_message', { to: { kind: 'lane', id: 'B' }, body: 'x'.repeat(32 * 1024 + 1) }, /32768 bytes/],
+      ['send_message', { to: { kind: 'lane', id: 'B' }, body: 'hi', attachments: [{ kind: 'file', path: '../../etc/passwd' }] }, /outside|does not exist/],
       ['complete_job', { jobId: job.id, summary: 'x', artifacts: ['/etc/hosts'] }, /outside/],
       ['complete_job', { jobId: 'bad id!', summary: 'x' }, /ids are/],
       ['list_jobs', { states: ['nope'] }, /invalid/i],
@@ -188,8 +189,8 @@ describe.each(MODES)('lane and brain tools (%s mode)', (_mode, backendFor) => {
     expect((await laneX('list_jobs')).json).toEqual([]);
     expect((await laneX('add_note', { body: 'hi', jobId: job.id })).text).toMatch(/^NOT_FOUND/);
     // A lane cannot smuggle in the brain-only address field: it is stripped, so it reads its own inbox.
-    await hub('send_message', { to: 'lane:A', body: 'for A' });
-    expect((await laneX('read_inbox', { address: 'lane:A' })).json).toEqual([]);
+    await hub('send_message', { to: { kind: 'lane', id: 'A' }, body: 'for A' });
+    expect((await laneX('read_inbox', { address: { kind: 'lane', id: 'A' } })).json).toEqual([]);
   });
 
   it('brain tools: link cycles, assign, block, requeue, lanes, broadcast, notes', async () => {
@@ -209,10 +210,10 @@ describe.each(MODES)('lane and brain tools (%s mode)', (_mode, backendFor) => {
     });
     expect((await hub('requeue_job', { jobId: a.id })).json).toMatchObject({ state: 'ready', attempts: 0 });
     expect((await hub('list_lanes')).json.map((l: { id: string }) => l.id)).toEqual(['A', 'B']);
-    expect((await hub('broadcast', { body: 'standup at 10' })).json).toEqual(['lane:A', 'lane:B']);
+    expect((await hub('broadcast', { body: 'standup at 10' })).json).toEqual([{ kind: 'lane', id: 'A' }, { kind: 'lane', id: 'B' }]);
     expect((await hub('list_jobs', { states: ['proposed'] })).json).toMatchObject([{ id: b.id }]);
     expect((await hub('add_note', { body: 'decided on OAuth' })).json).toMatchObject({ projectId: 'p1' });
-    expect((await hub('read_inbox', { address: 'lane:A' })).json).toHaveLength(1);
+    expect((await hub('read_inbox', { address: { kind: 'lane', id: 'A' } })).json).toHaveLength(1);
   });
 });
 

@@ -1,7 +1,7 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import type { BrainStore } from '../store/store';
 import type { Address, Identity, ProjectId, Job, JobId } from '../types';
-import { addressOf } from '../types';
+import { addressOf, sameAddress } from '../types';
 
 /**
  * Lane-scoped authorization. The rules:
@@ -52,7 +52,7 @@ export function scopeProject(identity: Identity, requested?: ProjectId): Project
 
 export function inboxAddress(identity: Identity, requested?: Address): Address {
   const own = addressOf(identity);
-  if (requested === undefined || requested === own) return own;
+  if (requested === undefined || sameAddress(requested, own)) return own;
   if (identity.role === 'brain') return requested;
   throw new ForbiddenError(`lane ${identity.laneId} can only read its own inbox`);
 }

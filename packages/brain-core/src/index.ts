@@ -10,6 +10,7 @@ export {
   type StoredBrainEvent,
 } from './events';
 export { LIMITS, utf8Bytes } from './limits';
+export { ID_PATTERN, assertId, idPathSegment, isId } from './ids';
 export type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from './store/store';
 export { InMemoryBrainStore } from './store/memory-store';
 export {

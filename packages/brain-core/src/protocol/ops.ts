@@ -9,7 +9,8 @@
  */
 import { z } from 'zod';
 import { LIMITS, utf8Bytes } from '../limits';
-import { JOB_STATES } from '../types';
+import { ID_PATTERN } from '../ids';
+import { ADDRESS_KINDS, JOB_STATES } from '../types';
 
 export const BRAIN_PROTOCOL_VERSION = 1 as const;
 
@@ -18,13 +19,11 @@ const bytes = (max: number, label: string) =>
 
 const notBlank = (label: string) => (value: string) => value.trim().length > 0 || `${label} must not be empty`;
 
-export const idSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9._:-]{1,128}$/, 'ids are 1-128 characters of letters, digits, . _ : -');
+/** SEC-14: IDs are safe path segments. */
+export const idSchema = z.string().regex(ID_PATTERN, 'ids are 1-64 characters of letters, digits, _ or -');
 
-export const addressSchema = z
-  .string()
-  .regex(/^(lane|brain):[A-Za-z0-9._:-]{1,128}$/, 'address must be lane:<id> or brain:<id>');
+/** A structured mailbox address. Never a `kind:id` string. */
+export const addressSchema = z.object({ kind: z.enum(ADDRESS_KINDS), id: idSchema });
 
 const bodySchema = bytes(LIMITS.bodyBytes, 'body').refine(notBlank('body'));
 const pathSchema = z.string().min(1).max(LIMITS.pathChars);
@@ -57,7 +56,7 @@ export const opArgs = {
     reason: z.string().min(1).max(LIMITS.reasonChars).describe('What is blocking you and what would unblock it.'),
   }),
   send_message: z.object({
-    to: addressSchema.describe('lane:<id> for another lane, brain:<id> for a Brain session.'),
+    to: addressSchema.describe('{"kind":"lane","id":"<laneId>"} for another lane, {"kind":"brain","id":"<brainId>"} for a Brain session.'),
     body: bodySchema,
     attachments: z.array(attachmentSchema).max(LIMITS.attachments).default([]),
   }),

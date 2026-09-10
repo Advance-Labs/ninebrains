@@ -1,9 +1,10 @@
 import { cycleIfAdded } from '../dag';
 import { CycleError, ForbiddenError, IllegalTransitionError, InvalidInputError, NotFoundError } from '../errors';
+import { assertId } from '../ids';
 import { LIMITS } from '../limits';
 import { MAX_ATTEMPTS } from '../state-machine';
 import type { JobEdge, GateSpec, Identity, LaneId, ProjectId, Job, JobHints, JobId } from '../types';
-import { addressOf } from '../types';
+import { addressOf, laneAddress } from '../types';
 import { loadLiveJob, requireBrain, requireHolder, requireLane } from './authz';
 import { type BrainContext, type Tx, checkText, checkTitle, transition } from './context';
 
@@ -34,6 +35,7 @@ export function settle(ctx: BrainContext, tx: Tx, job: Job): Job {
 
 export function createJob(ctx: BrainContext, tx: Tx, identity: Identity, input: CreateJobInput): Job {
   requireBrain(identity, 'create_job');
+  assertId('projectId', input.projectId);
   checkTitle(input.title);
   checkText('body', input.body ?? '', LIMITS.bodyBytes, false);
   const now = ctx.now();
@@ -198,7 +200,7 @@ export function recordGateResult(
     const message = {
       id: ctx.newId(),
       from: addressOf(identity),
-      to: `lane:${job.laneId}` as const,
+      to: laneAddress(job.laneId),
       body: `Gate failed for job ${job.id} (attempt ${attempts}/${MAX_ATTEMPTS}):\n${feedback}`,
       attachments: [],
       createdAt: ctx.now(),

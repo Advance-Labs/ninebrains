@@ -26,7 +26,7 @@ const job = (id: string, createdAt: number, overrides: Partial<Job> = {}): Job =
   hints: {},
   result: null,
   reason: null,
-  createdBy: 'brain:main',
+  createdBy: { kind: 'brain', id: 'main' },
   planId: null,
   planNodeId: null,
   archivedAt: null,

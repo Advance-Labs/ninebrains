@@ -1,6 +1,7 @@
 import type { BrainEvent, StoredBrainEvent } from '../events';
 import { NotFoundError } from '../errors';
 import type { DoneEntry, JobEdge, Lane, LaneId, Message, Note, ProjectId, Run, Job, JobId } from '../types';
+import { sameAddress } from '../types';
 import type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from './store';
 
 interface State {
@@ -126,7 +127,7 @@ export class InMemoryBrainStore implements BrainStore {
 
   listMessages(filter: MessageFilter): Message[] {
     const rows = this.state.messages.filter(
-      (m) => m.to === filter.to && (!filter.unreadOnly || m.readAt === null)
+      (m) => sameAddress(m.to, filter.to) && (!filter.unreadOnly || m.readAt === null)
     );
     return clone(take(rows, filter.limit));
   }

@@ -34,7 +34,8 @@ export const MIGRATIONS: readonly Migration[] = [
         hints TEXT NOT NULL DEFAULT '{}',
         result TEXT,
         reason TEXT,
-        created_by TEXT NOT NULL,
+        created_by_kind TEXT NOT NULL CHECK (created_by_kind IN ('lane','brain')),
+        created_by_id TEXT NOT NULL,
         plan_id TEXT,
         plan_node_id TEXT,
         archived_at INTEGER,
@@ -59,14 +60,16 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE TABLE messages (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
         id TEXT NOT NULL UNIQUE,
-        from_addr TEXT NOT NULL,
-        to_addr TEXT NOT NULL,
+        from_kind TEXT NOT NULL CHECK (from_kind IN ('lane','brain')),
+        from_id TEXT NOT NULL,
+        to_kind TEXT NOT NULL CHECK (to_kind IN ('lane','brain')),
+        to_id TEXT NOT NULL,
         body TEXT NOT NULL,
         attachments TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL,
         read_at INTEGER
       ) STRICT;
-      CREATE INDEX messages_inbox ON messages (to_addr, read_at);
+      CREATE INDEX messages_inbox ON messages (to_kind, to_id, read_at);
 
       CREATE TABLE runs (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +90,8 @@ export const MIGRATIONS: readonly Migration[] = [
         id TEXT NOT NULL UNIQUE,
         project_id TEXT NOT NULL,
         job_id TEXT,
-        author TEXT NOT NULL,
+        author_kind TEXT NOT NULL CHECK (author_kind IN ('lane','brain')),
+        author_id TEXT NOT NULL,
         body TEXT NOT NULL,
         created_at INTEGER NOT NULL
       ) STRICT;

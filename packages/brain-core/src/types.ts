@@ -1,6 +1,6 @@
 /**
  * Domain types for the Brain. Everything here is plain data (JSON-safe) so it
- * can cross IPC, the MCP protocol and the SQLite boundary unchanged.
+ * can cross IPC, the forwarding protocol and the SQLite boundary unchanged.
  */
 
 export type JobId = string;
@@ -20,14 +20,7 @@ export const JOB_STATES = [
 ] as const;
 export type JobState = (typeof JOB_STATES)[number];
 
-export const LANE_STATUSES = [
-  'idle',
-  'running',
-  'waiting',
-  'verifying',
-  'blocked',
-  'asleep',
-] as const;
+export const LANE_STATUSES = ['idle', 'running', 'waiting', 'verifying', 'blocked', 'asleep'] as const;
 export type LaneStatus = (typeof LANE_STATUSES)[number];
 
 export const PROVIDERS = ['claude', 'codex'] as const;
@@ -35,8 +28,17 @@ export type Provider = (typeof PROVIDERS)[number];
 
 export type RunMode = 'attended' | 'unattended';
 
-/** `lane:<id>` or `brain:<id>`. */
-export type Address = `lane:${string}` | `brain:${string}`;
+export const ADDRESS_KINDS = ['lane', 'brain'] as const;
+export type AddressKind = (typeof ADDRESS_KINDS)[number];
+
+/**
+ * A mailbox address. Structured on purpose: it is never concatenated into a
+ * string that could end up in a path. `formatAddress` is for display only.
+ */
+export interface Address {
+  kind: AddressKind;
+  id: string;
+}
 
 /** Which gates run when the job reaches `verifying`. Interpreted by the gate runner. */
 export interface GateSpec {
@@ -44,10 +46,12 @@ export interface GateSpec {
   [option: string]: unknown;
 }
 
+export type JobKind = 'work' | 'review';
+
 /** Optional routing hints consumed by `pickLane`. */
 export interface JobHints {
   /** `review` jobs prefer a lane whose provider differs from `authorProvider`. */
-  kind?: 'work' | 'review';
+  kind?: JobKind;
   authorProvider?: Provider;
   /** Files or directories the job is expected to touch. */
   paths?: string[];
@@ -145,18 +149,30 @@ export interface Lane {
 }
 
 /**
- * Who is calling. Every Brain operation takes one; the MCP server builds it
- * from its spawn environment so an agent cannot pick its own identity.
+ * Who is calling. Every Brain operation takes one. In the app it comes from
+ * the token map in main, never from anything the agent sends.
  */
 export type Identity =
   | { role: 'lane'; laneId: LaneId; projectId: ProjectId }
   | { role: 'brain'; brainId: BrainId };
 
-export function addressOf(identity: Identity): Address {
-  return identity.role === 'lane' ? `lane:${identity.laneId}` : `brain:${identity.brainId}`;
+export function laneAddress(id: LaneId): Address {
+  return { kind: 'lane', id };
 }
 
-export function parseAddress(value: string): Address | null {
-  const match = /^(lane|brain):([A-Za-z0-9._:-]{1,128})$/.exec(value);
-  return match ? (value as Address) : null;
+export function brainAddress(id: BrainId): Address {
+  return { kind: 'brain', id };
+}
+
+export function addressOf(identity: Identity): Address {
+  return identity.role === 'lane' ? laneAddress(identity.laneId) : brainAddress(identity.brainId);
+}
+
+export function sameAddress(a: Address, b: Address): boolean {
+  return a.kind === b.kind && a.id === b.id;
+}
+
+/** Human-readable form for messages and logs. Never parse it back, never use it in a path. */
+export function formatAddress(address: Address): string {
+  return `${address.kind} ${address.id}`;
 }

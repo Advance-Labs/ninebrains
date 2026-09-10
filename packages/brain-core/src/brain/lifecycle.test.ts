@@ -11,7 +11,7 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     const b = brain.createJob(BRAIN, { projectId: 'p1', title: 'B', dependsOn: [a.id] });
     expect(a.state).toBe('ready');
     expect(b.state).toBe('proposed');
-    expect(a.createdBy).toBe('brain:main');
+    expect(a.createdBy).toEqual({ kind: 'brain', id: 'main' });
     expect(brain.listEdges(BRAIN, { projectId: 'p1' })).toMatchObject([{ from: a.id, to: b.id }]);
   });
 
@@ -168,7 +168,7 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
   it('persists every committed event to the log in order', () => {
     const brain = makeBrain(createStore(), { lanes: false });
     const job = brain.createJob(BRAIN, { projectId: 'p1', title: 'T' });
-    brain.sendMessage(BRAIN, { to: 'lane:A', body: 'hi' });
+    brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: 'hi' });
     const events = brain.readEvents(0);
     expect(events.map((e) => e.type)).toEqual(['jobChanged', 'jobChanged', 'messageSent']);
     expect(events.map((e) => e.seq)).toEqual([...events.map((e) => e.seq)].sort((x, y) => x - y));

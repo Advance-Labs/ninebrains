@@ -6,7 +6,24 @@ import type { DoneEntry, Job, JobEdge, JobId, Lane, LaneId, Message, Note, Proje
 import type { BrainStore, JobEdgeFilter, JobFilter, MessageFilter, RunFilter } from '../store';
 import { type SqliteConnectionLike, openNodeSqliteConnection } from './connection';
 import { migrate } from './migrations';
-import { JOB_COLUMNS, type Row, jobParams, toDone, toEdge, toJob, toLane, toMessage, toNote, toRun } from './rows';
+import {
+  JOB_COLUMNS,
+  MESSAGE_COLUMNS,
+  NOTE_COLUMNS,
+  type Param,
+  type Row,
+  jobParams,
+  messageParams,
+  noteParams,
+  placeholders,
+  toDone,
+  toEdge,
+  toJob,
+  toLane,
+  toMessage,
+  toNote,
+  toRun,
+} from './rows';
 
 export const DEFAULT_DB_FILENAME = 'brain.sqlite';
 
@@ -20,7 +37,6 @@ export function resolveBrainDbPath(dirOrFile: string): string {
   return /\.(sqlite3?|db)$/i.test(dirOrFile) ? dirOrFile : path.join(dirOrFile, DEFAULT_DB_FILENAME);
 }
 
-type Param = string | number | null;
 
 /**
  * SQLite-backed store over any `SqliteConnectionLike`.
@@ -160,15 +176,12 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   insertMessage(m: Message): void {
-    this.run(
-      'INSERT INTO messages (id, from_addr, to_addr, body, attachments, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [m.id, m.from, m.to, m.body, JSON.stringify(m.attachments), m.createdAt, m.readAt]
-    );
+    this.run(`INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (${placeholders(MESSAGE_COLUMNS)})`, messageParams(m));
   }
 
   listMessages(filter: MessageFilter): Message[] {
     const unread = filter.unreadOnly ? 'AND read_at IS NULL' : '';
-    return this.all(`SELECT * FROM messages WHERE to_addr = ? ${unread} ORDER BY seq ${limit(filter.limit)}`, [filter.to]).map(
+    return this.all(`SELECT * FROM messages WHERE to_kind = ? AND to_id = ? ${unread} ORDER BY seq ${limit(filter.limit)}`, [filter.to.kind, filter.to.id]).map(
       toMessage
     );
   }
@@ -207,14 +220,7 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   insertNote(n: Note): void {
-    this.run('INSERT INTO notes (id, project_id, job_id, author, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', [
-      n.id,
-      n.projectId,
-      n.jobId,
-      n.author,
-      n.body,
-      n.createdAt,
-    ]);
+    this.run(`INSERT INTO notes (${NOTE_COLUMNS}) VALUES (${placeholders(NOTE_COLUMNS)})`, noteParams(n));
   }
 
   listNotes(filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {

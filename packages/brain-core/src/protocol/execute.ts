@@ -78,7 +78,7 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
     case 'read_inbox':
       return brain.readInbox(me, {
         limit: request.args.limit,
-        address: request.args.address as `lane:${string}` | `brain:${string}` | undefined,
+        address: request.args.address,
       });
     case 'list_jobs': {
       const { states, mine, projectId, laneId, limit } = request.args;

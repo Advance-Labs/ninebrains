@@ -62,8 +62,8 @@ describe('executeBrainRequest', () => {
       state: 'verifying',
     });
     expect(brain.getJob(BRAIN, first.id).result?.artifacts).toEqual([path.join(dir, 'project', 'out.png')]);
-    track('A', 'send_message', { to: 'lane:B', body: 'look', attachments: [{ kind: 'file', path: 'out.png' }] });
-    expect(track('B', 'read_inbox', {})).toMatchObject([{ from: 'lane:A', body: 'look' }]);
+    track('A', 'send_message', { to: { kind: 'lane', id: 'B' }, body: 'look', attachments: [{ kind: 'file', path: 'out.png' }] });
+    expect(track('B', 'read_inbox', {})).toMatchObject([{ from: { kind: 'lane', id: 'A' }, body: 'look' }]);
     expect(track('B', 'add_note', { body: 'noted' })).toMatchObject({ projectId: 'p1', jobId: null });
     expect(track('hub', 'assign_job', { jobId: track('hub', 'create_job', { title: 'C' }).id, laneId: 'B' })).toMatchObject({
       state: 'claimed',
@@ -73,7 +73,7 @@ describe('executeBrainRequest', () => {
     expect(track('B', 'block_job', { jobId: blocked.id, reason: 'no creds' })).toMatchObject({ state: 'blocked' });
     expect(track('hub', 'requeue_job', { jobId: blocked.id })).toMatchObject({ state: 'ready', attempts: 0 });
     expect(track('hub', 'list_lanes', {}).map((l: { id: string }) => l.id)).toEqual(['A', 'B']);
-    expect(track('hub', 'broadcast', { body: 'hello' })).toEqual(['lane:A', 'lane:B']);
+    expect(track('hub', 'broadcast', { body: 'hello' })).toEqual([{ kind: 'lane', id: 'A' }, { kind: 'lane', id: 'B' }]);
 
     expect([...covered].sort()).toEqual([...new Set([...LANE_OPS, ...BRAIN_OPS])].sort());
     expect(Object.keys(opArgs).sort()).toEqual([...covered].sort());
@@ -91,7 +91,7 @@ describe('executeBrainRequest', () => {
     [{ v: 1, op: 'drop_database', args: {} }],
     [{ v: 1, op: 'complete_job', args: { jobId: 'j' } }],
     [{ v: 1, op: 'send_message', args: { to: 'nobody', body: 'x' } }],
-    [{ v: 1, op: 'send_message', args: { to: 'lane:B', body: 'x'.repeat(32 * 1024 + 1) } }],
+    [{ v: 1, op: 'send_message', args: { to: { kind: 'lane', id: 'B' }, body: 'x'.repeat(32 * 1024 + 1) } }],
     [{ v: 1, op: 'list_jobs', args: { states: ['sleeping'] } }],
   ])('rejects malformed request %# as BAD_REQUEST without throwing', (input) => {
     const response = executeBrainRequest(brain, grants.A, input);
@@ -103,7 +103,7 @@ describe('executeBrainRequest', () => {
     result('A', 'claim_job', { jobId: job.id });
     expect(call('B', 'claim_job', { jobId: job.id })).toMatchObject({ error: { code: 'ILLEGAL_TRANSITION' } });
     expect(call('B', 'complete_job', { jobId: job.id, summary: 'mine' })).toMatchObject({ error: { code: 'FORBIDDEN' } });
-    expect(call('B', 'read_inbox', { address: 'lane:A' })).toMatchObject({ error: { code: 'FORBIDDEN' } });
+    expect(call('B', 'read_inbox', { address: { kind: 'lane', id: 'A' } })).toMatchObject({ error: { code: 'FORBIDDEN' } });
     expect(call('X', 'claim_job', { jobId: job.id })).toMatchObject({ error: { code: 'NOT_FOUND' } });
     expect(call('X', 'list_jobs', { projectId: 'p1' })).toMatchObject({ error: { code: 'FORBIDDEN' } });
     expect(call('hub', 'claim_job', { jobId: job.id })).toMatchObject({ error: { code: 'FORBIDDEN' } });

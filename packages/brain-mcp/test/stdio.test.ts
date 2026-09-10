@@ -113,9 +113,9 @@ describe('built stdio server', () => {
     expect((await laneA.call('complete_job', { jobId: job.id, summary: 'written', artifacts: ['report.md'] })).json).toMatchObject({
       state: 'verifying',
     });
-    await laneA.call('send_message', { to: 'lane:B', body: 'report is in', attachments: [{ kind: 'file', path: 'report.md' }] });
+    await laneA.call('send_message', { to: { kind: 'lane', id: 'B' }, body: 'report is in', attachments: [{ kind: 'file', path: 'report.md' }] });
     const inbox = (await laneB.call('read_inbox')).json;
-    expect(inbox).toMatchObject([{ from: 'lane:A', body: 'report is in' }]);
+    expect(inbox).toMatchObject([{ from: { kind: 'lane', id: 'A' }, body: 'report is in' }]);
     expect(inbox[0].attachments[0].path).toBe(path.join(dir, 'project', 'report.md'));
     expect(appBrain!.getJob(HUB, job.id)).toMatchObject({ state: 'verifying', laneId: 'A' });
   });

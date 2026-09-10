@@ -21,11 +21,11 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
 
   it("lane A cannot read lane B's inbox; the brain can", () => {
     const { brain } = setup();
-    brain.sendMessage(BRAIN, { to: 'lane:B', body: 'for B only' });
-    expect(() => brain.readInbox(LANE_A, { address: 'lane:B' })).toThrow(ForbiddenError);
-    expect(() => brain.readInbox(LANE_A, { address: 'brain:main' })).toThrow(ForbiddenError);
+    brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'B' }, body: 'for B only' });
+    expect(() => brain.readInbox(LANE_A, { address: { kind: 'lane', id: 'B' } })).toThrow(ForbiddenError);
+    expect(() => brain.readInbox(LANE_A, { address: { kind: 'brain', id: 'main' } })).toThrow(ForbiddenError);
     expect(brain.readInbox(LANE_A)).toEqual([]);
-    expect(brain.readInbox(BRAIN, { address: 'lane:B' }).map((m) => m.body)).toEqual(['for B only']);
+    expect(brain.readInbox(BRAIN, { address: { kind: 'lane', id: 'B' } }).map((m) => m.body)).toEqual(['for B only']);
   });
 
   it('a lane cannot see or claim jobs in another project', () => {
@@ -83,9 +83,9 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
   it('a lane cannot message lanes of another project, or note on their jobs', () => {
     const { brain } = setup();
     const foreign = brain.createJob(BRAIN, { projectId: 'p2', title: 'F' });
-    expect(() => brain.sendMessage(LANE_A, { to: 'lane:X', body: 'hello' })).toThrow(ForbiddenError);
+    expect(() => brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'X' }, body: 'hello' })).toThrow(ForbiddenError);
     expect(() => brain.addNote(LANE_A, { body: 'n', jobId: foreign.id })).toThrow(NotFoundError);
-    expect(brain.sendMessage(LANE_A, { to: 'lane:B', body: 'hello' }).from).toBe('lane:A');
-    expect(brain.sendMessage(LANE_A, { to: 'brain:main', body: 'status' }).to).toBe('brain:main');
+    expect(brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'B' }, body: 'hello' }).from).toEqual({ kind: 'lane', id: 'A' });
+    expect(brain.sendMessage(LANE_A, { to: { kind: 'brain', id: 'main' }, body: 'status' }).to).toEqual({ kind: 'brain', id: 'main' });
   });
 });

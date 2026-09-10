@@ -1,5 +1,6 @@
 import { findCycle } from '../dag';
 import { CycleError, InvalidInputError } from '../errors';
+import { assertId } from '../ids';
 import { LIMITS } from '../limits';
 import type { GateSpec, Identity, ProjectId, Job, JobHints, JobId } from '../types';
 import { addressOf } from '../types';
@@ -166,11 +167,12 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
 }
 
 function validatePlan(input: PlanInput): void {
-  if (!input.planId.trim()) throw new InvalidInputError('planId must not be empty');
+  assertId('planId', input.planId);
+  assertId('projectId', input.projectId);
   if (input.nodes.length > LIMITS.planNodes) throw new InvalidInputError(`a plan has at most ${LIMITS.planNodes} nodes`);
   const ids = new Set<string>();
   for (const node of input.nodes) {
-    if (!node.id.trim()) throw new InvalidInputError('plan node id must not be empty');
+    assertId('plan node id', node.id);
     if (ids.has(node.id)) throw new InvalidInputError(`duplicate plan node id ${node.id}`);
     ids.add(node.id);
     checkTitle(node.title);
