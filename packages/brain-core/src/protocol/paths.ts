@@ -1,13 +1,15 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import { InvalidInputError, LIMITS } from '@ninebrains/brain-core';
+import { InvalidInputError } from '../errors';
+import { LIMITS } from '../limits';
 
 /**
  * Resolves an agent-supplied attachment path and proves it stays inside an
- * allowed root (the project dir or the app evidence dir). Relative paths are
- * resolved against the first root. The file must exist: both the file and
+ * allowed root (the lane's project dir or the app evidence dir). Relative
+ * paths resolve against the first root. The file must exist: the file and
  * the roots are canonicalized with realpath, so `..` segments and symlinks
- * cannot point outside.
+ * cannot point outside. Runs wherever the request executes (main in forward
+ * mode), so a lane that bypasses its shim is still confined.
  */
 export function resolveAttachmentPath(input: string, roots: readonly string[]): string {
   if (input.length === 0 || input.length > LIMITS.pathChars) {

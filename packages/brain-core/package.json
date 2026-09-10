@@ -32,6 +32,9 @@
     "format:check": "oxfmt --check",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
   "devDependencies": {
     "@types/node": "^24.13.1",
     "@typescript/native-preview": "7.0.0-dev.20260609.1",

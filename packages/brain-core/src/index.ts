@@ -25,3 +25,4 @@ export type { SendMessageInput } from './brain/mailbox';
 export type { CompileResult, PlanInput, PlanNode } from './brain/plan';
 export { pickLane, type RoutableJob, type RoutingHistory } from './dispatch/route';
 export { dispatchTick, type DispatchState, type PlannedAssignment } from './dispatch/tick';
+export * from './protocol';

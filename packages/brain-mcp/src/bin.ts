@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Keep first: it must run before anything loads node:sqlite.
+// Keep first: in direct mode it must run before anything loads node:sqlite.
 import './quiet-warnings';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Brain, SqliteBrainStore } from '@ninebrains/brain-core';
+import { openBackend } from './backend';
 import { ConfigError, loadConfig } from './config';
 import { createBrainMcpServer } from './server';
 
@@ -18,15 +18,15 @@ async function main(): Promise<void> {
     throw error;
   }
 
-  const brain = new Brain({ store: SqliteBrainStore.open(config.dbPath) });
-  const server = createBrainMcpServer({ brain, config });
+  const backend = openBackend(config);
+  const server = createBrainMcpServer({ backend, role: config.role });
 
   let closing = false;
   const shutdown = () => {
     if (closing) return;
     closing = true;
     void server.close().finally(() => {
-      brain.close();
+      backend.close();
       process.exit(0);
     });
   };

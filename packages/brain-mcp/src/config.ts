@@ -1,21 +1,23 @@
 import path from 'node:path';
-import { type Identity, resolveBrainDbPath } from '@ninebrains/brain-core';
+import { type BrainGrant, type Identity, assertLoopbackUrl, resolveBrainDbPath } from '@ninebrains/brain-core';
+
+export type Role = 'lane' | 'brain';
 
 /**
- * The server's identity comes only from its spawn environment, never from
- * tool arguments, so an agent cannot act as another lane.
+ * forward (default): a thin shim. Each tool call is POSTed to the app's main
+ * process, which owns the DB and decides identity from the token.
+ * direct: opens the Brain SQLite file itself; identity comes from env. For
+ * tests and headless use only, so it must be asked for explicitly.
  */
-export interface BrainMcpConfig {
-  identity: Identity;
-  /** Default project for brain-role calls that omit one. Always set for lanes. */
-  projectId: string | null;
-  dbPath: string;
-  /** Attachments and artifacts must resolve inside one of these directories. */
-  attachmentRoots: string[];
-}
+export type BrainMcpConfig =
+  | { mode: 'forward'; role: Role; url: string; token: string }
+  | { mode: 'direct'; role: Role; dbPath: string; grant: BrainGrant };
 
 export const ENV = {
+  mode: 'NINEBRAINS_MODE',
   role: 'NINEBRAINS_ROLE',
+  url: 'NINEBRAINS_BRAIN_URL',
+  token: 'NINEBRAINS_TOKEN',
   laneId: 'NINEBRAINS_LANE_ID',
   brainId: 'NINEBRAINS_BRAIN_ID',
   projectId: 'NINEBRAINS_PROJECT_ID',
@@ -34,11 +36,34 @@ export class ConfigError extends Error {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainMcpConfig {
-  const role = env[ENV.role] ?? 'lane';
+  const role = env[ENV.role] || 'lane';
   if (role !== 'lane' && role !== 'brain') throw new ConfigError(`${ENV.role} must be "lane" or "brain", got "${role}"`);
+  const mode = env[ENV.mode] || 'forward';
+  if (mode === 'forward') return forwardConfig(env, role);
+  if (mode === 'direct') return directConfig(env, role);
+  throw new ConfigError(`${ENV.mode} must be "forward" or "direct", got "${mode}"`);
+}
 
+function forwardConfig(env: NodeJS.ProcessEnv, role: Role): BrainMcpConfig {
+  const url = env[ENV.url];
+  const token = env[ENV.token];
+  if (!url) {
+    throw new ConfigError(
+      `${ENV.url} is required (the app sets it). For a standalone DB, set ${ENV.mode}=direct and ${ENV.db}.`
+    );
+  }
+  try {
+    assertLoopbackUrl(url);
+  } catch (error) {
+    throw new ConfigError((error as Error).message);
+  }
+  if (!token || token.length > 512) throw new ConfigError(`${ENV.token} is required in forward mode`);
+  return { mode: 'forward', role, url, token };
+}
+
+function directConfig(env: NodeJS.ProcessEnv, role: Role): BrainMcpConfig {
   const db = env[ENV.db];
-  if (!db) throw new ConfigError(`${ENV.db} is required (a brain.sqlite path or the directory holding it)`);
+  if (!db) throw new ConfigError(`${ENV.db} is required in direct mode (a brain.sqlite path or its directory)`);
   if (!path.isAbsolute(db)) throw new ConfigError(`${ENV.db} must be an absolute path`);
 
   const projectId = optionalId(env, ENV.projectId);
@@ -58,8 +83,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainMcpConfig
   } else {
     identity = { role: 'brain', brainId: optionalId(env, ENV.brainId) ?? 'main' };
   }
-
-  return { identity, projectId, dbPath: resolveBrainDbPath(db), attachmentRoots };
+  return { mode: 'direct', role, dbPath: resolveBrainDbPath(db), grant: { identity, projectId, attachmentRoots } };
 }
 
 function optionalId(env: NodeJS.ProcessEnv, name: string): string | null {

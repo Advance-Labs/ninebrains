@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { InvalidInputError } from '@ninebrains/brain-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { InvalidInputError } from '../errors';
 import { resolveAttachmentPath } from './paths';
 
 let root: string;
@@ -11,7 +11,7 @@ let evidence: string;
 let outside: string;
 
 beforeAll(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'brain-mcp-paths-')));
+  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'brain-paths-')));
   project = path.join(root, 'project');
   evidence = path.join(root, 'evidence');
   outside = path.join(root, 'outside');
@@ -30,9 +30,7 @@ describe('resolveAttachmentPath', () => {
   });
 
   it('accepts absolute paths inside any root', () => {
-    expect(resolveAttachmentPath(path.join(evidence, 'shot.png'), [project, evidence])).toBe(
-      path.join(evidence, 'shot.png')
-    );
+    expect(resolveAttachmentPath(path.join(evidence, 'shot.png'), [project, evidence])).toBe(path.join(evidence, 'shot.png'));
     expect(resolveAttachmentPath(project, [project])).toBe(project);
   });
 

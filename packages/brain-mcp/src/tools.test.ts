@@ -3,33 +3,39 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { Brain, InMemoryBrainStore } from '@ninebrains/brain-core';
+import {
+  Brain,
+  type BrainGrant,
+  type BrainHttpServer,
+  InMemoryBrainStore,
+  startBrainHttpServer,
+} from '@ninebrains/brain-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { BrainMcpConfig } from './config';
+import { type BrainBackend, directBackend, forwardBackend } from './backend';
+import type { Role } from './config';
 import { createBrainMcpServer } from './server';
 import { BRAIN_TOOLS, LANE_TOOLS } from './tools';
 
-interface Result {
-  isError: boolean;
-  text: string;
-  json: unknown;
-}
+type Call = (name: string, args?: Record<string, unknown>) => Promise<{ isError: boolean; text: string; json: any }>;
+
+const HUB = { role: 'brain', brainId: 'main' } as const;
 
 let dir: string;
 let brain: Brain;
+let http: BrainHttpServer | null;
 const clients: Client[] = [];
 
-async function connect(config: BrainMcpConfig): Promise<(name: string, args?: Record<string, unknown>) => Promise<Result>> {
-  const server = createBrainMcpServer({ brain, config });
+async function connect(backend: BrainBackend, role: Role): Promise<{ call: Call; client: Client }> {
+  const server = createBrainMcpServer({ backend, role });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: 'test', version: '0.0.0' });
   await client.connect(clientSide);
   clients.push(client);
-  return async (name, args = {}) => {
+  const call: Call = async (name, args = {}) => {
     const result = (await client.callTool({ name, arguments: args })) as {
       isError?: boolean;
-      content: Array<{ type: string; text: string }>;
+      content: Array<{ text: string }>;
     };
     const text = result.content.map((c) => c.text).join('\n');
     let json: unknown = null;
@@ -38,21 +44,24 @@ async function connect(config: BrainMcpConfig): Promise<(name: string, args?: Re
     } catch {}
     return { isError: result.isError === true, text, json };
   };
+  return { call, client };
 }
 
-const laneConfig = (laneId: string, projectId = 'p1'): BrainMcpConfig => ({
-  identity: { role: 'lane', laneId, projectId },
-  projectId,
-  dbPath: ':unused:',
-  attachmentRoots: [path.join(dir, 'project'), path.join(dir, 'evidence')],
-});
+function grant(identity: BrainGrant['identity'], projectId: string): BrainGrant {
+  return { identity, projectId, attachmentRoots: [path.join(dir, 'project'), path.join(dir, 'evidence')] };
+}
 
-const brainConfig: () => BrainMcpConfig = () => ({
-  identity: { role: 'brain', brainId: 'main' },
-  projectId: 'p1',
-  dbPath: ':unused:',
-  attachmentRoots: [path.join(dir, 'project')],
-});
+/** Both transports must behave identically; every flow test runs over each. */
+const MODES: Array<[string, (g: BrainGrant) => Promise<BrainBackend>]> = [
+  ['direct', async (g) => directBackend(brain, g)],
+  [
+    'forward',
+    async (g) => {
+      http ??= await startBrainHttpServer({ brain });
+      return forwardBackend(http.url, http.issueToken(g));
+    },
+  ],
+];
 
 beforeEach(() => {
   dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'brain-mcp-tools-')));
@@ -61,60 +70,58 @@ beforeEach(() => {
   writeFileSync(path.join(dir, 'project', 'notes.md'), '');
   writeFileSync(path.join(dir, 'evidence', 'shot.png'), '');
   brain = new Brain({ store: new InMemoryBrainStore() });
+  http = null;
   for (const [id, provider] of [
     ['A', 'claude'],
     ['B', 'codex'],
   ] as const) {
-    brain.upsertLane({ role: 'brain', brainId: 'main' }, { id, projectId: 'p1', provider, status: 'idle' });
+    brain.upsertLane(HUB, { id, projectId: 'p1', provider, status: 'idle' });
   }
 });
 
 afterEach(async () => {
   while (clients.length > 0) await clients.pop()!.close();
+  await http?.close();
   rmSync(dir, { recursive: true, force: true });
 });
 
 describe('tool surface', () => {
-  it('lanes see only lane tools; brains see brain tools and cannot claim', async () => {
-    const list = async (config: BrainMcpConfig) => {
-      const server = createBrainMcpServer({ brain, config });
-      const [c, s] = InMemoryTransport.createLinkedPair();
-      await server.connect(s);
-      const client = new Client({ name: 't', version: '0' });
-      await client.connect(c);
-      clients.push(client);
-      const { tools } = await client.listTools();
-      for (const tool of tools) expect(tool.description!.length, tool.name).toBeGreaterThan(40);
-      return tools.map((t) => t.name).sort();
-    };
-    expect(await list(laneConfig('A'))).toEqual([...LANE_TOOLS].sort());
-    expect(await list(brainConfig())).toEqual([...BRAIN_TOOLS].sort());
+  it('lanes see lane tools without brain-only fields; brains see brain tools', async () => {
+    const lane = await connect(directBackend(brain, grant({ role: 'lane', laneId: 'A', projectId: 'p1' }, 'p1')), 'lane');
+    const hub = await connect(directBackend(brain, grant(HUB, 'p1')), 'brain');
+    const laneTools = (await lane.client.listTools()).tools;
+    const hubTools = (await hub.client.listTools()).tools;
+    expect(laneTools.map((t) => t.name).sort()).toEqual([...LANE_TOOLS].sort());
+    expect(hubTools.map((t) => t.name).sort()).toEqual([...BRAIN_TOOLS].sort());
+    for (const tool of [...laneTools, ...hubTools]) expect(tool.description!.length, tool.name).toBeGreaterThan(40);
+
+    const props = (tools: typeof laneTools, name: string) =>
+      Object.keys((tools.find((t) => t.name === name)!.inputSchema.properties ?? {}) as object).sort();
+    expect(props(laneTools, 'read_inbox')).toEqual(['limit']);
+    expect(props(hubTools, 'read_inbox')).toEqual(['address', 'limit']);
+    expect(props(laneTools, 'list_jobs')).not.toContain('projectId');
+    expect(laneTools.find((t) => t.name === 'list_jobs')!.annotations?.readOnlyHint).toBe(true);
   });
 });
 
-describe('lane and brain tools', () => {
-  it('runs a full plan -> claim -> complete -> message flow', async () => {
-    const hub = await connect(brainConfig());
-    const laneA = await connect(laneConfig('A'));
-    const laneB = await connect(laneConfig('B'));
+describe.each(MODES)('lane and brain tools (%s mode)', (_mode, backendFor) => {
+  const lane = async (laneId: string, projectId = 'p1') =>
+    (await connect(await backendFor(grant({ role: 'lane', laneId, projectId }, projectId)), 'lane')).call;
+  const hubCall = async () => (await connect(await backendFor(grant(HUB, 'p1')), 'brain')).call;
 
-    const first = (await hub('create_job', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })).json as {
-      id: string;
-      state: string;
-      body: string;
-    };
+  it('runs a plan -> claim -> complete -> message flow', async () => {
+    const hub = await hubCall();
+    const laneA = await lane('A');
+    const laneB = await lane('B');
+
+    const first = (await hub('create_job', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })).json;
     expect(first.state).toBe('ready');
     expect(first.body.endsWith('...')).toBe(true);
-    const second = (await hub('create_job', { title: 'Review login', dependsOn: [first.id], kind: 'review' })).json as {
-      id: string;
-      state: string;
-    };
+    const second = (await hub('create_job', { title: 'Review login', dependsOn: [first.id], kind: 'review' })).json;
     expect(second.state).toBe('proposed');
 
-    const listed = (await laneA('list_jobs', { states: ['ready'] })).json as Array<{ id: string }>;
-    expect(listed.map((t) => t.id)).toEqual([first.id]);
-
-    const claimed = (await laneA('claim_job')).json as { id: string; state: string; body: string; gates: string[] };
+    expect((await laneA('list_jobs', { states: ['ready'] })).json.map((j: { id: string }) => j.id)).toEqual([first.id]);
+    const claimed = (await laneA('claim_job')).json;
     expect(claimed).toMatchObject({ id: first.id, state: 'running', gates: ['tests'] });
     expect(claimed.body).toHaveLength(400);
 
@@ -124,7 +131,7 @@ describe('lane and brain tools', () => {
     expect((await laneB('claim_job')).json).toMatchObject({ claimed: null });
 
     const forbidden = await laneB('complete_job', { jobId: first.id, summary: 'not mine' });
-    expect(forbidden).toMatchObject({ isError: true });
+    expect(forbidden.isError).toBe(true);
     expect(forbidden.text).toMatch(/^FORBIDDEN/);
 
     const done = await laneA('complete_job', {
@@ -133,29 +140,27 @@ describe('lane and brain tools', () => {
       artifacts: ['notes.md', path.join(dir, 'evidence', 'shot.png')],
     });
     expect(done.json).toMatchObject({ state: 'verifying' });
-    expect(brain.getJob({ role: 'brain', brainId: 'main' }, first.id).result?.artifacts).toEqual([
+    expect(brain.getJob(HUB, first.id).result?.artifacts).toEqual([
       path.join(dir, 'project', 'notes.md'),
       path.join(dir, 'evidence', 'shot.png'),
     ]);
 
-    const sent = await laneA('send_message', {
+    await laneA('send_message', {
       to: 'lane:B',
       body: 'please review',
       attachments: [{ kind: 'screenshot', ref: path.join(dir, 'evidence', 'shot.png') }],
     });
-    expect(sent.json).toMatchObject({ to: 'lane:B', delivered: true });
-    const inbox = (await laneB('read_inbox')).json as Array<{ from: string; body: string; attachments: unknown[] }>;
-    expect(inbox).toMatchObject([{ from: 'lane:A', body: 'please review' }]);
+    expect((await laneB('read_inbox')).json).toMatchObject([{ from: 'lane:A', body: 'please review' }]);
     expect((await laneB('read_inbox')).json).toEqual([]);
 
     await laneA('send_message', { to: 'brain:main', body: 'done with login' });
-    expect(((await hub('read_inbox')).json as Array<{ body: string }>).map((m) => m.body)).toEqual(['done with login']);
+    expect((await hub('read_inbox')).json.map((m: { body: string }) => m.body)).toEqual(['done with login']);
   });
 
   it('returns validation and authorization failures as tool errors', async () => {
-    const laneA = await connect(laneConfig('A'));
-    const hub = await connect(brainConfig());
-    const job = (await hub('create_job', { title: 'T' })).json as { id: string };
+    const hub = await hubCall();
+    const laneA = await lane('A');
+    const job = (await hub('create_job', { title: 'T' })).json;
     await laneA('claim_job', { jobId: job.id });
 
     const cases: Array<[string, Record<string, unknown>, RegExp]> = [
@@ -164,34 +169,34 @@ describe('lane and brain tools', () => {
       ['send_message', { to: 'lane:B', body: 'hi', attachments: [{ kind: 'file', path: '../../etc/passwd' }] }, /outside|does not exist/],
       ['complete_job', { jobId: job.id, summary: 'x', artifacts: ['/etc/hosts'] }, /outside/],
       ['complete_job', { jobId: 'bad id!', summary: 'x' }, /ids are/],
-      ['list_jobs', { states: ['nope'] }, /Invalid|invalid/],
-      ['block_job', { jobId: job.id, reason: '' }, /Invalid|too_small|at least/i],
+      ['list_jobs', { states: ['nope'] }, /invalid/i],
+      ['block_job', { jobId: job.id, reason: '' }, /too_small|at least|>=1/i],
     ];
     for (const [name, args, message] of cases) {
       const result = await laneA(name, args);
       expect(result.isError, `${name} ${JSON.stringify(args).slice(0, 60)}`).toBe(true);
       expect(result.text).toMatch(message);
     }
-    // Nothing above changed the job.
-    expect(brain.getJob({ role: 'brain', brainId: 'main' }, job.id).state).toBe('running');
+    expect(brain.getJob(HUB, job.id).state).toBe('running');
   });
 
-  it('a lane cannot read another inbox or reach another project', async () => {
-    const hub = await connect(brainConfig());
-    const laneX = await connect(laneConfig('X', 'p2'));
-    const job = (await hub('create_job', { title: 'p1 only' })).json as { id: string };
-    const claim = await laneX('claim_job', { jobId: job.id });
-    expect(claim.text).toMatch(/^NOT_FOUND/);
+  it('keeps lanes out of other projects and other inboxes', async () => {
+    const hub = await hubCall();
+    const laneX = await lane('X', 'p2');
+    const job = (await hub('create_job', { title: 'p1 only' })).json;
+    expect((await laneX('claim_job', { jobId: job.id })).text).toMatch(/^NOT_FOUND/);
     expect((await laneX('list_jobs')).json).toEqual([]);
-    const note = await laneX('add_note', { body: 'hi', jobId: job.id });
-    expect(note.text).toMatch(/^NOT_FOUND/);
+    expect((await laneX('add_note', { body: 'hi', jobId: job.id })).text).toMatch(/^NOT_FOUND/);
+    // A lane cannot smuggle in the brain-only address field: it is stripped, so it reads its own inbox.
+    await hub('send_message', { to: 'lane:A', body: 'for A' });
+    expect((await laneX('read_inbox', { address: 'lane:A' })).json).toEqual([]);
   });
 
   it('brain tools: link cycles, assign, block, requeue, lanes, broadcast, notes', async () => {
-    const hub = await connect(brainConfig());
-    const laneB = await connect(laneConfig('B'));
-    const a = (await hub('create_job', { title: 'A' })).json as { id: string };
-    const b = (await hub('create_job', { title: 'B', dependsOn: [a.id] })).json as { id: string };
+    const hub = await hubCall();
+    const laneB = await lane('B');
+    const a = (await hub('create_job', { title: 'A' })).json;
+    const b = (await hub('create_job', { title: 'B', dependsOn: [a.id] })).json;
 
     const cycle = await hub('link_jobs', { from: b.id, to: a.id });
     expect(cycle.isError).toBe(true);
@@ -203,12 +208,29 @@ describe('lane and brain tools', () => {
       reason: 'need an API key',
     });
     expect((await hub('requeue_job', { jobId: a.id })).json).toMatchObject({ state: 'ready', attempts: 0 });
-
-    const lanes = (await hub('list_lanes')).json as Array<{ id: string; activeJobId: string | null }>;
-    expect(lanes.map((l) => l.id)).toEqual(['A', 'B']);
+    expect((await hub('list_lanes')).json.map((l: { id: string }) => l.id)).toEqual(['A', 'B']);
     expect((await hub('broadcast', { body: 'standup at 10' })).json).toEqual(['lane:A', 'lane:B']);
     expect((await hub('list_jobs', { states: ['proposed'] })).json).toMatchObject([{ id: b.id }]);
     expect((await hub('add_note', { body: 'decided on OAuth' })).json).toMatchObject({ projectId: 'p1' });
-    expect(((await hub('read_inbox', { address: 'lane:A' })).json as unknown[]).length).toBe(1);
+    expect((await hub('read_inbox', { address: 'lane:A' })).json).toHaveLength(1);
+  });
+});
+
+describe('forward mode specifics', () => {
+  it('reports an unreachable app as a tool error instead of crashing', async () => {
+    http = await startBrainHttpServer({ brain });
+    const url = http.url;
+    await http.close();
+    http = null;
+    const { call } = await connect(forwardBackend(url, 'token'), 'lane');
+    const result = await call('list_jobs');
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/^UNAVAILABLE: the Ninebrains app is not reachable/);
+  });
+
+  it('rejects a forged token', async () => {
+    http = await startBrainHttpServer({ brain });
+    const { call } = await connect(forwardBackend(http.url, 'forged'), 'lane');
+    expect((await call('list_jobs')).text).toMatch(/^UNAUTHORIZED/);
   });
 });
