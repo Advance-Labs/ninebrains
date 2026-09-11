@@ -10,6 +10,7 @@ import {
 } from './ops';
 import { resolveAttachmentPath } from './paths';
 import { jobDetail, jobSummary, messageView } from './results';
+import { authorizeRequest } from './scope';
 
 /**
  * What a token grants (SEC-02): who the caller is, its default project, where
@@ -21,11 +22,22 @@ export interface BrainGrant {
   projectId: ProjectId | null;
   attachmentRoots: readonly string[];
   runId?: string;
+  /**
+   * v0.1 has no global Brain grant: a brain-role token acts only inside `projectId` (M3, see
+   * `scope.ts`). The field exists as a type only; `false` is its one legal value.
+   */
+  global?: false;
 }
 
 export interface ExecuteOptions {
   /** Receives unexpected errors for main's logs. The caller only ever sees a bare INTERNAL. */
   onInternalError?: (error: unknown) => void;
+  /**
+   * The project of a live Brain session by brainId, or undefined when no such Brain exists.
+   * `send_message` and `read_inbox` refuse Brains that are unknown or in another project (L1).
+   * `startBrainHttpServer` derives it from its token registry.
+   */
+  resolveBrainProject?: (brainId: string) => ProjectId | null | undefined;
 }
 
 /**
@@ -42,6 +54,7 @@ export function executeBrainRequest(
   const parsed = brainRequestSchema.safeParse(input);
   if (!parsed.success) return brainFailure('BAD_REQUEST', z.prettifyError(parsed.error));
   try {
+    authorizeRequest(brain, grant, parsed.data, options);
     return { ok: true, result: run(brain, grant, parsed.data) };
   } catch (error) {
     return errorResponse(error, options);

@@ -71,7 +71,13 @@ const MODES: Array<[string, (g: BrainGrant) => Promise<BrainBackend>]> = [
     'forward',
     async (g) => forwardBackend({ url: (await app()).url, token: (await app()).issueToken(g) }),
   ],
-  ['in-process test backend', async (g) => directBackend(brain, g)],
+  [
+    'in-process test backend',
+    async (g) =>
+      directBackend(brain, g, {
+        resolveBrainProject: (id) => (id === HUB.brainId ? 'p1' : undefined),
+      }),
+  ],
 ];
 
 beforeEach(() => {

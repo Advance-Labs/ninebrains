@@ -61,6 +61,10 @@ afterEach(async () => {
 /** Plays the app's main process: the only DB opener, the endpoint, and the token minter. */
 async function startApp() {
   appBrain = new Brain({ store: SqliteBrainStore.open(path.join(dir, 'app-data')) });
+  // Main registers every lane it launches; L1 refuses messages to lanes that don't exist.
+  for (const id of ['A', 'B']) {
+    appBrain.upsertLane(HUB, { id, projectId: 'p1', provider: 'claude', status: 'idle' });
+  }
   app = await startBrainHttpServer({ brain: appBrain });
   const roots = [path.join(dir, 'project')];
   return {

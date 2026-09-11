@@ -1,4 +1,4 @@
-import { ForbiddenError, InvalidInputError } from '../errors';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '../errors';
 import { assertId } from '../ids';
 import { LIMITS } from '../limits';
 import type { Address, Attachment, Identity, JobId, Message, Note, ProjectId } from '../types';
@@ -35,8 +35,10 @@ export function sendMessage(
   if (attachments.length > LIMITS.attachments)
     throw new InvalidInputError(`at most ${LIMITS.attachments} attachments`);
   if (identity.role === 'lane' && to.kind === 'lane') {
+    // L1: the recipient must exist; a message to an unregistered lane id is refused.
     const target = ctx.store.getLane(to.id);
-    if (target && target.projectId !== identity.projectId) {
+    if (!target) throw new NotFoundError('lane', to.id);
+    if (target.projectId !== identity.projectId) {
       throw new ForbiddenError(`lane ${identity.laneId} cannot message a lane in another project`);
     }
   }

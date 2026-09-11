@@ -197,16 +197,18 @@ describe('executeBrainRequest', () => {
     });
   });
 
-  it('requires a project when the grant has no default', () => {
-    const response = executeBrainRequest(
-      brain,
-      { ...grants.hub, projectId: null },
-      { v: 1, op: 'create_job', args: { title: 'T' } }
-    );
-    expect(response).toMatchObject({
-      ok: false,
-      error: { code: 'INVALID', message: expect.stringContaining('projectId') },
-    });
+  it('M3 refuses a Brain grant with no project: v0.1 has no global grant', () => {
+    for (const args of [{ title: 'T' }, { title: 'T', projectId: 'p1' }]) {
+      const response = executeBrainRequest(
+        brain,
+        { ...grants.hub, projectId: null },
+        { v: 1, op: 'create_job', args }
+      );
+      expect(response).toMatchObject({
+        ok: false,
+        error: { code: 'FORBIDDEN', message: expect.stringContaining('no project') },
+      });
+    }
   });
 
   it('SEC-07 errors do not leak internals: unexpected exceptions become a bare INTERNAL', () => {

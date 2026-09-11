@@ -111,6 +111,8 @@ export async function startBrainHttpServer(
               limiter,
               expectedHost,
               onInternalError: options.onInternalError,
+              resolveBrainProject:
+                options.resolveBrainProject ?? ((brainId) => tokens.brainProject(brainId)),
             }
           )
         );
