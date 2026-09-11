@@ -184,7 +184,10 @@ try {
 
   step('Copying release artifacts to app directory');
   rmSync('release', { recursive: true, force: true });
-  cpSync(join(deployDir, 'release'), 'release', { recursive: true });
+  // verbatimSymlinks: without it Node rewrites the .framework symlinks (Versions/Current, ...) to
+  // absolute paths into deployDir, which is deleted below, and `codesign --verify` then rejects the
+  // copied app. The dmg/zip were built inside deployDir and are unaffected.
+  cpSync(join(deployDir, 'release'), 'release', { recursive: true, verbatimSymlinks: true });
 
   step('Preparing GitHub and R2 channel manifests');
   const generatedManifests = findManifests(githubChannel);
