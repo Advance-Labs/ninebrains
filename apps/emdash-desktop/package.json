@@ -1,6 +1,6 @@
 {
   "name": "@emdash/emdash-desktop",
-  "version": "1.2.4",
+  "version": "0.1.0",
   "description": "Ninebrains: a desktop workbench for parallel coding agents (a fork of Emdash)",
   "keywords": [
     "claude",
