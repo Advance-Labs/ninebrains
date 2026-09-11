@@ -1,0 +1,74 @@
+/* Themes xyflow's base.css with the workbench's own tokens, so the canvas
+   follows light and dark with no palette of its own. Status colours reuse the
+   @emdash/ui semantic tokens. */
+
+.planner-flow.react-flow {
+  --xy-background-color: var(--background);
+  --xy-node-color-default: var(--foreground);
+  --xy-node-background-color-default: var(--background-1);
+  --xy-node-border-default: 1px solid var(--border);
+  --xy-node-boxshadow-selected-default: 0 0 0 2px var(--em-border-primary);
+  --xy-edge-stroke-default: var(--foreground-passive);
+  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-stroke-selected-default: var(--foreground);
+  --xy-connectionline-stroke-default: var(--foreground-muted);
+  --xy-connectionline-stroke-width-default: 1.5;
+  --xy-handle-background-color-default: var(--background-2);
+  --xy-handle-border-color-default: var(--foreground-muted);
+  --xy-selection-background-color-default: color-mix(in srgb, var(--em-border-primary) 10%, transparent);
+  --xy-selection-border-default: 1px dashed var(--em-border-primary);
+  --xy-minimap-background-color-default: var(--background-1);
+  --xy-minimap-mask-background-color-default: color-mix(in srgb, var(--background) 60%, transparent);
+  --xy-minimap-node-background-color-default: var(--background-3);
+  --xy-controls-button-background-color-default: var(--background-1);
+  --xy-controls-button-background-color-hover-default: var(--background-2);
+  --xy-controls-button-color-default: var(--foreground-muted);
+  --xy-controls-button-color-hover-default: var(--foreground);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-background-pattern-dots-color-default: var(--border);
+  background-color: var(--xy-background-color);
+  font-family: inherit;
+}
+
+.planner-flow .react-flow__node {
+  font-size: 12px;
+}
+
+.planner-flow .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.planner-flow .react-flow__edge.planner-proposed path.react-flow__edge-path {
+  stroke-dasharray: 5 4;
+}
+
+.planner-flow .react-flow__edge.planner-cycle path.react-flow__edge-path {
+  stroke: var(--em-foreground-error);
+  stroke-width: 2.5;
+}
+
+.planner-flow .react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.planner-flow .react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.planner-flow .react-flow__attribution {
+  background: transparent;
+  color: var(--foreground-passive);
+}
+
+/* On a phone-width window the minimap would cover half the canvas. */
+@media (max-width: 640px) {
+  .planner-flow .react-flow__minimap {
+    display: none;
+  }
+}

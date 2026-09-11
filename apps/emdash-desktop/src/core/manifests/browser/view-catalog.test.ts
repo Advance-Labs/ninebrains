@@ -15,6 +15,7 @@ describe('viewCatalog', () => {
       'task',
       'settings',
       'lanes',
+      'planner',
     ]);
   });
 

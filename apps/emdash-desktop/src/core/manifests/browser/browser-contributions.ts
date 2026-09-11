@@ -6,6 +6,7 @@ import { integrationsBrowserContributions } from '@core/features/integrations/co
 import { lanesBrowserContributions } from '@core/features/lanes/contributions/browser';
 import { libraryBrowserContributions } from '@core/features/library/contributions/browser';
 import { machinesBrowserContributions } from '@core/features/machines/contributions/browser';
+import { plannerBrowserContributions } from '@core/features/planner/contributions/browser';
 import { projectsBrowserContributions } from '@core/features/projects/contributions/browser';
 import { settingsBrowserContributions } from '@core/features/settings/contributions/browser';
 import { skillsBrowserContributions } from '@core/features/skills/contributions/browser';
@@ -20,6 +21,7 @@ export const featureViewRuntimes = [
   ...settingsBrowserContributions.views,
   ...tasksBrowserContributions.views,
   ...lanesBrowserContributions.views,
+  ...plannerBrowserContributions.views,
 ] as const;
 
 export const featureModalDefs = [

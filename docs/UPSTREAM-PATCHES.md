@@ -131,6 +131,20 @@ controller falls back to `createFallbackPacksService` until Phase 2 wires a real
 | `src/core/features/settings/browser/search/settings-search.ts` | `+packs` search entry (integration fix) | `settings-search.test.ts` requires every settings tab to have at least one search entry |
 | `package.json` (desktop), `pnpm-lock.yaml` | `@emdash/gates-core` and `@emdash/citations` workspace dependencies | The `seo-evidence` gate and the gate capabilities type against the packages directly |
 
+## 8. Planner canvas (W3 `planner`, Phase 3)
+
+All append-only registrations for `src/core/features/planner/` except the last row.
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/browser/view-catalog.ts` (+ `view-catalog.test.ts`) | `plannerViewDef` appended | New `planner` view |
+| `src/core/manifests/browser/browser-contributions.ts` | `plannerBrowserContributions.views` appended | View runtime |
+| `src/core/manifests/shared/domain-contracts.ts` | `[plannerDomain]: plannerContract` | Wire contract |
+| `src/core/manifests/node/controllers.ts` | optional `planner?: PlannerService` on the context + `planner` controller (falls back to an in-memory, Brain-less service when unset) | Keeps typecheck green until `services.ts`/`wiring.ts` pass the real service |
+| `src/core/manifests/shared/memento-catalog.ts` | `plannerViewportMemento` | Persisted pan/zoom retention |
+| `src/core/primitives/telemetry/api/telemetry.ts` | `'planner'` added to `FocusView` | Navigation telemetry passes any `ViewId` as `from_view` |
+| `package.json` (desktop), `pnpm-lock.yaml` | `@xyflow/react` (MIT), `@ninebrains/brain-core` (workspace) | Canvas + compile |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -140,4 +154,6 @@ controller falls back to `createFallbackPacksService` until Phase 2 wires a real
 `src/main/db/default-path.test.ts`, `src/core/features/exec-runs/**`,
 `src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`),
 `src/core/features/lanes/**`, `e2e/**`, `docs/screenshots/lanes-grid-*.png`,
-`src/core/features/packs/**`, `packages/brain-core/**`, `packages/brain-mcp/**`.
+`src/core/features/packs/**`, `packages/brain-core/**`, `packages/brain-mcp/**`,
+`src/core/features/planner/**`, `src/renderer/tests/browser/planner-screenshots.test.tsx`,
+`docs/screenshots/planner-*.png`.

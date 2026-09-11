@@ -15,7 +15,14 @@ type SpawnCountProps = {
   [P in SpawnPurpose as `spawns_${P}`]?: number;
 };
 
-export type FocusView = 'home' | 'project' | 'task' | 'settings' | 'automations' | 'lanes';
+export type FocusView =
+  | 'home'
+  | 'project'
+  | 'task'
+  | 'settings'
+  | 'automations'
+  | 'lanes'
+  | 'planner';
 export type FocusMainPanel = 'agents' | 'editor' | 'diff' | 'browser' | 'terminal';
 export type FocusedRegion = 'main' | 'bottom';
 
