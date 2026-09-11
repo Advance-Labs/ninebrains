@@ -85,9 +85,9 @@ codex exec --json --cd <wt> --sandbox workspace-write|read-only -c approval_poli
 
 ## Decisions made while blocked
 
-1. **Mirrored gates-core types.** The desktop app doesn't depend on `@emdash/gates-core`, so
-   `gates/node/capabilities/types.ts` copies the contract from 18fcedfbe. Once the integrator adds
-   the dependency, swap in `import type`.
+1. **gates-core types.** `gates/node/capabilities/types.ts` re-exports the contract with
+   `import type` from `@emdash/gates-core` and `@emdash/citations` (a desktop dependency since the
+   packs merge). It adds only the planned optional `mcpServers` field to `SpawnReviewerOptions`.
 2. **`fetchText` pins with `node:http(s)`'s `lookup` option, not undici.** undici isn't installed,
    and adding it would touch the lockfile, a hot spot. The `lookup` option is the socket's
    connect-time resolver, which gives the same guarantee.
