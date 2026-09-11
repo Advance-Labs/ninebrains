@@ -62,7 +62,8 @@
       "@openai/codex-linux-arm64",
       "@openai/codex-linux-x64",
       "@openai/codex-win32-arm64",
-      "@openai/codex-win32-x64"
+      "@openai/codex-win32-x64",
+      "sharp"
     ]
   }
 }

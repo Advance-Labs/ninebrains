@@ -1,453 +1,246 @@
-# Contributing to Emdash
+# Contributing to Ninebrains
 
-Thanks for your interest in contributing. We favor small, focused PRs with clear
-intent. This guide covers the local development setup, the commands that matter,
-and the conventions contributors should follow before opening a PR.
+Thanks for helping. Ninebrains is a fork of [Emdash](https://github.com/generalaction/emdash), so
+most of this guide is Emdash's, adapted. Four things are specific to the fork: the upstream rebase
+policy, the patch log, the licence gate and the fake agent. Read those sections before your first
+PR.
 
-## Quick Start
+We favour small, focused PRs with a clear reason. By contributing you agree that your contribution
+is licensed under the Apache License 2.0, the same as the project, and that you follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+**Security issues:** email security@advancelabs.dev. Do not open a public issue. See
+[docs/SECURITY.md](docs/SECURITY.md).
+
+## Quick start
 
 ### Prerequisites
 
-- Git
-- Any reasonably recent `pnpm` (install via Homebrew, `npm install -g pnpm`, or
-  `curl -fsSL https://get.pnpm.io/install.sh | sh -`)
-- Optional, but useful for integration work:
-  - GitHub CLI (`gh`)
-  - At least one supported coding agent CLI
-  - Docker, when working on remote development infrastructure
+- Git.
+- Any reasonably recent `pnpm`. `package.json` pins `pnpm@10.28.2` (`packageManager`) and Node
+  `24.14.0` (`devEngines.runtime`, `onFail: "download"`), so any pnpm on your PATH switches to the
+  pinned versions inside this repo. You do not need nvm or a matching Node. `mise` is optional.
+- Optional: the GitHub CLI (`gh`), and `claude` or `codex` if you want to try real agents. Tests
+  never need them.
 
-That is the whole toolchain requirement. `package.json` pins both the package
-manager (`packageManager: pnpm@10.28.2`) and the Node runtime
-(`devEngines.runtime` with `onFail: "download"`), so any pnpm on PATH swaps
-itself to the pinned version and provisions the pinned Node — checksummed in
-`pnpm-lock.yaml` — when it runs in this repo. You do not need nvm, corepack, or
-a preinstalled Node of the right version.
-
-If you use [mise](https://mise.jdx.dev) for toolchain auto-switching, the
-committed `mise.toml` pins node and pnpm for you; it is optional and required
-by nothing. `.nvmrc` remains as a compatibility hint for other version
-managers.
-
-### Get The Source
-
-Fork the repository on GitHub, then clone your fork:
+### Get the source and run it
 
 ```bash
-git clone https://github.com/<you>/emdash.git
-cd emdash
-```
-
-### Install
-
-From the repo root:
-
-```bash
+git clone https://github.com/Advance-Labs/ninebrains.git
+cd ninebrains
 pnpm install
+pnpm run dev            # builds packages/, watches them, and starts the Electron app
 ```
 
-This single command provisions the pinned pnpm and Node if needed, installs
-dependencies, and prepares the native modules — after it succeeds the machine
-is ready for every dev flow.
+`pnpm run dev` from `apps/emdash-desktop/` starts only the desktop app. Use the root command when
+you change anything under `packages/`, so their `dist/` output stays current. Renderer changes
+hot-reload; main-process changes may need a restart.
 
-This repository is a pnpm workspace. The Electron app is in
-`apps/emdash-desktop/`, and shared workspace packages live in `packages/`.
+The dev app keeps its data in `~/Library/Application Support/ninebrains-dev` on macOS
+(`~/.config/ninebrains-dev` on Linux, `%APPDATA%\ninebrains-dev` on Windows).
 
-### Start Development
+[docs/FORK.md](docs/FORK.md) records the fork baseline, test counts and CI.
 
-For normal app development, run the full workspace dev command from the repo root:
+## Repository layout
 
-```bash
-pnpm run dev
-```
+- `apps/emdash-desktop/`: the Electron app. Package and folder names keep the `emdash` prefix on
+  purpose; renaming them would make every rebase conflict.
+  - `src/core/features/`: vertical feature slices. Ninebrains adds `lanes`, `planner`, `packs`,
+    `exec-runs` and `gates`.
+  - `src/main/`: the Electron main process. `src/renderer/`: the React shell.
+- `apps/docs/`: the documentation site (Astro Starlight). Its content is `docs/guide/`.
+- `packages/brain-core/`, `packages/brain-mcp/`: the Brain and the MCP shim lanes run.
+- `packages/gates-core/`, `packages/citations/`: gate logic and claim checking.
+- `packages/core/`, `shared/`, `ui/`, `plugins/`, `wire/`, `theme/`, `chat-ui/`: inherited from
+  Emdash.
+- `tooling/fake-agent/`: a stand-in `claude` CLI for tests.
+- `tooling/scripts/check-licenses.mjs`: the licence gate.
+- `agents/`: Emdash's architecture, workflow and risk notes. Still accurate for the inherited code.
+- `docs/`: fork docs (`FORK.md`, `SEAMS.md`, `UPSTREAM-PATCHES.md`, `THREAT-MODEL.md`) and the user
+  guide.
 
-The root `dev` command now does two things:
+Start with [docs/guide/architecture.md](docs/guide/architecture.md), then
+[docs/SEAMS.md](docs/SEAMS.md) before you touch Emdash code.
 
-1. Builds all packages under `packages/`.
-2. Starts package watch builds and the Electron desktop app in parallel.
+## Commands
 
-Use this command when you are changing code in `packages/` or when you want the
-same startup path a fresh contributor will use.
-
-If you are only working inside `apps/emdash-desktop/`, you can run the Electron
-dev server directly:
-
-```bash
-cd apps/emdash-desktop
-pnpm run dev
-```
-
-Important distinction:
-
-- `pnpm run dev` from the repo root starts the workspace package watchers and the
-  app together.
-- `pnpm run dev` from `apps/emdash-desktop/` starts only `electron-vite dev` for
-  the desktop app.
-- If app code imports changed package output, prefer the root command so package
-  `dist/` files stay current.
-
-Renderer changes usually hot reload. Main-process changes under
-`apps/emdash-desktop/src/main/` may require restarting the Electron dev app.
-
-## Repository Layout
-
-This is a pnpm workspace monorepo.
-
-- `apps/emdash-desktop/` - Electron desktop app package
-- `apps/emdash-desktop/src/main/` - Electron main process, RPC controllers,
-  services, database, PTY, SSH, Git, GitHub, updates, and integrations
-- `apps/emdash-desktop/src/preload/` - typed Electron preload bridge
-- `apps/emdash-desktop/src/renderer/` - React composition shell and shared browser infrastructure
-- `apps/emdash-desktop/src/core/` - vertical slices with APIs, Node implementations, browser UI,
-  contributions, and manifests
-- `apps/emdash-desktop/drizzle/` - generated Drizzle migrations and metadata
-- `apps/emdash-desktop/scripts/` - release, verification, and build scripts
-- `packages/core/` - transport-agnostic core runtime primitives
-- `packages/shared/` - shared workspace primitives
-- `packages/ui/` - shared UI components and theme system
-- `packages/plugins/` - plugin interfaces and helpers
-- `agents/` - architecture, workflow, convention, integration, and risk docs
-
-Root scripts are aggregate workspace scripts. Most app-specific commands live in
-`apps/emdash-desktop/package.json`.
-
-## Common Commands
-
-Run these from the repo root unless noted. Root scripts run through Nx, which
-builds projects in dependency order and caches results locally. A second run
-of any cached target (`build`, `test`, `typecheck`, `lint`, `format:check`)
-replays instantly if inputs have not changed.
-
-```bash
-pnpm run dev            # build packages, watch packages, and start the Electron app
-pnpm run build          # build every workspace package
-pnpm run format         # format with oxfmt
-pnpm run format:check   # check formatting without writing
-pnpm run lint           # lint with oxlint
-pnpm run typecheck      # run TypeScript checks
-pnpm run test           # run workspace tests
-pnpm run affected       # lint, typecheck, and test only projects changed vs. main
-pnpm run graph          # open the Nx project graph in the browser
-```
-
-Individual project targets are addressable from the root without `cd`:
-
-```bash
-nx package:mac @emdash/emdash-desktop
-nx db:reset @emdash/emdash-desktop
-nx build:theme @emdash/ui
-```
-
-See `agents/workflows/nx.md` for a full explanation of the Nx setup.
-
-Useful app-local commands from `apps/emdash-desktop/`:
-
-```bash
-pnpm run dev            # start electron-vite dev for the desktop app only
-pnpm run dev:debug      # start with debug logging
-pnpm run dev:main       # watch the Electron main process
-pnpm run dev:renderer   # watch the renderer
-pnpm run build          # build the Electron app
-pnpm run build:main     # build main process only
-pnpm run build:renderer # build renderer only
-pnpm run package        # build and package desktop artifacts
-pnpm run rebuild        # rebuild native Electron dependencies
-pnpm run reset          # clean app dependencies and reinstall
-```
-
-Useful package-local commands from a package under `packages/`:
-
-```bash
-pnpm run dev            # watch-build that package with tsdown
-pnpm run build          # build that package with tsdown
-pnpm run test
-pnpm run typecheck
-```
-
-## Local Validation
-
-Before opening or merging a PR, run the local merge gate:
-
-```bash
-pnpm run format
-pnpm run lint
-pnpm run typecheck
-pnpm run test
-```
-
-There are no pre-commit hooks. CI enforces format:check, typecheck, lint, and
-test via `nx affected` — only projects touched by the PR are checked. The
-Playwright-backed `browser` Vitest projects are skipped in CI, so the full
-local suite is still expected before merging.
-
-## Development Workflow
-
-1. Create a feature branch:
-
-```bash
-git checkout -b feat/<short-slug>
-```
-
-2. Keep PRs small and focused.
-
-Update docs when behavior changes. Include screenshots or short recordings for UI
-changes where they help reviewers understand the result.
-
-3. Run validation locally.
-
-Use the full merge gate above for broad changes. For narrow work, it is fine to
-run focused tests while iterating, then run the full gate before opening or
-merging the PR.
-
-4. Commit using Conventional Commits:
-
-```text
-fix(opencode): change initialPromptFlag from -p to --prompt for TUI
-feat(docs): add changelog tab with GitHub releases integration
-```
-
-5. Open a pull request.
-
-Describe the change, the reason for it, and the validation you ran. Link related
-issues when relevant.
-
-## Code Style
-
-- Use TypeScript strict mode.
-- Use top-level `import` statements, not `require()`.
-- Do not introduce npm or yarn lockfiles.
-- Use `pnpm`.
-- Format with `oxfmt`.
-- Lint with `oxlint`.
-- Keep lines near the configured `printWidth` of 100 characters.
-- Use 2 spaces, semicolons, single quotes in TypeScript, double quotes in JSX, LF
-  endings, and trailing commas where valid in ES5.
-- Avoid `any`. If a boundary requires it, keep the escape local and document why.
-- Do not re-export as a shortcut. Import from the original source.
-
-## App Architecture Conventions
-
-The app follows this high-level flow:
-
-```text
-Renderer -> typed RPC client -> preload bridge -> Electron main -> controllers -> services
-```
-
-Main process:
-
-- RPC handlers live in `src/main/core/*/controller.ts`.
-- Controllers should delegate to imported operation or service functions.
-- Expected failures should use the `Result<T, E>` pattern from
-  `src/main/lib/result.ts`.
-- Prefer `execFile` over `exec`.
-- Treat shell escaping, PTY spawning, SSH commands, and worktree paths as
-  security-sensitive.
-- Preserve secret redaction in logging and telemetry code.
-
-Renderer:
-
-- Feature UI lives under `src/core/features/<feature>/browser/`.
-- Shared renderer primitives, stores, hooks, commands, PTY, Monaco, modal
-  infrastructure, and UI live under `src/renderer/lib/`.
-- Renderer RPC calls go through `rpc` from `src/renderer/lib/ipc.ts`.
-- New modals must be registered in `src/renderer/app/modal-registry.ts`.
-- New views must be registered in `src/renderer/app/view-registry.ts`.
-- New commands should use `src/renderer/lib/commands/registry.ts` and view-level
-  `commandProvider` hooks when possible.
-- Components use `PascalCase`; hooks use `useX` camelCase or an existing local
-  pattern.
-
-State and stores:
-
-- Access task managers through `getTaskManagerStore(projectId)`, not
-  `project.taskManager`.
-- Access available Project contexts through `asAvailableProject(getProjectStore(id))`.
-- Never use `asProvisioned(...)!` or `asAvailableProject(...)!`; use explicit null checks.
-- State guards should check `kind !== 'ready'` rather than enumerate non-ready
-  states.
-- Task selectors live in
-  `src/core/features/tasks/browser/stores/task-selectors.ts`.
-- Project selectors live in
-  `src/core/features/projects/browser/stores/project-selectors.ts`.
-
-## Database And Migrations
-
-Development database paths use Electron `app.getPath('userData')`.
-
-- macOS: `~/Library/Application Support/emdash-dev/emdash4.db`
-- Linux: `~/.config/emdash-dev/emdash4.db`
-- Windows: `%APPDATA%\emdash-dev\emdash4.db`
-
-Use an isolated scratch database when working on schema or migration changes.
 From the repo root:
 
 ```bash
-EMDASH_DB_FILE=/tmp/emdash-scratch.db pnpm run dev
+pnpm run dev            # packages + Electron app
+pnpm run build          # build every workspace project
+pnpm run format         # oxfmt
+pnpm run lint           # oxlint, plus the boundary allowlist check
+pnpm run typecheck
+pnpm run licenses       # the licence gate and its tests
+pnpm run test           # every project's tests
+pnpm run check          # format, lint, typecheck, licenses, test, in order
+pnpm run affected       # lint, typecheck and test only what changed vs main
 ```
 
-For app-only development, change into `apps/emdash-desktop/` first so this starts
-only `electron-vite dev`:
+One feature's tests, from the repo root:
 
 ```bash
-cd apps/emdash-desktop
-EMDASH_DB_FILE=/tmp/emdash-scratch.db pnpm run dev
+pnpm --dir apps/emdash-desktop exec vitest run --project node src/core/features/lanes
+pnpm --dir apps/emdash-desktop exec vitest run --project browser src/core/features/lanes
 ```
 
-Reset dev databases from `apps/emdash-desktop/`:
+The docs site:
 
 ```bash
-pnpm run db:reset
+pnpm --filter @ninebrains/docs dev
+pnpm --filter @ninebrains/docs build
 ```
 
-Database rules:
+## Before you open a PR
 
-- Do not hand-edit numbered Drizzle migrations or `drizzle/meta/`.
-- Use `pnpm run db:generate` for new migrations.
-- Update fixtures and migration tests when schema behavior changes.
-- Run focused database validation from `apps/emdash-desktop/` when relevant:
+Run `pnpm run check`. It must be green. There are no pre-commit hooks.
+
+CI runs format, lint, typecheck and test on the projects your PR touches, plus the licence gate.
+CI skips the Playwright-backed `browser` test projects, so run them locally. The first run on a
+machine needs:
 
 ```bash
-pnpm run db:fixtures
-pnpm run test:migrations
+pnpm --dir apps/emdash-desktop exec playwright install chromium-headless-shell
 ```
 
-Read `agents/risky-areas/database.md` before changing database internals.
+If a browser test fails with `Cannot read properties of null (reading 'useRef')` or "Failed to
+fetch dynamically imported module", re-run it. That is Vite re-optimising dependencies mid-run.
 
-## Worktrees, PTY, SSH, And Providers
+Then:
 
-Emdash orchestrates coding agents in Git worktrees and PTY sessions. These areas
-are high impact.
+1. Branch: `git checkout -b feat/<short-slug>`.
+2. Commit with Conventional Commits (`feat(lanes): …`, `fix(brain-core): …`, `docs(guide): …`).
+3. In the PR, say what changed, why, and what you ran. Add screenshots at 1440 and 390 px for UI
+   changes.
+4. Update `docs/guide/` in the same PR when behaviour changes. Docs reviewed next to the code that
+   changes them are the ones that stay true.
 
-- Do not delete worktree folders manually unless you know the matching Git state.
-  Prefer in-app cleanup or `git worktree prune` from the main repository.
-- Do not weaken shell quoting, spawn behavior, environment allowlists, or secret
-  redaction.
-- PTY environment passthrough must use the allowlist in
-  `src/main/core/pty/pty-env.ts`.
-- Provider changes may need updates to shared provider metadata, dependency
-  detection, PTY behavior, hooks/plugins, renderer assumptions, and tests.
+## The fork: upstream rebase policy
 
-Read the relevant risk or integration doc before touching these areas:
+- The `upstream` remote is `https://github.com/generalaction/emdash.git`. **Never push to it.**
+- We rebase on upstream regularly. Upstream ships about 20 commits a day, so every patch to an
+  inherited file costs us again at each rebase.
+- **Prefer a new feature slice to a patch.** Most work fits a slice under
+  `apps/emdash-desktop/src/core/features/` plus one-line registrations in the manifests. SEAMS.md
+  names the extension point for each area.
+- When you must change an inherited file, keep the change small, start the code comment on the
+  patched line with `Ninebrains:`, and **log it in
+  [docs/UPSTREAM-PATCHES.md](docs/UPSTREAM-PATCHES.md)** in the same PR: file, what, why. A PR that
+  patches an upstream file without a log entry will be sent back.
+- Boot wiring goes through the single `createNinebrainsServices()` call, so the hot `services.ts`
+  patch stays small.
+- On a rebase, regenerate `pnpm-lock.yaml`. Never hand-merge it.
+- Kept from Emdash on purpose: the `.emdash.json` file name, `EMDASH_*` variables, the `@emdash/*`
+  package names and the `emdash4.db` file name. Renaming any of them is a separate, deliberate
+  decision.
+- If you fix a bug that also exists upstream, consider sending the fix to Emdash as well.
 
-- `agents/risky-areas/pty.md`
-- `agents/risky-areas/ssh.md`
-- `agents/integrations/providers.md`
-- `agents/integrations/mcp.md`
+## The licence gate
 
-## Testing Notes
+`pnpm run licenses` runs `tooling/scripts/check-licenses.mjs`. It checks the production dependency
+tree and walks every installed package, because the renderer bundles the desktop app's
+`devDependencies`.
 
-- Unit tests use Vitest.
-- Main database integration tests run in the `main-db` Vitest project.
-- Migration tests run in the `migrations` project.
-- Fixture generation runs in the `fixtures` project.
-- Renderer browser tests use Playwright-backed `@vitest/browser-playwright`.
-- Main-process tests are colocated under `src/main/core/**/*.test.ts`.
-- Renderer unit tests live under `src/renderer/tests/`.
-- Renderer browser tests live under `src/renderer/tests/browser/`.
-- Integration-style tests create temporary repos and worktrees in `os.tmpdir()`.
+- **Allowed:** MIT, Apache-2.0, ISC, BSD-2-Clause, BSD-3-Clause, 0BSD, MPL-2.0, BlueOak-1.0.0,
+  CC0-1.0, Unlicense, Python-2.0.
+- **Blocked packages:** tldraw (licence key), Remotion (paid company licence), claude-task-master
+  (Commons Clause), mcp_agent_mail (usage rider).
+- **Never allowed, even as an exception:** AGPL, GPL, SSPL, Elastic, BUSL and Commons Clause.
+- Anything else, including LGPL, needs a reviewed entry with a written reason in
+  `tooling/scripts/allowlist-exceptions.json`. An entry names the package and the exact licence
+  string, so a licence change re-opens the review.
 
-From `apps/emdash-desktop/`, the app test command is:
+Before adding a dependency, check its licence and its transitive tree. Code from projects under a
+source-available or copyleft licence (for example Superset's ELv2, or AGPL projects) must not be
+copied in, even in part. Reading their public design is fine; re-implement from scratch.
 
-```bash
-pnpm run test
-```
+## Tests use the fake agent
 
-It runs the app Vitest projects:
+Tests never spend real credits. `tooling/fake-agent/` is a zero-dependency stand-in for the
+`claude` CLI (`bin/fake-claude.mjs`). It accepts the real flags, rejects unknown ones, reproduces
+the variadic `--mcp-config` behaviour, emits `stream-json` events whose shapes are checked against
+real captures, fires hooks from `--settings`, and makes real MCP stdio calls.
 
-```text
-node, main-db, migrations, browser, scripts
-```
+- Script its behaviour with `FAKE_AGENT_SCRIPT` (a file or inline JSON array of steps: `say`,
+  `callTool`, `writeFile`, `sleep`, `waitForInput`, `exit`).
+- Record each launch's argv, working directory and lane ID with `FAKE_AGENT_ARGV_LOG`.
+- Point code that spawns Claude at it with `CLAUDE_BIN=<path>/fake-claude.mjs`.
+- Its own tests: `node --test "tooling/fake-agent/test/*.test.mjs"`.
 
-## Native Dependencies
+Run a real CLI only by hand, and say in the PR that you did.
 
-After native dependency changes, rebuild Electron native modules from
-`apps/emdash-desktop/`:
+## Security-sensitive code
 
-```bash
-pnpm run rebuild
-```
+Lanes run agents that execute shell commands as the user. Treat these areas as high risk: the Brain
+endpoint and brain-mcp, launch config, the dispatcher and exec runs, gates, the lane browser, packs,
+and anything that spawns a process.
 
-This is especially relevant for `better-sqlite3` and `node-pty`.
+- Every requirement in [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) has an ID (`SEC-01` …). Its test
+  uses a `describe` title that starts with the ID, so `grep SEC-17` finds the proof. Keep that
+  convention for new tests.
+- Spawn with argv arrays, `shell: false` and absolute binary paths. Pass prompts on stdin, never as
+  argv.
+- Build agent environments from the allowlist in `packages/core/src/primitives/agent-env/api`, never
+  from raw `process.env`.
+- Never emit a permission-bypass flag from any launch builder.
+- Never read provider credential files, and never drive a provider login.
+- Put anything untrusted into a reviewer prompt only through `createFence()` from gates-core.
 
-## Remote Development Stack
+Security-relevant PRs get an extra security review before merge.
 
-The workspace-server stack (`apps/workspace-server/docker-compose.yaml`) is the
-only Docker-backed remote-dev stack. When working on SSH/remote development
-infrastructure, start it from `apps/workspace-server/`:
+## Code style
 
-```bash
-pnpm run run:docker-remote
-```
+- TypeScript strict mode; avoid `any`, and document it if a boundary needs it.
+- Top-level `import` only: no `require()`, no dynamic `import()`.
+- `pnpm` only; do not add npm or yarn lockfiles.
+- Format with oxfmt (width 100, single quotes), lint with oxlint.
+- Files stay under 500 lines.
+- Do not re-export as a shortcut; import from the original source.
+- Features follow the boundary lint (see SEAMS.md §2). The lint allowlists are ratcheted empty. Do
+  not add entries; change the design instead.
 
-Read `agents/workflows/remote-development.md` and `agents/risky-areas/ssh.md`
-before making SSH behavior changes.
+## Databases
 
-## Issue Reports And Feature Requests
+- The app database is Emdash's (`emdash4.db`), with Drizzle migrations in
+  `apps/emdash-desktop/drizzle/`. Do not hand-edit numbered migrations; use `pnpm run db:generate`
+  from `apps/emdash-desktop/`. Read `agents/risky-areas/database.md` first.
+- Use a scratch database when working on schema changes:
+  `EMDASH_DB_FILE=/tmp/ninebrains-scratch.db pnpm run dev`.
+- Brain data lives in its own database, owned by `packages/brain-core`. Do not add Brain tables to
+  the app database.
 
-Use GitHub Issues. Include:
+## Worktrees, terminals and providers
 
-- Operating system
-- Emdash version or commit SHA
-- Node and pnpm versions, if development-related
-- Steps to reproduce
-- Expected behavior
-- Actual behavior
-- Relevant logs, terminal output, or screenshots
+- Do not delete worktree folders by hand unless you know the matching git state. Prefer in-app
+  cleanup or `git worktree prune`.
+- Do not weaken shell quoting, spawn behaviour, environment allowlists or secret redaction.
+- Read `agents/risky-areas/pty.md`, `agents/integrations/providers.md` and
+  `agents/integrations/mcp.md` before changing those areas.
 
-Do not include secrets, tokens, private keys, local app databases, or private
-repository content in public issues.
+## Native dependencies
 
-## Release Process For Maintainers
+After changing native dependencies, rebuild them from `apps/emdash-desktop/` with
+`pnpm run rebuild`. This matters most for `better-sqlite3` and `node-pty`.
 
-Do not dispatch release workflows, publish packages, or upload artifacts unless
-you are explicitly doing release work.
+## Issues and feature requests
 
-The app version lives in `apps/emdash-desktop/package.json`. For release version
-bumps, run these from `apps/emdash-desktop/`:
+Use GitHub Issues on `Advance-Labs/ninebrains`. Include your OS, the Ninebrains version or commit,
+steps to reproduce, what you expected, what happened, and relevant logs. Never include secrets,
+tokens, private keys, app databases or private repository content.
 
-```bash
-pnpm version patch
-pnpm version minor
-pnpm version major
-```
+Problems that also happen in upstream Emdash, and that Ninebrains does not change, are best
+reported to `generalaction/emdash` too.
 
-This updates `package.json` and `pnpm-lock.yaml`, creates a version commit, and
-creates a tag.
+## Releases
 
-Production releases are dispatched through GitHub Actions:
+Maintainers only. See [docs/RELEASING.md](docs/RELEASING.md). Do not dispatch release workflows,
+publish packages or upload artifacts unless you are doing release work.
 
-```bash
-gh workflow run release-prod.yml --ref main -f arch=both
-```
+## Further reading
 
-Canary releases are dispatched through:
-
-```bash
-gh workflow run release-canary.yml --ref main -f arch=both
-```
-
-Workspace-server releases have an independent version and channel:
-
-```bash
-gh workflow run release-workspace-server.yml --ref main -f channel=stable
-```
-
-See [`apps/workspace-server/docs/packaging.md`](apps/workspace-server/docs/packaging.md) before
-bumping or publishing a workspace-server version.
-
-Production releases publish artifacts to GitHub Releases as the primary update
-feed and Cloudflare R2 as fallback. Canary releases currently publish to R2 only.
-
-## Further Reading
-
-- `agents/README.md`
-- `agents/quickstart.md`
-- `agents/architecture/overview.md`
-- `agents/architecture/main-process.md`
-- `agents/architecture/renderer.md`
-- `agents/conventions/ipc.md`
-- `agents/conventions/main-patterns.md`
-- `agents/conventions/renderer-patterns.md`
-- `agents/conventions/typescript.md`
-- `agents/workflows/nx.md`
-- `agents/workflows/testing.md`
-- `agents/workflows/worktrees.md`
+- [docs/guide/](docs/guide/README.md): the user guide.
+- [docs/SEAMS.md](docs/SEAMS.md): where Ninebrains plugs into Emdash.
+- [docs/SPIKE-EXEC-PATHS.md](docs/SPIKE-EXEC-PATHS.md): verified CLI flags and gotchas.
+- `agents/README.md`, `agents/architecture/overview.md`, `agents/workflows/testing.md`: Emdash's
+  own notes.

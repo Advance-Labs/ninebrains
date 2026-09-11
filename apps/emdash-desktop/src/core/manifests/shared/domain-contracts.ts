@@ -17,6 +17,7 @@ import { promptLibraryContract, promptLibraryDomain } from '@core/features/libra
 import { machinesContract, machinesDomain } from '@core/features/machines/api';
 import { mcpContract, mcpDomain } from '@core/features/mcp/api';
 import { packsContract, packsDomain } from '@core/features/packs/api';
+import { plannerContract, plannerDomain } from '@core/features/planner/api';
 import { previewServersContract, previewServersDomain } from '@core/features/preview-servers/api';
 import { projectsDomain, projectsWireContract } from '@core/features/projects/api';
 import { repositoryContract, repositoryDomain } from '@core/features/repository/api';
@@ -94,4 +95,5 @@ export const desktopDomainContracts = {
   [packsDomain]: packsContract,
   [lanesDomain]: lanesContract,
   [gatesDomain]: gatesContract,
+  [plannerDomain]: plannerContract,
 } as const;

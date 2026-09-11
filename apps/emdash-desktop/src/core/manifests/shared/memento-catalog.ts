@@ -11,6 +11,7 @@ import {
   packsPrefsIndexMemento,
   packsProjectPrefsMemento,
 } from '@core/features/packs/contributions/mementos';
+import { plannerViewportMemento } from '@core/features/planner/contributions/mementos';
 import {
   projectViewMemento,
   workspaceChromeMemento,
@@ -58,6 +59,7 @@ export const mementoCatalog: readonly MementoCatalogEntry[] = [
   lanesGridMemento,
   gatesProjectPrefsMemento,
   gatesPrefsIndexMemento,
+  plannerViewportMemento,
 ];
 
 export const mementoSweepPolicies = mementoCatalog.flatMap((definition) =>

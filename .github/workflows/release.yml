@@ -1,0 +1,272 @@
+name: Release
+
+# Ninebrains: builds unsigned installers on macOS, Windows and Linux, writes SHA256SUMS, and
+# uploads everything to a DRAFT GitHub release. Manual only: no tag or push trigger, because Actions
+# minutes on the private repo are limited and publishing is a human decision. Publishing the draft
+# in the GitHub UI is what creates the tag. How to cut, verify and publish: docs/RELEASING.md.
+#
+# Idempotent: re-running (or re-dispatching the same version from the same commit) rebuilds, reuses
+# the one draft for the tag, replaces its assets and deletes stale ones. It refuses to touch a
+# published release, or a draft that targets a different commit.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, without the v. Must equal apps/emdash-desktop/package.json.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Check the version input against package.json
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          pkg=$(node -p "require('./apps/emdash-desktop/package.json').version")
+          if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$INPUT_VERSION' is not a semver version like 0.1.0"; exit 1
+          fi
+          if [ "$INPUT_VERSION" != "$pkg" ]; then
+            echo "::error::Input $INPUT_VERSION does not match package.json $pkg. Commit the version bump first."; exit 1
+          fi
+          echo "tag=v$pkg" >> "$GITHUB_OUTPUT"
+
+      # SEC-36 (no updater feed in the builder configs) and SEC-37 (checksum tooling). No install
+      # needed: the tests only import types from electron-builder.
+      - name: Release config and checksum tests
+        working-directory: apps/emdash-desktop
+        run: node --test scripts/release/*.test.mjs
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: preflight
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon runner; build.ts builds arm64 and x64 in turn, rebuilding native modules
+          # for each arch.
+          - os: macos-14
+            platform: mac
+            arch: both
+            windows-native: 'false'
+          # Same images as build-matrix.yml: setup-build pins MSVC 2022, and ubuntu-22.04 keeps the
+          # glibc floor at 2.35 so the AppImage and deb run on older distros.
+          - os: windows-2022
+            platform: win
+            arch: x64
+            windows-native: 'true'
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            windows-native: 'false'
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      # Public OAuth App client ID (repository variable, not a secret); empty disables device flow.
+      NINEBRAINS_GITHUB_OAUTH_CLIENT_ID: ${{ vars.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsecret-1-dev pkg-config
+
+      - name: Setup build environment
+        uses: ./.github/actions/setup-build
+        with:
+          windows-native: ${{ matrix.windows-native }}
+
+      - name: Export Python path for native modules
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "python=$(which python)" >> "$GITHUB_ENV"
+
+      - name: Build workspace
+        shell: bash
+        run: pnpm run build
+
+      # No --release-id: build.ts runs in local mode and never talks to GitHub. Signing env is
+      # empty until the secrets exist; scripts/release/lib/signing.ts then packages unsigned
+      # (ad-hoc on macOS). Setting the secrets switches signing on with no workflow change.
+      - name: Package
+        shell: bash
+        working-directory: apps/emdash-desktop
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          NINEBRAINS_AZURE_SIGNING_ENDPOINT: ${{ vars.NINEBRAINS_AZURE_SIGNING_ENDPOINT }}
+          NINEBRAINS_AZURE_SIGNING_ACCOUNT: ${{ vars.NINEBRAINS_AZURE_SIGNING_ACCOUNT }}
+          NINEBRAINS_AZURE_CERT_PROFILE: ${{ vars.NINEBRAINS_AZURE_CERT_PROFILE }}
+          NINEBRAINS_AZURE_PUBLISHER: ${{ vars.NINEBRAINS_AZURE_PUBLISHER }}
+        run: >
+          node --experimental-strip-types scripts/release/build.ts
+          --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - name: Verify macOS bundles (arch, bundle id, signature)
+        if: runner.os == 'macOS'
+        working-directory: apps/emdash-desktop
+        run: node --experimental-strip-types scripts/release/verify-mac.ts
+
+      - name: Stage installers
+        shell: bash
+        working-directory: apps/emdash-desktop
+        run: |
+          mkdir -p ../../dist-release
+          shopt -s nullglob
+          files=(release/Ninebrains-*.{dmg,zip,exe,AppImage,deb})
+          if [ ${#files[@]} -eq 0 ]; then echo "::error::No installers in release/"; ls -la release; exit 1; fi
+          cp "${files[@]}" ../../dist-release/
+          ls -la ../../dist-release
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: dist-release/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Build-provenance attestations (SEC-37). GitHub only offers them on public repos, or private repos
+  # on Enterprise Cloud, so this job runs once the repo is public or NINEBRAINS_ATTEST is 'true'.
+  attest:
+    name: Attest
+    needs: build
+    if: ${{ !github.event.repository.private || vars.NINEBRAINS_ATTEST == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: dist-release
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist-release/*
+
+  release:
+    name: Upload to draft release
+    needs: [preflight, build, attest]
+    # attest is skipped on a private repo; that must not block the draft.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.preflight.outputs.tag }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: dist-release
+
+      - name: Write and check SHA256SUMS
+        run: |
+          node apps/emdash-desktop/scripts/release/checksums.mjs dist-release
+          node apps/emdash-desktop/scripts/release/checksums.mjs --verify dist-release
+
+      - name: Write release notes
+        run: |
+          {
+            echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn; see [RELEASING.md](https://github.com/$GH_REPO/blob/$GITHUB_SHA/docs/RELEASING.md) before installing."
+            echo
+            echo "Built from \`$GITHUB_SHA\` by workflow run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID)."
+            echo
+            echo "### SHA256SUMS"
+            echo
+            echo "Check your download against these before you open it (\`shasum -a 256 -c SHA256SUMS\` on macOS, \`sha256sum -c SHA256SUMS\` on Linux, \`Get-FileHash\` on Windows):"
+            echo
+            echo '```'
+            cat dist-release/SHA256SUMS
+            echo '```'
+          } > release-notes.md
+
+      - name: Create or reuse the draft
+        run: |
+          releases=$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | {id, draft, target_commitish}" | jq -s .)
+          if [ "$(jq '[.[] | select(.draft | not)] | length' <<<"$releases")" != 0 ]; then
+            echo "::error::$TAG is already published. Bump the version instead of rebuilding a shipped release."; exit 1
+          fi
+          drafts=$(jq '[.[] | select(.draft)]' <<<"$releases")
+          case "$(jq length <<<"$drafts")" in
+            0)
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Ninebrains $VERSION" --notes-file release-notes.md
+              ;;
+            1)
+              target=$(jq -r '.[0].target_commitish' <<<"$drafts")
+              if [ "$target" != "$GITHUB_SHA" ]; then
+                echo "::error::The $TAG draft targets $target, not $GITHUB_SHA. Delete that draft or dispatch from its commit."; exit 1
+              fi
+              gh release edit "$TAG" --notes-file release-notes.md
+              ;;
+            *)
+              echo "::error::More than one draft exists for $TAG. Delete the extras and re-run."; exit 1
+              ;;
+          esac
+
+      - name: Upload assets and remove stale ones
+        run: |
+          gh release upload "$TAG" dist-release/* --clobber
+          for name in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+            if [ ! -f "dist-release/$name" ]; then
+              echo "Deleting stale asset $name"
+              gh release delete-asset "$TAG" "$name" --yes
+            fi
+          done
+
+      # SEC-37: re-verify what GitHub actually serves, not just what we uploaded.
+      - name: Re-download the draft and verify SHA256SUMS
+        run: |
+          mkdir verify
+          gh release download "$TAG" --dir verify
+          node apps/emdash-desktop/scripts/release/checksums.mjs --verify verify
+          echo "Draft $TAG is ready for review: $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

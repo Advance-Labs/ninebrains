@@ -54,6 +54,9 @@ import {
   type PacksService,
 } from '@core/features/packs/node/packs-service';
 import { createPacksWireController } from '@core/features/packs/node/wire-controller';
+import { createUnwiredPlannerService } from '@core/features/planner/node/fallback';
+import type { PlannerService } from '@core/features/planner/node/planner-service';
+import { createPlannerWireController } from '@core/features/planner/node/wire-controller';
 import type { PreviewServerAccessOperations } from '@core/features/preview-servers/node/preview-server-access-service';
 import { createPreviewServersWireController } from '@core/features/preview-servers/node/wire-controller';
 import type { ProjectAttachmentManager } from '@core/features/projects/api/node/project-attachment-manager';
@@ -177,6 +180,8 @@ export type DesktopControllerContext = {
   readonly packs?: PacksService;
   /** Ninebrains gate verification views. Optional until boot wiring passes one (features/gates/README.md). */
   readonly gates?: GatesVerificationService;
+  /** Ninebrains planner. Optional until wired; absent means an in-memory, Brain-less fallback. */
+  readonly planner?: PlannerService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -481,6 +486,9 @@ export const desktopNodeControllers = {
   },
   gates: {
     create: ({ gates }) => createGatesWireController(gates ?? unavailableVerificationService),
+  },
+  planner: {
+    create: ({ planner }) => createPlannerWireController(planner ?? createUnwiredPlannerService()),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;
