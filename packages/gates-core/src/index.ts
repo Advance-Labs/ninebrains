@@ -28,6 +28,7 @@ export {
   safeFileName,
   type OpenEvidenceStoreOptions,
 } from './evidence-store';
+export { createEvidenceRedactor, type EvidenceRedactor } from './evidence-redact';
 export {
   COMPLETE_JOB_TOOL,
   DEFAULT_GATE_TIMEOUT_MS,
