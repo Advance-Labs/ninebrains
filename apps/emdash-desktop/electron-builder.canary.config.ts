@@ -1,8 +1,8 @@
 import type { Configuration } from 'electron-builder';
+import { resolveMacSigning, resolveWinSigning } from './scripts/release/lib/signing.ts';
 import {
   APP_ID,
   APP_NAME_LOWER,
-  ARTIFACT_PREFIX,
   COPYRIGHT,
   PRODUCT_NAME,
 } from './src/core/primitives/app-identity/api/app-identity.canary.ts';
@@ -13,21 +13,12 @@ const config: Configuration = {
   executableName: PRODUCT_NAME,
   copyright: COPYRIGHT,
   directories: { output: 'release' },
-  artifactName: `${ARTIFACT_PREFIX}-\${arch}.\${ext}`,
-  // Ninebrains: GitHub Releases only. Emdash's R2 generic feed is removed.
-  publish: [
-    {
-      provider: 'github',
-      owner: 'Advance-Labs',
-      repo: 'ninebrains',
-      releaseType: 'draft',
-      // 'canary' must match the prerelease identifier in scripts/release/lib/version.ts
-      // (e.g. 1.1.33-canary.42 -> prerelease id "canary"). electron-updater uses this
-      // id to select the matching release from the Atom feed and to construct the
-      // channel filename (canary*.yml) it fetches from GitHub.
-      channel: 'canary',
-    },
-  ],
+  // Ninebrains: e.g. Ninebrains-Canary-0.1.1-canary.3-mac-arm64.dmg (no spaces in file names).
+  artifactName: `${PRODUCT_NAME.replace(/ /g, '-')}-\${version}-\${os}-\${arch}.\${ext}`,
+  // Ninebrains: no publish provider, so no app-update.yml and no canary*.yml feed (SEC-36). When
+  // auto-update returns, the provider must be github / Advance-Labs / ninebrains with
+  // `channel: 'canary'`, matching the prerelease id in scripts/release/lib/version.ts.
+  publish: null,
   generateUpdatesFilesForAllChannels: false,
   files: ['out/**/*', 'node_modules/**/*', 'drizzle/**/*'],
   asarUnpack: [
@@ -39,7 +30,7 @@ const config: Configuration = {
   ],
   mac: {
     category: 'public.app-category.developer-tools',
-    hardenedRuntime: true,
+    ...resolveMacSigning(process.env),
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.plist',
     extendInfo: {
@@ -49,11 +40,10 @@ const config: Configuration = {
         'Ninebrains needs local network access to connect to SSH hosts on your network.',
     },
     target: [
-      { target: 'dmg', arch: ['arm64'] },
-      { target: 'zip', arch: ['arm64'] },
+      { target: 'dmg', arch: ['arm64', 'x64'] },
+      { target: 'zip', arch: ['arm64', 'x64'] },
     ],
     icon: 'src/assets/images/emdash/emdash-canary.icns',
-    notarize: false,
   },
   dmg: {
     icon: 'src/assets/images/emdash/emdash-canary.icns',
@@ -71,30 +61,18 @@ const config: Configuration = {
     target: [
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] },
-      { target: 'rpm', arch: ['x64'] },
     ],
   },
   deb: {
     packageName: APP_NAME_LOWER,
   },
-  rpm: {
-    packageName: APP_NAME_LOWER,
-  },
   win: {
     icon: 'src/assets/images/emdash/emdash-canary.png',
-    target: [
-      { target: 'nsis', arch: ['x64'] },
-      { target: 'msi', arch: ['x64'] },
-    ],
-    // Ninebrains: Emdash's Azure Trusted Signing profile is removed. Builds ship unsigned until
-    // plan task 7.1 wires up our own signing.
-  },
-  msi: {
-    oneClick: false,
-    perMachine: false,
+    target: [{ target: 'nsis', arch: ['x64'] }],
+    ...resolveWinSigning(process.env),
   },
   nsis: {
-    differentialPackage: true,
+    differentialPackage: false,
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     perMachine: false,
