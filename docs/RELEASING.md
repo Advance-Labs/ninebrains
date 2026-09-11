@@ -153,7 +153,15 @@ while the prompt is open.
 An ad-hoc signature has no stable identity: every build has a new code hash, so the Keychain treats
 each update as a different app and asks again. The same happens if another build of the app (a dev
 or e2e run) created the key first. Clicking **Deny** leaves the app unable to read the key. A
-Developer ID signature (below) makes the approval stick across updates.
+Developer ID signature (plan task 7.1, below) makes the approval stick across updates.
+
+For local launch checks of a packaged build, skip the prompt with Chromium's mock keychain. It
+never touches the real key, so nothing pops up on the desktop:
+
+```sh
+open -a apps/emdash-desktop/release/mac-arm64/Ninebrains.app --args --use-mock-keychain
+# or: apps/emdash-desktop/release/mac-arm64/Ninebrains.app/Contents/MacOS/Ninebrains --use-mock-keychain
+```
 
 ### Windows SmartScreen
 
