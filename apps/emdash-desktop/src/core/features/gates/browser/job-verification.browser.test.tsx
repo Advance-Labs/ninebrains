@@ -77,7 +77,7 @@ describe('job verification through the wire seam', () => {
         .click()
     );
     expect(
-      document.querySelector('[role="dialog"][aria-label="Attempt 2, 390 px"] img')
+      document.querySelector('[role="group"][aria-label="Attempt 2, 390 px"] img')
     ).not.toBeNull();
   });
 

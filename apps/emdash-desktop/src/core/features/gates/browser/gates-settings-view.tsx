@@ -21,7 +21,7 @@ function RigorSlider(props: {
         aria-label={props.label}
         disabled={props.disabled}
         onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-        className="w-40 accent-[var(--primary-button-background)]"
+        className="w-24 accent-[var(--primary-button-background)] sm:w-40"
       />
       <Text variant="body" className="w-5 text-right text-foreground tabular-nums">
         {props.value}
@@ -37,21 +37,21 @@ function RigorTable({ testing, security }: { testing: number; security: number }
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-foreground-muted">
-            <th className="px-3 py-2 font-medium">Gate</th>
-            <th className="px-3 py-2 font-medium">Attaches at</th>
-            <th className="px-3 py-2 font-medium">Job kinds</th>
-            <th className="px-3 py-2 font-medium">Now</th>
+            <th className="px-2 py-2 font-medium sm:px-3">Gate</th>
+            <th className="px-2 py-2 font-medium sm:px-3">Attaches at</th>
+            <th className="px-2 py-2 font-medium sm:px-3">Job kinds</th>
+            <th className="px-2 py-2 font-medium sm:px-3">Now</th>
           </tr>
         </thead>
         <tbody>
           {RIGOR_TABLE.map((row) => (
             <tr key={row.gate} className="border-t border-border text-foreground">
-              <td className="px-3 py-2">{row.label}</td>
-              <td className="px-3 py-2 tabular-nums">
+              <td className="px-2 py-2 sm:px-3">{row.label}</td>
+              <td className="px-2 py-2 tabular-nums sm:px-3">
                 {row.slider === 'testing' ? 'Testing' : 'Security'} ≥ {row.threshold}
               </td>
-              <td className="px-3 py-2 text-foreground-muted">{row.kinds}</td>
-              <td className="px-3 py-2">
+              <td className="px-2 py-2 text-foreground-muted sm:px-3">{row.kinds}</td>
+              <td className="px-2 py-2 sm:px-3">
                 {attached.has(row.gate) ? (
                   <Badge tone="success">On</Badge>
                 ) : (

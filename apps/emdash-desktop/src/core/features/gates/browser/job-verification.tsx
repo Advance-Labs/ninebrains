@@ -118,8 +118,14 @@ function LogExcerpt(props: { attempt: number; file: string; label: string; load:
   const tail = text ? text.split('\n').slice(-LOG_LINES).join('\n') : '';
   return (
     <div className="flex flex-col gap-1">
-      <Button size="sm" variant="ghost" onClick={() => setOpen(!open)} className="self-start">
-        {open ? 'Hide' : 'Show'} {props.label}
+      <Button
+        size="sm"
+        variant="ghost"
+        title={props.label}
+        onClick={() => setOpen(!open)}
+        className="self-start"
+      >
+        {open ? 'Hide log' : 'Show log'}
       </Button>
       {open && (
         <pre className="max-h-56 overflow-auto rounded-md border border-border bg-background-secondary p-2 text-xs whitespace-pre-wrap text-foreground">
@@ -220,6 +226,26 @@ export function VerificationPanel(props: { view: JobVerificationView; load: Load
   const badge = latestBadge(view);
   const attempts = [...view.history].reverse();
   const newest = view.history.at(-1)?.attempt;
+  // In-flow rather than a fixed overlay: the dialog popup is a transformed container.
+  if (enlarged) {
+    return (
+      <div role="group" aria-label={enlarged.label} className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="ghost" onClick={() => setEnlarged(null)}>
+            Back to all attempts
+          </Button>
+          <Text variant="description" tone="muted">
+            {enlarged.label}
+          </Text>
+        </div>
+        <img
+          src={enlarged.src}
+          alt={enlarged.label}
+          className="w-full rounded-md border border-border"
+        />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-4" data-testid="job-verification">
       <div className="flex flex-col gap-1">
@@ -267,23 +293,6 @@ export function VerificationPanel(props: { view: JobVerificationView; load: Load
               </li>
             ))}
           </ul>
-        </div>
-      )}
-      {enlarged && (
-        <div
-          role="dialog"
-          aria-label={enlarged.label}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-2 bg-background p-6"
-        >
-          <img src={enlarged.src} alt={enlarged.label} className="max-h-[85vh] max-w-full" />
-          <div className="flex items-center gap-3">
-            <Text variant="description" tone="muted">
-              {enlarged.label}
-            </Text>
-            <Button size="sm" variant="ghost" onClick={() => setEnlarged(null)}>
-              Close
-            </Button>
-          </div>
         </div>
       )}
     </div>
