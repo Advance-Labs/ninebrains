@@ -24,7 +24,11 @@ import { getPlannerClient } from '@core/features/planner/api/browser/client';
 import { cycleEdgeIds, flattenCanvas } from '@core/features/planner/api/flatten';
 import * as model from './canvas-model';
 import { DraftFromBriefModal } from './draft-modal';
-import { PlannerNodeActionsContext, plannerNodeTypes, type PlannerNodeActions } from './planner-nodes';
+import {
+  PlannerNodeActionsContext,
+  plannerNodeTypes,
+  type PlannerNodeActions,
+} from './planner-nodes';
 import { PlannerToolbar } from './planner-toolbar';
 import { usePlannerNodeStates } from './use-node-states';
 
@@ -49,10 +53,19 @@ export function PlannerCanvas(props: PlannerCanvasProps) {
 }
 
 function isTyping(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+  );
 }
 
-function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, saveDebounceMs = 600 }: PlannerCanvasProps) {
+function PlannerCanvasInner({
+  projectId,
+  canvasId,
+  viewport,
+  onViewportChange,
+  saveDebounceMs = 600,
+}: PlannerCanvasProps) {
   const flow = useReactFlow();
   const [doc, setDoc] = useState<CanvasDoc | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,7 +97,9 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
         return;
       }
       if (result.data.recovered) {
-        toast.warning('The saved canvas was unreadable', { description: 'Starting from an empty canvas.' });
+        toast.warning('The saved canvas was unreadable', {
+          description: 'Starting from an empty canvas.',
+        });
       }
       setDoc(result.data.doc);
     })();
@@ -132,11 +147,21 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
   );
 
   const derivedNodes = useMemo(
-    () => (doc ? model.toFlowNodes(doc, scope, { states, cycleNodes: cycle.nodes, selected: selectedNodes }) : []),
+    () =>
+      doc
+        ? model.toFlowNodes(doc, scope, {
+            states,
+            cycleNodes: cycle.nodes,
+            selected: selectedNodes,
+          })
+        : [],
     [doc, scope, states, cycle, selectedNodes]
   );
   const derivedEdges = useMemo(
-    () => (doc ? model.toFlowEdges(doc, scope, { cycleEdges: cycle.edges, selected: selectedEdges }) : []),
+    () =>
+      doc
+        ? model.toFlowEdges(doc, scope, { cycleEdges: cycle.edges, selected: selectedEdges })
+        : [],
     [doc, scope, cycle, selectedEdges]
   );
   // xyflow owns transient state (drag positions, measured sizes); the doc owns the truth.
@@ -146,10 +171,20 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
   useEffect(() => setEdges(derivedEdges), [derivedEdges]);
 
   const onNodesChange = useCallback((changes: NodeChange<model.PlannerFlowNode>[]) => {
-    setNodes((current) => applyNodeChanges(changes.filter((c) => c.type !== 'remove'), current));
+    setNodes((current) =>
+      applyNodeChanges(
+        changes.filter((c) => c.type !== 'remove'),
+        current
+      )
+    );
   }, []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    setEdges((current) => applyEdgeChanges(changes.filter((c) => c.type !== 'remove'), current));
+    setEdges((current) =>
+      applyEdgeChanges(
+        changes.filter((c) => c.type !== 'remove'),
+        current
+      )
+    );
   }, []);
   const onSelectionChange = useCallback(({ nodes: n, edges: e }: OnSelectionChangeParams) => {
     setSelectedNodes(new Set(n.map((node) => node.id)));
@@ -173,7 +208,10 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
     (type: model.PlannerNodeType) => {
       const rect = document.querySelector('.planner-flow')?.getBoundingClientRect();
       const center = rect
-        ? flow.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+        ? flow.screenToFlowPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          })
         : { x: 0, y: 0 };
       const position = { x: center.x - 100, y: center.y - 30 };
       const base = { position, parentId: scope };
@@ -182,7 +220,13 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
           ? { ...base, id: model.newPlannerId('n'), type: 'job', title: 'New job', kind: 'work' }
           : type === 'note'
             ? { ...base, id: model.newPlannerId('n'), type: 'note', text: '' }
-            : { ...base, id: model.newPlannerId('m'), type: 'module', title: 'New module', size: { width: 320, height: 220 } };
+            : {
+                ...base,
+                id: model.newPlannerId('m'),
+                type: 'module',
+                title: 'New module',
+                size: { width: 320, height: 220 },
+              };
       change((d) => model.addNodes(d, [node]));
       setEditingId(node.id);
     },
@@ -204,14 +248,18 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
         const current = docRef.current;
         const flat = flattenCanvas(current);
         setCycle({ nodes: new Set(path), edges: cycleEdgeIds(flat, path) });
-        const titles = new Map(current.nodes.map((n) => [n.id, n.type === 'note' ? n.id : n.title]));
+        const titles = new Map(
+          current.nodes.map((n) => [n.id, n.type === 'note' ? n.id : n.title])
+        );
         toast.error('The plan has a dependency cycle', {
           description: path.map((id) => titles.get(id) ?? id).join(' → '),
         });
         return;
       }
       const { created, updated, archived } = result.data;
-      toast.success('Plan compiled', { description: `${created} created, ${updated} updated, ${archived} archived` });
+      toast.success('Plan compiled', {
+        description: `${created} created, ${updated} updated, ${archived} archived`,
+      });
     } finally {
       setRunning(false);
     }
@@ -220,7 +268,9 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
   const draft = useCallback(
     async (brief: string): Promise<string | null> => {
       await save();
-      const result = await (await getPlannerClient()).draftFromBrief({ projectId, canvasId, brief });
+      const result = await (
+        await getPlannerClient()
+      ).draftFromBrief({ projectId, canvasId, brief });
       if (!result.success) return result.error.message;
       change((d) => model.mergeProposal(d, result.data, scope));
       return null;
@@ -251,7 +301,12 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
           dirty.current = true;
           saveTimer.current = setTimeout(() => void save(), saveDebounceMs);
         }
-      } else if (mod && event.key.toLowerCase() === 'c' && docRef.current && selectedNodes.size > 0) {
+      } else if (
+        mod &&
+        event.key.toLowerCase() === 'c' &&
+        docRef.current &&
+        selectedNodes.size > 0
+      ) {
         handled();
         clipboard.current = model.copySelection(docRef.current, selectedNodes);
       } else if (mod && event.key.toLowerCase() === 'v' && clipboard.current) {
@@ -288,7 +343,10 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
       },
       resizeModule: (id, rect) =>
         change((d) =>
-          model.updateNode(model.resizeModule(d, id, rect), id, (node) => ({ ...node, position: { x: rect.x, y: rect.y } }))
+          model.updateNode(model.resizeModule(d, id, rect), id, (node) => ({
+            ...node,
+            position: { x: rect.x, y: rect.y },
+          }))
         ),
       drillDown: (id) => {
         setScope(id);
@@ -308,16 +366,29 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
     const path = doc ? model.breadcrumbPath(doc, scope) : [];
     return [
       { id: 'root', label: doc?.title ?? 'Plan', onSelect: () => setScope(undefined) },
-      ...path.map((item) => ({ id: item.id, label: item.title, onSelect: () => setScope(item.id) })),
+      ...path.map((item) => ({
+        id: item.id,
+        label: item.title,
+        onSelect: () => setScope(item.id),
+      })),
     ];
   }, [doc, scope]);
 
   if (loadError) {
-    return <div className="p-6 text-sm text-foreground-muted">Could not open this canvas: {loadError}</div>;
+    return (
+      <div className="p-6 text-sm text-foreground-muted">
+        Could not open this canvas: {loadError}
+      </div>
+    );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col outline-none" tabIndex={0} onKeyDownCapture={onKeyDown} data-testid="planner-canvas">
+    <div
+      className="flex h-full min-h-0 flex-col outline-none"
+      tabIndex={0}
+      onKeyDownCapture={onKeyDown}
+      data-testid="planner-canvas"
+    >
       <PlannerToolbar
         crumbs={crumbs}
         saveLabel={saveLabel}
@@ -336,9 +407,13 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onSelectionChange={onSelectionChange}
-            onConnect={(connection) => change((d) => model.connect(d, connection.source, connection.target))}
+            onConnect={(connection) =>
+              change((d) => model.connect(d, connection.source, connection.target))
+            }
             onNodeDragStop={commitPositions}
-            onSelectionDragStop={(event, dragged) => commitPositions(event, null, dragged as model.PlannerFlowNode[])}
+            onSelectionDragStop={(event, dragged) =>
+              commitPositions(event, null, dragged as model.PlannerFlowNode[])
+            }
             onNodeDoubleClick={(_event, node) =>
               node.type === 'module' ? actions.drillDown(node.id) : setEditingId(node.id)
             }
@@ -356,7 +431,9 @@ function PlannerCanvasInner({ projectId, canvasId, viewport, onViewportChange, s
             {doc && model.hasProposals(doc) ? (
               <Panel position="top-center">
                 <div className="flex items-center gap-2 rounded-md border border-dashed border-border bg-background-1 px-3 py-1.5 text-xs text-foreground shadow-sm">
-                  <span>The Brain proposed a draft. Dashed items are not part of the plan yet.</span>
+                  <span>
+                    The Brain proposed a draft. Dashed items are not part of the plan yet.
+                  </span>
                   <Button variant="primary" onClick={() => change(model.acceptProposals)}>
                     Accept
                   </Button>

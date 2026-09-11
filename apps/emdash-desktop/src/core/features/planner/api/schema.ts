@@ -129,7 +129,8 @@ export function canvasIntegrityProblems(doc: Pick<CanvasDoc, 'nodes' | 'edges'>)
   for (const node of doc.nodes) {
     if (node.parentId === undefined) continue;
     const parent = byId.get(node.parentId);
-    if (parent?.type !== 'module') problems.push(`node ${node.id} has a parent that is not a module`);
+    if (parent?.type !== 'module')
+      problems.push(`node ${node.id} has a parent that is not a module`);
   }
   for (const node of doc.nodes) {
     const seen = new Set<string>([node.id]);
@@ -166,7 +167,8 @@ export type CanvasParseResult =
 export function parseCanvasDoc(raw: unknown): CanvasParseResult {
   let value = raw;
   if (typeof raw === 'string') {
-    if (utf8Length(raw) > PLANNER_LIMITS.docBytes) return { ok: false, reason: 'document too large' };
+    if (utf8Length(raw) > PLANNER_LIMITS.docBytes)
+      return { ok: false, reason: 'document too large' };
     try {
       value = JSON.parse(raw);
     } catch {

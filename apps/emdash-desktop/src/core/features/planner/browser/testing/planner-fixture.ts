@@ -15,7 +15,13 @@ export const PLANNER_FIXTURE_DOC: CanvasDoc = {
       title: 'Backend',
       size: { width: 520, height: 230 },
     },
-    { id: 'design', type: 'job', position: { x: 0, y: 110 }, title: 'Design the auth schema', kind: 'work' },
+    {
+      id: 'design',
+      type: 'job',
+      position: { x: 0, y: 110 },
+      title: 'Design the auth schema',
+      kind: 'work',
+    },
     {
       id: 'api',
       type: 'job',

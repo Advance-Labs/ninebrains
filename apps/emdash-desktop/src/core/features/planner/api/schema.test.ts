@@ -11,7 +11,13 @@ const good = (): CanvasDoc => ({
   canvasId: 'c1',
   title: 'Launch',
   nodes: [
-    { id: 'm', type: 'module', position: { x: 0, y: 0 }, title: 'API', size: { width: 400, height: 300 } },
+    {
+      id: 'm',
+      type: 'module',
+      position: { x: 0, y: 0 },
+      title: 'API',
+      size: { width: 400, height: 300 },
+    },
     job('a', { parentId: 'm', kind: 'work', gates: ['tests'] }),
     job('b'),
     { id: 'n', type: 'note', position: { x: 0, y: 0 }, text: 'ship Friday' },
@@ -28,36 +34,78 @@ describe('canvas document schema', () => {
 
   it.each<[string, (doc: CanvasDoc) => unknown]>([
     ['a duplicate node id', (d) => ({ ...d, nodes: [...d.nodes, job('b')] })],
-    ['an edge to an unknown node', (d) => ({ ...d, edges: [{ id: 'e2', source: 'a', target: 'zz' }] })],
+    [
+      'an edge to an unknown node',
+      (d) => ({ ...d, edges: [{ id: 'e2', source: 'a', target: 'zz' }] }),
+    ],
     ['a self edge', (d) => ({ ...d, edges: [{ id: 'e2', source: 'a', target: 'a' }] })],
-    ['a parent that is not a module', (d) => ({ ...d, nodes: [...d.nodes, job('c', { parentId: 'b' })] })],
+    [
+      'a parent that is not a module',
+      (d) => ({ ...d, nodes: [...d.nodes, job('c', { parentId: 'b' })] }),
+    ],
     [
       'a module nesting loop',
       (d) => ({
         ...d,
         nodes: [
-          { id: 'x', type: 'module', parentId: 'y', position: { x: 0, y: 0 }, title: 'X', size: { width: 200, height: 200 } },
-          { id: 'y', type: 'module', parentId: 'x', position: { x: 0, y: 0 }, title: 'Y', size: { width: 200, height: 200 } },
+          {
+            id: 'x',
+            type: 'module',
+            parentId: 'y',
+            position: { x: 0, y: 0 },
+            title: 'X',
+            size: { width: 200, height: 200 },
+          },
+          {
+            id: 'y',
+            type: 'module',
+            parentId: 'x',
+            position: { x: 0, y: 0 },
+            title: 'Y',
+            size: { width: 200, height: 200 },
+          },
         ],
         edges: [],
       }),
     ],
     ['a path-unsafe id', (d) => ({ ...d, nodes: [job('../etc')], edges: [] })],
     ['an empty title', (d) => ({ ...d, nodes: [job('a', { title: '   ' })], edges: [] })],
-    ['a non-finite position', (d) => ({ ...d, nodes: [job('a', { position: { x: Infinity, y: 0 } })], edges: [] })],
-    ['an unknown node type', (d) => ({ ...d, nodes: [{ id: 'q', type: 'script', position: { x: 0, y: 0 } }] })],
+    [
+      'a non-finite position',
+      (d) => ({ ...d, nodes: [job('a', { position: { x: Infinity, y: 0 } })], edges: [] }),
+    ],
+    [
+      'an unknown node type',
+      (d) => ({ ...d, nodes: [{ id: 'q', type: 'script', position: { x: 0, y: 0 } }] }),
+    ],
     ['a wrong version', (d) => ({ ...d, version: 2 })],
-    ['too many nodes', (d) => ({ ...d, nodes: Array.from({ length: PLANNER_LIMITS.nodes + 1 }, (_, i) => job(`j${i}`)), edges: [] })],
+    [
+      'too many nodes',
+      (d) => ({
+        ...d,
+        nodes: Array.from({ length: PLANNER_LIMITS.nodes + 1 }, (_, i) => job(`j${i}`)),
+        edges: [],
+      }),
+    ],
   ])('rejects %s', (_label, mutate) => {
     expect(parseCanvasDoc(mutate(good()))).toMatchObject({ ok: false });
   });
 
   it('rejects oversized and unparseable input without throwing', () => {
     const huge = { ...good(), nodes: [job('a', { body: 'x'.repeat(PLANNER_LIMITS.bodyChars) })] };
-    const many = { ...huge, nodes: Array.from({ length: 80 }, (_, i) => job(`j${i}`, { body: 'x'.repeat(7_000) })) };
+    const many = {
+      ...huge,
+      nodes: Array.from({ length: 80 }, (_, i) => job(`j${i}`, { body: 'x'.repeat(7_000) })),
+    };
     expect(parseCanvasDoc(many)).toEqual({ ok: false, reason: 'document too large' });
-    expect(parseCanvasDoc('x'.repeat(PLANNER_LIMITS.docBytes + 1))).toEqual({ ok: false, reason: 'document too large' });
-    expect(parseCanvasDoc('{not json')).toEqual({ ok: false, reason: 'document is not valid JSON' });
+    expect(parseCanvasDoc('x'.repeat(PLANNER_LIMITS.docBytes + 1))).toEqual({
+      ok: false,
+      reason: 'document too large',
+    });
+    expect(parseCanvasDoc('{not json')).toEqual({
+      ok: false,
+      reason: 'document is not valid JSON',
+    });
     expect(parseCanvasDoc(null)).toMatchObject({ ok: false });
     expect(parseCanvasDoc(undefined)).toMatchObject({ ok: false });
   });

@@ -92,7 +92,8 @@ export function toFlowNodes(
   const index = childrenIndex(doc);
   const jobCount = (id: string): number =>
     (index.get(id) ?? []).reduce(
-      (sum, child) => sum + (child.type === 'job' ? 1 : child.type === 'module' ? jobCount(child.id) : 0),
+      (sum, child) =>
+        sum + (child.type === 'job' ? 1 : child.type === 'module' ? jobCount(child.id) : 0),
       0
     );
   // xyflow needs parents before their children.
@@ -144,7 +145,10 @@ export function toFlowEdges(
 }
 
 /** Root-to-scope chain of modules, for breadcrumbs. */
-export function breadcrumbPath(doc: CanvasDoc, scope: string | undefined): Array<{ id: string; title: string }> {
+export function breadcrumbPath(
+  doc: CanvasDoc,
+  scope: string | undefined
+): Array<{ id: string; title: string }> {
   const byId = new Map(doc.nodes.map((node) => [node.id, node]));
   const path: Array<{ id: string; title: string }> = [];
   let cursor = scope;
@@ -157,11 +161,18 @@ export function breadcrumbPath(doc: CanvasDoc, scope: string | undefined): Array
   return path;
 }
 
-export function updateNode(doc: CanvasDoc, id: string, patch: (node: CanvasNode) => CanvasNode): CanvasDoc {
+export function updateNode(
+  doc: CanvasDoc,
+  id: string,
+  patch: (node: CanvasNode) => CanvasNode
+): CanvasDoc {
   return { ...doc, nodes: doc.nodes.map((node) => (node.id === id ? patch(node) : node)) };
 }
 
-export function moveNodes(doc: CanvasDoc, positions: ReadonlyMap<string, { x: number; y: number }>): CanvasDoc {
+export function moveNodes(
+  doc: CanvasDoc,
+  positions: ReadonlyMap<string, { x: number; y: number }>
+): CanvasDoc {
   if (positions.size === 0) return doc;
   return {
     ...doc,
@@ -172,7 +183,11 @@ export function moveNodes(doc: CanvasDoc, positions: ReadonlyMap<string, { x: nu
   };
 }
 
-export function resizeModule(doc: CanvasDoc, id: string, size: { width: number; height: number }): CanvasDoc {
+export function resizeModule(
+  doc: CanvasDoc,
+  id: string,
+  size: { width: number; height: number }
+): CanvasDoc {
   return updateNode(doc, id, (node) =>
     node.type === 'module'
       ? { ...node, size: { width: Math.max(120, size.width), height: Math.max(80, size.height) } }
@@ -181,14 +196,19 @@ export function resizeModule(doc: CanvasDoc, id: string, size: { width: number; 
 }
 
 /** Removes nodes (modules take their contents with them) and edges, plus any edge left dangling. */
-export function removeElements(doc: CanvasDoc, nodeIds: Iterable<string>, edgeIds: Iterable<string> = []): CanvasDoc {
+export function removeElements(
+  doc: CanvasDoc,
+  nodeIds: Iterable<string>,
+  edgeIds: Iterable<string> = []
+): CanvasDoc {
   const goneNodes = withDescendants(doc, nodeIds);
   const goneEdges = new Set(edgeIds);
   return {
     ...doc,
     nodes: doc.nodes.filter((node) => !goneNodes.has(node.id)),
     edges: doc.edges.filter(
-      (edge) => !goneEdges.has(edge.id) && !goneNodes.has(edge.source) && !goneNodes.has(edge.target)
+      (edge) =>
+        !goneEdges.has(edge.id) && !goneNodes.has(edge.source) && !goneNodes.has(edge.target)
     ),
   };
 }
@@ -198,7 +218,12 @@ export function addNodes(doc: CanvasDoc, nodes: CanvasNode[]): CanvasDoc {
 }
 
 /** Adds `source -> target` unless it would duplicate an edge or loop a node onto itself. */
-export function connect(doc: CanvasDoc, source: string, target: string, id = newPlannerId('e')): CanvasDoc {
+export function connect(
+  doc: CanvasDoc,
+  source: string,
+  target: string,
+  id = newPlannerId('e')
+): CanvasDoc {
   if (source === target) return doc;
   if (doc.edges.some((edge) => edge.source === source && edge.target === target)) return doc;
   return { ...doc, edges: [...doc.edges, { id, source, target }] };
@@ -219,14 +244,18 @@ export function pasteClipboard(
   scope: string | undefined,
   offset = 40
 ): { doc: CanvasDoc; pastedIds: string[] } {
-  const remap = new Map(payload.nodes.map((node) => [node.id, newPlannerId(node.type === 'module' ? 'm' : 'n')]));
+  const remap = new Map(
+    payload.nodes.map((node) => [node.id, newPlannerId(node.type === 'module' ? 'm' : 'n')])
+  );
   const nodes = payload.nodes.map((node): CanvasNode => {
     const nested = node.parentId !== undefined && remap.has(node.parentId);
     return {
       ...node,
       id: remap.get(node.id)!,
       parentId: nested ? remap.get(node.parentId!) : scope,
-      position: nested ? node.position : { x: node.position.x + offset, y: node.position.y + offset },
+      position: nested
+        ? node.position
+        : { x: node.position.x + offset, y: node.position.y + offset },
     };
   });
   const edges = payload.edges.map((edge) => ({
@@ -235,11 +264,18 @@ export function pasteClipboard(
     source: remap.get(edge.source)!,
     target: remap.get(edge.target)!,
   }));
-  return { doc: { ...doc, nodes: [...doc.nodes, ...nodes], edges: [...doc.edges, ...edges] }, pastedIds: [...remap.values()] };
+  return {
+    doc: { ...doc, nodes: [...doc.nodes, ...nodes], edges: [...doc.edges, ...edges] },
+    pastedIds: [...remap.values()],
+  };
 }
 
 /** Places a draft beside the existing canvas, in `scope`, as proposed nodes and edges. */
-export function mergeProposal(doc: CanvasDoc, proposal: DraftProposal, scope: string | undefined): CanvasDoc {
+export function mergeProposal(
+  doc: CanvasDoc,
+  proposal: DraftProposal,
+  scope: string | undefined
+): CanvasDoc {
   const known = new Set(doc.nodes.map((node) => node.id));
   const nodes = proposal.nodes
     .filter((node) => !known.has(node.id))
@@ -258,7 +294,10 @@ export function acceptProposals(doc: CanvasDoc): CanvasDoc {
 }
 
 export function rejectProposals(doc: CanvasDoc): CanvasDoc {
-  const cleaned = removeElements(doc, doc.nodes.filter((node) => node.proposed).map((node) => node.id));
+  const cleaned = removeElements(
+    doc,
+    doc.nodes.filter((node) => node.proposed).map((node) => node.id)
+  );
   return { ...cleaned, edges: cleaned.edges.filter((edge) => !edge.proposed) };
 }
 

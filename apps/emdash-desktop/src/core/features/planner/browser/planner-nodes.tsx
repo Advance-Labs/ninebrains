@@ -23,7 +23,10 @@ function useActions(): PlannerNodeActions {
 }
 
 /** Live Brain state -> label and semantic tone. Colours come from the design tokens only. */
-export const JOB_STATE_DISPLAY: Record<PlannerJobState, { label: string; tone: BadgeTone; border: string }> = {
+export const JOB_STATE_DISPLAY: Record<
+  PlannerJobState,
+  { label: string; tone: BadgeTone; border: string }
+> = {
   proposed: { label: 'Waiting', tone: 'neutral', border: 'var(--em-border)' },
   ready: { label: 'Ready', tone: 'info', border: 'var(--em-border-info)' },
   claimed: { label: 'Claimed', tone: 'info', border: 'var(--em-border-info)' },
@@ -62,7 +65,8 @@ function InlineEditor({
     onKeyDown: (event: React.KeyboardEvent) => {
       event.stopPropagation();
       if (event.key === 'Escape') cancelEdit();
-      if (event.key === 'Enter' && (!multiline || event.metaKey || event.ctrlKey)) commitEdit(id, value);
+      if (event.key === 'Enter' && (!multiline || event.metaKey || event.ctrlKey))
+        commitEdit(id, value);
     },
   };
   return multiline ? <textarea rows={4} {...props} /> : <input {...props} />;
@@ -91,7 +95,7 @@ export function JobNode({ id, data, selected }: NodeProps<PlannerFlowNode>) {
     >
       <Handle type="target" position={Position.Left} />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-tiny uppercase tracking-wide text-foreground-muted">
+        <span className="text-tiny tracking-wide text-foreground-muted uppercase">
           {node.kind === 'review' ? 'Review' : 'Job'}
         </span>
         {node.proposed ? (
@@ -134,13 +138,13 @@ export function NoteNode({ id, data, selected }: NodeProps<PlannerFlowNode>) {
         selected && 'ring-2 ring-[var(--em-border-primary)]'
       )}
     >
-      <div className="mb-1 flex items-center gap-1 text-tiny uppercase tracking-wide">
+      <div className="mb-1 flex items-center gap-1 text-tiny tracking-wide uppercase">
         <StickyNote className="size-3" aria-hidden /> Note
       </div>
       {editingId === id ? (
         <InlineEditor id={id} initial={node.text} multiline className="text-xs" />
       ) : (
-        <p className="whitespace-pre-wrap text-xs">{node.text || 'Double-click to write'}</p>
+        <p className="text-xs whitespace-pre-wrap">{node.text || 'Double-click to write'}</p>
       )}
     </div>
   );

@@ -68,7 +68,10 @@ export function createMementoCanvasStore(
       await port.write(docKey(doc.projectId, doc.canvasId), row);
 
       const summary: CanvasSummary = { canvasId: doc.canvasId, title: doc.title, updatedAt };
-      const index = [summary, ...(await readIndex(doc.projectId)).filter((c) => c.canvasId !== doc.canvasId)]
+      const index = [
+        summary,
+        ...(await readIndex(doc.projectId)).filter((c) => c.canvasId !== doc.canvasId),
+      ]
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, PLANNER_LIMITS.canvasesPerProject);
       await port.write(indexKey(doc.projectId), {

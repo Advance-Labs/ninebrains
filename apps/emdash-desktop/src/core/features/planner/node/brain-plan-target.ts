@@ -48,7 +48,8 @@ export function createBrainPlanTarget(
           const known = nodeIdsByJob(request.planId);
           return { ok: false, kind: 'cycle', path: error.path.map((id) => known.get(id) ?? id) };
         }
-        if (error instanceof BrainError) return { ok: false, kind: 'invalid', message: error.message };
+        if (error instanceof BrainError)
+          return { ok: false, kind: 'invalid', message: error.message };
         throw error;
       }
     },

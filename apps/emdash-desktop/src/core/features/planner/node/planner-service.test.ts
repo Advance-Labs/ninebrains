@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { PLANNER_JOB_STATES, type CanvasDoc, type CanvasEdge, type CanvasNode } from '../api';
 import { createBrainPlanTarget } from './brain-plan-target';
 import { DRAFTING_UNAVAILABLE_MESSAGE } from './brief-drafter';
-import { createMementoCanvasStore, createMemoryMementoRowPort, PLANNER_MEMENTO_IDS } from './canvas-store';
+import {
+  createMementoCanvasStore,
+  createMemoryMementoRowPort,
+  PLANNER_MEMENTO_IDS,
+} from './canvas-store';
 import { createPlannerService, planIdFor, sanitizeProposal } from './planner-service';
 
 const BRAIN: Identity = { role: 'brain', brainId: 'test' };
@@ -30,25 +34,36 @@ const doc = (nodes: CanvasNode[], edges: CanvasEdge[] = []): CanvasDoc => ({
 function setup() {
   let clock = 1_000;
   let seq = 0;
-  const brain = new Brain({ store: new InMemoryBrainStore(), now: () => ++clock, newId: () => `job-${++seq}` });
+  const brain = new Brain({
+    store: new InMemoryBrainStore(),
+    now: () => ++clock,
+    newId: () => `job-${++seq}`,
+  });
   const rows = createMemoryMementoRowPort();
   const service = createPlannerService({
     canvasStore: createMementoCanvasStore(rows),
     planTarget: createBrainPlanTarget(brain),
     now: () => ++clock,
   });
-  const planJobs = (includeArchived = false) => brain.listJobs(BRAIN, { planId: PLAN_ID, includeArchived });
+  const planJobs = (includeArchived = false) =>
+    brain.listJobs(BRAIN, { planId: PLAN_ID, includeArchived });
   return { brain, rows, service, planJobs };
 }
 
-const threeStep = doc([job('design'), job('api'), job('qa')], [edge('design', 'api'), edge('api', 'qa')]);
+const threeStep = doc(
+  [job('design'), job('api'), job('qa')],
+  [edge('design', 'api'), edge('api', 'qa')]
+);
 
 describe('planner compile through brain-core', () => {
   it('round-trips a canvas into jobs and edges keyed by node id', async () => {
     const { brain, service, planJobs } = setup();
     expect((await service.saveCanvas(threeStep)).success).toBe(true);
     const outcome = await service.compile(KEY);
-    expect(outcome).toEqual({ success: true, data: { created: 3, updated: 0, unchanged: 0, archived: 0 } });
+    expect(outcome).toEqual({
+      success: true,
+      data: { created: 3, updated: 0, unchanged: 0, archived: 0 },
+    });
     expect(planJobs().map((j) => [j.planNodeId, j.state])).toEqual([
       ['design', 'ready'],
       ['api', 'proposed'],
@@ -62,7 +77,10 @@ describe('planner compile through brain-core', () => {
     await service.saveCanvas(threeStep);
     await service.compile(KEY);
     const again = await service.compile(KEY);
-    expect(again).toEqual({ success: true, data: { created: 0, updated: 0, unchanged: 3, archived: 0 } });
+    expect(again).toEqual({
+      success: true,
+      data: { created: 0, updated: 0, unchanged: 3, archived: 0 },
+    });
     expect(planJobs()).toHaveLength(3);
     expect(brain.listEdges(BRAIN, { projectId: 'p1' })).toHaveLength(2);
   });
@@ -71,7 +89,10 @@ describe('planner compile through brain-core', () => {
     const { service, planJobs } = setup();
     await service.saveCanvas(threeStep);
     await service.compile(KEY);
-    const edited = doc([job('design', { title: 'Design v2' } as Partial<CanvasNode>), job('api'), job('qa')], threeStep.edges);
+    const edited = doc(
+      [job('design', { title: 'Design v2' } as Partial<CanvasNode>), job('api'), job('qa')],
+      threeStep.edges
+    );
     await service.saveCanvas(edited);
     const outcome = await service.compile(KEY);
     expect(outcome.success && outcome.data).toMatchObject({ created: 0, updated: 1, unchanged: 2 });
@@ -149,7 +170,11 @@ describe('planner compile through brain-core', () => {
     await service.saveCanvas(threeStep);
     await service.compile(KEY);
     const target = createBrainPlanTarget(brain);
-    expect(target.jobStates('p1', PLAN_ID)).toEqual({ design: 'ready', api: 'proposed', qa: 'proposed' });
+    expect(target.jobStates('p1', PLAN_ID)).toEqual({
+      design: 'ready',
+      api: 'proposed',
+      qa: 'proposed',
+    });
   });
 
   it('keeps the api job-state enum in step with brain-core', () => {
@@ -164,19 +189,30 @@ describe('planner canvas persistence', () => {
     const list = await service.listCanvases('p1');
     expect(list.success && list.data.map((c) => c.canvasId)).toEqual(['c1']);
     const loaded = await service.getCanvas(KEY);
-    expect(loaded.success && loaded.data.doc.nodes.map((n) => n.id)).toEqual(['design', 'api', 'qa']);
+    expect(loaded.success && loaded.data.doc.nodes.map((n) => n.id)).toEqual([
+      'design',
+      'api',
+      'qa',
+    ]);
   });
 
   it('returns an empty doc for an unknown canvas', async () => {
     const { service } = setup();
     const loaded = await service.getCanvas({ projectId: 'p1', canvasId: 'fresh' });
-    expect(loaded.success && loaded.data).toMatchObject({ recovered: false, doc: { nodes: [], edges: [] } });
+    expect(loaded.success && loaded.data).toMatchObject({
+      recovered: false,
+      doc: { nodes: [], edges: [] },
+    });
   });
 
   it('recovers from a corrupt stored document instead of crashing', async () => {
     const { rows, service } = setup();
     const id = JSON.stringify([PLANNER_MEMENTO_IDS.doc, 'planner-canvas', 'p1/c1']);
-    rows.rows.set(id, { version: '1', data: '{"version":1,"nodes":[{"id":"../x"}]}', updatedAt: 1 });
+    rows.rows.set(id, {
+      version: '1',
+      data: '{"version":1,"nodes":[{"id":"../x"}]}',
+      updatedAt: 1,
+    });
     const loaded = await service.getCanvas(KEY);
     expect(loaded.success && loaded.data).toMatchObject({ recovered: true, doc: { nodes: [] } });
     rows.rows.set(id, { version: '1', data: 'x'.repeat(600 * 1024), updatedAt: 1 });
@@ -189,12 +225,18 @@ describe('draft from brief', () => {
   it('reports that drafting needs the Brain until it is wired', async () => {
     const { service } = setup();
     const drafted = await service.draftFromBrief({ ...KEY, brief: 'Build a login page' });
-    expect(drafted).toEqual({ success: false, error: { type: 'unavailable', message: DRAFTING_UNAVAILABLE_MESSAGE } });
+    expect(drafted).toEqual({
+      success: false,
+      error: { type: 'unavailable', message: DRAFTING_UNAVAILABLE_MESSAGE },
+    });
   });
 
   it('marks drafted nodes proposed and drops ids that collide with the canvas', () => {
     const proposal = sanitizeProposal(
-      { nodes: [job('design'), job('new-1'), job('new-2')], edges: [edge('design', 'new-1'), edge('x', 'new-2')] },
+      {
+        nodes: [job('design'), job('new-1'), job('new-2')],
+        edges: [edge('design', 'new-1'), edge('x', 'new-2')],
+      },
       threeStep
     );
     expect(proposal.nodes.map((n) => [n.id, n.proposed])).toEqual([

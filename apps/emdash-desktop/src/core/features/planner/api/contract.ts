@@ -63,7 +63,9 @@ export const plannerContract = defineContract({
     error: plannerErrorSchema,
   }),
   draftFromBrief: fallible({
-    input: canvasKeySchema.extend({ brief: z.string().trim().min(1).max(PLANNER_LIMITS.briefChars) }),
+    input: canvasKeySchema.extend({
+      brief: z.string().trim().min(1).max(PLANNER_LIMITS.briefChars),
+    }),
     data: draftProposalSchema,
     error: plannerErrorSchema,
   }),

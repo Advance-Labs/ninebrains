@@ -26,8 +26,9 @@ import { resetPlannerNodeStatesForTests } from './use-node-states';
 const nestedPlannerContract = defineContract({ [plannerDomain]: plannerContract })[plannerDomain];
 
 beforeAll(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
 describe('planner canvas through the wire seam', () => {
@@ -39,7 +40,8 @@ describe('planner canvas through the wire seam', () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  const node = (id: string) => host.querySelector<HTMLElement>(`[data-testid="planner-node-${id}"]`);
+  const node = (id: string) =>
+    host.querySelector<HTMLElement>(`[data-testid="planner-node-${id}"]`);
 
   async function renderCanvas() {
     await act(async () => {
@@ -61,7 +63,8 @@ describe('planner canvas through the wire seam', () => {
         compiled.push(input);
         return ok(outcome);
       },
-      draftFromBrief: async () => err({ type: 'unavailable' as const, message: 'Drafting needs the Brain.' }),
+      draftFromBrief: async () =>
+        err({ type: 'unavailable' as const, message: 'Drafting needs the Brain.' }),
       nodeStates: expose(nestedPlannerContract.nodeStates, { states }),
     });
     host = document.createElement('div');
@@ -108,12 +111,22 @@ describe('planner canvas through the wire seam', () => {
 
   it('highlights the cycle path when compile rejects the plan', async () => {
     doc = PLANNER_FIXTURE_CYCLE_DOC;
-    outcome = { created: 0, updated: 0, unchanged: 0, archived: 0, cycles: [PLANNER_FIXTURE_CYCLE_PATH] };
+    outcome = {
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      archived: 0,
+      cycles: [PLANNER_FIXTURE_CYCLE_PATH],
+    };
     await renderCanvas();
-    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Run plan"]')!.click());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="Run plan"]')!.click()
+    );
     await vi.waitFor(() => expect(node('review')?.dataset.inCycle).toBe('true'));
     expect(node('design')?.dataset.inCycle).toBe('true');
     expect(node('note')?.dataset.inCycle).toBeUndefined();
-    expect(host.querySelectorAll('.react-flow__edge.planner-cycle').length).toBeGreaterThanOrEqual(3);
+    expect(host.querySelectorAll('.react-flow__edge.planner-cycle').length).toBeGreaterThanOrEqual(
+      3
+    );
   });
 });

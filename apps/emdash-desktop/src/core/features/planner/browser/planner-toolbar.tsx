@@ -16,7 +16,14 @@ const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform
 /** Labels collapse to icons below `md`; every button keeps an accessible name. */
 const label = 'max-md:sr-only';
 
-export function PlannerToolbar({ crumbs, saveLabel, running, onAdd, onDraft, onRun }: PlannerToolbarProps) {
+export function PlannerToolbar({
+  crumbs,
+  saveLabel,
+  running,
+  onAdd,
+  onDraft,
+  onRun,
+}: PlannerToolbarProps) {
   return (
     <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-background px-3 py-1">
       <Breadcrumbs items={crumbs} label="Canvas" className="min-w-32 flex-1 text-sm" />
@@ -34,7 +41,8 @@ export function PlannerToolbar({ crumbs, saveLabel, running, onAdd, onDraft, onR
           <Layers className="size-3.5" aria-hidden /> <span className={label}>Module</span>
         </Button>
         <Button variant="secondary" onClick={onDraft} aria-label="Draft from brief">
-          <Sparkles className="size-3.5" aria-hidden /> <span className={label}>Draft from brief</span>
+          <Sparkles className="size-3.5" aria-hidden />{' '}
+          <span className={label}>Draft from brief</span>
         </Button>
         <Button variant="primary" onClick={onRun} disabled={running} aria-label="Run plan">
           {running ? (

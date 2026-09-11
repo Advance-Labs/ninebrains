@@ -15,10 +15,18 @@
   --xy-connectionline-stroke-width-default: 1.5;
   --xy-handle-background-color-default: var(--background-2);
   --xy-handle-border-color-default: var(--foreground-muted);
-  --xy-selection-background-color-default: color-mix(in srgb, var(--em-border-primary) 10%, transparent);
+  --xy-selection-background-color-default: color-mix(
+    in srgb,
+    var(--em-border-primary) 10%,
+    transparent
+  );
   --xy-selection-border-default: 1px dashed var(--em-border-primary);
   --xy-minimap-background-color-default: var(--background-1);
-  --xy-minimap-mask-background-color-default: color-mix(in srgb, var(--background) 60%, transparent);
+  --xy-minimap-mask-background-color-default: color-mix(
+    in srgb,
+    var(--background) 60%,
+    transparent
+  );
   --xy-minimap-node-background-color-default: var(--background-3);
   --xy-controls-button-background-color-default: var(--background-1);
   --xy-controls-button-background-color-hover-default: var(--background-2);

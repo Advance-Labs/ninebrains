@@ -9,7 +9,10 @@ let statesRemotePromise: Promise<RemoteModel<typeof plannerContract.nodeStates>>
 const EMPTY: Record<string, PlannerJobState> = {};
 
 /** Live Brain job state per canvas node id. Empty until the canvas has been compiled. */
-export function usePlannerNodeStates(projectId: string, canvasId: string): Record<string, PlannerJobState> {
+export function usePlannerNodeStates(
+  projectId: string,
+  canvasId: string
+): Record<string, PlannerJobState> {
   const key = useMemo(() => ({ projectId, canvasId }), [projectId, canvasId]);
   const state = useRemoteModelState(plannerContract.nodeStates, getStatesRemote, key, 'states', {
     initialValue: EMPTY,
