@@ -4,7 +4,7 @@ import { defineContract } from '@emdash/wire/rpc';
 import { cell, expose } from '@emdash/wire/state';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedSliceWire } from '@core/primitives/wire/browser/testing';
 import {
   plannerContract,
@@ -42,12 +42,17 @@ describe('planner canvas through the wire seam', () => {
 
   const node = (id: string) =>
     host.querySelector<HTMLElement>(`[data-testid="planner-node-${id}"]`);
+  const edgeCount = (selector = '.react-flow__edge') => host.querySelectorAll(selector).length;
 
+  // xyflow draws an edge only after both of its nodes have been measured, and
+  // measurement arrives through a ResizeObserver callback some frames after
+  // the nodes are in the DOM. Waiting for the nodes alone leaves the edges
+  // racing every later assertion, so wait until every edge is drawn.
   async function renderCanvas() {
     await act(async () => {
       root.render(<PlannerCanvas projectId="p1" canvasId="c1" />);
     });
-    await vi.waitFor(() => expect(node('design')).not.toBeNull());
+    await expect.poll(() => edgeCount()).toBe(doc.edges.length);
   }
 
   beforeEach(() => {
@@ -87,7 +92,7 @@ describe('planner canvas through the wire seam', () => {
     expect(node('backend')?.textContent).toContain('Backend');
     expect(node('backend')?.textContent).toContain('2 jobs');
     expect(node('note')?.textContent).toContain('Magic links only');
-    expect(host.querySelectorAll('.react-flow__edge')).toHaveLength(3);
+    expect(edgeCount()).toBe(3);
   });
 
   it('colours nodes from the live job-state model', async () => {
@@ -96,7 +101,7 @@ describe('planner canvas through the wire seam', () => {
     act(() => {
       states.set({ design: 'done', ui: 'blocked' });
     });
-    await vi.waitFor(() => expect(node('design')?.dataset.state).toBe('done'));
+    await expect.poll(() => node('design')?.dataset.state).toBe('done');
     expect(node('ui')?.dataset.state).toBe('blocked');
     expect(node('ui')?.textContent).toContain('Blocked');
   });
@@ -106,7 +111,7 @@ describe('planner canvas through the wire seam', () => {
     const run = host.querySelector<HTMLButtonElement>('button[aria-label="Run plan"]');
     expect(run).not.toBeNull();
     await act(async () => run!.click());
-    await vi.waitFor(() => expect(compiled).toEqual([{ projectId: 'p1', canvasId: 'c1' }]));
+    await expect.poll(() => compiled).toEqual([{ projectId: 'p1', canvasId: 'c1' }]);
   });
 
   it('highlights the cycle path when compile rejects the plan', async () => {
@@ -122,11 +127,10 @@ describe('planner canvas through the wire seam', () => {
     await act(async () =>
       host.querySelector<HTMLButtonElement>('button[aria-label="Run plan"]')!.click()
     );
-    await vi.waitFor(() => expect(node('review')?.dataset.inCycle).toBe('true'));
+    // Node and edge highlights reach xyflow through separate state updates; poll both.
+    await expect.poll(() => node('review')?.dataset.inCycle).toBe('true');
+    await expect.poll(() => edgeCount('.react-flow__edge.planner-cycle')).toBe(4);
     expect(node('design')?.dataset.inCycle).toBe('true');
     expect(node('note')?.dataset.inCycle).toBeUndefined();
-    expect(host.querySelectorAll('.react-flow__edge.planner-cycle').length).toBeGreaterThanOrEqual(
-      3
-    );
   });
 });
