@@ -144,7 +144,7 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   `OPTIONS` with 405.
   Test `SEC-05 browser origin rejected`: from an offscreen `BrowserWindow` on a lane partition, a
   `no-cors` `text/plain` POST and a JSON POST both leave the DB unchanged; `Host: evil.test` → 421.
-- **SEC-06 Limits.** Body ≤ 256 KiB (reject before buffering by `Content-Length`, and abort
+- **SEC-06 Limits.** Body ≤ 64 KiB (reject before buffering by `Content-Length`, and abort
   streaming bodies at the cap). 5 s header/body timeout. Per token: 20 req/s, burst 60, then 429.
   ≤ 64 concurrent connections.
   Test `SEC-06 endpoint limits`: 300 KiB body → 413 without a full read; 100 rapid calls → 429s;
