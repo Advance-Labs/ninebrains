@@ -12,6 +12,8 @@ export interface BrainHttpServerOptions extends ExecuteOptions {
   brain: Brain;
   tokens?: TokenRegistry;
   limiter?: RateLimiter;
+  /** L3 failed-auth budget. Default: `BRAIN_ENDPOINT.preAuthRateLimit`. */
+  preAuthLimiter?: RateLimiter;
   /** Socket timeouts. Defaults to BRAIN_ENDPOINT (5 s); tests shorten them. */
   timeouts?: { headersMs?: number; requestMs?: number; checkIntervalMs?: number };
 }
@@ -44,6 +46,12 @@ export async function startBrainHttpServer(
     createTokenBucketLimiter({
       ratePerSecond: BRAIN_ENDPOINT.rateLimit.perSecond,
       burst: BRAIN_ENDPOINT.rateLimit.burst,
+    });
+  const preAuthLimiter =
+    options.preAuthLimiter ??
+    createTokenBucketLimiter({
+      ratePerSecond: BRAIN_ENDPOINT.preAuthRateLimit.perSecond,
+      burst: BRAIN_ENDPOINT.preAuthRateLimit.burst,
     });
   const headersMs = options.timeouts?.headersMs ?? BRAIN_ENDPOINT.headersTimeoutMs;
   const requestMs = Math.max(
@@ -109,6 +117,7 @@ export async function startBrainHttpServer(
               brain: options.brain,
               tokens,
               limiter,
+              preAuthLimiter,
               expectedHost,
               onInternalError: options.onInternalError,
               resolveBrainProject:
