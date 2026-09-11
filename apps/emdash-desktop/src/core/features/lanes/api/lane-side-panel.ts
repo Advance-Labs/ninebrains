@@ -8,6 +8,8 @@ export type LaneSidePanelItem = {
   detail?: string;
   /** Epoch millis, for ordering and relative time. */
   at?: number;
+  /** Short status tag, e.g. `unverified`, `verified`, `blocked`. */
+  badge?: string;
 };
 
 export type LaneSidePanelTab = 'jobs' | 'done' | 'notes';
