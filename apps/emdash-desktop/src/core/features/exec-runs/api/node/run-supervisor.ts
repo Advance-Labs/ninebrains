@@ -4,8 +4,13 @@
  * `killAll()` is the global STOP (SEC-30): it latches, SIGTERMs every run's process group and
  * SIGKILLs it at 2 s, so everything is gone well inside 5 s.
  *
- * Persisting budget counters across an app restart (the rest of SEC-29) belongs to the Brain DB
- * owner; this class emits every counter change as an event for that store to record.
+ * Budget counters persist in each run's transcript (`ninebrains.budget` records), and `recover()`
+ * closes runs a dead app instance left open as `killed` (SEC-29 restart half, `run-recovery.ts`).
+ * Every counter change is also emitted as an event for the Brain DB.
+ *
+ * Codex has no max-turns flag: `maxTurns` does not apply to it. The wall clock bounds a Codex run,
+ * and its token budget is checked on each `turn.completed` usage event, which Codex only sends at
+ * the end of a turn, so for a single `codex exec` turn the wall clock is the real cap.
  */
 import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -23,6 +28,7 @@ import {
   type ProcessGroupRegistry,
 } from './process-group';
 import { createRedactor, describeEnvForTranscript } from './redact';
+import { recoverInterruptedRuns } from './run-recovery';
 import { buildUnattendedEnv } from './run-env';
 import { ensurePrivateDir, ninebrainsDir, resolveRunCwd, runPaths } from './run-paths';
 import { buildClaudeSandboxSettings } from './sandbox-settings';
@@ -150,6 +156,31 @@ export class ExecRunSupervisor {
     this.latched = false;
     this.groups.clearStop();
     this.emit({ type: 'stop-cleared' });
+  }
+
+  /**
+   * SEC-29: call once at app start, before any run. Runs a previous app instance left mid-flight
+   * are closed as `killed` with their last persisted counters, and reported as `finished` events
+   * so the Brain DB listener records them.
+   */
+  async recover(): Promise<ExecRunResult[]> {
+    const results = (await recoverInterruptedRuns(this.options.userDataDir)).map(
+      (run): ExecRunResult => ({
+        runId: run.runId,
+        ok: false,
+        reason: 'killed',
+        exitCode: null,
+        signal: null,
+        isError: true,
+        errors: ['the app stopped while this run was active'],
+        usage: run.usage,
+        totalTokens: run.totalTokens,
+        transcriptPath: run.transcriptPath,
+        durationMs: run.elapsedMs,
+      })
+    );
+    for (const result of results) this.emit({ type: 'finished', runId: result.runId, result });
+    return results;
   }
 
   private get groups(): ProcessGroupRegistry {
@@ -289,10 +320,16 @@ export class ExecRunSupervisor {
           transcript.raw(line);
           for (const event of parser.push(line)) {
             this.emit({ type: 'agent', runId: spec.runId, event });
+            if (event.kind !== 'usage') continue;
+            // SEC-29: persisted, so a restart can close this run with its real counters.
+            const used = totalTokens(event.usage);
+            transcript.record('budget', {
+              usage: event.usage,
+              totalTokens: used,
+              elapsedMs: Date.now() - startedAt,
+            });
             const max = spec.budgets.maxTokens;
-            if (event.kind === 'usage' && max !== undefined && totalTokens(event.usage) > max) {
-              void this.terminate(spec.runId, 'tokens');
-            }
+            if (max !== undefined && used > max) void this.terminate(spec.runId, 'tokens');
           }
         });
       }
