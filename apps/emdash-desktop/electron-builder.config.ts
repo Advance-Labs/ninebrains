@@ -26,6 +26,7 @@ const config: Configuration = {
   files: ['out/**/*', 'node_modules/**/*', 'drizzle/**/*'],
   asarUnpack: [
     'out/main/adapters/**',
+    'out/main/brain-mcp/**',
     'node_modules/better-sqlite3/**',
     'node_modules/node-pty/**',
     'node_modules/@parcel/watcher/**',

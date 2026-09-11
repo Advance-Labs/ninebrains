@@ -1,6 +1,7 @@
 import type { Gate } from '@emdash/gates-core';
 import { err, ok, type Result } from '@emdash/shared';
 import type { SkillsRuntimeBroker } from '@core/features/skills/api/runtime-adapter';
+import { USER_PACKS_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import type { PacksError, PacksListing, PackSummary } from '../api/contract';
 import type { McpServerEntry, PackLaunch } from '../api/launch';
 import { normalizeBaseUrl } from '../api/pack-schema';
@@ -29,8 +30,10 @@ export interface PacksServiceDeps {
   secrets: SecretResolver;
   /** Omit to skip skill installation (tests, remote hosts). */
   skills?: SkillsPort;
-  /** `<userData>/ninebrains/packs`. Omit to load bundled packs only. */
+  /** `<userData>/ninebrains/packs`. Ignored unless user packs are allowed (SEC-26). */
   userPacksDir?: string;
+  /** Overrides the `USER_PACKS_ENABLED` fork flag (off in v0.1). For tests. */
+  allowUserPacks?: boolean;
   fs?: PackFs;
   bundled?: readonly BundledPack[];
   onWarning?: (message: string) => void;
@@ -62,7 +65,8 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
   const load = (): Promise<PackLoadResult> => {
     loading ??= loadPacks({
       bundled: deps.bundled ?? defaultBundledPacks,
-      userPacksDir: deps.userPacksDir,
+      // SEC-26: user packs load only when the fork flag (or a test) turns them on.
+      userPacksDir: (deps.allowUserPacks ?? USER_PACKS_ENABLED) ? deps.userPacksDir : undefined,
       fs: deps.fs,
       knownGateIds: KNOWN_GATE_IDS,
     });

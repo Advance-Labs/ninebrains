@@ -3,7 +3,7 @@ import { tuiAgentsContract, type TuiAgentStateStatus } from '@emdash/core/runtim
 import type { RuntimeBroker } from '@emdash/core/services/runtime-broker/api';
 import { createScope } from '@emdash/shared/concurrency';
 import { observe, remote } from '@emdash/wire/state';
-import type { LaneAgentFeedPort } from './lane-ports';
+import type { LaneAgentDetail, LaneAgentFeedPort } from './lane-ports';
 import type { TuiSessionStatus } from './lane-status';
 
 /**
@@ -20,7 +20,8 @@ export function createTuiAgentFeed(options: {
       const scope = createScope({ label: 'lanes:agent-feed' });
       let agents = new Map<string, TuiAgentStateStatus>();
       let sessions = new Map<string, TuiSessionStatus>();
-      const notify = () => listener({ agents, sessions });
+      let details = new Map<string, LaneAgentDetail>();
+      const notify = () => listener({ agents, sessions, details });
 
       void (async () => {
         const client = await options.runtimes.client(LOCAL_HOST_REF);
@@ -40,8 +41,13 @@ export function createTuiAgentFeed(options: {
           agentStates,
           (next) => {
             if (next.status === 'loading') return;
-            agents = new Map(
-              Object.values(next.value ?? {}).map((state) => [state.conversationId, state.status])
+            const states = Object.values(next.value ?? {});
+            agents = new Map(states.map((state) => [state.conversationId, state.status]));
+            details = new Map(
+              states.map((state) => [
+                state.conversationId,
+                { notificationType: state.notificationType, message: state.message },
+              ])
             );
             notify();
           },

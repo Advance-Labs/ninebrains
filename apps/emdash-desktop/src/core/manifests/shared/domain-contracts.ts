@@ -10,6 +10,7 @@ import { filesDomain, filesWireContract } from '@core/features/files/api';
 import { githubContract, githubDomain } from '@core/features/github/api';
 import { integrationsContract, integrationsDomain } from '@core/features/integrations/api';
 import { issuesContract, issuesDomain } from '@core/features/issues/api';
+import { brainContract, brainDomain } from '@core/features/brain/api';
 import { lanesContract, lanesDomain } from '@core/features/lanes/api';
 import { legacyPortContract, legacyPortDomain } from '@core/features/legacy-port/api';
 import { promptLibraryContract, promptLibraryDomain } from '@core/features/library/api';
@@ -93,5 +94,6 @@ export const desktopDomainContracts = {
   [desktopHostDomain]: desktopHostContract,
   [packsDomain]: packsContract,
   [lanesDomain]: lanesContract,
+  [brainDomain]: brainContract,
   [plannerDomain]: plannerContract,
 } as const;

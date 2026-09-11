@@ -56,7 +56,8 @@ export type TuiConversationProviderDependencies = {
    * after the provider config. `undefined` leaves the launch untouched.
    */
   resolveLaneLaunch?(
-    conversationId: string
+    conversationId: string,
+    upstream: { extraArgs: readonly string[]; autoApprove: boolean; cwd: string }
   ): { extraArgs: string[]; providerVars: Record<string, string> } | undefined;
 };
 
@@ -153,7 +154,13 @@ export class TuiConversationProvider implements ConversationProvider {
     }
     const trustWorkspace =
       conversation.autoApprove === true || taskSettings?.autoTrustWorktrees === true;
-    const laneLaunch = this.dependencies.resolveLaneLaunch?.(conversation.id);
+    const userExtraArgs = parseExtraArgs(providerConfig?.extraArgs);
+    // Ninebrains: the Brain guards the full flag list and refuses auto-approve.
+    const laneLaunch = this.dependencies.resolveLaneLaunch?.(conversation.id, {
+      extraArgs: userExtraArgs,
+      autoApprove: conversation.autoApprove ?? false,
+      cwd: this.taskPath,
+    });
     const providerVars = {
       ...(providerConfig?.env ?? {}),
       ...colorEnv,
@@ -174,7 +181,7 @@ export class TuiConversationProvider implements ConversationProvider {
       initialPrompt: effectiveInitialPrompt,
       autoApprove: conversation.autoApprove ?? false,
       trustWorkspace,
-      extraArgs: [...parseExtraArgs(providerConfig?.extraArgs), ...(laneLaunch?.extraArgs ?? [])],
+      extraArgs: [...userExtraArgs, ...(laneLaunch?.extraArgs ?? [])],
       providerVars,
       gitCredentials,
       cols: initialSize.cols,

@@ -34,6 +34,8 @@ import { createGithubWireController } from '@core/features/github/node/wire-cont
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
 import type { IssueProviderRegistry } from '@core/features/issues/node/registry';
 import { createIssuesWireController } from '@core/features/issues/node/wire-controller';
+import type { BrainService } from '@core/features/brain/node/brain-service';
+import { createBrainWireController } from '@core/features/brain/node/wire-controller';
 import type { LaneService } from '@core/features/lanes/node/lane-service';
 import { createLanesWireController } from '@core/features/lanes/node/wire-controller';
 import {
@@ -141,6 +143,8 @@ export type DesktopControllerContext = {
   readonly hostOperations: DesktopHostControllerOperations;
   readonly issueProviders: IssueProviderRegistry;
   readonly lanes: LaneService;
+  /** Ninebrains Brain (features/brain/README.md). */
+  readonly brain: BrainService;
   readonly legacyPortOperations: LegacyPortControllerOperations;
   readonly logger: Logger;
   readonly loggingOperations: LoggingControllerOperations;
@@ -476,6 +480,10 @@ export const desktopNodeControllers = {
   lanes: {
     create: ({ lanes, scope }) =>
       controllerFromImpl(desktopDomainContracts.lanes, createLanesWireController(lanes), scope),
+  },
+  brain: {
+    create: ({ brain, scope }) =>
+      controllerFromImpl(desktopDomainContracts.brain, createBrainWireController(brain), scope),
   },
   planner: {
     create: ({ planner }) => createPlannerWireController(planner ?? createUnwiredPlannerService()),
