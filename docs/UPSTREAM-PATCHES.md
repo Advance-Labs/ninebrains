@@ -145,6 +145,24 @@ All append-only registrations for `src/core/features/planner/` except the last r
 | `src/core/primitives/telemetry/api/telemetry.ts` | `'planner'` added to `FocusView` | Navigation telemetry passes any `ViewId` as `from_view` |
 | `package.json` (desktop), `pnpm-lock.yaml` | `@xyflow/react` (MIT), `@ninebrains/brain-core` (workspace) | Canvas + compile |
 
+## 9. Release pipeline (W4 `release`, plan 7.1/7.2)
+
+Full rationale in `docs/RELEASING.md`.
+
+| File | What | Why |
+|---|---|---|
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `publish: null` (was GitHub draft); mac dmg+zip for arm64 **and x64**, signing from `resolveMacSigning(env)` (`identity: '-'` ad-hoc, `notarize: false` with no env); win nsis only (msi dropped), `resolveWinSigning(env)`; linux AppImage+deb (rpm dropped); `nsis.differentialPackage: false`; `artifactName` `Ninebrains-${version}-${os}-${arch}.${ext}` | SEC-36: no `app-update.yml` or `latest*.yml` while builds are unsigned. Signing switches on from env only and never fails without it |
+| `scripts/release/build.ts` | `--release-id` optional: without it, no GitHub token or draft check (local mode); default targets drop rpm and msi; `cpSync(..., { verbatimSymlinks: true })` when copying `release/` out of the deploy dir | Build jobs run with `contents: read`, and the same path works on a laptop. Without `verbatimSymlinks`, the `.framework` symlinks in the copied app pointed into the deleted deploy dir, so `codesign --verify` (and `verify-mac.ts`) failed. This is an upstream bug |
+| `package.json` (desktop) | `version` 1.2.4 → 0.1.0 | Ninebrains' first version; nothing keys state or migrations off it (RELEASING.md, Versioning) |
+
+New files: `.github/workflows/release.yml`, `docs/RELEASING.md`,
+`scripts/release/checksums.mjs`, `scripts/release/checksums.test.mjs`,
+`scripts/release/release-config.test.mjs`, `scripts/release/lib/signing.ts`.
+
+Upstream release scripts left in place but unused by our workflow: `prepare-release.ts`,
+`upload-github-assets.ts`, `finalize-release.ts` (R2 promotion), `notarize-mac.ts`,
+`verify-linux.ts` (keyed to upstream's artifact names), `verify-win.ts` (needs a valid signature).
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -156,4 +174,7 @@ All append-only registrations for `src/core/features/planner/` except the last r
 `src/core/features/lanes/**`, `e2e/**`, `docs/screenshots/lanes-grid-*.png`,
 `src/core/features/packs/**`, `packages/brain-core/**`, `packages/brain-mcp/**`,
 `src/core/features/planner/**`, `src/renderer/tests/browser/planner-screenshots.test.tsx`,
-`docs/screenshots/planner-*.png`.
+`docs/screenshots/planner-*.png`,
+`.github/workflows/release.yml`, `docs/RELEASING.md`, `scripts/release/checksums.mjs`,
+`scripts/release/checksums.test.mjs`, `scripts/release/release-config.test.mjs`,
+`scripts/release/lib/signing.ts`.
