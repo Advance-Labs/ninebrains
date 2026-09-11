@@ -76,6 +76,20 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
 
+## 5. Planner canvas (Phase 3 / W3)
+
+All append-only registrations for `src/core/features/planner/` except the last row.
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/browser/view-catalog.ts` (+ `view-catalog.test.ts`) | `plannerViewDef` appended | New `planner` view |
+| `src/core/manifests/browser/browser-contributions.ts` | `plannerBrowserContributions.views` appended | View runtime |
+| `src/core/manifests/shared/domain-contracts.ts` | `[plannerDomain]: plannerContract` | Wire contract |
+| `src/core/manifests/node/controllers.ts` | optional `planner?: PlannerService` on the context + `planner` controller (falls back to an in-memory, Brain-less service when unset) | Keeps typecheck green until `services.ts`/`wiring.ts` pass the real service |
+| `src/core/manifests/shared/memento-catalog.ts` | `plannerViewportMemento` | Persisted pan/zoom retention |
+| `src/core/primitives/telemetry/api/telemetry.ts` | `'planner'` added to `FocusView` | Navigation telemetry passes any `ViewId` as `from_view` |
+| `package.json` (desktop), `pnpm-lock.yaml` | `@xyflow/react` (MIT), `@ninebrains/brain-core` (workspace) | Canvas + compile |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,

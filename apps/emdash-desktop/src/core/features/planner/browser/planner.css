@@ -65,3 +65,10 @@
   background: transparent;
   color: var(--foreground-passive);
 }
+
+/* On a phone-width window the minimap would cover half the canvas. */
+@media (max-width: 640px) {
+  .planner-flow .react-flow__minimap {
+    display: none;
+  }
+}
