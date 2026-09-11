@@ -1,1 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><!-- Placeholder until Ninebrains has brand assets; the desktop icons are still Emdash's. --><circle cx="16" cy="16" r="12" fill="#6b7280"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+  <!-- The Ninebrains mark as drawn by LogoShapes (apps/emdash-desktop/src/core/primitives/app-identity/browser/emdash-logo.tsx),
+       on the app icon's rounded square. Colours are sampled from the packaged icon, emdash.png. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22293a"/>
+      <stop offset="1" stop-color="#0d1017"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+  <g transform="translate(178.8 178.8) scale(9.52)">
+    <g fill="none" stroke="#ff7a59" stroke-width="3" stroke-linecap="round">
+      <path transform="rotate(0 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(45 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(90 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(135 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(180 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(225 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(270 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+      <path transform="rotate(315 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"/>
+    </g>
+    <g fill="#ffd3c4">
+      <circle transform="rotate(0 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(45 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(90 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(135 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(180 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(225 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(270 35 35)" cx="36.4" cy="5" r="3.4"/>
+      <circle transform="rotate(315 35 35)" cx="36.4" cy="5" r="3.4"/>
+    </g>
+    <circle cx="35" cy="35" r="11.8" fill="#ff7a59"/>
+  </g>
+</svg>

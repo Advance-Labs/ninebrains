@@ -89,6 +89,10 @@ export default defineConfig({
       // app, so filePath starts `../../`, which consumes two segments: ending the base at
       // `apps/docs/` lands on `/edit/main/docs/<file>.md`.
       editLink: { baseUrl: `${REPO}/edit/main/apps/docs/` },
+      // The octopus mark from the app icon (drawn from LogoShapes in the desktop app), used as
+      // both the header logo and the favicon so there is one copy.
+      logo: { src: './public/favicon.svg', alt: 'Ninebrains' },
+      favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
       head: [
         { tag: 'meta', attrs: { property: 'og:site_name', content: 'Ninebrains Docs' } },
