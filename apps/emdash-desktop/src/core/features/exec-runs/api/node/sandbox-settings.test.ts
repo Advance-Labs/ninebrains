@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeSettings, buildClaudeSandboxSettings } from './sandbox-settings';
+import {
+  assertSafeSettings,
+  buildClaudeSandboxSettings,
+  SECRET_HOME_PATHS,
+  secretDenyPaths,
+} from './sandbox-settings';
 
 const base = {
   worktree: '/wt/proj/lane-a',
@@ -44,6 +49,36 @@ describe('SEC-11 lane sandbox settings', () => {
     expect(denyRead).not.toContain('/wt/proj/lane-a');
     expect(allowRead).toEqual(['/wt/proj/lane-a']);
     expect(allowWrite).toEqual(['/wt/proj/lane-a']);
+  });
+
+  it('M4 denies every listed home secret and all of <userData>, not just ninebrains/', () => {
+    const s = buildClaudeSandboxSettings({ ...base, preset: 'worker', userDataDir: '/ud' });
+    const { denyRead } = s.sandbox.filesystem;
+    for (const secret of [
+      '.git-credentials',
+      '.config/git/credentials',
+      '.netrc',
+      '.pypirc',
+      '.cargo/credentials',
+      '.cargo/credentials.toml',
+      '.azure',
+      '.aws',
+      '.config/gcloud',
+      '.kube',
+      '.docker/config.json',
+      '.npmrc',
+      '.gnupg',
+      '.ssh',
+    ]) {
+      expect(SECRET_HOME_PATHS).toContain(secret);
+      expect(denyRead).toContain(`/home/u/${secret}`);
+    }
+    expect(denyRead).toContain('/ud');
+    expect(s.permissions.deny).toContain('Read(//ud/**)');
+    expect(secretDenyPaths({ homeDir: '/home/u', userDataDir: '/ud' })).toEqual([
+      '/ud',
+      ...SECRET_HOME_PATHS.map((p) => `/home/u/${p}`),
+    ]);
   });
 
   it('writes permission rules with // for absolute paths (a single / is settings-relative)', () => {

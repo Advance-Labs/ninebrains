@@ -20,6 +20,8 @@ export interface SandboxSettingsInput {
   worktree: string;
   /** `<userData>/ninebrains`: tokens, lane mcp.json, Brain DB, evidence, transcripts. */
   ninebrainsDataDir: string;
+  /** All of `<userData>` (M4): app settings, other Emdash state, pack secrets. Denied whole. */
+  userDataDir?: string;
   siblingWorktrees?: readonly string[];
   claudeConfigDir?: string;
   codexHome?: string;
@@ -44,25 +46,43 @@ export interface ClaudeSandboxSettings {
   permissions: { deny: string[] };
 }
 
-/** Credential and config locations every run is denied, relative to home. */
-const HOME_DENY = [
+/**
+ * M4: the one list of secret locations under home. The Claude settings file, the tests gate's
+ * macOS seatbelt profile and its Linux bubblewrap tmpfs mounts all read it, so they can't drift.
+ * `~/.cargo/credentials*` is spelled out as both files Cargo writes.
+ */
+export const SECRET_HOME_PATHS = [
   '.ssh',
   '.aws',
+  '.azure',
   '.config/gcloud',
   '.config/gh',
+  '.config/git/credentials',
+  '.git-credentials',
+  '.kube',
+  '.docker/config.json',
+  '.npmrc',
+  '.pypirc',
+  '.netrc',
+  '.cargo/credentials',
+  '.cargo/credentials.toml',
+  '.gnupg',
   '.codex',
   '.claude/.credentials.json',
   '.claude.json',
-  '.netrc',
-  '.npmrc',
-  '.docker/config.json',
-  '.kube',
-  '.gnupg',
-];
+] as const;
 
-/** Credential locations under `home`, shared with the tests gate's macOS profile (SEC-20). */
+/** Credential locations under `home`. */
 export function credentialDenyPaths(home: string = homedir()): string[] {
-  return HOME_DENY.map((p) => join(home, p));
+  return SECRET_HOME_PATHS.map((p) => join(home, p));
+}
+
+/** Everything a run or the tests gate may never read: the home secrets plus all of `<userData>`. */
+export function secretDenyPaths(input: { homeDir?: string; userDataDir?: string } = {}): string[] {
+  return [
+    ...(input.userDataDir ? [resolve(input.userDataDir)] : []),
+    ...credentialDenyPaths(input.homeDir),
+  ];
 }
 
 const isInside = (child: string, parent: string): boolean => {
@@ -76,7 +96,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
   const denyRead = [
     resolve(input.ninebrainsDataDir),
     ...(input.siblingWorktrees ?? []).map((p) => resolve(p)),
-    ...credentialDenyPaths(home),
+    ...secretDenyPaths({ homeDir: home, userDataDir: input.userDataDir }),
     ...(input.claudeConfigDir ? [join(resolve(input.claudeConfigDir), '.credentials.json')] : []),
     ...(input.codexHome ? [resolve(input.codexHome)] : []),
   ].filter((p) => p !== worktree);

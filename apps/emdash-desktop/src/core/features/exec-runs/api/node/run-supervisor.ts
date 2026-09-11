@@ -186,6 +186,7 @@ export class ExecRunSupervisor {
         preset: spec.preset,
         worktree: cwd,
         ninebrainsDataDir: ninebrainsDir(userDataDir),
+        userDataDir,
         siblingWorktrees: spec.siblingWorktrees,
         claudeConfigDir: spec.auth?.CLAUDE_CONFIG_DIR,
         egressAllowedDomains: spec.egressAllowedDomains,
