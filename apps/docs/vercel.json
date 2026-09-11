@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @ninebrains/docs build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/ninebrains", "destination": "/" },
+    { "source": "/ninebrains/(.*)", "destination": "/$1" }
+  ]
+}
