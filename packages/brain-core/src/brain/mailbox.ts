@@ -10,6 +10,8 @@ export interface SendMessageInput {
   to: Address;
   body: string;
   attachments?: Attachment[];
+  /** Main only (never an op argument): the body relays gate feedback, test output or web text. */
+  untrusted?: boolean;
 }
 
 function checkAddress(to: Address): Address {
@@ -42,7 +44,7 @@ export function sendMessage(
       throw new ForbiddenError(`lane ${identity.laneId} cannot message a lane in another project`);
     }
   }
-  return deliver(ctx, tx, addressOf(identity), to, input.body, attachments);
+  return deliver(ctx, tx, addressOf(identity), to, input.body, attachments, input.untrusted);
 }
 
 /** The Brain messages every registered lane of a project. */
@@ -50,7 +52,7 @@ export function broadcast(
   ctx: BrainContext,
   tx: Tx,
   identity: Identity,
-  input: { projectId: ProjectId; body: string; attachments?: Attachment[] }
+  input: { projectId: ProjectId; body: string; attachments?: Attachment[]; untrusted?: boolean }
 ): Message[] {
   requireBrain(identity, 'broadcast');
   checkText('body', input.body, LIMITS.bodyBytes);
@@ -58,7 +60,15 @@ export function broadcast(
   return ctx.store
     .listLanes({ projectId: input.projectId })
     .map((lane) =>
-      deliver(ctx, tx, from, laneAddress(lane.id), input.body, input.attachments ?? [])
+      deliver(
+        ctx,
+        tx,
+        from,
+        laneAddress(lane.id),
+        input.body,
+        input.attachments ?? [],
+        input.untrusted
+      )
     );
 }
 
@@ -113,7 +123,8 @@ function deliver(
   from: Address,
   to: Address,
   body: string,
-  attachments: Attachment[]
+  attachments: Attachment[],
+  untrusted?: boolean
 ): Message {
   const message: Message = {
     id: ctx.newId(),
@@ -123,6 +134,7 @@ function deliver(
     attachments,
     createdAt: ctx.now(),
     readAt: null,
+    ...(untrusted ? { untrusted: true } : {}),
   };
   ctx.store.insertMessage(message);
   tx.raise({ type: 'messageSent', payload: { message } });
