@@ -31,7 +31,8 @@ export function listArtifacts(dir) {
     .map((entry) => entry.name)
     .sort();
   for (const name of names) {
-    if (!SAFE_NAME.test(name)) throw new Error(`Refusing unsafe artifact name: ${JSON.stringify(name)}`);
+    if (!SAFE_NAME.test(name))
+      throw new Error(`Refusing unsafe artifact name: ${JSON.stringify(name)}`);
   }
   return names;
 }
@@ -92,7 +93,8 @@ export async function verifyChecksums(dir) {
       problems.push(`${name}: checksum mismatch`);
     }
   }
-  if (problems.length > 0) throw new Error(`Checksum verification failed:\n  ${problems.join('\n  ')}`);
+  if (problems.length > 0)
+    throw new Error(`Checksum verification failed:\n  ${problems.join('\n  ')}`);
   return [...expected.keys()];
 }
 

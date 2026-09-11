@@ -72,7 +72,9 @@ export function resolveWinSigning(env: Env): WinSigning {
   const auth = completeSet(env, AZURE_AUTH_VARS, 'Azure signing credentials');
   const profile = completeSet(env, AZURE_PROFILE_VARS, 'Azure signing profile');
   if (auth !== profile) {
-    throw new Error('Azure signing needs both the AZURE_* credentials and the NINEBRAINS_AZURE_* profile');
+    throw new Error(
+      'Azure signing needs both the AZURE_* credentials and the NINEBRAINS_AZURE_* profile'
+    );
   }
   if (!auth) return { azureSignOptions: undefined };
   return {

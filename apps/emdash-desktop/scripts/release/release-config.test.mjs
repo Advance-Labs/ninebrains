@@ -65,7 +65,12 @@ describe('signing is switched by env only', () => {
   });
 
   it('empty-string secrets (unset GitHub secrets) count as absent', () => {
-    const env = { CSC_LINK: '', APPLE_ID: '', AZURE_TENANT_ID: '', NINEBRAINS_AZURE_PUBLISHER: ' ' };
+    const env = {
+      CSC_LINK: '',
+      APPLE_ID: '',
+      AZURE_TENANT_ID: '',
+      NINEBRAINS_AZURE_PUBLISHER: ' ',
+    };
     assert.equal(resolveMacSigning(env).identity, '-');
     assert.equal(resolveWinSigning(env).azureSignOptions, undefined);
   });
@@ -100,7 +105,8 @@ describe('signing is switched by env only', () => {
       /no CSC_LINK/
     );
     assert.throws(
-      () => resolveWinSigning({ AZURE_TENANT_ID: 't', AZURE_CLIENT_ID: 'c', AZURE_CLIENT_SECRET: 's' }),
+      () =>
+        resolveWinSigning({ AZURE_TENANT_ID: 't', AZURE_CLIENT_ID: 'c', AZURE_CLIENT_SECRET: 's' }),
       /needs both/
     );
   });
