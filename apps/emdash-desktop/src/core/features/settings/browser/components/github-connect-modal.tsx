@@ -20,6 +20,10 @@ import {
 } from '@core/features/github/api/browser/useGithubAccounts';
 import { useModalController, useOpenModal } from '@core/manifests/browser/modal-api';
 import { HOSTED_ACCOUNT_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
+import {
+  GITHUB_OAUTH_APP_REQUIRED_MESSAGE,
+  readGitHubOAuthClientId,
+} from '@core/primitives/app-identity/api/github-oauth-app';
 import { defineModal } from '@core/primitives/modals/react';
 import { cn } from '@core/primitives/styling/browser/cn';
 
@@ -46,7 +50,9 @@ export function GithubConnectModal() {
   const deviceFlowLoading = deviceFlowMutation.isPending;
   const anyLoading = oauthLoading || cliLoading || deviceFlowLoading;
   const oauthContent = getOAuthContent({ isSignedIn, hasAccount });
-  const showDeviceFlowMethod = !HOSTED_ACCOUNT_ENABLED || !hasAccount;
+  // Ninebrains: device flow needs our own GitHub OAuth App; without one only CLI import is offered.
+  const githubOAuthConfigured = readGitHubOAuthClientId() !== '';
+  const showDeviceFlowMethod = githubOAuthConfigured && (!HOSTED_ACCOUNT_ENABLED || !hasAccount);
 
   const connectOAuth = async () => {
     setError(null);
@@ -178,6 +184,9 @@ export function GithubConnectModal() {
             onClick={connectDeviceFlow}
             error={error?.method === 'device_flow' ? error.message : undefined}
           />
+        )}
+        {!githubOAuthConfigured && (
+          <p className="text-muted-foreground text-xs">{GITHUB_OAUTH_APP_REQUIRED_MESSAGE}</p>
         )}
       </Dialog.Body>
       <Dialog.Footer>

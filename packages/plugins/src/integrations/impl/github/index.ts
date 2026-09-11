@@ -16,7 +16,9 @@ const plugin = defineIntegrationPlugin(
         { kind: 'oauth', providerId: 'github' },
         {
           kind: 'oauth-device',
-          clientId: 'Ov23ligC35uHWopzCeWf',
+          // Ninebrains: Emdash's OAuth App client ID is removed. The desktop app supplies its own
+          // from NINEBRAINS_GITHUB_OAUTH_CLIENT_ID at build time; empty disables device flow.
+          clientId: '',
           scopes: ['repo', 'read:user', 'read:org'],
         },
         { kind: 'cli-import', cli: 'gh' },

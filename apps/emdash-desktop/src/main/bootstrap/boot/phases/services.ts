@@ -88,6 +88,7 @@ import type { TaskProviderOpts } from '@core/features/workspaces/api/node/worksp
 import { createWorkspaceDeletionSweepKind } from '@core/features/workspaces/node/sweep/workspace-deletion-sweep';
 import { WorkspaceRegistryBackfillService } from '@core/features/workspaces/node/sync/workspace-registry-backfill';
 import { WorkspaceRegistrySyncService } from '@core/features/workspaces/node/sync/workspace-registry-sync-service';
+import { readGitHubOAuthClientId } from '@core/primitives/app-identity/api/github-oauth-app';
 import { startPeriodicSweep } from '@core/primitives/periodic-sweep/node/periodic-sweep';
 import { DEFAULT_AGENT_GIT_CREDENTIALS } from '@core/primitives/project-settings/api';
 import type { HostReachabilityProbe } from '@core/primitives/ssh/api';
@@ -603,7 +604,8 @@ export async function bootServices(
     publishEvent: (event) => githubEvents.emit(undefined, event),
     createDeviceAuth: defaultGitHubDeviceAuthFactory,
     config: {
-      clientId: githubDeviceMethod.clientId,
+      // Ninebrains: our own OAuth App client ID from the build env (empty disables device flow).
+      clientId: readGitHubOAuthClientId(),
       scopes: githubDeviceMethod.scopes,
     },
   });

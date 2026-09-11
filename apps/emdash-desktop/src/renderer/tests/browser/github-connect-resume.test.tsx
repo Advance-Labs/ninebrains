@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { GithubConnectModal } from '@core/features/settings/browser/components/github-connect-modal';
+import type * as GitHubOAuthAppModule from '@core/primitives/app-identity/api/github-oauth-app';
 import { ModalHostTestProvider, type ModalHostController } from '@core/primitives/modals/react';
 import { modalStore } from '@core/primitives/modals/react/modal-store';
 
@@ -20,6 +21,15 @@ const accountHooks = vi.hoisted(() => ({
 const githubHooks = vi.hoisted(() => ({
   deviceFlowAuth: vi.fn(async () => ({ success: true })),
   importCliAccounts: vi.fn(async () => ({ success: true, importedAccountIds: [] })),
+}));
+
+// Ninebrains: device flow only exists with our own OAuth App client ID (docs/FORK.md). The ID is
+// a build-time constant, so tests control it through the module rather than the env.
+const oauthApp = vi.hoisted(() => ({ clientId: 'Ov23test-client-id' }));
+
+vi.mock('@core/primitives/app-identity/api/github-oauth-app', async (importOriginal) => ({
+  ...(await importOriginal<typeof GitHubOAuthAppModule>()),
+  readGitHubOAuthClientId: () => oauthApp.clientId,
 }));
 
 vi.mock('@core/features/account/api/browser/useAccount', () => ({
@@ -57,6 +67,7 @@ describe('GitHub connect-and-resume', () => {
   };
 
   beforeEach(() => {
+    oauthApp.clientId = 'Ov23test-client-id';
     accountHooks.signIn.mockClear();
     githubHooks.deviceFlowAuth.mockClear();
     controller = {
@@ -122,6 +133,17 @@ describe('GitHub connect-and-resume', () => {
     expect(document.querySelector('button[aria-label="Continue"]')).toBeNull();
     expect(methodButton('Use device flow')).toBeDefined();
     expect(accountHooks.signIn).not.toHaveBeenCalled();
+  });
+
+  it('hides device flow and explains why when no Ninebrains OAuth App client ID is built in', async () => {
+    oauthApp.clientId = '';
+    await renderConnectModal();
+
+    expect(document.querySelector('button[aria-label="Use device flow"]')).toBeNull();
+    expect(methodButton('Import from GitHub CLI')).toBeDefined();
+    // The dialog renders into a portal on document.body, not into the test host.
+    expect(document.body.textContent).toContain('needs a Ninebrains OAuth App');
+    expect(githubHooks.deviceFlowAuth).not.toHaveBeenCalled();
   });
 
   it('completes the connect modal when the device flow modal completes', async () => {
