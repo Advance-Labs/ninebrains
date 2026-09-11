@@ -36,7 +36,6 @@ import {
 } from '@ninebrains/brain-core';
 import { createRedactor, type Redactor } from '@core/features/exec-runs/api/node/redact';
 import type { AttemptVerdict } from '../../api/verification';
-import { createReadWorktreeFile } from '../capabilities/read-worktree-file';
 import {
   MANIFEST_FILE,
   openAttemptEvidence,
@@ -44,6 +43,7 @@ import {
   writeVerdict,
 } from '../evidence/evidence';
 import { gateJobKindOf, type RigorResolver } from '../rigor/rigor';
+import { createReadWorktreeFile } from '../worktree/read-worktree-file';
 import {
   defaultBuiltInGates,
   effectiveGateIds,
