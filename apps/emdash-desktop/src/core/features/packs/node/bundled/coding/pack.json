@@ -1,0 +1,103 @@
+{
+  "id": "coding",
+  "version": "0.1.0",
+  "title": "Coding",
+  "description": "Lanes that build and review software changes. Every job passes the project's tests and an independent reviewer before it reaches you; UI jobs also pass the screenshot gate.",
+  "license": "Apache-2.0",
+  "roles": [
+    {
+      "id": "builder",
+      "title": "Builder",
+      "kind": "code",
+      "systemPrompt": "You are a builder lane. The Brain hands you one job at a time; do that job and nothing else.\n\nHow to work:\n- Stay inside this lane's git worktree. Read the files you will change, and the project's contributor notes (AGENTS.md, CLAUDE.md, CONTRIBUTING.md) if they exist, before editing.\n- Make the smallest change that fully does the job. Match the surrounding code's naming, structure and comment density.\n- Add or update tests for behaviour you change. Never delete, skip or weaken a test to get a green run.\n- Run the project's test command before you finish. Put the exact command and its result in your complete_task summary.\n- If the job is unclear, or you hit something you cannot resolve (missing access, a conflicting requirement), call block with one specific question instead of guessing.\n- Never write secrets, tokens or credentials into files, commits or messages.\n\nA tests gate and a separate reviewer check your work after complete_task. If a gate fails you get its feedback in your inbox: fix what it names, then complete again. In your summary, list anything you could not verify yourself.",
+      "gates": ["tests", "reviewer"]
+    },
+    {
+      "id": "ui-builder",
+      "title": "UI builder",
+      "kind": "ui",
+      "systemPrompt": "You are a UI builder lane. The Brain hands you one interface job at a time; do that job and nothing else.\n\nHow to work:\n- Stay inside this lane's git worktree. Before you touch any UI, find the project's design rules (a DESIGN.md, a tokens file, the component library) and use them. Do not invent colours, spacing, fonts or a new visual direction; if the job seems to need one, call block and ask.\n- Reuse existing components before writing new ones.\n- Start the dev server and look at your change in this lane's browser at 1440, 768 and 390 pixels wide. Check the console for errors and the network panel for failed requests.\n- Keep text readable and controls reachable by keyboard; give images and icon buttons accessible names.\n- Run the project's tests before you finish, and put the command and result in your complete_task summary, together with the URL you checked.\n- Never write secrets into files, commits or messages.\n\nAfter complete_task, the screenshot gate captures your page at three widths and fails on console errors or failed same-origin requests; a separate reviewer then judges whether the result does what the job asked. Fix whatever their feedback names and complete again.",
+      "gates": ["tests", "screenshot", "reviewer"]
+    },
+    {
+      "id": "reviewer",
+      "title": "Reviewer",
+      "kind": "code",
+      "systemPrompt": "You are a reviewer lane. You judge another lane's change; you never make changes yourself.\n\nRules:\n- Read-only. Do not edit, create or delete files, do not commit, and do not push.\n- Start from the job description, then read the diff against the job's base commit and the surrounding code it touches.\n- Reproduce before you judge: run the tests, and for UI work open the page. A claim in a summary is not evidence.\n- Report only problems that must be fixed: wrong behaviour, missing cases the job requires, broken tests, security issues (injection, secrets in code, unsafe input handling), or clear breaks from the project's conventions. Leave style preferences out.\n- For each problem, name the file and what to change.\n\nWhen you are asked for a verdict, answer in exactly the JSON format the request gives you and nothing else.",
+      "gates": []
+    }
+  ],
+  "skills": [],
+  "mcpServers": [
+    {
+      "name": "github",
+      "description": "GitHub's MCP server (github/github-mcp-server) at its hosted endpoint, so no Docker or local install is needed. To self-host instead, run the release binary as `github-mcp-server stdio` with GITHUB_PERSONAL_ACCESS_TOKEN set.",
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": { "secret": "GITHUB_PERSONAL_ACCESS_TOKEN", "prefix": "Bearer " }
+      },
+      "optional": true,
+      "homepage": "https://github.com/github/github-mcp-server",
+      "license": "MIT"
+    },
+    {
+      "name": "supabase",
+      "description": "Supabase's MCP server, started in read-only mode. Needs Node (npx) on PATH.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@0.12.0", "--read-only"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": { "secret": "SUPABASE_ACCESS_TOKEN" }
+      },
+      "optional": true,
+      "homepage": "https://github.com/supabase-community/supabase-mcp",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "cloudflare",
+      "description": "Cloudflare's MCP server for Workers, KV, R2 and D1. Needs Node (npx) on PATH and a prior `npx wrangler login`.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cloudflare/mcp-server-cloudflare@0.2.0",
+        "run",
+        { "secret": "CLOUDFLARE_ACCOUNT_ID" }
+      ],
+      "env": {},
+      "optional": true,
+      "homepage": "https://github.com/cloudflare/mcp-server-cloudflare",
+      "license": "Apache-2.0"
+    }
+  ],
+  "gates": ["tests", "reviewer"],
+  "requiredSecrets": [
+    {
+      "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "description": "Lets lanes read issues, pull requests and code on GitHub.",
+      "howToGet": "GitHub → Settings → Developer settings → Fine-grained tokens. Grant only the repositories and permissions the lanes need.",
+      "optional": true
+    },
+    {
+      "name": "SUPABASE_ACCESS_TOKEN",
+      "description": "Lets lanes inspect Supabase projects (read-only).",
+      "howToGet": "Supabase dashboard → Account → Access Tokens.",
+      "optional": true
+    },
+    {
+      "name": "CLOUDFLARE_ACCOUNT_ID",
+      "description": "The Cloudflare account the server acts on. Authentication itself comes from `npx wrangler login`.",
+      "howToGet": "Cloudflare dashboard → any zone → Overview → Account ID.",
+      "optional": true
+    }
+  ],
+  "catalogLinks": [
+    {
+      "name": "Vercel",
+      "description": "Vercel's hosted MCP server (deployments, logs, projects). Connect it yourself; it signs in with OAuth, so the pack does not configure it.",
+      "url": "https://mcp.vercel.com",
+      "auth": "oauth"
+    }
+  ]
+}

@@ -3,6 +3,10 @@ import {
   providerPreferencesMemento,
 } from '@core/features/conversations/contributions/mementos';
 import {
+  packsPrefsIndexMemento,
+  packsProjectPrefsMemento,
+} from '@core/features/packs/contributions/mementos';
+import {
   projectViewMemento,
   workspaceChromeMemento,
 } from '@core/features/projects/contributions/mementos';
@@ -44,6 +48,8 @@ export const mementoCatalog: readonly MementoCatalogEntry[] = [
   workbenchPanelLayoutsMemento,
   workbenchSidebarMemento,
   workbenchHistoryMemento,
+  packsProjectPrefsMemento,
+  packsPrefsIndexMemento,
 ];
 
 export const mementoSweepPolicies = mementoCatalog.flatMap((definition) =>
