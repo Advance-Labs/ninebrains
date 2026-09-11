@@ -14,7 +14,13 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
 import { buildCodexExecArgv, CodexEventParser } from './codex-exec';
-import { signalGroup, spawnInGroup, terminateGroup } from './process-group';
+import {
+  processGroups,
+  signalGroup,
+  spawnInGroup,
+  terminateGroup,
+  type ProcessGroupRegistry,
+} from './process-group';
 import { createRedactor, describeEnvForTranscript } from './redact';
 import { buildUnattendedEnv } from './run-env';
 import { ensurePrivateDir, ninebrainsDir, resolveRunCwd, runPaths } from './run-paths';
@@ -41,6 +47,11 @@ export interface ExecRunSupervisorOptions {
   platform?: NodeJS.Platform;
   /** SIGTERM → SIGKILL delay. SEC-30 fixes it at 2 s. */
   killGraceMs?: number;
+  /**
+   * SEC-30: process groups started outside this supervisor (tests gate, review-checkout git).
+   * `killAll()` latches and kills them too. Default: the app-wide registry.
+   */
+  groups?: ProcessGroupRegistry;
 }
 
 export type ExecRunRejection = 'stop-latched' | 'concurrency' | 'duplicate-run';
@@ -129,13 +140,19 @@ export class ExecRunSupervisor {
       void this.terminate(id, 'killed');
       return run.done.catch(() => undefined);
     });
+    const others = this.groups.killAll(this.graceMs);
     const deadline = new Promise((r) => setTimeout(r, this.graceMs + KILL_ALL_SLACK_MS));
-    await Promise.race([Promise.all(runs), deadline]);
+    await Promise.race([Promise.all([...runs, others]), deadline]);
   }
 
   clearStop(): void {
     this.latched = false;
+    this.groups.clearStop();
     this.emit({ type: 'stop-cleared' });
+  }
+
+  private get groups(): ProcessGroupRegistry {
+    return this.options.groups ?? processGroups;
   }
 
   private terminate(runId: string, reason: ExecRunEndReason): Promise<void> {
