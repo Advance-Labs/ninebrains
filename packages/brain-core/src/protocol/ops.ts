@@ -15,11 +15,9 @@ import { ADDRESS_KINDS, JOB_STATES } from '../types';
 export const BRAIN_PROTOCOL_VERSION = 1 as const;
 
 const bytes = (max: number, label: string) =>
-  z
-    .string()
-    .refine((value) => utf8Bytes(value) <= max, {
-      message: `${label} must be at most ${max} bytes`,
-    });
+  z.string().refine((value) => utf8Bytes(value) <= max, {
+    message: `${label} must be at most ${max} bytes`,
+  });
 
 const notBlank = (label: string) => (value: string) =>
   value.trim().length > 0 || `${label} must not be empty`;
