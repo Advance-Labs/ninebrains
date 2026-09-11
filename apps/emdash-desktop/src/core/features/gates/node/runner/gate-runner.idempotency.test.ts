@@ -75,6 +75,7 @@ describe('gate runner is idempotent per (jobId, attempt)', () => {
         recordGateResult: () => {
           throw new Error('simulated crash');
         },
+        blockJob: (identity, id, reason) => f.brain.blockJob(identity, id, reason),
       },
     });
     await expect(crashing.verifyJob(job.id)).rejects.toThrow('simulated crash');

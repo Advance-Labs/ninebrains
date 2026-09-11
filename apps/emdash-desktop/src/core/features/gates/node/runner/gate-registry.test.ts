@@ -1,6 +1,12 @@
 import type { GateContext } from '@emdash/gates-core';
 import { describe, expect, it, vi } from 'vitest';
-import { defaultBuiltInGates, effectiveGateIds, resolveGates, unknownGate } from './gate-registry';
+import {
+  CONFIGURATION_ERROR_METRIC,
+  defaultBuiltInGates,
+  effectiveGateIds,
+  resolveGates,
+  unknownGate,
+} from './gate-registry';
 import { fakeCapabilities, scriptedGate } from './test-fixtures';
 
 const job = { id: 'j1', title: 't', body: '', kind: 'code' as const, attempt: 1 };
@@ -79,6 +85,7 @@ describe('gate resolution', () => {
     );
     expect(result.pass).toBe(false);
     expect(result.feedback).toContain('No test command is set');
+    expect(result.metrics?.[CONFIGURATION_ERROR_METRIC]).toBe(1);
     expect(runCommand).not.toHaveBeenCalled();
   });
 

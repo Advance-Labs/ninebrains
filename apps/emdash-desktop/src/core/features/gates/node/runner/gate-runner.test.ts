@@ -108,16 +108,18 @@ describe('gate runner verdicts', () => {
     const f = await setup({ gates: [scriptedGate('tests', [true])] });
     const job = f.createJob({ gates: ['does-not-exist'] });
     await f.runner.verifyJob(job.id);
-    expect(f.job(job.id)).toMatchObject({ state: 'running', attempts: 1 });
-    expect(f.brain.readInbox(LANE)[0]?.body).toContain('"does-not-exist" is not installed');
+    // The worker can't install a gate, so the job blocks without using an attempt.
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('"does-not-exist" is not installed');
   });
 
-  it('a lane that is gone fails the attempt with setup feedback', async () => {
+  it('a lane that is gone blocks the job as a setup problem', async () => {
     const f = await setup({ gates: [scriptedGate('tests', [true])], laneAvailable: false });
     const job = f.createJob();
     await f.runner.verifyJob(job.id);
-    expect(f.job(job.id)).toMatchObject({ state: 'running', attempts: 1 });
-    expect(f.brain.readInbox(LANE)[0]?.body).toContain('is not available');
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('is not available');
+    expect(f.brain.readInbox(LANE)).toHaveLength(0);
   });
 
   it('start() picks up jobs already verifying, then follows Brain events', async () => {
@@ -165,7 +167,48 @@ describe('SEC-24 evidence stays out of the worktree', () => {
     const runner = f.makeRunner({ evidenceRoot: join(f.worktree, '.ninebrains', 'evidence') });
     const job = f.createJob();
     await runner.verifyJob(job.id);
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('inside the lane worktree');
+  });
+});
+
+describe('SEC-20 a tests-gate sandbox refusal is a non-retryable failure', () => {
+  it('blocks at once, uses no attempt, and notifies the user', async () => {
+    const f = await setup({
+      prefs: { testCommand: 'pnpm test' },
+      capabilities: {
+        runCommand: async () => {
+          throw new Error('refused: no OS sandbox (bwrap) on this machine; set allowUnsandboxed');
+        },
+      },
+    });
+    const job = f.createJob();
+
+    const outcome = await f.runner.verifyJob(job.id);
+
+    expect(outcome).toMatchObject({ decision: 'block', applied: true, attempt: 1 });
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('bwrap');
+    expect(f.job(job.id).reason).toContain('no attempt was used');
+    expect(f.brain.readInbox(LANE)).toHaveLength(0);
+    await waitFor(() => f.notifications.length === 1);
+  });
+
+  it('a failing test run (the command ran) still retries', async () => {
+    const f = await setup({
+      prefs: { testCommand: 'pnpm test' },
+      capabilities: { runCommand: async () => ({ exitCode: 1, stdout: '1 failed', stderr: '' }) },
+    });
+    const job = f.createJob();
+    await f.runner.verifyJob(job.id);
     expect(f.job(job.id)).toMatchObject({ state: 'running', attempts: 1 });
-    expect(f.brain.readInbox(LANE)[0]?.body).toContain('inside the lane worktree');
+  });
+
+  it('no test command configured blocks too', async () => {
+    const f = await setup();
+    const job = f.createJob();
+    await f.runner.verifyJob(job.id);
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('No test command is set');
   });
 });

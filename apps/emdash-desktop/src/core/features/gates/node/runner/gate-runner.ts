@@ -26,9 +26,11 @@ import {
   type GateJob,
   type GateRunReport,
   type RunStatus,
+  type SelfHealDecision,
 } from '@emdash/gates-core';
 import {
   IllegalTransitionError,
+  LIMITS,
   MAX_ATTEMPTS,
   type Brain,
   type Identity,
@@ -46,6 +48,7 @@ import { gateJobKindOf, type RigorResolver } from '../rigor/rigor';
 import { createReadWorktreeFile } from '../worktree/read-worktree-file';
 import {
   defaultBuiltInGates,
+  CONFIGURATION_ERROR_METRIC,
   effectiveGateIds,
   resolveGates,
   type BuiltInGates,
@@ -59,7 +62,10 @@ import type {
 
 export const GATE_RUNNER_IDENTITY: Identity = { role: 'brain', brainId: 'gate-runner' };
 
-export type GateRunnerBrain = Pick<Brain, 'events' | 'getJob' | 'listJobs' | 'recordGateResult'>;
+export type GateRunnerBrain = Pick<
+  Brain,
+  'events' | 'getJob' | 'listJobs' | 'recordGateResult' | 'blockJob'
+>;
 
 export interface GateRunnerDeps {
   brain: GateRunnerBrain;
@@ -229,6 +235,7 @@ export class GateRunnerService {
     const options = { timeoutMs: this.deps.gateTimeoutMs, concurrency: this.deps.concurrency };
     let evidence: EvidenceStore | undefined;
     let report: GateRunReport;
+    let setupFailed = false;
     try {
       evidence = await openAttemptEvidence({
         root: this.deps.evidenceRoot,
@@ -257,6 +264,7 @@ export class GateRunnerService {
         options
       );
     } catch (error) {
+      setupFailed = true;
       report = await runGates(
         gateJob,
         [setupFailure(error)],
@@ -270,7 +278,17 @@ export class GateRunnerService {
       );
     }
 
-    const decision = decideSelfHeal(report, attempt, MAX_ATTEMPTS);
+    // Setup problems (no test command, sandbox refused, lane gone) aren't the worker's to fix.
+    const nonRetryable =
+      report.status === 'failed' &&
+      (setupFailed ||
+        report.results.some((r) => !r.pass && r.metrics?.[CONFIGURATION_ERROR_METRIC] === 1));
+    const decision: SelfHealDecision = nonRetryable
+      ? {
+          action: 'block',
+          reason: `Verification can't run until the user fixes the setup, so no attempt was used.\n\n${report.feedback}`,
+        }
+      : decideSelfHeal(report, attempt, MAX_ATTEMPTS);
     const feedback =
       decision.action === 'retry'
         ? decision.feedback
@@ -284,6 +302,7 @@ export class GateRunnerService {
       jobUpdatedAt: job.updatedAt,
       status: report.status,
       decision: decision.action,
+      ...(nonRetryable ? { nonRetryable: true } : {}),
       feedback: this.redact(feedback),
       gateIds,
       gates: report.results.map((r) => ({
@@ -357,6 +376,19 @@ export class GateRunnerService {
       : undefined;
     const outcome = this.outcomeOf(verdict, replayed);
     try {
+      if (verdict.nonRetryable) {
+        // Block without counting an attempt; the attempt check still guards replays.
+        const current = this.deps.brain.getJob(this.identity, job.id);
+        if (current.state !== 'verifying' || current.attempts + 1 !== verdict.attempt) {
+          return { ...outcome, applied: false };
+        }
+        this.deps.brain.blockJob(
+          this.identity,
+          job.id,
+          verdict.feedback.slice(0, LIMITS.reasonChars)
+        );
+        return { ...outcome, applied: true };
+      }
       this.deps.brain.recordGateResult(
         this.identity,
         job.id,

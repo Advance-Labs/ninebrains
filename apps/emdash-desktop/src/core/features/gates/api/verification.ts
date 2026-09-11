@@ -41,6 +41,8 @@ export const attemptVerdictSchema = z.object({
   jobUpdatedAt: z.number(),
   status: runStatusSchema,
   decision: z.enum(['pass', 'retry', 'block']),
+  /** A setup problem: blocked at once, without using an attempt. */
+  nonRetryable: z.boolean().optional(),
   /** What went to the lane's inbox (retry), the block reason, or the pass summary. */
   feedback: z.string(),
   gateIds: z.array(z.string()),
