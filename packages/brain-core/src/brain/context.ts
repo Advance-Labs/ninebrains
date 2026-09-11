@@ -83,8 +83,16 @@ export function checkTitle(title: string): void {
     throw new InvalidInputError(`title exceeds ${LIMITS.titleChars} characters`);
 }
 
-/** Returns the gates a job must pass at minimum (from the project's rigor settings). */
-export type GateFloorResolver = (projectId: ProjectId, kind: JobKind) => readonly string[];
+/**
+ * Returns the gates a job must pass at minimum (from the project's rigor
+ * settings). `requested` is the caller's spec, so a resolver can read options
+ * such as the gate-level job kind; it can only add gates, never remove them.
+ */
+export type GateFloorResolver = (
+  projectId: ProjectId,
+  kind: JobKind,
+  requested: GateSpec | null
+) => readonly string[];
 
 /**
  * SEC-08: effective gates = union(floor, requested), floor first. A caller can
@@ -98,7 +106,7 @@ export function withGateFloor(
   requested: GateSpec | null
 ): GateSpec | null {
   const gates = [
-    ...new Set([...ctx.resolveGateFloor(projectId, kind), ...(requested?.gates ?? [])]),
+    ...new Set([...ctx.resolveGateFloor(projectId, kind, requested), ...(requested?.gates ?? [])]),
   ];
   if (gates.length === 0 && requested === null) return null;
   return { ...requested, gates };

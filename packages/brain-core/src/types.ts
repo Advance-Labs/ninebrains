@@ -64,9 +64,26 @@ export interface JobHints {
   paths?: string[];
 }
 
+export const VERIFICATION_STATUSES = ['passed', 'failed', 'unverified'] as const;
+/** The gate runner's verdict. `unverified` means no gate applied: it unblocks but is not `passed`. */
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+
+/** The latest gate-runner verdict on a job. Written by `recordGateResult`. */
+export interface JobVerification {
+  status: VerificationStatus;
+  /** True only for `passed`. A `done` job with `verified: false` must show an "unverified" badge. */
+  verified: boolean;
+  /** 1-based attempt this verdict is for. */
+  attempt: number;
+  /** Absolute path of this attempt's evidence manifest, if the runner stored evidence. */
+  evidencePath: string | null;
+  at: number;
+}
+
 export interface JobResult {
   summary: string;
   artifacts: string[];
+  verification?: JobVerification;
 }
 
 export interface Job {
