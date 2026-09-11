@@ -95,7 +95,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 
 | File | What | Why |
 |---|---|---|
-| `packages/core/package.json`, `packages/core/tsdown.config.ts` | Export `./primitives/agent-env/api` as a package entry point | The `exec-runs` slice builds the allowlisted agent env (`buildAllowlistedAgentEnv`, `mergeAgentEnvLayers`) for `claude -p` / `codex exec` spawns. Upstream has no print path, so nothing outside core imported it before |
+| `packages/core/package.json`, `packages/core/tsdown.config.ts` | New export and build entry `./primitives/agent-env/api` (additive) | The `exec-runs` slice builds the allowlisted agent env (`buildAllowlistedAgentEnv`, `mergeAgentEnvLayers`) for `claude -p` / `codex exec` spawns (SEC-13). Upstream has no print path, so nothing outside core imported it before |
 
 ## New Ninebrains-only files
 
@@ -103,4 +103,5 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 `tooling/scripts/check-licenses.mjs`, `tooling/scripts/check-licenses.test.mjs`,
 `tooling/scripts/allowlist-exceptions.json`, `.github/workflows/licenses.yml`,
 `.github/workflows/build-matrix.yml`, `src/core/primitives/app-identity/api/fork-flags.ts`,
-`src/main/db/default-path.test.ts`.
+`src/main/db/default-path.test.ts`, `src/core/features/exec-runs/**`,
+`src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`).
