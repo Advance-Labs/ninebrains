@@ -34,6 +34,8 @@ import { createGithubWireController } from '@core/features/github/node/wire-cont
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
 import type { IssueProviderRegistry } from '@core/features/issues/node/registry';
 import { createIssuesWireController } from '@core/features/issues/node/wire-controller';
+import type { LaneService } from '@core/features/lanes/node/lane-service';
+import { createLanesWireController } from '@core/features/lanes/node/wire-controller';
 import {
   createLegacyPortWireController,
   type LegacyPortControllerOperations,
@@ -135,6 +137,7 @@ export type DesktopControllerContext = {
   readonly hostIsReachable: HostReachabilityProbe;
   readonly hostOperations: DesktopHostControllerOperations;
   readonly issueProviders: IssueProviderRegistry;
+  readonly lanes: LaneService;
   readonly legacyPortOperations: LegacyPortControllerOperations;
   readonly logger: Logger;
   readonly loggingOperations: LoggingControllerOperations;
@@ -464,6 +467,10 @@ export const desktopNodeControllers = {
             getMementosRuntimeClient: runtimeClients.getMementosRuntimeClient,
           })
       ),
+  },
+  lanes: {
+    create: ({ lanes, scope }) =>
+      controllerFromImpl(desktopDomainContracts.lanes, createLanesWireController(lanes), scope),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

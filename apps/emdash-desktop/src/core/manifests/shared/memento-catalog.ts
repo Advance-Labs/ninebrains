@@ -2,6 +2,7 @@ import {
   acpDraftMemento,
   providerPreferencesMemento,
 } from '@core/features/conversations/contributions/mementos';
+import { lanesGridMemento } from '@core/features/lanes/contributions/mementos';
 import {
   packsPrefsIndexMemento,
   packsProjectPrefsMemento,
@@ -50,6 +51,7 @@ export const mementoCatalog: readonly MementoCatalogEntry[] = [
   workbenchHistoryMemento,
   packsProjectPrefsMemento,
   packsPrefsIndexMemento,
+  lanesGridMemento,
 ];
 
 export const mementoSweepPolicies = mementoCatalog.flatMap((definition) =>

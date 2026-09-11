@@ -3,6 +3,7 @@ import { conversationsBrowserContributions } from '@core/features/conversations/
 import { devPerfBrowserContributions } from '@core/features/dev-perf/contributions/browser';
 import { editorBrowserContributions } from '@core/features/editor/contributions/browser';
 import { integrationsBrowserContributions } from '@core/features/integrations/contributions/browser';
+import { lanesBrowserContributions } from '@core/features/lanes/contributions/browser';
 import { libraryBrowserContributions } from '@core/features/library/contributions/browser';
 import { machinesBrowserContributions } from '@core/features/machines/contributions/browser';
 import { projectsBrowserContributions } from '@core/features/projects/contributions/browser';
@@ -18,6 +19,7 @@ export const featureViewRuntimes = [
   ...projectsBrowserContributions.views,
   ...settingsBrowserContributions.views,
   ...tasksBrowserContributions.views,
+  ...lanesBrowserContributions.views,
 ] as const;
 
 export const featureModalDefs = [

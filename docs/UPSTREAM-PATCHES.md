@@ -97,6 +97,39 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 |---|---|---|
 | `packages/core/package.json`, `packages/core/tsdown.config.ts` | New export and build entry `./primitives/agent-env/api` (additive) | The `exec-runs` slice builds the allowlisted agent env (`buildAllowlistedAgentEnv`, `mergeAgentEnvLayers`) for `claude -p` / `codex exec` spawns (SEC-13). Upstream has no print path, so nothing outside core imported it before |
 
+## 6. Lanes (W1 `lanes`, Phase 1)
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/domain-contracts.ts` | `+[lanesDomain]: lanesContract` | Register the `lanes` wire contract |
+| `src/core/manifests/node/controllers.ts` | `readonly lanes: LaneService` on the context + `lanes` controller entry | Serve the `lanes` contract |
+| `src/main/bootstrap/boot/wiring.ts` | `lanes: services.ninebrains.lanes` | Pass LaneService into the controller context |
+| `src/main/bootstrap/boot/phases/services.ts` | One `createNinebrainsServices({...})` call, `ninebrains` on `ServicesBundle`, late-bound `resolveLaneLaunch` in `tuiConversationDependencies`, bound `createConversation`/`launchTuiConversation` | Construct lanes; conversation verbs live in `conversations/node/`, which other slices may not import, so the composition root binds them |
+| `src/core/features/conversations/node/tui-conversation-provider.ts` | Optional `resolveLaneLaunch(conversationId)` dependency, merged into `extraArgs` and `providerVars` in `buildStartInput` | SEAMS §3.7 launch hook; Phase 1 returns `undefined`, Phase 2 fills it |
+| `src/core/manifests/shared/memento-catalog.ts` | `+lanesGridMemento` | Persist lane config and grid membership |
+| `src/core/manifests/browser/view-catalog.ts` + `view-catalog.test.ts` | `+lanesViewDef`; expected ids gain `'lanes'` | Register the `lanes` view |
+| `src/core/manifests/browser/browser-contributions.ts` | `+...lanesBrowserContributions.views` | Mount the lanes view runtime |
+| `src/core/manifests/shared/command-catalog.ts`, `command-palette-catalog.ts` | `+LANES_COMMAND_DEFS`, `+LANES_COMMAND_PALETTE_ITEMS` | Lane shortcuts and the Open Lanes palette command |
+| `src/core/manifests/browser/scope-catalog.ts` | Window scope gains `LANES_WINDOW_COMMAND_DEFS`; `+lanesViewScope` | Bind Open Lanes globally and lane shortcuts in the view |
+| `src/core/features/workbench/browser/window-scope.tsx` | `'lanes.open'` handler (navigate to the lanes view) | Window-scope commands must be implemented here |
+| `src/core/primitives/telemetry/api/telemetry.ts` | `FocusView` gains `'lanes'` | Navigation telemetry types view ids; drop with telemetry removal |
+| `package.json` (desktop), `pnpm-lock.yaml` | `playwright` 1.60.0 devDependency; `e2e` and `e2e:run` scripts | Electron e2e harness (`e2e/`), kept out of CI |
+
+## 7. Packs (W2 `packs`)
+
+Append-only registrations. The slice does not touch `services.ts` or `wiring.ts`: the `packs`
+controller falls back to `createFallbackPacksService` until Phase 2 wires a real one
+(`src/core/features/packs/README.md`, "Wiring").
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/domain-contracts.ts` | `+[packsDomain]: packsContract` | Register the `packs` wire contract |
+| `src/core/manifests/node/controllers.ts` | Optional `packs?: PacksService` on the context + `packs` controller entry (fallback service when absent) | Serve the `packs` contract with contract/controller key parity and no `wiring.ts` edit |
+| `src/core/manifests/shared/memento-catalog.ts` | `+packsProjectPrefsMemento`, `+packsPrefsIndexMemento` | Per-project pack prefs and the app-level index |
+| `src/core/manifests/browser/settings-page-contributions.ts` | `+packsSettingsPage` | Packs settings page |
+| `src/core/features/settings/contributions/views.ts` | `'packs'` in `settingsPageTabSchema` | Settings tab id |
+| `package.json` (desktop), `pnpm-lock.yaml` | `@emdash/gates-core` and `@emdash/citations` workspace dependencies | The `seo-evidence` gate and the gate capabilities type against the packages directly |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -104,4 +137,6 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 `tooling/scripts/allowlist-exceptions.json`, `.github/workflows/licenses.yml`,
 `.github/workflows/build-matrix.yml`, `src/core/primitives/app-identity/api/fork-flags.ts`,
 `src/main/db/default-path.test.ts`, `src/core/features/exec-runs/**`,
-`src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`).
+`src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`),
+`src/core/features/lanes/**`, `e2e/**`, `docs/screenshots/lanes-grid-*.png`,
+`src/core/features/packs/**`, `packages/brain-core/**`, `packages/brain-mcp/**`.

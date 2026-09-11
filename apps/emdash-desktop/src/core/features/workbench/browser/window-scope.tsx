@@ -1,6 +1,7 @@
 import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
 import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
+import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { toggleAppTheme } from '@core/features/settings/api/browser/theme-toggle';
 import {
@@ -19,7 +20,10 @@ import {
   useViewParams,
   useWorkspaceSlots,
 } from '@core/primitives/navigation/browser/navigation-hooks';
-import { getNavigationHistory } from '@core/primitives/navigation/browser/navigation-selectors';
+import {
+  getNavigation,
+  getNavigationHistory,
+} from '@core/primitives/navigation/browser/navigation-selectors';
 import { toggleSettingsView } from '@core/primitives/navigation/browser/settings-toggle';
 import { openInCommandRegistry } from '@core/primitives/open-in-apps/browser/open-in-command-registry';
 import { EMDASH_ISSUES_NEW_URL } from '@core/primitives/urls/api/urls';
@@ -134,6 +138,9 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
     // active as a derived condition (no task-chrome mutation).
     'workbench.zenMode': () => ({
       execute: () => toggleZenMode(),
+    }),
+    'lanes.open': () => ({
+      execute: () => getNavigation().navigate(lanesViewDef({})),
     }),
   } satisfies ViewScopeImpl<typeof windowScope>;
 

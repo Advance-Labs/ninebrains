@@ -51,6 +51,13 @@ export type TuiConversationProviderDependencies = {
     projectId: string;
     host: HostRef;
   }): Promise<GitCredentialsSessionSpec | undefined>;
+  /**
+   * Ninebrains: per-lane launch overrides (extra CLI args and env), merged
+   * after the provider config. `undefined` leaves the launch untouched.
+   */
+  resolveLaneLaunch?(
+    conversationId: string
+  ): { extraArgs: string[]; providerVars: Record<string, string> } | undefined;
 };
 
 function parseExtraArgs(value: string | undefined): string[] {
@@ -146,10 +153,12 @@ export class TuiConversationProvider implements ConversationProvider {
     }
     const trustWorkspace =
       conversation.autoApprove === true || taskSettings?.autoTrustWorktrees === true;
+    const laneLaunch = this.dependencies.resolveLaneLaunch?.(conversation.id);
     const providerVars = {
       ...(providerConfig?.env ?? {}),
       ...colorEnv,
       ...launchContext.data.env,
+      ...laneLaunch?.providerVars,
     };
     const sessionId = makePtySessionId(this.projectId, this.taskId, conversation.id);
 
@@ -165,7 +174,7 @@ export class TuiConversationProvider implements ConversationProvider {
       initialPrompt: effectiveInitialPrompt,
       autoApprove: conversation.autoApprove ?? false,
       trustWorkspace,
-      extraArgs: parseExtraArgs(providerConfig?.extraArgs),
+      extraArgs: [...parseExtraArgs(providerConfig?.extraArgs), ...(laneLaunch?.extraArgs ?? [])],
       providerVars,
       gitCredentials,
       cols: initialSize.cols,
