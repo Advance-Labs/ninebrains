@@ -148,7 +148,7 @@ Full rationale in `docs/RELEASING.md`.
 | File | What | Why |
 |---|---|---|
 | `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `publish: null` (was GitHub draft); mac dmg+zip for arm64 **and x64**, signing from `resolveMacSigning(env)` (`identity: '-'` ad-hoc, `notarize: false` with no env); win nsis only (msi dropped), `resolveWinSigning(env)`; linux AppImage+deb (rpm dropped); `nsis.differentialPackage: false`; `artifactName` `Ninebrains-${version}-${os}-${arch}.${ext}` | SEC-36: no `app-update.yml` or `latest*.yml` while builds are unsigned. Signing switches on from env only and never fails without it |
-| `scripts/release/build.ts` | `--release-id` optional: without it, no GitHub token or draft check (local mode); default targets drop rpm and msi | Build jobs run with `contents: read`; the same path works on a laptop |
+| `scripts/release/build.ts` | `--release-id` optional: without it, no GitHub token or draft check (local mode); default targets drop rpm and msi; `cpSync(..., { verbatimSymlinks: true })` when copying `release/` out of the deploy dir | Build jobs run with `contents: read`, and the same path works on a laptop. Without `verbatimSymlinks`, the `.framework` symlinks in the copied app pointed into the deleted deploy dir, so `codesign --verify` (and `verify-mac.ts`) failed. This is an upstream bug |
 | `package.json` (desktop) | `version` 1.2.4 → 0.1.0 | Ninebrains' first version; nothing keys state or migrations off it (RELEASING.md, Versioning) |
 
 New files: `.github/workflows/release.yml`, `docs/RELEASING.md`,

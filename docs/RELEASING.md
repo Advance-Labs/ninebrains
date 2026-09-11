@@ -143,6 +143,18 @@ The honest trade-off: an unnotarized app has not been scanned by Apple. Removing
 also skips the one-time check macOS runs on first launch. Your protection is the checksum, plus your
 trust in this repository.
 
+### macOS Keychain prompt on every new build
+
+On first launch, macOS may ask: *"Ninebrains wants to use your confidential information stored in
+'Ninebrains Safe Storage' in your keychain"*. Click **Always Allow**. The app encrypts its cookie
+store and saved secrets with that key, and **it cannot start until you answer**. No window appears
+while the prompt is open.
+
+An ad-hoc signature has no stable identity: every build has a new code hash, so the Keychain treats
+each update as a different app and asks again. The same happens if another build of the app (a dev
+or e2e run) created the key first. Clicking **Deny** leaves the app unable to read the key. A
+Developer ID signature (below) makes the approval stick across updates.
+
 ### Windows SmartScreen
 
 The installer shows "Windows protected your PC". Click **More info** → **Run anyway**. SmartScreen warns
@@ -241,6 +253,30 @@ nothing keys state or migrations off the version number:
 - **Canary** versions are derived: `0.1.0` becomes `0.1.1-canary.<run>` (`scripts/release/lib/version.ts`).
 - **Downgrade from 1.2.4.** electron-updater rejects downgrades, but no user has a build from our feed,
   and the updater is off.
+
+## Local verification (2026-09-10, macOS 26 arm64)
+
+Command: `build.ts --platform mac --arch arm64 --targets dmg` (local mode, no signing env).
+
+| Check | Result |
+|---|---|
+| Artifact | `Ninebrains-0.1.0-mac-arm64.dmg`, 227,193,328 bytes (216.7 MiB); the unpacked `.app` is 764 MB |
+| Bundle | `CFBundleIdentifier` `dev.advancelabs.ninebrains`, name and executable `Ninebrains`, version `0.1.0` |
+| Icon | `icon.icns` is byte-identical to `src/assets/images/emdash/emdash.icns`, the asset the fork ships today |
+| Signature | `Signature=adhoc`, `flags=(adhoc,runtime)`; `codesign --verify --deep --strict` passes on the app inside the dmg; notarization skipped |
+| SEC-36 | no `Contents/Resources/app-update.yml`; builder reported "Prepared 0 local update manifest(s)" |
+| Launch | Starts from the mounted dmg and takes its singleton lock in `~/Library/Application Support/ninebrains`; no `emdash` directory is created. Boot then waits on the Keychain prompt above (the key was created earlier by an e2e run with a different signature). With `--use-mock-keychain` it boots fully (20 processes, services running). |
+| Checksums | `checksums.mjs release` wrote `SHA256SUMS` and `SHA256SUMS.json`; `--verify` and `shasum -a 256 -c SHA256SUMS` both pass |
+
+Found and fixed: `build.ts` copied `release/` out of the deploy dir with `cpSync` but without
+`verbatimSymlinks`. Node rewrote the `.framework` symlinks to absolute paths into the deploy dir,
+which is deleted afterwards, so the copied `release/mac-*/Ninebrains.app` failed
+`codesign --verify`, and `verify-mac.ts` in CI would have failed with it. The dmg and zip were not
+affected. After the fix, a re-package (`--targets dir`) passes both `codesign --verify --deep
+--strict` and `verify-mac.ts`.
+
+Not verified locally: the x64 mac, Windows and Linux builds (they need their runners), and the
+workflow itself (it has never been dispatched).
 
 ## Threat-model coverage
 
