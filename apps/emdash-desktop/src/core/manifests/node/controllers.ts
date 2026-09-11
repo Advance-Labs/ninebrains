@@ -42,6 +42,9 @@ import type { PromptLibraryService } from '@core/features/library/node/prompt-li
 import { createPromptLibraryWireController } from '@core/features/library/node/wire-controller';
 import { createMachinesWireController } from '@core/features/machines/node/wire-controller';
 import { createMcpWireController } from '@core/features/mcp/node/wire-controller';
+import { createUnwiredPlannerService } from '@core/features/planner/node/fallback';
+import type { PlannerService } from '@core/features/planner/node/planner-service';
+import { createPlannerWireController } from '@core/features/planner/node/wire-controller';
 import type { PreviewServerAccessOperations } from '@core/features/preview-servers/node/preview-server-access-service';
 import { createPreviewServersWireController } from '@core/features/preview-servers/node/wire-controller';
 import type { ProjectAttachmentManager } from '@core/features/projects/api/node/project-attachment-manager';
@@ -160,6 +163,8 @@ export type DesktopControllerContext = {
   readonly workspaceIdentity: WorkspaceIdentityService;
   readonly workspacePlacement: WorkspacePlacementResolver;
   readonly workspaces: Omit<CreateWorkspacesWireControllerOptions, 'db' | 'mutations'>;
+  /** Ninebrains planner. Optional until wired; absent means an in-memory, Brain-less fallback. */
+  readonly planner?: PlannerService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -447,6 +452,9 @@ export const desktopNodeControllers = {
   },
   host: {
     create: ({ hostOperations }) => createDesktopHostWireController(hostOperations),
+  },
+  planner: {
+    create: ({ planner }) => createPlannerWireController(planner ?? createUnwiredPlannerService()),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

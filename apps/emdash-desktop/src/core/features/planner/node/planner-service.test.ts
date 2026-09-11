@@ -129,7 +129,11 @@ describe('planner compile through brain-core', () => {
     );
     const outcome = await service.compile(KEY);
     expect(outcome.success && outcome.data.created).toBe(3);
-    expect(planJobs().map((j) => j.planNodeId).sort()).toEqual(['j1', 'j2', 'j3']);
+    expect(
+      planJobs()
+        .map((j) => String(j.planNodeId))
+        .sort((a, b) => a.localeCompare(b))
+    ).toEqual(['j1', 'j2', 'j3']);
     expect(brain.listEdges(BRAIN, { projectId: 'p1' })).toHaveLength(2);
   });
 

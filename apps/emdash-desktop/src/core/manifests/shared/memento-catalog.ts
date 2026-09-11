@@ -2,6 +2,7 @@ import {
   acpDraftMemento,
   providerPreferencesMemento,
 } from '@core/features/conversations/contributions/mementos';
+import { plannerViewportMemento } from '@core/features/planner/contributions/mementos';
 import {
   projectViewMemento,
   workspaceChromeMemento,
@@ -44,6 +45,7 @@ export const mementoCatalog: readonly MementoCatalogEntry[] = [
   workbenchPanelLayoutsMemento,
   workbenchSidebarMemento,
   workbenchHistoryMemento,
+  plannerViewportMemento,
 ];
 
 export const mementoSweepPolicies = mementoCatalog.flatMap((definition) =>

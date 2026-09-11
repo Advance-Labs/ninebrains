@@ -14,6 +14,7 @@ describe('viewCatalog', () => {
       'project',
       'task',
       'settings',
+      'planner',
     ]);
   });
 
