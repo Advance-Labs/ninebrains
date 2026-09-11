@@ -169,6 +169,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
     description: 'Manage reusable local agent skills.',
     keywords: ['skill modules', 'agents'],
   },
+  // Ninebrains: packs settings tab (features/packs).
+  {
+    id: 'packs',
+    label: 'Packs',
+    tab: 'packs',
+    description: 'Enable packs of roles, skills, MCP servers and gates per project.',
+    keywords: ['aeo', 'seo', 'mcp servers', 'gates'],
+  },
 
   // Integrations
   {

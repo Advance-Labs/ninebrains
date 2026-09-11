@@ -128,6 +128,7 @@ controller falls back to `createFallbackPacksService` until Phase 2 wires a real
 | `src/core/manifests/shared/memento-catalog.ts` | `+packsProjectPrefsMemento`, `+packsPrefsIndexMemento` | Per-project pack prefs and the app-level index |
 | `src/core/manifests/browser/settings-page-contributions.ts` | `+packsSettingsPage` | Packs settings page |
 | `src/core/features/settings/contributions/views.ts` | `'packs'` in `settingsPageTabSchema` | Settings tab id |
+| `src/core/features/settings/browser/search/settings-search.ts` | `+packs` search entry (integration fix) | `settings-search.test.ts` requires every settings tab to have at least one search entry |
 | `package.json` (desktop), `pnpm-lock.yaml` | `@emdash/gates-core` and `@emdash/citations` workspace dependencies | The `seo-evidence` gate and the gate capabilities type against the packages directly |
 
 ## New Ninebrains-only files
