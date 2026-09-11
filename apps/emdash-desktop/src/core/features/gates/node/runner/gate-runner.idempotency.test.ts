@@ -51,9 +51,8 @@ describe('gate runner is idempotent per (jobId, attempt)', () => {
 
     const failing = scriptedGate('tests', [false]);
     const restarted = fixture.makeRunner({ builtInGates: () => [failing] });
-    restarted.start();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    restarted.stop();
+    // What start() does at boot: sweep the jobs a crash left in `verifying`.
+    await restarted.sweep();
 
     expect(failing.calls).toBe(1);
     expect(fixture.job(job.id)).toMatchObject({ state: 'running', attempts: 1 });

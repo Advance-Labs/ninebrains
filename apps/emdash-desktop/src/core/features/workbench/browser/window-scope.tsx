@@ -142,6 +142,12 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
     'lanes.open': () => ({
       execute: () => getNavigation().navigate(lanesViewDef({})),
     }),
+    // Ninebrains: other slices open a job's verification by command id.
+    'gates.openJobVerification': () => ({
+      execute: (input) => {
+        if (input?.jobId) void openModal('jobVerificationModal', { jobId: input.jobId });
+      },
+    }),
   } satisfies ViewScopeImpl<typeof windowScope>;
 
   const { instance } = useViewScope(windowScope(), implementation);

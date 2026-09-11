@@ -2,6 +2,7 @@ import { automationsBrowserContributions } from '@core/features/automations/cont
 import { conversationsBrowserContributions } from '@core/features/conversations/contributions/browser';
 import { devPerfBrowserContributions } from '@core/features/dev-perf/contributions/browser';
 import { editorBrowserContributions } from '@core/features/editor/contributions/browser';
+import { gatesBrowserContributions } from '@core/features/gates/contributions/browser';
 import { integrationsBrowserContributions } from '@core/features/integrations/contributions/browser';
 import { lanesBrowserContributions } from '@core/features/lanes/contributions/browser';
 import { libraryBrowserContributions } from '@core/features/library/contributions/browser';
@@ -35,4 +36,5 @@ export const featureModalDefs = [
   ...sourceControlBrowserContributions.modalDefs,
   ...tasksBrowserContributions.modalDefs,
   ...workbenchBrowserContributions.modalDefs,
+  ...gatesBrowserContributions.modalDefs,
 ] as const;

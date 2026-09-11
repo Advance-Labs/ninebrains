@@ -1,5 +1,6 @@
 import { DEV_PERF_COMMAND_DEFS } from '@core/features/dev-perf/contributions/commands';
 import { fileTreeScope } from '@core/features/editor/contributions/scopes';
+import { GATES_WINDOW_COMMAND_DEFS } from '@core/features/gates/contributions/commands';
 import { LANES_WINDOW_COMMAND_DEFS } from '@core/features/lanes/contributions/commands';
 import { lanesViewScope } from '@core/features/lanes/contributions/scopes';
 import { settingsScope } from '@core/features/settings/contributions/scopes';
@@ -17,6 +18,7 @@ import { COMMAND_CATALOG } from '../shared/command-catalog';
 export const windowScope = defineWindowScope([
   ...DEV_PERF_COMMAND_DEFS,
   ...LANES_WINDOW_COMMAND_DEFS,
+  ...GATES_WINDOW_COMMAND_DEFS,
 ]);
 
 export const SCOPE_CATALOG = [

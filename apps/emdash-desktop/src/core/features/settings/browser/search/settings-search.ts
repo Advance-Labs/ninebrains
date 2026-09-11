@@ -177,6 +177,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
     description: 'Enable packs of roles, skills, MCP servers and gates per project.',
     keywords: ['aeo', 'seo', 'mcp servers', 'gates'],
   },
+  // Ninebrains: gates settings tab (features/gates).
+  {
+    id: 'gates',
+    label: 'Gates',
+    tab: 'gates',
+    description: 'Testing and security rigor: which verification gates attach to jobs.',
+    keywords: ['rigor', 'verification', 'screenshots', 'reviewer', 'security review'],
+  },
 
   // Integrations
   {

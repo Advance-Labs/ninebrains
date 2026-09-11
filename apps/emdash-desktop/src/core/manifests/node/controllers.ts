@@ -29,6 +29,11 @@ import {
 import type { EditorBufferService } from '@core/features/editor/node/editor-buffer-service';
 import { createEditorWireController } from '@core/features/editor/node/wire-controller';
 import { createFilesWireController } from '@core/features/files/node/wire-controller';
+import {
+  unavailableVerificationService,
+  type GatesVerificationService,
+} from '@core/features/gates/node/verification-service';
+import { createGatesWireController } from '@core/features/gates/node/wire-controller';
 import type { GitCredentialsService } from '@core/features/github/api/node/services/git-credentials-service';
 import { createGithubWireController } from '@core/features/github/node/wire-controller';
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
@@ -170,6 +175,8 @@ export type DesktopControllerContext = {
   readonly workspaces: Omit<CreateWorkspacesWireControllerOptions, 'db' | 'mutations'>;
   /** Ninebrains packs. Optional until boot wiring passes one (features/packs/README.md). */
   readonly packs?: PacksService;
+  /** Ninebrains gate verification views. Optional until boot wiring passes one (features/gates/README.md). */
+  readonly gates?: GatesVerificationService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -471,6 +478,9 @@ export const desktopNodeControllers = {
   lanes: {
     create: ({ lanes, scope }) =>
       controllerFromImpl(desktopDomainContracts.lanes, createLanesWireController(lanes), scope),
+  },
+  gates: {
+    create: ({ gates }) => createGatesWireController(gates ?? unavailableVerificationService),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;
