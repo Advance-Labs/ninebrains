@@ -77,6 +77,12 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
 
+## 5. Unattended exec path (W2 `exec-runs`)
+
+| File | What | Why |
+|---|---|---|
+| `packages/core/package.json`, `packages/core/tsdown.config.ts` | Export `./primitives/agent-env/api` as a package entry point | The `exec-runs` slice builds the allowlisted agent env (`buildAllowlistedAgentEnv`, `mergeAgentEnvLayers`) for `claude -p` / `codex exec` spawns. Upstream has no print path, so nothing outside core imported it before |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
