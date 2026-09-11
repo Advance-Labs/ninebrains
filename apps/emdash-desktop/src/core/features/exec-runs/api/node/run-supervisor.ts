@@ -13,7 +13,8 @@ import { open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
-import { buildCodexExecArgv, CodexEventParser } from './codex-exec';
+import type { ArgvGuardOptions } from './argv-guard';
+import { buildCodexExecLaunch, CodexEventParser } from './codex-exec';
 import {
   processGroups,
   signalGroup,
@@ -196,6 +197,7 @@ export class ExecRunSupervisor {
     ];
 
     let argv: string[];
+    let guard: ArgvGuardOptions;
     let parser: AgentStreamParser;
     let sandbox: unknown;
     if (spec.provider === 'claude') {
@@ -213,10 +215,13 @@ export class ExecRunSupervisor {
       await writePrivateFile(settingsPath, JSON.stringify(settings, null, 2));
       await writePrivateFile(mcpConfigPath, buildClaudeMcpConfig(spec));
       argv = buildClaudePrintArgv(spec, { settingsPath, mcpConfigPath, sessionId: randomUUID() });
+      guard = { provider: 'claude', trusted: [settingsPath, mcpConfigPath] };
       parser = new ClaudeStreamParser();
       sandbox = settings;
     } else {
-      argv = buildCodexExecArgv(spec, cwd);
+      const launch = buildCodexExecLaunch(spec, cwd);
+      argv = launch.argv;
+      guard = { provider: 'codex', trusted: launch.trusted };
       parser = new CodexEventParser();
       sandbox = { codexSandbox: spec.preset === 'reviewer' ? 'read-only' : 'workspace-write' };
     }
@@ -247,6 +252,7 @@ export class ExecRunSupervisor {
       env,
       stdin: spec.prompt,
       platform: this.platform,
+      argvGuard: guard,
     });
     const run: ActiveRun = { child, done: undefined as unknown as Promise<ExecRunResult> };
     this.active.set(spec.runId, run);

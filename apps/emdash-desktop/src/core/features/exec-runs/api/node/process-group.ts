@@ -7,7 +7,7 @@
  */
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { isAbsolute } from 'node:path';
-import { assertSafeArgv } from './argv-guard';
+import { assertSafeArgv, type ArgvGuardOptions } from './argv-guard';
 
 export interface GroupSpawnOptions {
   cwd: string;
@@ -20,6 +20,8 @@ export interface GroupSpawnOptions {
    * builds itself (tests gate, git), whose argv legitimately carries flags like `-c`.
    */
   kind?: 'agent' | 'command';
+  /** Agent spawns: the provider and the config values Ninebrains wrote (SEC-12 / M2). */
+  argvGuard?: ArgvGuardOptions;
 }
 
 /** SEC-16: absolute binary, argv array, no shell, new process group. SEC-12 guard on agents. */
@@ -29,7 +31,7 @@ export function spawnInGroup(
   options: GroupSpawnOptions
 ): ChildProcess {
   if (!isAbsolute(binary)) throw new Error(`Agent binary must be an absolute path: ${binary}`);
-  if ((options.kind ?? 'agent') === 'agent') assertSafeArgv(argv);
+  if ((options.kind ?? 'agent') === 'agent') assertSafeArgv(argv, options.argvGuard);
   const spawnOptions: SpawnOptions = {
     cwd: options.cwd,
     env: options.env,
