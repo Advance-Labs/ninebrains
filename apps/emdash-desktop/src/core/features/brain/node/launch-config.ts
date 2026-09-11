@@ -148,9 +148,21 @@ export function buildLaneLaunch(
   } else {
     extraArgs = ['--sandbox=workspace-write', ...codexMcpOverrides(brain, target.pack)];
   }
-  assertSafeArgv([...upstream.extraArgs, ...extraArgs]);
+  // The full variable argv: upstream's user flags plus ours. The config files we
+  // generated are registered as trusted, so the hardened guard (w6) accepts our
+  // own --mcp-config/--settings and still rejects any a user flag brings in.
+  guardArgv([...upstream.extraArgs, ...extraArgs], {
+    trusted: settingsPath ? [mcpConfigPath, settingsPath] : [mcpConfigPath],
+  });
   return { extraArgs, providerVars: {}, mcpConfigPath, settingsPath };
 }
+
+/**
+ * `assertSafeArgv` with the `{ trusted }` option the hardened guard takes.
+ * Today's single-parameter guard ignores the option.
+ */
+const guardArgv: (argv: readonly unknown[], options: { trusted: readonly string[] }) => void =
+  assertSafeArgv;
 
 const toml = (value: string) => JSON.stringify(value);
 const tomlArray = (values: readonly string[]) => `[${values.map(toml).join(',')}]`;

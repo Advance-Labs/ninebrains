@@ -76,12 +76,16 @@ export async function launchApp() {
     ].join(':'),
     EMDASH_USER_DATA_DIR: userData,
     TELEMETRY_ENABLED: 'false',
+    // Main appends --use-mock-keychain when this is set, so safeStorage never
+    // prompts for (or touches) the real macOS login keychain.
+    NINEBRAINS_E2E: '1',
     FAKE_AGENT_ARGV_LOG: join(root, 'argv.log'),
   };
 
   const app = await electron.launch({
     executablePath: require('electron'),
-    args: [appDir],
+    // A mock keychain: no "Safe Storage" password prompt on every unsigned rebuild.
+    args: ['--use-mock-keychain', appDir],
     cwd: appDir,
     env,
   });
