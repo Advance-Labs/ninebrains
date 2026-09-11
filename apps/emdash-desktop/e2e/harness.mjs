@@ -47,7 +47,8 @@ function installFakeClaude(home) {
   return { bin, fake };
 }
 
-export async function launchApp() {
+/** `env` adds variables for the app and every agent it spawns (e.g. FAKE_AGENT_SCRIPT). */
+export async function launchApp({ env: extraEnv = {} } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'ninebrains-e2e-'));
   const home = join(root, 'home');
   const userData = join(root, 'user-data');
@@ -80,6 +81,7 @@ export async function launchApp() {
     // prompts for (or touches) the real macOS login keychain.
     NINEBRAINS_E2E: '1',
     FAKE_AGENT_ARGV_LOG: join(root, 'argv.log'),
+    ...extraEnv,
   };
 
   const app = await electron.launch({

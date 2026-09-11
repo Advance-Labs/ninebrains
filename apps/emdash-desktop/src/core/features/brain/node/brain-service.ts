@@ -113,7 +113,7 @@ export class BrainService {
     this.sessions = new BrainSessions(deps.sessions, (brainId) =>
       this.release(brainLaunchKey(brainId), brainLaunchId(brainId))
     );
-    this.views = new BrainViews(deps.brain, () => this.inboxes(), () => this.dispatcherView());
+    // The dispatcher first: the views read its state as soon as they are built.
     this.dispatcher = new Dispatcher(
       {
         brain: deps.brain,
@@ -151,6 +151,7 @@ export class BrainService {
       },
       deps.dispatch
     );
+    this.views = new BrainViews(deps.brain, () => this.inboxes(), () => this.dispatcherView());
     this.verification = startVerification({
       brain: deps.brain,
       gateRunner: deps.gateRunner,

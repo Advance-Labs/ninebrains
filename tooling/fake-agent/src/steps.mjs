@@ -23,8 +23,20 @@ export function loadScript(value) {
 
 const interpolate = (text, ctx) =>
   String(text)
+    // {{prompt:<regex>}}: the regex's first capture group in the current prompt ('' if none).
+    .replace(/\{\{prompt:(.+?)\}\}/g, (_, source) => new RegExp(source, 'm').exec(ctx.state.prompt ?? '')?.[1] ?? '')
     .replaceAll('{{prompt}}', ctx.state.prompt ?? '')
     .replaceAll('{{lastToolResult}}', ctx.state.lastToolResult ?? '');
+
+/** Interpolates every string inside callTool args, so a script can pass ids it was given. */
+export function interpolateArgs(value, ctx) {
+  if (typeof value === 'string') return interpolate(value, ctx);
+  if (Array.isArray(value)) return value.map((item) => interpolateArgs(item, ctx));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, interpolateArgs(v, ctx)]));
+  }
+  return value;
+}
 
 function toolMatches(list, name) {
   return list.some((entry) => {
@@ -119,8 +131,11 @@ export async function runSteps(ctx, steps, ui, start = 0) {
       ctx.state.lastText = text;
       ui.text(text);
     } else if (step.callTool) {
-      const { server, tool, args = {} } = step.callTool;
-      const r = await runTool(ctx, ui, `mcp__${server}__${tool}`, args, () => callMcp(ctx, step.callTool));
+      const { server, tool } = step.callTool;
+      const args = interpolateArgs(step.callTool.args ?? {}, ctx);
+      const r = await runTool(ctx, ui, `mcp__${server}__${tool}`, args, () =>
+        callMcp(ctx, { server, tool, args })
+      );
       if (r.maxTurns) return { next: i, maxTurns: true };
     } else if (step.writeFile) {
       const input = { file_path: step.writeFile.path, content: step.writeFile.content ?? '' };
