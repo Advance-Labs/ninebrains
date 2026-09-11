@@ -1,0 +1,21 @@
+{
+  "name": "@ninebrains/docs",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Documentation site for Ninebrains, built from the repo's docs/ directory.",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node -e \"for (const p of ['.astro', 'node_modules/.astro']) require('node:fs').rmSync(p, { recursive: true, force: true })\" && astro build",
+    "preview": "astro preview",
+    "typecheck": "echo \"docs: the content schema is validated by astro build\"",
+    "lint": "echo \"docs: no lint\""
+  },
+  "devDependencies": {
+    "@astrojs/markdown-remark": "^7.3.0",
+    "@astrojs/starlight": "0.42.0",
+    "astro": "7.3.2",
+    "unist-util-visit": "^5.1.0"
+  }
+}
