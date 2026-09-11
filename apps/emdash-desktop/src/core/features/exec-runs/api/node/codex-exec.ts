@@ -30,6 +30,9 @@ function mcpOverrides(spec: ExecRunSpec): string[] {
   const out: string[] = [];
   for (const [name, server] of Object.entries(spec.mcpServers ?? {})) {
     if (!SERVER_NAME.test(name)) throw new Error(`Unsafe MCP server name: ${JSON.stringify(name)}`);
+    if (server.type === 'http') {
+      throw new Error(`Codex runs take stdio MCP servers only; "${name}" is an http server`);
+    }
     out.push(`mcp_servers.${name}.command=${tomlString(server.command)}`);
     out.push(`mcp_servers.${name}.args=[${(server.args ?? []).map(tomlString).join(',')}]`);
     const env = Object.entries(server.env ?? {});

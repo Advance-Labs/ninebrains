@@ -23,7 +23,12 @@ import type {
   RunBudgets,
 } from '@core/features/exec-runs/api/node/types';
 import { isReviewCheckout, prepareReviewCheckout } from './review-checkout';
-import type { Evidence, SpawnReviewer, SpawnReviewerOptions } from './types';
+import type {
+  Evidence,
+  ReviewerMcpServers,
+  SpawnReviewer,
+  SpawnReviewerOptions,
+} from './types';
 
 const KNOWN_OPTIONS = new Set(['signal', 'cwd', 'tools', 'attachments', 'purpose', 'mcpServers']);
 const EVIDENCE_DIR = '.ninebrains-evidence';
@@ -58,13 +63,69 @@ function assertSupportedOptions(opts: SpawnReviewerOptions): void {
       `spawnReviewer only runs read-only reviews, got tools: ${JSON.stringify(opts.tools)}`
     );
   }
-  for (const [name, server] of Object.entries(opts.mcpServers ?? {})) {
-    const ok =
-      typeof server?.command === 'string' &&
-      (server.args ?? []).every((a) => typeof a === 'string') &&
-      Object.values(server.env ?? {}).every((v) => typeof v === 'string');
-    if (!ok) throw new Error(`spawnReviewer: invalid MCP server "${name}"`);
+}
+
+const isStringRecord = (value: unknown): boolean =>
+  value === undefined ||
+  (typeof value === 'object' &&
+    value !== null &&
+    Object.values(value).every((v) => typeof v === 'string'));
+
+const isHttpUrl = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
   }
+};
+
+function toSpec(name: string, server: unknown): McpServerSpec {
+  const s = (server ?? {}) as Record<string, unknown>;
+  const invalid = () => new Error(`spawnReviewer: invalid MCP server "${name}"`);
+  if (s.type === 'http') {
+    if (!isHttpUrl(s.url) || !isStringRecord(s.headers)) throw invalid();
+    return { type: 'http', url: s.url, headers: { ...(s.headers as Record<string, string>) } };
+  }
+  const args = s.args ?? [];
+  const ok =
+    (s.type ?? 'stdio') === 'stdio' &&
+    typeof s.command === 'string' &&
+    Array.isArray(args) &&
+    args.every((a) => typeof a === 'string') &&
+    isStringRecord(s.env);
+  if (!ok) throw invalid();
+  return {
+    type: 'stdio',
+    command: s.command as string,
+    args: [...(args as string[])],
+    env: { ...(s.env as Record<string, string> | undefined) },
+  };
+}
+
+/**
+ * Accepts both the record form and the packs' `McpServerEntry[]` (named stdio and http entries),
+ * which the SEO red-team gate passes. Each becomes one entry in the reviewer's per-run config.
+ */
+export function normalizeMcpServers(
+  servers: ReviewerMcpServers | undefined
+): Record<string, McpServerSpec> | undefined {
+  if (servers === undefined) return undefined;
+  const entries: Array<readonly [string, unknown]> = Array.isArray(servers)
+    ? servers.map((entry, i) => {
+        const name = (entry as { name?: unknown } | null)?.name;
+        if (typeof name !== 'string' || name.length === 0) {
+          throw new Error(`spawnReviewer: MCP server #${i} has no name`);
+        }
+        return [name, entry] as const;
+      })
+    : Object.entries(servers);
+  const out: Record<string, McpServerSpec> = {};
+  for (const [name, server] of entries) {
+    if (Object.hasOwn(out, name)) throw new Error(`spawnReviewer: duplicate MCP server "${name}"`);
+    out[name] = toSpec(name, server);
+  }
+  return out;
 }
 
 interface Attached {
@@ -99,6 +160,7 @@ function withAttachments(prompt: string, attached: readonly Attached[]): string 
 export function createSpawnReviewer(deps: SpawnReviewerDeps): SpawnReviewer {
   return async (prompt, opts) => {
     assertSupportedOptions(opts);
+    const mcpServers = normalizeMcpServers(opts.mcpServers);
     opts.signal.throwIfAborted();
     const source = await realpath(opts.cwd);
     const reuse = await isReviewCheckout(source);
@@ -119,7 +181,7 @@ export function createSpawnReviewer(deps: SpawnReviewerDeps): SpawnReviewer {
           cwd,
           prompt: withAttachments(prompt, attached),
           budgets: deps.budgets ?? DEFAULT_BUDGETS,
-          mcpServers: opts.mcpServers as Readonly<Record<string, McpServerSpec>> | undefined,
+          mcpServers,
           siblingWorktrees: [...new Set(denied)].filter((p) => p !== cwd),
           auth: deps.auth?.(route.provider),
         },

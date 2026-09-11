@@ -193,7 +193,9 @@ export class ExecRunSupervisor {
     });
     const secrets = [
       ...(spec.auth?.ANTHROPIC_API_KEY ? [spec.auth.ANTHROPIC_API_KEY] : []),
-      ...Object.values(spec.mcpServers ?? {}).flatMap((s) => Object.values(s.env ?? {})),
+      ...Object.values(spec.mcpServers ?? {}).flatMap((s) =>
+        Object.values((s.type === 'http' ? s.headers : s.env) ?? {})
+      ),
     ];
 
     let argv: string[];

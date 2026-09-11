@@ -13,11 +13,15 @@ export type ExecProvider = 'claude' | 'codex';
  */
 export type ExecPreset = 'worker' | 'reviewer';
 
-export interface McpServerSpec {
-  command: string;
-  args?: readonly string[];
-  env?: Readonly<Record<string, string>>;
-}
+/** One MCP server for a run. Claude takes both kinds; Codex runs take stdio servers only. */
+export type McpServerSpec =
+  | {
+      type?: 'stdio';
+      command: string;
+      args?: readonly string[];
+      env?: Readonly<Record<string, string>>;
+    }
+  | { type: 'http'; url: string; headers?: Readonly<Record<string, string>> };
 
 export interface RunBudgets {
   /** Hard wall-clock limit. The supervisor kills the process group when it passes. */
