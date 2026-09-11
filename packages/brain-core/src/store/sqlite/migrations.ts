@@ -162,20 +162,30 @@ export const BRAIN_BUNDLED_MIGRATIONS = MIGRATIONS.map((migration) => ({
  * by core's runner (the app DB) counts core's applied tags as applied, so
  * direct mode can open it without re-running DDL.
  */
-export function migrate(connection: SqliteConnectionLike, migrations: readonly Migration[] = MIGRATIONS): number[] {
+export function migrate(
+  connection: SqliteConnectionLike,
+  migrations: readonly Migration[] = MIGRATIONS
+): number[] {
   connection.exec('BEGIN IMMEDIATE');
   try {
     connection.exec(
       'CREATE TABLE IF NOT EXISTS brain_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL) STRICT'
     );
     const applied = new Set(
-      connection.all<{ version: number }>('SELECT version FROM brain_migrations').map((row) => Number(row.version))
+      connection
+        .all<{ version: number }>('SELECT version FROM brain_migrations')
+        .map((row) => Number(row.version))
     );
     const coreManaged =
-      connection.get("SELECT 1 AS present FROM sqlite_schema WHERE type = 'table' AND name = ?", [CORE_MIGRATIONS_TABLE]) !==
-      undefined;
+      connection.get("SELECT 1 AS present FROM sqlite_schema WHERE type = 'table' AND name = ?", [
+        CORE_MIGRATIONS_TABLE,
+      ]) !== undefined;
     const coreTags = coreManaged
-      ? new Set(connection.all<{ tag: string }>(`SELECT tag FROM ${CORE_MIGRATIONS_TABLE}`).map((row) => row.tag))
+      ? new Set(
+          connection
+            .all<{ tag: string }>(`SELECT tag FROM ${CORE_MIGRATIONS_TABLE}`)
+            .map((row) => row.tag)
+        )
       : new Set<string>();
 
     const ran: number[] = [];

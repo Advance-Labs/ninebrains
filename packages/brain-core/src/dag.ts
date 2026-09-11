@@ -59,14 +59,22 @@ export function findCycle(nodes: Iterable<string>, edges: readonly EdgeLike[]): 
  * The cycle that adding `from -> to` would close, or null. A cycle exists
  * when `from` is already reachable from `to`.
  */
-export function cycleIfAdded(edges: readonly EdgeLike[], from: string, to: string): string[] | null {
+export function cycleIfAdded(
+  edges: readonly EdgeLike[],
+  from: string,
+  to: string
+): string[] | null {
   if (from === to) return [from, from];
   const found = pathBetween(edges, to, from);
   return found ? [from, ...found] : null;
 }
 
 /** A path `start -> ... -> goal` following edge direction, or null. */
-export function pathBetween(edges: readonly EdgeLike[], start: string, goal: string): string[] | null {
+export function pathBetween(
+  edges: readonly EdgeLike[],
+  start: string,
+  goal: string
+): string[] | null {
   const out = adjacency(edges, 'from');
   const parent = new Map<string, string | null>([[start, null]]);
   const queue = [start];

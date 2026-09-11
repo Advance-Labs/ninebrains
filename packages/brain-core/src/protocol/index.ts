@@ -1,7 +1,12 @@
 export * from './ops';
 export * from './results';
 export * from './endpoint';
-export { type BrainGrant, type ExecuteOptions, errorResponse, executeBrainRequest } from './execute';
+export {
+  type BrainGrant,
+  type ExecuteOptions,
+  errorResponse,
+  executeBrainRequest,
+} from './execute';
 export {
   type BrainHttpOptions,
   type BrainHttpRequest,

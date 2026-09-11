@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { IllegalTransitionError, isBrainError } from './errors';
-import { allowedTransitions, assertTransition, canTransition, isTerminal, MAX_ATTEMPTS } from './state-machine';
+import {
+  allowedTransitions,
+  assertTransition,
+  canTransition,
+  isTerminal,
+  MAX_ATTEMPTS,
+} from './state-machine';
 import { JOB_STATES, type JobState } from './types';
 
 const LEGAL: Record<JobState, JobState[]> = {

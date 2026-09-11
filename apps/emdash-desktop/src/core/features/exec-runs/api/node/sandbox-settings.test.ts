@@ -68,7 +68,9 @@ describe('SEC-11 lane sandbox settings', () => {
   });
 
   it('adds a network egress allowlist only when one is given (SEC-32)', () => {
-    expect(buildClaudeSandboxSettings({ ...base, preset: 'worker' }).sandbox.network).toBeUndefined();
+    expect(
+      buildClaudeSandboxSettings({ ...base, preset: 'worker' }).sandbox.network
+    ).toBeUndefined();
     const s = buildClaudeSandboxSettings({
       ...base,
       preset: 'worker',
@@ -79,7 +81,9 @@ describe('SEC-11 lane sandbox settings', () => {
 
   it('rejects settings that turn the sandbox off or bypass permissions', () => {
     const s = buildClaudeSandboxSettings({ ...base, preset: 'worker' });
-    expect(() => assertSafeSettings({ ...s, sandbox: { ...s.sandbox, enabled: false as true } })).toThrow();
+    expect(() =>
+      assertSafeSettings({ ...s, sandbox: { ...s.sandbox, enabled: false as true } })
+    ).toThrow();
     expect(() =>
       assertSafeSettings({ ...s, permissions: { deny: ['bypassPermissions'] } })
     ).toThrow();

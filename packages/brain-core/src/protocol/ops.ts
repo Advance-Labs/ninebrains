@@ -8,19 +8,26 @@
  * another lane. The same request objects run in-process in direct-DB mode.
  */
 import { z } from 'zod';
-import { LIMITS, utf8Bytes } from '../limits';
 import { ID_PATTERN } from '../ids';
+import { LIMITS, utf8Bytes } from '../limits';
 import { ADDRESS_KINDS, JOB_STATES } from '../types';
 
 export const BRAIN_PROTOCOL_VERSION = 1 as const;
 
 const bytes = (max: number, label: string) =>
-  z.string().refine((value) => utf8Bytes(value) <= max, { message: `${label} must be at most ${max} bytes` });
+  z
+    .string()
+    .refine((value) => utf8Bytes(value) <= max, {
+      message: `${label} must be at most ${max} bytes`,
+    });
 
-const notBlank = (label: string) => (value: string) => value.trim().length > 0 || `${label} must not be empty`;
+const notBlank = (label: string) => (value: string) =>
+  value.trim().length > 0 || `${label} must not be empty`;
 
 /** SEC-14: IDs are safe path segments. */
-export const idSchema = z.string().regex(ID_PATTERN, 'ids are 1-64 characters of letters, digits, _ or -');
+export const idSchema = z
+  .string()
+  .regex(ID_PATTERN, 'ids are 1-64 characters of letters, digits, _ or -');
 
 /** A structured mailbox address. Never a `kind:id` string. */
 export const addressSchema = z.object({ kind: z.enum(ADDRESS_KINDS), id: idSchema });
@@ -39,7 +46,9 @@ export const jobStateSchema = z.enum(JOB_STATES);
 export const opArgs = {
   whoami: z.object({}),
   claim_job: z.object({
-    jobId: idSchema.optional().describe('Job to claim. Omit to take the oldest ready job in your project.'),
+    jobId: idSchema
+      .optional()
+      .describe('Job to claim. Omit to take the oldest ready job in your project.'),
   }),
   complete_job: z.object({
     jobId: idSchema,
@@ -50,14 +59,22 @@ export const opArgs = {
       .array(pathSchema)
       .max(LIMITS.artifacts)
       .default([])
-      .describe('Paths (inside the project or evidence dir) that prove the work: screenshots, logs, reports.'),
+      .describe(
+        'Paths (inside the project or evidence dir) that prove the work: screenshots, logs, reports.'
+      ),
   }),
   block_job: z.object({
     jobId: idSchema,
-    reason: z.string().min(1).max(LIMITS.reasonChars).describe('What is blocking you and what would unblock it.'),
+    reason: z
+      .string()
+      .min(1)
+      .max(LIMITS.reasonChars)
+      .describe('What is blocking you and what would unblock it.'),
   }),
   send_message: z.object({
-    to: addressSchema.describe('{"kind":"lane","id":"<laneId>"} for another lane, {"kind":"brain","id":"<brainId>"} for a Brain session.'),
+    to: addressSchema.describe(
+      '{"kind":"lane","id":"<laneId>"} for another lane, {"kind":"brain","id":"<brainId>"} for a Brain session.'
+    ),
     body: bodySchema,
     attachments: z.array(attachmentSchema).max(LIMITS.attachments).default([]),
   }),
@@ -66,7 +83,11 @@ export const opArgs = {
     address: addressSchema.optional().describe('Brain only: inbox to read. Defaults to your own.'),
   }),
   list_jobs: z.object({
-    states: z.array(jobStateSchema).max(JOB_STATES.length).optional().describe('Only jobs in these states.'),
+    states: z
+      .array(jobStateSchema)
+      .max(JOB_STATES.length)
+      .optional()
+      .describe('Only jobs in these states.'),
     mine: z.boolean().default(false).describe('Only jobs held by this lane.'),
     projectId: idSchema.optional().describe("Brain only. Defaults to this session's project."),
     laneId: idSchema.optional().describe('Only jobs held by this lane id.'),
@@ -81,14 +102,24 @@ export const opArgs = {
     title: z.string().trim().min(1).max(LIMITS.titleChars),
     body: bytes(LIMITS.bodyBytes, 'body').default(''),
     projectId: idSchema.optional().describe("Defaults to this session's project."),
-    dependsOn: z.array(idSchema).max(100).default([]).describe('Job ids that must be done before this one is ready.'),
+    dependsOn: z
+      .array(idSchema)
+      .max(100)
+      .default([])
+      .describe('Job ids that must be done before this one is ready.'),
     gates: z
       .array(z.string().min(1).max(64))
       .max(10)
       .optional()
-      .describe('Verification gates to run on completion, e.g. ["tests", "screenshot", "reviewer"].'),
+      .describe(
+        'Verification gates to run on completion, e.g. ["tests", "screenshot", "reviewer"].'
+      ),
     kind: z.enum(['work', 'review']).optional(),
-    paths: z.array(pathSchema).max(100).optional().describe('Files the job will touch; used for routing.'),
+    paths: z
+      .array(pathSchema)
+      .max(100)
+      .optional()
+      .describe('Files the job will touch; used for routing.'),
   }),
   link_jobs: z.object({
     from: idSchema.describe('The prerequisite job.'),

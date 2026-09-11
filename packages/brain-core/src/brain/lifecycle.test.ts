@@ -17,13 +17,23 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
 
   it('walks the happy path claimed -> running -> verifying -> done and logs it', () => {
     const brain = makeBrain(createStore());
-    const job = brain.createJob(BRAIN, { projectId: 'p1', title: 'Ship it', gateSpec: { gates: ['tests'] } });
+    const job = brain.createJob(BRAIN, {
+      projectId: 'p1',
+      title: 'Ship it',
+      gateSpec: { gates: ['tests'] },
+    });
 
     expect(brain.claimJob(LANE_A, job.id)).toMatchObject({ state: 'claimed', laneId: 'A' });
     expect(brain.store.getLane('A')?.activeJobId).toBe(job.id);
     expect(brain.startJob(LANE_A, job.id).state).toBe('running');
-    const verifying = brain.completeJob(LANE_A, job.id, { summary: 'shipped', artifacts: ['out.png'] });
-    expect(verifying).toMatchObject({ state: 'verifying', result: { summary: 'shipped', artifacts: ['out.png'] } });
+    const verifying = brain.completeJob(LANE_A, job.id, {
+      summary: 'shipped',
+      artifacts: ['out.png'],
+    });
+    expect(verifying).toMatchObject({
+      state: 'verifying',
+      result: { summary: 'shipped', artifacts: ['out.png'] },
+    });
     expect(brain.recordGateResult(BRAIN, job.id, { pass: true }).state).toBe('done');
 
     expect(brain.listDone(BRAIN, { projectId: 'p1' })).toMatchObject([
@@ -58,7 +68,9 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     brain.claimJob(LANE_A, a.id);
     expect(() => brain.claimJob(LANE_B, a.id)).toThrow(IllegalTransitionError);
     expect(() => brain.completeJob(LANE_A, a.id, { summary: 'x' })).toThrow(IllegalTransitionError);
-    expect(() => brain.recordGateResult(BRAIN, a.id, { pass: true })).toThrow(IllegalTransitionError);
+    expect(() => brain.recordGateResult(BRAIN, a.id, { pass: true })).toThrow(
+      IllegalTransitionError
+    );
     expect(() => brain.requeueJob(BRAIN, a.id)).toThrow(IllegalTransitionError);
   });
 
@@ -71,11 +83,17 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
 
     for (const attempt of [1, 2]) {
       brain.completeJob(LANE_A, job.id, { summary: `try ${attempt}` });
-      const back = brain.recordGateResult(BRAIN, job.id, { pass: false, feedback: `broken ${attempt}` });
+      const back = brain.recordGateResult(BRAIN, job.id, {
+        pass: false,
+        feedback: `broken ${attempt}`,
+      });
       expect(back).toMatchObject({ state: 'running', attempts: attempt });
     }
     brain.completeJob(LANE_A, job.id, { summary: 'try 3' });
-    const blocked = brain.recordGateResult(BRAIN, job.id, { pass: false, feedback: 'still broken' });
+    const blocked = brain.recordGateResult(BRAIN, job.id, {
+      pass: false,
+      feedback: 'still broken',
+    });
 
     expect(blocked).toMatchObject({ state: 'blocked', attempts: 3 });
     expect(blocked.reason).toContain('still broken');
@@ -83,7 +101,11 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     expect(blockedEvents[0]!.job.id).toBe(job.id);
 
     const inbox = brain.readInbox(LANE_A);
-    expect(inbox.map((m) => m.body.split('\n')[1])).toEqual(['broken 1', 'broken 2', 'still broken']);
+    expect(inbox.map((m) => m.body.split('\n')[1])).toEqual([
+      'broken 1',
+      'broken 2',
+      'still broken',
+    ]);
     expect(inbox[2]!.body).toContain('attempt 3/3');
   });
 
@@ -93,7 +115,13 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     brain.claimJob(LANE_A, job.id, { start: true });
     brain.blockJob(LANE_A, job.id, 'need credentials');
     const requeued = brain.requeueJob(BRAIN, job.id);
-    expect(requeued).toMatchObject({ state: 'ready', attempts: 0, laneId: null, reason: null, result: null });
+    expect(requeued).toMatchObject({
+      state: 'ready',
+      attempts: 0,
+      laneId: null,
+      reason: null,
+      result: null,
+    });
     expect(brain.store.getLane('A')?.activeJobId).toBeNull();
   });
 
@@ -148,9 +176,9 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     const changed: string[] = [];
     brain.events.on('jobChanged', ({ job }) => changed.push(job.title));
 
-    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: 'Doomed', dependsOn: [other.id] })).toThrow(
-      InvalidInputError
-    );
+    expect(() =>
+      brain.createJob(BRAIN, { projectId: 'p1', title: 'Doomed', dependsOn: [other.id] })
+    ).toThrow(InvalidInputError);
     expect(brain.listJobs(BRAIN).map((t) => t.title)).toEqual(['Other project']);
     expect(changed).toEqual([]);
     expect(brain.readEvents(0)).toHaveLength(eventsBefore);
@@ -158,11 +186,15 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
 
   it('validates titles and bodies', () => {
     const brain = makeBrain(createStore());
-    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: '  ' })).toThrow(InvalidInputError);
-    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: 'x'.repeat(201) })).toThrow(InvalidInputError);
-    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: 'ok', body: 'é'.repeat(17_000) })).toThrow(
+    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: '  ' })).toThrow(
       InvalidInputError
     );
+    expect(() => brain.createJob(BRAIN, { projectId: 'p1', title: 'x'.repeat(201) })).toThrow(
+      InvalidInputError
+    );
+    expect(() =>
+      brain.createJob(BRAIN, { projectId: 'p1', title: 'ok', body: 'é'.repeat(17_000) })
+    ).toThrow(InvalidInputError);
   });
 
   it('persists every committed event to the log in order', () => {
@@ -172,14 +204,19 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     const events = brain.readEvents(0);
     expect(events.map((e) => e.type)).toEqual(['jobChanged', 'jobChanged', 'messageSent']);
     expect(events.map((e) => e.seq)).toEqual([...events.map((e) => e.seq)].sort((x, y) => x - y));
-    expect(events[1]).toMatchObject({ payload: { job: { id: job.id, state: 'ready' }, previousState: 'proposed' } });
+    expect(events[1]).toMatchObject({
+      payload: { job: { id: job.id, state: 'ready' }, previousState: 'proposed' },
+    });
     expect(brain.readEvents(events[1]!.seq).map((e) => e.type)).toEqual(['messageSent']);
     expect(brain.readEvents(0, 1)).toHaveLength(1);
   });
 
   it('isolates listener failures from the operation', () => {
     const errors: unknown[] = [];
-    const noisy = new Brain({ store: createStore(), onListenerError: (error) => errors.push(error) });
+    const noisy = new Brain({
+      store: createStore(),
+      onListenerError: (error) => errors.push(error),
+    });
     noisy.events.on('jobChanged', () => {
       throw new Error('listener bug');
     });
@@ -192,7 +229,12 @@ describe.each(STORES)('job lifecycle (%s store)', (_name, createStore) => {
     const brain = makeBrain(createStore());
     const job = brain.createJob(BRAIN, { projectId: 'p1', title: 'T' });
     brain.assignJob(BRAIN, job.id, 'B');
-    const run = brain.startRun(BRAIN, { jobId: job.id, laneId: 'B', mode: 'unattended', transcriptPath: '/t.jsonl' });
+    const run = brain.startRun(BRAIN, {
+      jobId: job.id,
+      laneId: 'B',
+      mode: 'unattended',
+      transcriptPath: '/t.jsonl',
+    });
     expect(brain.getJob(BRAIN, job.id)).toMatchObject({ state: 'running', laneId: 'B' });
     const ended = brain.endRun(BRAIN, run.id, { exitCode: 0 });
     expect(ended).toMatchObject({ exitCode: 0, transcriptPath: '/t.jsonl' });

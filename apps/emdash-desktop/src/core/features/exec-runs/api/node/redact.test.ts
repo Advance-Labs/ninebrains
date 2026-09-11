@@ -27,7 +27,11 @@ describe('SEC-35 transcript redactor', () => {
 
   it('dumps env names, with values only for known-safe keys', () => {
     expect(
-      describeEnvForTranscript({ PATH: '/bin', ANTHROPIC_API_KEY: 'sk-ant-x', CLAUDE_CONFIG_DIR: '/a' })
+      describeEnvForTranscript({
+        PATH: '/bin',
+        ANTHROPIC_API_KEY: 'sk-ant-x',
+        CLAUDE_CONFIG_DIR: '/a',
+      })
     ).toEqual({ ANTHROPIC_API_KEY: '[REDACTED]', CLAUDE_CONFIG_DIR: '/a', PATH: '/bin' });
   });
 });

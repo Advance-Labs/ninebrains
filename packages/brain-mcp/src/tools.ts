@@ -45,7 +45,8 @@ const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> =
     'Create a job. With dependsOn it stays "proposed" until every dependency is done, then becomes "ready" and the dispatcher hands it to a free lane. gates picks the verification that runs on completion. kind "review" plus paths help routing (reviews prefer a different model than the author).',
   link_jobs: () =>
     'Make job `to` wait until job `from` is done. Idempotent. Rejected, with the cycle path, if it would create a dependency cycle.',
-  assign_job: () => 'Hand a ready job to a specific lane in the same project, instead of letting the dispatcher route it.',
+  assign_job: () =>
+    'Hand a ready job to a specific lane in the same project, instead of letting the dispatcher route it.',
   requeue_job: () =>
     'Put a blocked or failed job back in the queue with a fresh 3-attempt budget. Read its reason first (list_jobs) and fix the cause or message the lane.',
   list_lanes: () =>
@@ -55,8 +56,12 @@ const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> =
 
 /** Brain errors come back as readable tool errors (`CODE: message`), never as protocol failures. */
 export function toToolResult(response: BrainResponse): CallToolResult {
-  if (response.ok) return { content: [{ type: 'text', text: JSON.stringify(response.result, null, 2) }] };
-  return { isError: true, content: [{ type: 'text', text: `${response.error.code}: ${response.error.message}` }] };
+  if (response.ok)
+    return { content: [{ type: 'text', text: JSON.stringify(response.result, null, 2) }] };
+  return {
+    isError: true,
+    content: [{ type: 'text', text: `${response.error.code}: ${response.error.message}` }],
+  };
 }
 
 function inputShape(op: BrainOp, role: Role): z.ZodRawShape {
@@ -81,7 +86,9 @@ export function registerTools(server: McpServer, backend: BrainBackend, role: Ro
         annotations: { readOnlyHint: READ_ONLY.has(op), openWorldHint: false },
       },
       (async (args: Record<string, unknown>) =>
-        toToolResult(await backend.call({ v: BRAIN_PROTOCOL_VERSION, op, args } as BrainRequest))) as never
+        toToolResult(
+          await backend.call({ v: BRAIN_PROTOCOL_VERSION, op, args } as BrainRequest)
+        )) as never
     );
   }
 }

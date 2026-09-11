@@ -11,11 +11,17 @@ import { addressOf, sameAddress } from '../types';
  * - A lane reads only its own inbox.
  */
 
-export function requireBrain(identity: Identity, action: string): asserts identity is Extract<Identity, { role: 'brain' }> {
+export function requireBrain(
+  identity: Identity,
+  action: string
+): asserts identity is Extract<Identity, { role: 'brain' }> {
   if (identity.role !== 'brain') throw new ForbiddenError(`${action} requires the brain role`);
 }
 
-export function requireLane(identity: Identity, action: string): asserts identity is Extract<Identity, { role: 'lane' }> {
+export function requireLane(
+  identity: Identity,
+  action: string
+): asserts identity is Extract<Identity, { role: 'lane' }> {
   if (identity.role !== 'lane') throw new ForbiddenError(`${action} is a lane action`);
 }
 
@@ -38,7 +44,9 @@ export function loadLiveJob(store: BrainStore, identity: Identity, jobId: JobId)
 export function requireHolder(identity: Identity, job: Job, action: string): void {
   if (identity.role === 'brain') return;
   if (job.laneId !== identity.laneId) {
-    throw new ForbiddenError(`lane ${identity.laneId} cannot ${action} job ${job.id}: it is not held by this lane`);
+    throw new ForbiddenError(
+      `lane ${identity.laneId} cannot ${action} job ${job.id}: it is not held by this lane`
+    );
   }
 }
 

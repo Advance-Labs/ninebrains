@@ -54,7 +54,9 @@ function assertSupportedOptions(opts: SpawnReviewerOptions): void {
     }
   }
   if (opts.tools !== 'read-only') {
-    throw new Error(`spawnReviewer only runs read-only reviews, got tools: ${JSON.stringify(opts.tools)}`);
+    throw new Error(
+      `spawnReviewer only runs read-only reviews, got tools: ${JSON.stringify(opts.tools)}`
+    );
   }
   for (const [name, server] of Object.entries(opts.mcpServers ?? {})) {
     const ok =
@@ -70,7 +72,10 @@ interface Attached {
   evidence: Evidence;
 }
 
-async function copyAttachments(attachments: readonly Evidence[], checkout: string): Promise<Attached[]> {
+async function copyAttachments(
+  attachments: readonly Evidence[],
+  checkout: string
+): Promise<Attached[]> {
   if (attachments.length === 0) return [];
   const dir = join(checkout, EVIDENCE_DIR);
   await mkdir(dir, { recursive: true });
@@ -121,7 +126,9 @@ export function createSpawnReviewer(deps: SpawnReviewerDeps): SpawnReviewer {
         { signal: opts.signal }
       );
       if (!result.ok) {
-        throw new Error(`Reviewer run failed (${result.reason}): ${result.errors.join('; ').slice(0, 1000)}`);
+        throw new Error(
+          `Reviewer run failed (${result.reason}): ${result.errors.join('; ').slice(0, 1000)}`
+        );
       }
       return { text: result.text ?? '' };
     } finally {

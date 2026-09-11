@@ -12,7 +12,9 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
 
   it("lane A cannot complete, block, start or release lane B's job", () => {
     const { brain, job } = setup();
-    expect(() => brain.completeJob(LANE_A, job.id, { summary: 'mine now' })).toThrow(ForbiddenError);
+    expect(() => brain.completeJob(LANE_A, job.id, { summary: 'mine now' })).toThrow(
+      ForbiddenError
+    );
     expect(() => brain.blockJob(LANE_A, job.id, 'nope')).toThrow(ForbiddenError);
     expect(() => brain.startJob(LANE_A, job.id)).toThrow(ForbiddenError);
     expect(() => brain.releaseJob(LANE_A, job.id)).toThrow(ForbiddenError);
@@ -22,10 +24,16 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
   it("lane A cannot read lane B's inbox; the brain can", () => {
     const { brain } = setup();
     brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'B' }, body: 'for B only' });
-    expect(() => brain.readInbox(LANE_A, { address: { kind: 'lane', id: 'B' } })).toThrow(ForbiddenError);
-    expect(() => brain.readInbox(LANE_A, { address: { kind: 'brain', id: 'main' } })).toThrow(ForbiddenError);
+    expect(() => brain.readInbox(LANE_A, { address: { kind: 'lane', id: 'B' } })).toThrow(
+      ForbiddenError
+    );
+    expect(() => brain.readInbox(LANE_A, { address: { kind: 'brain', id: 'main' } })).toThrow(
+      ForbiddenError
+    );
     expect(brain.readInbox(LANE_A)).toEqual([]);
-    expect(brain.readInbox(BRAIN, { address: { kind: 'lane', id: 'B' } }).map((m) => m.body)).toEqual(['for B only']);
+    expect(
+      brain.readInbox(BRAIN, { address: { kind: 'lane', id: 'B' } }).map((m) => m.body)
+    ).toEqual(['for B only']);
   });
 
   it('a lane cannot see or claim jobs in another project', () => {
@@ -51,10 +59,12 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
     expect(() => brain.failJob(LANE_A, job.id, 'x')).toThrow(ForbiddenError);
     expect(() => brain.recordGateResult(LANE_B, job.id, { pass: true })).toThrow(ForbiddenError);
     expect(() => brain.broadcast(LANE_A, { projectId: 'p1', body: 'x' })).toThrow(ForbiddenError);
-    expect(() => brain.upsertLane(LANE_A, { id: 'A', projectId: 'p1', provider: 'claude', status: 'idle' })).toThrow(
+    expect(() =>
+      brain.upsertLane(LANE_A, { id: 'A', projectId: 'p1', provider: 'claude', status: 'idle' })
+    ).toThrow(ForbiddenError);
+    expect(() => brain.startRun(LANE_A, { jobId: job.id, laneId: 'A', mode: 'attended' })).toThrow(
       ForbiddenError
     );
-    expect(() => brain.startRun(LANE_A, { jobId: job.id, laneId: 'A', mode: 'attended' })).toThrow(ForbiddenError);
     expect(() => brain.listRuns(LANE_A)).toThrow(ForbiddenError);
     expect(() => brain.snapshot(LANE_A)).toThrow(ForbiddenError);
   });
@@ -83,9 +93,15 @@ describe.each(STORES)('lane-scoped authorization (%s store)', (_name, createStor
   it('a lane cannot message lanes of another project, or note on their jobs', () => {
     const { brain } = setup();
     const foreign = brain.createJob(BRAIN, { projectId: 'p2', title: 'F' });
-    expect(() => brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'X' }, body: 'hello' })).toThrow(ForbiddenError);
+    expect(() =>
+      brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'X' }, body: 'hello' })
+    ).toThrow(ForbiddenError);
     expect(() => brain.addNote(LANE_A, { body: 'n', jobId: foreign.id })).toThrow(NotFoundError);
-    expect(brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'B' }, body: 'hello' }).from).toEqual({ kind: 'lane', id: 'A' });
-    expect(brain.sendMessage(LANE_A, { to: { kind: 'brain', id: 'main' }, body: 'status' }).to).toEqual({ kind: 'brain', id: 'main' });
+    expect(
+      brain.sendMessage(LANE_A, { to: { kind: 'lane', id: 'B' }, body: 'hello' }).from
+    ).toEqual({ kind: 'lane', id: 'A' });
+    expect(
+      brain.sendMessage(LANE_A, { to: { kind: 'brain', id: 'main' }, body: 'status' }).to
+    ).toEqual({ kind: 'brain', id: 'main' });
   });
 });

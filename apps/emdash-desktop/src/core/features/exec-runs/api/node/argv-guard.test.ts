@@ -21,24 +21,30 @@ const BUILDERS: Record<string, string[]> = {
   'claude worker': buildClaudePrintArgv(spec(), files),
   'claude reviewer': buildClaudePrintArgv(spec({ preset: 'reviewer' }), files),
   'codex worker': buildCodexExecArgv(spec({ provider: 'codex' }), '/wt/lane-a'),
-  'codex reviewer': buildCodexExecArgv(spec({ provider: 'codex', preset: 'reviewer' }), '/wt/lane-a'),
+  'codex reviewer': buildCodexExecArgv(
+    spec({ provider: 'codex', preset: 'reviewer' }),
+    '/wt/lane-a'
+  ),
 };
 
 describe('SEC-12 launch argv guard', () => {
-  it.each(Object.entries(BUILDERS))('%s argv carries no bypass flag and passes the guard', (_n, argv) => {
-    const joined = argv.join(' ');
-    for (const banned of [
-      '--dangerously-skip-permissions',
-      '--allow-dangerously-skip-permissions',
-      'bypassPermissions',
-      '--dangerously-bypass-approvals-and-sandbox',
-      'danger-full-access',
-      '--full-auto',
-    ]) {
-      expect(joined).not.toContain(banned);
+  it.each(Object.entries(BUILDERS))(
+    '%s argv carries no bypass flag and passes the guard',
+    (_n, argv) => {
+      const joined = argv.join(' ');
+      for (const banned of [
+        '--dangerously-skip-permissions',
+        '--allow-dangerously-skip-permissions',
+        'bypassPermissions',
+        '--dangerously-bypass-approvals-and-sandbox',
+        'danger-full-access',
+        '--full-auto',
+      ]) {
+        expect(joined).not.toContain(banned);
+      }
+      expect(() => assertSafeArgv(argv)).not.toThrow();
     }
-    expect(() => assertSafeArgv(argv)).not.toThrow();
-  });
+  );
 
   it.each([
     [['--dangerously-skip-permissions']],

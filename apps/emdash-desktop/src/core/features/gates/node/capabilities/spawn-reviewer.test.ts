@@ -62,7 +62,9 @@ const hostile = (lane: string) => [
   { writeFile: { path: join(lane, 'tracked.txt'), content: 'overwritten' } },
   { bash: 'rm -f tracked.txt new.txt' },
   { bash: 'git add -A && git commit -q --allow-empty -m pwned' },
-  { bash: `echo x > '${lane}/abs-bash.txt'; rm -f '${lane}/tracked.txt'; git -C '${lane}' commit -q --allow-empty -m pwned` },
+  {
+    bash: `echo x > '${lane}/abs-bash.txt'; rm -f '${lane}/tracked.txt'; git -C '${lane}' commit -q --allow-empty -m pwned`,
+  },
   { say: VERDICT },
 ];
 
@@ -98,7 +100,8 @@ describe('SEC-18 reviewer cannot write the worktree', () => {
     await expect(spawnReviewer('review this', opts())).resolves.toEqual({ text: VERDICT });
 
     expect(snapshotWorktree(laneA)).toEqual(before);
-    for (const f of ['pwned.txt', 'pwned-abs.txt', 'abs-bash.txt']) expect(existsSync(join(laneA, f))).toBe(false);
+    for (const f of ['pwned.txt', 'pwned-abs.txt', 'abs-bash.txt'])
+      expect(existsSync(join(laneA, f))).toBe(false);
 
     // It ran in a disposable checkout with Read/Grep/Glob only, and the checkout is gone.
     const launch = JSON.parse(readFileSync(argvLog, 'utf8').trim());
@@ -130,7 +133,9 @@ describe('spawnReviewer options', () => {
     mkdirSync(evidenceDir, { recursive: true });
     const shot = join(evidenceDir, 'shot 1440.png');
     writeFileSync(shot, 'png-bytes');
-    const { spawnReviewer } = reviewerWith({ FAKE_AGENT_SCRIPT: JSON.stringify([{ say: '{{prompt}}' }]) });
+    const { spawnReviewer } = reviewerWith({
+      FAKE_AGENT_SCRIPT: JSON.stringify([{ say: '{{prompt}}' }]),
+    });
     const { text } = await spawnReviewer(
       'review',
       opts({ attachments: [{ kind: 'screenshot', path: shot, label: 'Desktop 1440' }] })
@@ -152,7 +157,9 @@ describe('spawnReviewer options', () => {
       opts({ mcpServers: { echo: { command: process.execPath, args: [ECHO_MCP_SERVER] } } })
     );
     expect(text).toContain('gsc rows');
-    expect(JSON.parse(readFileSync(argvLog, 'utf8').trim()).argv).toContain('--allowedTools=mcp__echo');
+    expect(JSON.parse(readFileSync(argvLog, 'utf8').trim()).argv).toContain(
+      '--allowedTools=mcp__echo'
+    );
   });
 
   it('throws on an option it cannot honour, and on tools other than read-only', async () => {
@@ -161,7 +168,9 @@ describe('spawnReviewer options', () => {
     await expect(spawnReviewer('p', unknown)).rejects.toThrow(/cannot honour option "network"/);
     const legacy = { ...opts(), readOnly: true } as unknown as SpawnReviewerOptions;
     await expect(spawnReviewer('p', legacy)).rejects.toThrow(/cannot honour option "readOnly"/);
-    await expect(spawnReviewer('p', opts({ tools: 'all' as 'read-only' }))).rejects.toThrow(/read-only/);
+    await expect(spawnReviewer('p', opts({ tools: 'all' as 'read-only' }))).rejects.toThrow(
+      /read-only/
+    );
     await expect(
       spawnReviewer('p', opts({ mcpServers: { bad: { command: 3 as unknown as string } } }))
     ).rejects.toThrow(/invalid MCP server/);
@@ -169,7 +178,9 @@ describe('spawnReviewer options', () => {
 
   it('fails loudly when the reviewer run fails, and still disposes the checkout', async () => {
     const { spawnReviewer } = reviewerWith({ FAKE_AGENT_SCRIPT: JSON.stringify([{ exit: 2 }]) });
-    await expect(spawnReviewer('p', opts())).rejects.toThrow(/Reviewer run failed \(exit-nonzero\)/);
+    await expect(spawnReviewer('p', opts())).rejects.toThrow(
+      /Reviewer run failed \(exit-nonzero\)/
+    );
     expect(readdirSync(checkouts)).toEqual([]);
   });
 });

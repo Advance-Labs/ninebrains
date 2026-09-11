@@ -27,20 +27,31 @@ describe('SEC-01 brain-mcp has no DB access', () => {
     ];
     const offenders = sources(path.join(packageDir, 'src')).flatMap((file) => {
       const text = readFileSync(file, 'utf8');
-      return forbidden.filter((pattern) => pattern.test(text)).map((pattern) => `${path.basename(file)}: ${pattern}`);
+      return forbidden
+        .filter((pattern) => pattern.test(text))
+        .map((pattern) => `${path.basename(file)}: ${pattern}`);
     });
     expect(offenders).toEqual([]);
   });
 
   it('the built bin contains no SQLite code at all', () => {
     const bundle = readFileSync(path.join(packageDir, 'dist', 'bin.mjs'), 'utf8');
-    for (const marker of ['node:sqlite', 'DatabaseSync', 'better-sqlite3', 'CREATE TABLE jobs', 'BEGIN IMMEDIATE', 'brain.sqlite']) {
+    for (const marker of [
+      'node:sqlite',
+      'DatabaseSync',
+      'better-sqlite3',
+      'CREATE TABLE jobs',
+      'BEGIN IMMEDIATE',
+      'brain.sqlite',
+    ]) {
       expect(bundle, marker).not.toContain(marker);
     }
   });
 
   it('declares no SQLite dependency', () => {
-    const manifest = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8')) as Record<string, Record<string, string>>;
+    const manifest = JSON.parse(
+      readFileSync(path.join(packageDir, 'package.json'), 'utf8')
+    ) as Record<string, Record<string, string>>;
     const deps = Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies });
     expect(deps.filter((d) => /sqlite/i.test(d))).toEqual([]);
   });

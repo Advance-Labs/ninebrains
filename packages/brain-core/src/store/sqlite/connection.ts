@@ -30,8 +30,13 @@ const requireBuiltin = createRequire(import.meta.url);
  * loaded on first open, not at import, so importing brain-core stays cheap
  * and a host can filter node:sqlite's experimental warning first.
  */
-export function openNodeSqliteConnection(file: string, options: { busyTimeoutMs?: number } = {}): SqliteConnectionLike {
-  const { DatabaseSync: Database } = requireBuiltin('node:sqlite') as { DatabaseSync: typeof DatabaseSync };
+export function openNodeSqliteConnection(
+  file: string,
+  options: { busyTimeoutMs?: number } = {}
+): SqliteConnectionLike {
+  const { DatabaseSync: Database } = requireBuiltin('node:sqlite') as {
+    DatabaseSync: typeof DatabaseSync;
+  };
   const db = new Database(file, { timeout: options.busyTimeoutMs ?? 10_000 });
   const statements = new Map<string, StatementSync>();
   const prepare = (sql: string) => {
@@ -47,7 +52,8 @@ export function openNodeSqliteConnection(file: string, options: { busyTimeoutMs?
   return {
     native: db,
     exec: (sql) => db.exec(sql),
-    get: <T>(sql: string, params?: readonly unknown[]) => prepare(sql).get(...bind(params)) as T | undefined,
+    get: <T>(sql: string, params?: readonly unknown[]) =>
+      prepare(sql).get(...bind(params)) as T | undefined,
     all: <T>(sql: string, params?: readonly unknown[]) => prepare(sql).all(...bind(params)) as T[],
     run: (sql, params) => prepare(sql).run(...bind(params)),
     close: () => {

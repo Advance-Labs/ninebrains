@@ -22,8 +22,12 @@ const str = (v: unknown): string => v as string;
 const strOrNull = (v: unknown): string | null => (v === null ? null : (v as string));
 const num = (v: unknown): number => Number(v);
 const numOrNull = (v: unknown): number | null => (v === null ? null : Number(v));
-const json = <T>(v: unknown, fallback: T): T => (v === null ? fallback : (JSON.parse(v as string) as T));
-const address = (kind: unknown, id: unknown): Address => ({ kind: kind as AddressKind, id: str(id) });
+const json = <T>(v: unknown, fallback: T): T =>
+  v === null ? fallback : (JSON.parse(v as string) as T);
+const address = (kind: unknown, id: unknown): Address => ({
+  kind: kind as AddressKind,
+  id: str(id),
+});
 
 export const JOB_COLUMNS =
   'id, project_id, title, body, state, lane_id, attempts, gate_spec, hints, result, reason, created_by_kind, created_by_id, plan_id, plan_node_id, archived_at, created_at, updated_at';
@@ -83,7 +87,8 @@ export function toEdge(r: Row): JobEdge {
   };
 }
 
-export const MESSAGE_COLUMNS = 'id, from_kind, from_id, to_kind, to_id, body, attachments, created_at, read_at';
+export const MESSAGE_COLUMNS =
+  'id, from_kind, from_id, to_kind, to_id, body, attachments, created_at, read_at';
 
 export function toMessage(r: Row): Message {
   return {
@@ -98,7 +103,17 @@ export function toMessage(r: Row): Message {
 }
 
 export function messageParams(m: Message): Param[] {
-  return [m.id, m.from.kind, m.from.id, m.to.kind, m.to.id, m.body, JSON.stringify(m.attachments), m.createdAt, m.readAt];
+  return [
+    m.id,
+    m.from.kind,
+    m.from.id,
+    m.to.kind,
+    m.to.id,
+    m.body,
+    JSON.stringify(m.attachments),
+    m.createdAt,
+    m.readAt,
+  ];
 }
 
 export function toRun(r: Row): Run {

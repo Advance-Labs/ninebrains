@@ -20,7 +20,14 @@ export const JOB_STATES = [
 ] as const;
 export type JobState = (typeof JOB_STATES)[number];
 
-export const LANE_STATUSES = ['idle', 'running', 'waiting', 'verifying', 'blocked', 'asleep'] as const;
+export const LANE_STATUSES = [
+  'idle',
+  'running',
+  'waiting',
+  'verifying',
+  'blocked',
+  'asleep',
+] as const;
 export type LaneStatus = (typeof LANE_STATUSES)[number];
 
 export const PROVIDERS = ['claude', 'codex'] as const;

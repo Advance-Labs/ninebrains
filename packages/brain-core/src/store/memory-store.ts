@@ -1,6 +1,17 @@
-import type { BrainEvent, StoredBrainEvent } from '../events';
 import { NotFoundError } from '../errors';
-import type { DoneEntry, JobEdge, Lane, LaneId, Message, Note, ProjectId, Run, Job, JobId } from '../types';
+import type { BrainEvent, StoredBrainEvent } from '../events';
+import type {
+  DoneEntry,
+  JobEdge,
+  Lane,
+  LaneId,
+  Message,
+  Note,
+  ProjectId,
+  Run,
+  Job,
+  JobId,
+} from '../types';
 import { sameAddress } from '../types';
 import type { BrainStore, JobEdgeFilter, MessageFilter, RunFilter, JobFilter } from './store';
 
@@ -53,7 +64,8 @@ export class InMemoryBrainStore implements BrainStore {
     this.depth = 1;
     try {
       const result = fn();
-      if (result instanceof Promise) throw new TypeError('transaction callbacks must be synchronous');
+      if (result instanceof Promise)
+        throw new TypeError('transaction callbacks must be synchronous');
       return result;
     } catch (error) {
       this.state = snapshot;
@@ -203,7 +215,9 @@ export class InMemoryBrainStore implements BrainStore {
 
   listLanes(filter: { projectId?: ProjectId } = {}): Lane[] {
     return clone(
-      this.state.lanes.filter((l) => filter.projectId === undefined || l.projectId === filter.projectId)
+      this.state.lanes.filter(
+        (l) => filter.projectId === undefined || l.projectId === filter.projectId
+      )
     );
   }
 

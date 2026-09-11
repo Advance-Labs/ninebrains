@@ -6,8 +6,16 @@ import type { BrainGrant } from './execute';
 import { createTokenBucketLimiter } from './rate-limit';
 import { TokenRegistry } from './tokens';
 
-const laneA: BrainGrant = { identity: { role: 'lane', laneId: 'A', projectId: 'p1' }, projectId: 'p1', attachmentRoots: ['/w'] };
-const laneB: BrainGrant = { identity: { role: 'lane', laneId: 'B', projectId: 'p1' }, projectId: 'p1', attachmentRoots: ['/w'] };
+const laneA: BrainGrant = {
+  identity: { role: 'lane', laneId: 'A', projectId: 'p1' },
+  projectId: 'p1',
+  attachmentRoots: ['/w'],
+};
+const laneB: BrainGrant = {
+  identity: { role: 'lane', laneId: 'B', projectId: 'p1' },
+  projectId: 'p1',
+  attachmentRoots: ['/w'],
+};
 const hub: BrainGrant = { identity: BRAIN, projectId: 'p1', attachmentRoots: [] };
 
 describe('SEC-03 token lifecycle', () => {
@@ -49,7 +57,9 @@ describe('SEC-03 token lifecycle', () => {
     const a1 = tokens.issue(laneA);
     const a2 = tokens.issue(laneA);
     const b = tokens.issue(laneB);
-    expect(tokens.revokeWhere((g) => g.identity.role === 'lane' && g.identity.laneId === 'A')).toBe(2);
+    expect(tokens.revokeWhere((g) => g.identity.role === 'lane' && g.identity.laneId === 'A')).toBe(
+      2
+    );
     expect([tokens.resolve(a1), tokens.resolve(a2)]).toEqual([null, null]);
     expect(tokens.resolve(b)).not.toBeNull();
   });
@@ -63,8 +73,12 @@ describe('SEC-03 token lifecycle', () => {
 
   it('refuses grants whose ids are not safe path segments', () => {
     const tokens = new TokenRegistry();
-    expect(() => tokens.issue({ ...laneA, identity: { role: 'lane', laneId: '..', projectId: 'p1' } })).toThrow(InvalidInputError);
-    expect(() => tokens.issue({ ...hub, identity: { role: 'brain', brainId: 'a:b' } })).toThrow(InvalidInputError);
+    expect(() =>
+      tokens.issue({ ...laneA, identity: { role: 'lane', laneId: '..', projectId: 'p1' } })
+    ).toThrow(InvalidInputError);
+    expect(() => tokens.issue({ ...hub, identity: { role: 'brain', brainId: 'a:b' } })).toThrow(
+      InvalidInputError
+    );
     expect(() => tokens.issue({ ...laneA, runId: 'a/b' })).toThrow(InvalidInputError);
   });
 

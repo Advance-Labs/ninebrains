@@ -11,7 +11,8 @@ import { isIP } from 'node:net';
 
 type V4Range = readonly [base: number, prefix: number];
 
-const v4 = (a: number, b: number, c: number, d: number) => ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+const v4 = (a: number, b: number, c: number, d: number) =>
+  ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
 
 const BLOCKED_V4: readonly V4Range[] = [
   [v4(0, 0, 0, 0), 8],

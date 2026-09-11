@@ -28,7 +28,9 @@ export class TranscriptWriter {
 
   /** Records a Ninebrains-authored record, e.g. the header, stderr or the final outcome. */
   record(type: string, data: Record<string, unknown>): void {
-    this.append(JSON.stringify({ type: `ninebrains.${type}`, at: new Date().toISOString(), ...data }));
+    this.append(
+      JSON.stringify({ type: `ninebrains.${type}`, at: new Date().toISOString(), ...data })
+    );
   }
 
   private append(line: string): void {

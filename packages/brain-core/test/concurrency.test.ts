@@ -51,14 +51,25 @@ describe('multi-process claims on one SQLite file', () => {
     setup.close();
 
     const lanes = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
-    const results = await race(path.join(dir, 'barrier'), lanes, (lane) => [dbPath, lane, path.join(dir, 'barrier'), 'race', job.id]);
+    const results = await race(path.join(dir, 'barrier'), lanes, (lane) => [
+      dbPath,
+      lane,
+      path.join(dir, 'barrier'),
+      'race',
+      job.id,
+    ]);
 
     const winners = results.filter((r) => r.ok === true);
     expect(winners).toHaveLength(1);
-    expect(results.filter((r) => r.ok === false).map((r) => r.code)).toEqual(Array(5).fill('ILLEGAL_TRANSITION'));
+    expect(results.filter((r) => r.ok === false).map((r) => r.code)).toEqual(
+      Array(5).fill('ILLEGAL_TRANSITION')
+    );
 
     const check = new Brain({ store: SqliteBrainStore.open(dbPath) });
-    expect(check.getJob(BRAIN, job.id)).toMatchObject({ state: 'claimed', laneId: winners[0]!.laneId });
+    expect(check.getJob(BRAIN, job.id)).toMatchObject({
+      state: 'claimed',
+      laneId: winners[0]!.laneId,
+    });
     check.close();
   }, 60_000);
 
@@ -66,11 +77,19 @@ describe('multi-process claims on one SQLite file', () => {
     const dir = tempDir();
     const dbPath = path.join(dir, 'brain.sqlite');
     const setup = new Brain({ store: SqliteBrainStore.open(dbPath) });
-    const ids = Array.from({ length: 40 }, (_, i) => setup.createJob(BRAIN, { projectId: 'p1', title: `t${i}` }).id);
+    const ids = Array.from(
+      { length: 40 },
+      (_, i) => setup.createJob(BRAIN, { projectId: 'p1', title: `t${i}` }).id
+    );
     setup.close();
 
     const lanes = ['D1', 'D2', 'D3', 'D4'];
-    const results = await race(path.join(dir, 'barrier'), lanes, (lane) => [dbPath, lane, path.join(dir, 'barrier'), 'drain']);
+    const results = await race(path.join(dir, 'barrier'), lanes, (lane) => [
+      dbPath,
+      lane,
+      path.join(dir, 'barrier'),
+      'drain',
+    ]);
 
     const claimedBy = new Map<string, string>();
     for (const result of results) {
@@ -86,7 +105,9 @@ describe('multi-process claims on one SQLite file', () => {
       expect(t).toMatchObject({ state: 'claimed', laneId: claimedBy.get(t.id) });
     }
     // Every claim is also in the durable event log, visible to other processes.
-    const claims = check.readEvents(0, 10_000).filter((e) => e.type === 'jobChanged' && e.payload.job.state === 'claimed');
+    const claims = check
+      .readEvents(0, 10_000)
+      .filter((e) => e.type === 'jobChanged' && e.payload.job.state === 'claimed');
     expect(claims).toHaveLength(40);
     check.close();
   }, 60_000);

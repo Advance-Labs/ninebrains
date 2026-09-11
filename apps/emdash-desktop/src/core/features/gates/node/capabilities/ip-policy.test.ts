@@ -40,10 +40,15 @@ describe('SEC-21 address policy', () => {
     expect(isBlockedAddress(address)).toBe(true);
   });
 
-  it.each(['8.8.8.8', '93.184.215.14', '1.1.1.1', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '2a00:1450:4001::200e'])(
-    'allows public %s',
-    (address) => {
-      expect(isBlockedAddress(address)).toBe(false);
-    }
-  );
+  it.each([
+    '8.8.8.8',
+    '93.184.215.14',
+    '1.1.1.1',
+    '172.32.0.1',
+    '100.128.0.1',
+    '2606:4700::1111',
+    '2a00:1450:4001::200e',
+  ])('allows public %s', (address) => {
+    expect(isBlockedAddress(address)).toBe(false);
+  });
 });

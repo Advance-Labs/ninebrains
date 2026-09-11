@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { type DispatchState, type PlannedAssignment, dispatchTick } from '../dispatch/tick';
 import { InvalidInputError, NotFoundError } from '../errors';
-import { assertId } from '../ids';
 import { BrainEmitter, type StoredBrainEvent } from '../events';
+import { assertId } from '../ids';
 import type { BrainStore, JobFilter } from '../store/store';
 import type {
   Address,
@@ -23,9 +23,9 @@ import type {
 import { LANE_STATUSES, PROVIDERS } from '../types';
 import { loadVisibleJob, requireBrain, scopeProject } from './authz';
 import { type BrainContext, type GateFloorResolver, mutate } from './context';
+import * as jobs from './jobs';
 import { addNote, broadcast, readInbox, sendMessage, type SendMessageInput } from './mailbox';
 import { type CompileResult, type PlanInput, compilePlan } from './plan';
-import * as jobs from './jobs';
 
 export interface BrainOptions {
   store: BrainStore;
@@ -92,11 +92,19 @@ export class Brain {
     return mutate(this.ctx, (tx) => jobs.releaseJob(this.ctx, tx, identity, jobId));
   }
 
-  completeJob(identity: Identity, jobId: JobId, report: { summary: string; artifacts?: string[] }): Job {
+  completeJob(
+    identity: Identity,
+    jobId: JobId,
+    report: { summary: string; artifacts?: string[] }
+  ): Job {
     return mutate(this.ctx, (tx) => jobs.completeJob(this.ctx, tx, identity, jobId, report));
   }
 
-  recordGateResult(identity: Identity, jobId: JobId, outcome: { pass: boolean; feedback?: string }): Job {
+  recordGateResult(
+    identity: Identity,
+    jobId: JobId,
+    outcome: { pass: boolean; feedback?: string }
+  ): Job {
     return mutate(this.ctx, (tx) => jobs.recordGateResult(this.ctx, tx, identity, jobId, outcome));
   }
 
@@ -122,7 +130,10 @@ export class Brain {
 
   /** Lanes are always scoped to their own project, whatever filter they pass. */
   listJobs(identity: Identity, filter: JobFilter = {}): Job[] {
-    return this.ctx.store.listJobs({ ...filter, projectId: scopeProject(identity, filter.projectId) });
+    return this.ctx.store.listJobs({
+      ...filter,
+      projectId: scopeProject(identity, filter.projectId),
+    });
   }
 
   listEdges(identity: Identity, filter: { projectId?: ProjectId } = {}): JobEdge[] {
@@ -135,11 +146,17 @@ export class Brain {
     return mutate(this.ctx, (tx) => sendMessage(this.ctx, tx, identity, input));
   }
 
-  broadcast(identity: Identity, input: { projectId: ProjectId; body: string; attachments?: Attachment[] }): Message[] {
+  broadcast(
+    identity: Identity,
+    input: { projectId: ProjectId; body: string; attachments?: Attachment[] }
+  ): Message[] {
     return mutate(this.ctx, (tx) => broadcast(this.ctx, tx, identity, input));
   }
 
-  readInbox(identity: Identity, options?: { address?: Address; limit?: number; includeRead?: boolean }): Message[] {
+  readInbox(
+    identity: Identity,
+    options?: { address?: Address; limit?: number; includeRead?: boolean }
+  ): Message[] {
     return this.ctx.store.transaction(() => readInbox(this.ctx, identity, options));
   }
 
@@ -147,23 +164,40 @@ export class Brain {
     return this.ctx.store.transaction(() => addNote(this.ctx, identity, input));
   }
 
-  listNotes(identity: Identity, filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {
-    return this.ctx.store.listNotes({ ...filter, projectId: scopeProject(identity, filter.projectId) });
+  listNotes(
+    identity: Identity,
+    filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}
+  ): Note[] {
+    return this.ctx.store.listNotes({
+      ...filter,
+      projectId: scopeProject(identity, filter.projectId),
+    });
   }
 
-  listDone(identity: Identity, filter: { projectId?: ProjectId; limit?: number } = {}): DoneEntry[] {
-    return this.ctx.store.listDone({ ...filter, projectId: scopeProject(identity, filter.projectId) });
+  listDone(
+    identity: Identity,
+    filter: { projectId?: ProjectId; limit?: number } = {}
+  ): DoneEntry[] {
+    return this.ctx.store.listDone({
+      ...filter,
+      projectId: scopeProject(identity, filter.projectId),
+    });
   }
 
   // --- lanes & runs --------------------------------------------------------
 
   /** Registers or updates a lane. Owned by the app's main process (brain role). */
-  upsertLane(identity: Identity, lane: Omit<Lane, 'updatedAt' | 'recentFiles' | 'activeJobId'> & Partial<Lane>): Lane {
+  upsertLane(
+    identity: Identity,
+    lane: Omit<Lane, 'updatedAt' | 'recentFiles' | 'activeJobId'> & Partial<Lane>
+  ): Lane {
     requireBrain(identity, 'upsert_lane');
     assertId('lane id', lane.id);
     assertId('projectId', lane.projectId);
-    if (!PROVIDERS.includes(lane.provider)) throw new InvalidInputError(`unknown provider ${lane.provider}`);
-    if (!LANE_STATUSES.includes(lane.status)) throw new InvalidInputError(`unknown lane status ${lane.status}`);
+    if (!PROVIDERS.includes(lane.provider))
+      throw new InvalidInputError(`unknown provider ${lane.provider}`);
+    if (!LANE_STATUSES.includes(lane.status))
+      throw new InvalidInputError(`unknown lane status ${lane.status}`);
     return mutate(this.ctx, (tx) => {
       const previous = this.ctx.store.getLane(lane.id);
       const next: Lane = {
@@ -183,7 +217,10 @@ export class Brain {
   }
 
   /** Records a run start; a claimed job moves to running. */
-  startRun(identity: Identity, input: { jobId: JobId; laneId: LaneId; mode: RunMode; transcriptPath?: string }): Run {
+  startRun(
+    identity: Identity,
+    input: { jobId: JobId; laneId: LaneId; mode: RunMode; transcriptPath?: string }
+  ): Run {
     requireBrain(identity, 'start_run');
     return mutate(this.ctx, (tx) => {
       const job = loadVisibleJob(this.ctx.store, identity, input.jobId);
@@ -214,7 +251,10 @@ export class Brain {
     });
   }
 
-  listRuns(identity: Identity, filter: { laneId?: LaneId; jobId?: JobId; since?: number; limit?: number } = {}): Run[] {
+  listRuns(
+    identity: Identity,
+    filter: { laneId?: LaneId; jobId?: JobId; since?: number; limit?: number } = {}
+  ): Run[] {
     requireBrain(identity, 'list_runs');
     return this.ctx.store.listRuns(filter);
   }
@@ -222,7 +262,10 @@ export class Brain {
   // --- dispatch & events -----------------------------------------------
 
   /** A consistent read of what `dispatchTick` needs, optionally for one project. */
-  snapshot(identity: Identity, options: { projectId?: ProjectId; runLimit?: number } = {}): DispatchState {
+  snapshot(
+    identity: Identity,
+    options: { projectId?: ProjectId; runLimit?: number } = {}
+  ): DispatchState {
     requireBrain(identity, 'snapshot');
     return this.ctx.store.transaction(() => ({
       jobs: this.ctx.store.listJobs({ projectId: options.projectId }),

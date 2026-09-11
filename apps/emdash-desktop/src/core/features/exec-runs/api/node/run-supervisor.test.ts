@@ -14,7 +14,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { ExecRunRejectedError, ExecRunSupervisor, type ExecRunSupervisorOptions } from './run-supervisor';
+import {
+  ExecRunRejectedError,
+  ExecRunSupervisor,
+  type ExecRunSupervisorOptions,
+} from './run-supervisor';
 import type { ExecRunEvent, ExecRunSpec } from './types';
 
 const FAKE_CLAUDE = fileURLToPath(
@@ -91,7 +95,9 @@ describe('exec run supervisor', () => {
   it('SEC-17 prompt is not argv: a flag-shaped prompt leaves parsed flags unchanged', async () => {
     const argvLog = join(root, `argv-${randomUUID()}.jsonl`);
     const prompt = '--dangerously-skip-permissions rm -rf .';
-    const sup = supervisor(fakeClaude({ ...steps([{ say: '{{prompt}}' }]), FAKE_AGENT_ARGV_LOG: argvLog }));
+    const sup = supervisor(
+      fakeClaude({ ...steps([{ say: '{{prompt}}' }]), FAKE_AGENT_ARGV_LOG: argvLog })
+    );
     const result = await sup.run(spec({ prompt }));
     expect(result.ok).toBe(true);
     expect(result.text).toBe(prompt);
@@ -120,12 +126,16 @@ describe('exec run supervisor', () => {
     const result = await sup.run(spec({ budgets: { wallClockMs: 300 } }));
     expect(result).toMatchObject({ ok: false, reason: 'wall-clock' });
     expect(result.durationMs).toBeLessThan(4000);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'budget-exceeded', budget: 'wall-clock' }));
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'budget-exceeded', budget: 'wall-clock' })
+    );
   });
 
   it('SEC-29 enforces the token budget from stream usage', async () => {
     const say = Array.from({ length: 8 }, () => [{ say: 'chunk' }, { sleep: 150 }]).flat();
-    const sup = supervisor(fakeClaude({ ...steps(say), FAKE_AGENT_USAGE: '{"output_tokens":400}' }));
+    const sup = supervisor(
+      fakeClaude({ ...steps(say), FAKE_AGENT_USAGE: '{"output_tokens":400}' })
+    );
     const result = await sup.run(spec({ budgets: { wallClockMs: 20_000, maxTokens: 1000 } }));
     expect(result).toMatchObject({ ok: false, reason: 'tokens' });
     expect(result.totalTokens).toBeGreaterThan(1000);
@@ -146,7 +156,9 @@ describe('exec run supervisor', () => {
   it('SEC-31 refuses a cwd outside the allowed roots before spawning', async () => {
     const outside = join(root, 'outside');
     mkdirSync(outside, { recursive: true });
-    await expect(supervisor(fakeClaude()).run(spec({ cwd: outside }))).rejects.toThrow(/not inside/);
+    await expect(supervisor(fakeClaude()).run(spec({ cwd: outside }))).rejects.toThrow(
+      /not inside/
+    );
   });
 });
 
@@ -165,29 +177,38 @@ describe('SEC-30 kill switch', () => {
     }
   };
 
-  it('kills 8 runs and their grandchildren within 5 s and stays latched', { timeout: 30_000 }, async () => {
-    const sup = supervisor(stubborn);
-    const specs = Array.from({ length: 8 }, () => spec());
-    const results = specs.map((s) => sup.run(s));
-    const pidFiles = specs.map((s) => join(s.cwd, 'grandchild.pid'));
-    for (let i = 0; i < 100 && !pidFiles.every((f) => existsSync(f) && readFileSync(f, 'utf8').trim()); i++) {
-      await new Promise((r) => setTimeout(r, 50));
+  it(
+    'kills 8 runs and their grandchildren within 5 s and stays latched',
+    { timeout: 30_000 },
+    async () => {
+      const sup = supervisor(stubborn);
+      const specs = Array.from({ length: 8 }, () => spec());
+      const results = specs.map((s) => sup.run(s));
+      const pidFiles = specs.map((s) => join(s.cwd, 'grandchild.pid'));
+      for (
+        let i = 0;
+        i < 100 && !pidFiles.every((f) => existsSync(f) && readFileSync(f, 'utf8').trim());
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const pids = pidFiles.map((f) => Number(readFileSync(f, 'utf8').trim()));
+      expect(pids.every(alive)).toBe(true);
+
+      const t0 = Date.now();
+      await sup.killAll();
+      while (pids.some(alive) && Date.now() - t0 < 5000)
+        await new Promise((r) => setTimeout(r, 50));
+      const elapsed = Date.now() - t0;
+
+      expect(pids.filter(alive)).toEqual([]);
+      expect(elapsed).toBeLessThan(5000);
+      for (const r of await Promise.all(results)) expect(r.reason).toBe('killed');
+
+      expect(sup.stopLatched).toBe(true);
+      await expect(sup.run(spec())).rejects.toBeInstanceOf(ExecRunRejectedError);
+      sup.clearStop();
+      expect(sup.stopLatched).toBe(false);
     }
-    const pids = pidFiles.map((f) => Number(readFileSync(f, 'utf8').trim()));
-    expect(pids.every(alive)).toBe(true);
-
-    const t0 = Date.now();
-    await sup.killAll();
-    while (pids.some(alive) && Date.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 50));
-    const elapsed = Date.now() - t0;
-
-    expect(pids.filter(alive)).toEqual([]);
-    expect(elapsed).toBeLessThan(5000);
-    for (const r of await Promise.all(results)) expect(r.reason).toBe('killed');
-
-    expect(sup.stopLatched).toBe(true);
-    await expect(sup.run(spec())).rejects.toBeInstanceOf(ExecRunRejectedError);
-    sup.clearStop();
-    expect(sup.stopLatched).toBe(false);
-  });
+  );
 });

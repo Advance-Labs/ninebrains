@@ -1,6 +1,13 @@
 export * from './types';
 export * from './errors';
-export { MAX_ATTEMPTS, HELD_STATES, allowedTransitions, assertTransition, canTransition, isTerminal } from './state-machine';
+export {
+  MAX_ATTEMPTS,
+  HELD_STATES,
+  allowedTransitions,
+  assertTransition,
+  canTransition,
+  isTerminal,
+} from './state-machine';
 export { ancestors, cycleIfAdded, findCycle, pathBetween, type EdgeLike } from './dag';
 export {
   BrainEmitter,

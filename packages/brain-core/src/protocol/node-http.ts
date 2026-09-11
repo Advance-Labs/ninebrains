@@ -35,17 +35,29 @@ export interface BrainHttpServer {
  * loopback bind, Content-Length refusal before reading, a hard cut for
  * streamed bodies, header/request timeouts, and a connection cap.
  */
-export async function startBrainHttpServer(options: BrainHttpServerOptions): Promise<BrainHttpServer> {
+export async function startBrainHttpServer(
+  options: BrainHttpServerOptions
+): Promise<BrainHttpServer> {
   const tokens = options.tokens ?? new TokenRegistry();
   const limiter =
     options.limiter ??
-    createTokenBucketLimiter({ ratePerSecond: BRAIN_ENDPOINT.rateLimit.perSecond, burst: BRAIN_ENDPOINT.rateLimit.burst });
+    createTokenBucketLimiter({
+      ratePerSecond: BRAIN_ENDPOINT.rateLimit.perSecond,
+      burst: BRAIN_ENDPOINT.rateLimit.burst,
+    });
   const headersMs = options.timeouts?.headersMs ?? BRAIN_ENDPOINT.headersTimeoutMs;
-  const requestMs = Math.max(options.timeouts?.requestMs ?? BRAIN_ENDPOINT.requestTimeoutMs, headersMs);
+  const requestMs = Math.max(
+    options.timeouts?.requestMs ?? BRAIN_ENDPOINT.requestTimeoutMs,
+    headersMs
+  );
   let expectedHost = '';
 
   const server = http.createServer(
-    { headersTimeout: headersMs, requestTimeout: requestMs, connectionsCheckingInterval: options.timeouts?.checkIntervalMs ?? 1_000 },
+    {
+      headersTimeout: headersMs,
+      requestTimeout: requestMs,
+      connectionsCheckingInterval: options.timeouts?.checkIntervalMs ?? 1_000,
+    },
     (req, res) => {
       const send = (out: BrainHttpResponse, close = false) => {
         if (res.headersSent) return;
@@ -54,7 +66,13 @@ export async function startBrainHttpServer(options: BrainHttpServerOptions): Pro
         if (close) res.once('finish', () => req.socket.destroy());
       };
       const tooLarge = () =>
-        send(reply(413, brainFailure('BAD_REQUEST', `request body exceeds ${BRAIN_ENDPOINT.maxBodyBytes} bytes`)), true);
+        send(
+          reply(
+            413,
+            brainFailure('BAD_REQUEST', `request body exceeds ${BRAIN_ENDPOINT.maxBodyBytes} bytes`)
+          ),
+          true
+        );
 
       // Refuse by declared length before reading a byte of the body.
       const declared = Number(req.headers['content-length']);
@@ -87,7 +105,13 @@ export async function startBrainHttpServer(options: BrainHttpServerOptions): Pro
               headers: req.headers,
               body: Buffer.concat(chunks).toString('utf8'),
             },
-            { brain: options.brain, tokens, limiter, expectedHost, onInternalError: options.onInternalError }
+            {
+              brain: options.brain,
+              tokens,
+              limiter,
+              expectedHost,
+              onInternalError: options.onInternalError,
+            }
           )
         );
       });
@@ -176,18 +200,30 @@ export function createHttpBrainClient(options: HttpBrainClientOptions): HttpBrai
           (res) => {
             const chunks: Buffer[] = [];
             res.on('data', (chunk: Buffer) => chunks.push(chunk));
-            res.on('error', () => resolve(brainFailure('UNAVAILABLE', 'the Brain connection dropped mid-response')));
+            res.on('error', () =>
+              resolve(brainFailure('UNAVAILABLE', 'the Brain connection dropped mid-response'))
+            );
             res.on('end', () => {
               let payload: unknown;
               try {
                 payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
               } catch {
-                resolve(brainFailure('INTERNAL', `the Brain endpoint returned a non-JSON ${res.statusCode} response`));
+                resolve(
+                  brainFailure(
+                    'INTERNAL',
+                    `the Brain endpoint returned a non-JSON ${res.statusCode} response`
+                  )
+                );
                 return;
               }
               const parsed = brainResponseSchema.safeParse(payload);
               resolve(
-                parsed.success ? parsed.data : brainFailure('INTERNAL', `the Brain endpoint returned a malformed ${res.statusCode} response`)
+                parsed.success
+                  ? parsed.data
+                  : brainFailure(
+                      'INTERNAL',
+                      `the Brain endpoint returned a malformed ${res.statusCode} response`
+                    )
               );
             });
           }
@@ -195,7 +231,10 @@ export function createHttpBrainClient(options: HttpBrainClientOptions): HttpBrai
         req.on('timeout', () => req.destroy(new Error(`no response within ${timeoutMs} ms`)));
         req.on('error', (error) =>
           resolve(
-            brainFailure('UNAVAILABLE', `the Ninebrains app is not reachable at ${base.origin} (${error.message}); is it running?`)
+            brainFailure(
+              'UNAVAILABLE',
+              `the Ninebrains app is not reachable at ${base.origin} (${error.message}); is it running?`
+            )
           )
         );
         req.end(body);

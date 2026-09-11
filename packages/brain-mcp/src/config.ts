@@ -31,7 +31,10 @@ export class ConfigError extends Error {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainMcpConfig {
   const url = env[ENV.url];
-  if (!url) throw new ConfigError(`${ENV.url} is required; the Ninebrains app sets it when it launches a session`);
+  if (!url)
+    throw new ConfigError(
+      `${ENV.url} is required; the Ninebrains app sets it when it launches a session`
+    );
   try {
     assertLoopbackUrl(url);
   } catch (error) {
@@ -40,7 +43,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BrainMcpConfig
 
   const token = env[ENV.token];
   // Never echo the value: a malformed token may still be a real one with a typo.
-  if (!token || !TOKEN_PATTERN.test(token)) throw new ConfigError(`${ENV.token} is missing or malformed`);
+  if (!token || !TOKEN_PATTERN.test(token))
+    throw new ConfigError(`${ENV.token} is missing or malformed`);
 
   const laneHint = env[ENV.laneHint] || null;
   if (laneHint !== null && !ID_PATTERN.test(laneHint)) {

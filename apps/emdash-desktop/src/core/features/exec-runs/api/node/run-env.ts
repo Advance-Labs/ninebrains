@@ -94,7 +94,9 @@ export function buildUnattendedEnv(
           ENABLE_TOOL_SEARCH: 'false',
         }
       : { CODEX_HOME: auth.CODEX_HOME };
-  return assertNoForbidden(mergeAgentEnvLayers(platform, baseEnv(parentEnv, platform), providerLayer));
+  return assertNoForbidden(
+    mergeAgentEnvLayers(platform, baseEnv(parentEnv, platform), providerLayer)
+  );
 }
 
 /** SEC-20: the tests gate's env. No provider auth, no tokens, no app variables. */
@@ -102,5 +104,7 @@ export function buildScrubbedCommandEnv(
   parentEnv: EnvRecord,
   platform: AgentEnvPlatform = currentAgentEnvPlatform()
 ): Record<string, string> {
-  return assertNoForbidden(mergeAgentEnvLayers(platform, baseEnv(parentEnv, platform), { CI: '1' }));
+  return assertNoForbidden(
+    mergeAgentEnvLayers(platform, baseEnv(parentEnv, platform), { CI: '1' })
+  );
 }

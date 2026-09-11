@@ -7,12 +7,25 @@ import { InMemoryBrainStore } from '../store/memory-store';
 import { BRAIN_ENDPOINT, LANE_HINT_HEADER, brainRequestHeadersSchema } from './endpoint';
 import type { BrainGrant } from './execute';
 import { handleBrainHttpRequest } from './http';
-import { type BrainHttpServer, assertLoopbackUrl, createHttpBrainClient, startBrainHttpServer } from './node-http';
+import {
+  type BrainHttpServer,
+  assertLoopbackUrl,
+  createHttpBrainClient,
+  startBrainHttpServer,
+} from './node-http';
 import { createTokenBucketLimiter } from './rate-limit';
 import { TokenRegistry } from './tokens';
 
-const laneA: BrainGrant = { identity: { role: 'lane', laneId: 'A', projectId: 'p1' }, projectId: 'p1', attachmentRoots: [] };
-const laneB: BrainGrant = { identity: { role: 'lane', laneId: 'B', projectId: 'p1' }, projectId: 'p1', attachmentRoots: [] };
+const laneA: BrainGrant = {
+  identity: { role: 'lane', laneId: 'A', projectId: 'p1' },
+  projectId: 'p1',
+  attachmentRoots: [],
+};
+const laneB: BrainGrant = {
+  identity: { role: 'lane', laneId: 'B', projectId: 'p1' },
+  projectId: 'p1',
+  attachmentRoots: [],
+};
 const hub: BrainGrant = { identity: BRAIN, projectId: 'p1', attachmentRoots: [] };
 const HOST = '127.0.0.1:4000';
 
@@ -21,7 +34,13 @@ function harness() {
   const tokens = new TokenRegistry();
   const tok = { A: tokens.issue(laneA), B: tokens.issue(laneB), hub: tokens.issue(hub) };
   const handle = (
-    over: { method?: string; path?: string; headers?: Record<string, string | undefined>; body?: unknown; token?: string } = {},
+    over: {
+      method?: string;
+      path?: string;
+      headers?: Record<string, string | undefined>;
+      body?: unknown;
+      token?: string;
+    } = {},
     limiter?: ReturnType<typeof createTokenBucketLimiter>
   ) => {
     const headers: Record<string, string> = {};
@@ -32,12 +51,18 @@ function harness() {
       ...over.headers,
     };
     for (const [k, v] of Object.entries(merged)) if (v !== undefined) headers[k] = v;
-    const body = typeof over.body === 'string' ? over.body : JSON.stringify(over.body ?? { v: 1, op: 'list_jobs', args: {} });
+    const body =
+      typeof over.body === 'string'
+        ? over.body
+        : JSON.stringify(over.body ?? { v: 1, op: 'list_jobs', args: {} });
     const out = handleBrainHttpRequest(
       { method: over.method ?? 'POST', path: over.path ?? BRAIN_ENDPOINT.path, headers, body },
       { brain, tokens, expectedHost: HOST, limiter }
     );
-    return { ...out, json: JSON.parse(out.body) as { ok: boolean; result?: any; error?: { code: string } } };
+    return {
+      ...out,
+      json: JSON.parse(out.body) as { ok: boolean; result?: any; error?: { code: string } },
+    };
   };
   return { brain, tokens, tok, handle };
 }
@@ -73,7 +98,11 @@ describe('SEC-05 browsers cannot reach the endpoint', () => {
     const { brain, tok, handle } = harness();
     const attack = {
       token: tok.hub,
-      headers: { 'content-type': 'text/plain', origin: 'https://evil.test', 'sec-fetch-mode': 'no-cors' },
+      headers: {
+        'content-type': 'text/plain',
+        origin: 'https://evil.test',
+        'sec-fetch-mode': 'no-cors',
+      },
       body: { v: 1, op: 'create_job', args: { title: 'pwned' } },
     };
     expect(handle(attack).status).toBe(403);
@@ -83,8 +112,15 @@ describe('SEC-05 browsers cannot reach the endpoint', () => {
 
   it('never emits CORS headers', () => {
     const { handle } = harness();
-    for (const response of [handle(), handle({ method: 'OPTIONS' }), handle({ headers: { origin: 'x' } }), handle({ token: 'nope' })]) {
-      expect(Object.keys(response.headers).some((h) => h.toLowerCase().startsWith('access-control-'))).toBe(false);
+    for (const response of [
+      handle(),
+      handle({ method: 'OPTIONS' }),
+      handle({ headers: { origin: 'x' } }),
+      handle({ token: 'nope' }),
+    ]) {
+      expect(
+        Object.keys(response.headers).some((h) => h.toLowerCase().startsWith('access-control-'))
+      ).toBe(false);
       expect(response.headers['content-type']).toBe('application/json');
     }
   });
@@ -92,34 +128,63 @@ describe('SEC-05 browsers cannot reach the endpoint', () => {
   it('publishes the required request headers as a zod schema', () => {
     const { tok } = harness();
     expect(
-      brainRequestHeadersSchema.safeParse({ host: HOST, authorization: `Bearer ${tok.A}`, 'content-type': 'application/json' }).success
+      brainRequestHeadersSchema.safeParse({
+        host: HOST,
+        authorization: `Bearer ${tok.A}`,
+        'content-type': 'application/json',
+      }).success
     ).toBe(true);
-    expect(brainRequestHeadersSchema.safeParse({ host: 'localhost:4000', authorization: `Bearer ${tok.A}`, 'content-type': 'application/json' }).success).toBe(false);
+    expect(
+      brainRequestHeadersSchema.safeParse({
+        host: 'localhost:4000',
+        authorization: `Bearer ${tok.A}`,
+        'content-type': 'application/json',
+      }).success
+    ).toBe(false);
   });
 });
 
 describe('SEC-02 lane token cannot act as brain or another lane', () => {
   it('identity and role come from the token, not headers or the body', () => {
     const { handle, tok } = harness();
-    expect(handle({ body: { v: 1, op: 'whoami', args: {} } }).json.result).toEqual({ role: 'lane', laneId: 'A', projectId: 'p1' });
+    expect(handle({ body: { v: 1, op: 'whoami', args: {} } }).json.result).toEqual({
+      role: 'lane',
+      laneId: 'A',
+      projectId: 'p1',
+    });
     const spoofed = handle({
       headers: { 'x-lane-id': 'B', 'x-ninebrains-role': 'brain' },
-      body: { v: 1, op: 'whoami', args: {}, role: 'brain', identity: { role: 'brain', brainId: 'main' } },
+      body: {
+        v: 1,
+        op: 'whoami',
+        args: {},
+        role: 'brain',
+        identity: { role: 'brain', brainId: 'main' },
+      },
     });
     expect(spoofed.json.result).toMatchObject({ role: 'lane', laneId: 'A' });
-    expect(handle({ token: tok.hub, body: { v: 1, op: 'whoami', args: {} } }).json.result).toMatchObject({ role: 'brain', brainId: 'main' });
+    expect(
+      handle({ token: tok.hub, body: { v: 1, op: 'whoami', args: {} } }).json.result
+    ).toMatchObject({ role: 'brain', brainId: 'main' });
   });
 
   it('a lane token calling create_job is FORBIDDEN', () => {
     const { handle } = harness();
-    expect(handle({ body: { v: 1, op: 'create_job', args: { title: 'x' } } }).json).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(handle({ body: { v: 1, op: 'create_job', args: { title: 'x' } } }).json).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    });
   });
 
   it("lane A's token cannot complete lane B's job", () => {
     const { handle, tok } = harness();
-    const job = handle({ token: tok.hub, body: { v: 1, op: 'create_job', args: { title: 'j' } } }).json.result;
+    const job = handle({ token: tok.hub, body: { v: 1, op: 'create_job', args: { title: 'j' } } })
+      .json.result;
     handle({ token: tok.B, body: { v: 1, op: 'claim_job', args: { jobId: job.id } } });
-    const stolen = handle({ headers: { 'x-lane-id': 'B' }, body: { v: 1, op: 'complete_job', args: { jobId: job.id, summary: 'mine' } } });
+    const stolen = handle({
+      headers: { 'x-lane-id': 'B' },
+      body: { v: 1, op: 'complete_job', args: { jobId: job.id, summary: 'mine' } },
+    });
     expect(stolen.json).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
   });
 
@@ -155,7 +220,11 @@ describe('SEC-06 endpoint limits (handler)', () => {
   it('rate-limits per token with 429', () => {
     const { handle, tok } = harness();
     const limiter = createTokenBucketLimiter({ burst: 2, ratePerSecond: 0.001 });
-    expect([handle({}, limiter).status, handle({}, limiter).status, handle({}, limiter).status]).toEqual([200, 200, 429]);
+    expect([
+      handle({}, limiter).status,
+      handle({}, limiter).status,
+      handle({}, limiter).status,
+    ]).toEqual([200, 200, 429]);
     expect(handle({ token: tok.B }, limiter).status).toBe(200);
   });
 
@@ -185,11 +254,22 @@ describe('reference server and client', () => {
     const brain = makeBrain(new InMemoryBrainStore());
     server = await startBrainHttpServer({ brain });
     const hubClient = createHttpBrainClient({ url: server.url, token: server.issueToken(hub) });
-    const aClient = createHttpBrainClient({ url: server.url, token: server.issueToken(laneA), laneHint: 'A' });
-    expect(await hubClient.call({ v: 1, op: 'create_job', args: { title: 'Over HTTP' } })).toMatchObject({ ok: true });
-    expect(await aClient.call({ v: 1, op: 'claim_job', args: {} })).toMatchObject({ ok: true, result: { state: 'running' } });
+    const aClient = createHttpBrainClient({
+      url: server.url,
+      token: server.issueToken(laneA),
+      laneHint: 'A',
+    });
+    expect(
+      await hubClient.call({ v: 1, op: 'create_job', args: { title: 'Over HTTP' } })
+    ).toMatchObject({ ok: true });
+    expect(await aClient.call({ v: 1, op: 'claim_job', args: {} })).toMatchObject({
+      ok: true,
+      result: { state: 'running' },
+    });
     expect(brain.listJobs(BRAIN)[0]!.laneId).toBe('A');
-    expect(await aClient.call({ v: 1, op: 'requeue_job', args: { jobId: 'x' } })).toMatchObject({ error: { code: 'FORBIDDEN' } });
+    expect(await aClient.call({ v: 1, op: 'requeue_job', args: { jobId: 'x' } })).toMatchObject({
+      error: { code: 'FORBIDDEN' },
+    });
   });
 
   it('the client sends no browser headers and exactly the contract headers', async () => {
@@ -201,9 +281,17 @@ describe('reference server and client', () => {
     });
     await new Promise<void>((r) => capture.listen(0, '127.0.0.1', () => r()));
     const { port } = capture.address() as AddressInfo;
-    await createHttpBrainClient({ url: `http://127.0.0.1:${port}`, token: 't'.repeat(43), laneHint: 'A' }).call({ v: 1, op: 'whoami', args: {} });
+    await createHttpBrainClient({
+      url: `http://127.0.0.1:${port}`,
+      token: 't'.repeat(43),
+      laneHint: 'A',
+    }).call({ v: 1, op: 'whoami', args: {} });
     await new Promise<void>((r) => capture.close(() => r()));
-    expect(Object.keys(seen).filter((h) => h === 'origin' || h === 'referer' || h.startsWith('sec-fetch-'))).toEqual([]);
+    expect(
+      Object.keys(seen).filter(
+        (h) => h === 'origin' || h === 'referer' || h.startsWith('sec-fetch-')
+      )
+    ).toEqual([]);
     expect(seen).toMatchObject({
       host: `127.0.0.1:${port}`,
       authorization: `Bearer ${'t'.repeat(43)}`,
@@ -222,7 +310,11 @@ describe('reference server and client', () => {
           port: server!.port,
           path: BRAIN_ENDPOINT.path,
           method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'content-length': 300 * 1024 },
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+            'content-length': 300 * 1024,
+          },
         },
         (res) => {
           resolve(res.statusCode ?? 0);
@@ -245,7 +337,11 @@ describe('reference server and client', () => {
           port: server!.port,
           path: BRAIN_ENDPOINT.path,
           method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+            'transfer-encoding': 'chunked',
+          },
         },
         (res) => resolve(res.statusCode ?? 0)
       );
@@ -279,7 +375,9 @@ describe('reference server and client', () => {
     });
     const started = Date.now();
     const closedAfter = await new Promise<number>((resolve) => {
-      const socket = net.connect(server!.port, '127.0.0.1', () => socket.write(`POST ${BRAIN_ENDPOINT.path} HTTP/1.1\r\nHost: 127.0.0.1\r\n`));
+      const socket = net.connect(server!.port, '127.0.0.1', () =>
+        socket.write(`POST ${BRAIN_ENDPOINT.path} HTTP/1.1\r\nHost: 127.0.0.1\r\n`)
+      );
       socket.on('data', () => {});
       socket.on('close', () => resolve(Date.now() - started));
       socket.on('error', () => {});
@@ -292,7 +390,11 @@ describe('reference server and client', () => {
     const url = server.url;
     await server.close();
     server = null;
-    const response = await createHttpBrainClient({ url, token: 't', timeoutMs: 2_000 }).call({ v: 1, op: 'whoami', args: {} });
+    const response = await createHttpBrainClient({ url, token: 't', timeoutMs: 2_000 }).call({
+      v: 1,
+      op: 'whoami',
+      args: {},
+    });
     expect(response).toMatchObject({ ok: false, error: { code: 'UNAVAILABLE' } });
   });
 });
@@ -302,11 +404,15 @@ describe('assertLoopbackUrl', () => {
     expect(assertLoopbackUrl('http://127.0.0.1:4000').port).toBe('4000');
   });
 
-  it.each(['http://localhost:4000', 'http://[::1]:4000', 'https://127.0.0.1:4000', 'http://127.0.0.1', 'http://10.0.0.5:80', 'not a url'])(
-    'rejects %s',
-    (url) => {
-      expect(() => assertLoopbackUrl(url)).toThrow(TypeError);
-      expect(() => createHttpBrainClient({ url, token: 't' })).toThrow(TypeError);
-    }
-  );
+  it.each([
+    'http://localhost:4000',
+    'http://[::1]:4000',
+    'https://127.0.0.1:4000',
+    'http://127.0.0.1',
+    'http://10.0.0.5:80',
+    'not a url',
+  ])('rejects %s', (url) => {
+    expect(() => assertLoopbackUrl(url)).toThrow(TypeError);
+    expect(() => createHttpBrainClient({ url, token: 't' })).toThrow(TypeError);
+  });
 });

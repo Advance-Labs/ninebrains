@@ -12,7 +12,13 @@ import { Brain } from '../src/brain/brain';
 import { isBrainError } from '../src/errors';
 import { SqliteBrainStore } from '../src/store/sqlite/sqlite-store';
 
-const [dbPath, laneId, barrierDir, mode, jobId] = process.argv.slice(2) as [string, string, string, string, string?];
+const [dbPath, laneId, barrierDir, mode, jobId] = process.argv.slice(2) as [
+  string,
+  string,
+  string,
+  string,
+  string?,
+];
 const lane = { role: 'lane', laneId, projectId: 'p1' } as const;
 const brain = new Brain({ store: SqliteBrainStore.open(dbPath, { busyTimeoutMs: 30_000 }) });
 

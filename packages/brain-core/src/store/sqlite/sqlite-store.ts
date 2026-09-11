@@ -1,8 +1,19 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { BrainEvent, StoredBrainEvent } from '../../events';
 import { NotFoundError } from '../../errors';
-import type { DoneEntry, Job, JobEdge, JobId, Lane, LaneId, Message, Note, ProjectId, Run } from '../../types';
+import type { BrainEvent, StoredBrainEvent } from '../../events';
+import type {
+  DoneEntry,
+  Job,
+  JobEdge,
+  JobId,
+  Lane,
+  LaneId,
+  Message,
+  Note,
+  ProjectId,
+  Run,
+} from '../../types';
 import type { BrainStore, JobEdgeFilter, JobFilter, MessageFilter, RunFilter } from '../store';
 import { type SqliteConnectionLike, openNodeSqliteConnection } from './connection';
 import { migrate } from './migrations';
@@ -34,9 +45,10 @@ export interface SqliteBrainStoreOptions {
 
 /** A file path is used as-is; anything else is treated as a directory holding `brain.sqlite`. */
 export function resolveBrainDbPath(dirOrFile: string): string {
-  return /\.(sqlite3?|db)$/i.test(dirOrFile) ? dirOrFile : path.join(dirOrFile, DEFAULT_DB_FILENAME);
+  return /\.(sqlite3?|db)$/i.test(dirOrFile)
+    ? dirOrFile
+    : path.join(dirOrFile, DEFAULT_DB_FILENAME);
 }
-
 
 /**
  * SQLite-backed store over any `SqliteConnectionLike`.
@@ -83,10 +95,16 @@ export class SqliteBrainStore implements BrainStore {
     connection: SqliteConnectionLike,
     options: { path?: string; ownsConnection?: boolean } = {}
   ): SqliteBrainStore {
-    return new SqliteBrainStore(connection, { path: options.path ?? null, ownsConnection: options.ownsConnection ?? false });
+    return new SqliteBrainStore(connection, {
+      path: options.path ?? null,
+      ownsConnection: options.ownsConnection ?? false,
+    });
   }
 
-  private constructor(connection: SqliteConnectionLike, options: { path: string | null; ownsConnection: boolean }) {
+  private constructor(
+    connection: SqliteConnectionLike,
+    options: { path: string | null; ownsConnection: boolean }
+  ) {
     this.connection = connection;
     this.path = options.path;
     this.ownsConnection = options.ownsConnection;
@@ -105,7 +123,8 @@ export class SqliteBrainStore implements BrainStore {
     this.depth = 1;
     try {
       const result = fn();
-      if (result instanceof Promise) throw new TypeError('transaction callbacks must be synchronous');
+      if (result instanceof Promise)
+        throw new TypeError('transaction callbacks must be synchronous');
       this.connection.exec('COMMIT');
       return result;
     } catch (error) {
@@ -124,21 +143,28 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   findJobByPlanNode(planId: string, planNodeId: string): Job | undefined {
-    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE plan_id = ? AND plan_node_id = ?`, [planId, planNodeId]);
+    const row = this.get(`SELECT ${JOB_COLUMNS} FROM jobs WHERE plan_id = ? AND plan_node_id = ?`, [
+      planId,
+      planNodeId,
+    ]);
     return row && toJob(row);
   }
 
   listJobs(filter: JobFilter = {}): Job[] {
     const where = new Where();
-    where.eq('project_id', filter.projectId).eq('lane_id', filter.laneId).eq('plan_id', filter.planId);
+    where
+      .eq('project_id', filter.projectId)
+      .eq('lane_id', filter.laneId)
+      .eq('plan_id', filter.planId);
     if (filter.states !== undefined) {
       if (filter.states.length === 0) return [];
       where.add(`state IN (${filter.states.map(() => '?').join(', ')})`, ...filter.states);
     }
     if (!filter.includeArchived) where.add('archived_at IS NULL');
-    return this.all(`SELECT ${JOB_COLUMNS} FROM jobs ${where.sql} ORDER BY created_at, rowid ${limit(filter.limit)}`, where.params).map(
-      toJob
-    );
+    return this.all(
+      `SELECT ${JOB_COLUMNS} FROM jobs ${where.sql} ORDER BY created_at, rowid ${limit(filter.limit)}`,
+      where.params
+    ).map(toJob);
   }
 
   insertJob(job: Job): void {
@@ -160,8 +186,14 @@ export class SqliteBrainStore implements BrainStore {
 
   listEdges(filter: JobEdgeFilter = {}): JobEdge[] {
     const where = new Where();
-    where.eq('project_id', filter.projectId).eq('from_id', filter.from).eq('to_id', filter.to).eq('plan_id', filter.planId);
-    return this.all(`SELECT * FROM job_edges ${where.sql} ORDER BY rowid`, where.params).map(toEdge);
+    where
+      .eq('project_id', filter.projectId)
+      .eq('from_id', filter.from)
+      .eq('to_id', filter.to)
+      .eq('plan_id', filter.planId);
+    return this.all(`SELECT * FROM job_edges ${where.sql} ORDER BY rowid`, where.params).map(
+      toEdge
+    );
   }
 
   insertEdge(edge: JobEdge): void {
@@ -176,18 +208,23 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   insertMessage(m: Message): void {
-    this.run(`INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (${placeholders(MESSAGE_COLUMNS)})`, messageParams(m));
+    this.run(
+      `INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (${placeholders(MESSAGE_COLUMNS)})`,
+      messageParams(m)
+    );
   }
 
   listMessages(filter: MessageFilter): Message[] {
     const unread = filter.unreadOnly ? 'AND read_at IS NULL' : '';
-    return this.all(`SELECT * FROM messages WHERE to_kind = ? AND to_id = ? ${unread} ORDER BY seq ${limit(filter.limit)}`, [filter.to.kind, filter.to.id]).map(
-      toMessage
-    );
+    return this.all(
+      `SELECT * FROM messages WHERE to_kind = ? AND to_id = ? ${unread} ORDER BY seq ${limit(filter.limit)}`,
+      [filter.to.kind, filter.to.id]
+    ).map(toMessage);
   }
 
   markMessagesRead(ids: readonly string[], at: number): void {
-    for (const id of ids) this.run('UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL', [at, id]);
+    for (const id of ids)
+      this.run('UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL', [at, id]);
   }
 
   insertRun(r: Run): void {
@@ -214,36 +251,41 @@ export class SqliteBrainStore implements BrainStore {
     const where = new Where();
     where.eq('lane_id', filter.laneId).eq('job_id', filter.jobId);
     if (filter.since !== undefined) where.add('started_at >= ?', filter.since);
-    return this.all(`SELECT * FROM runs ${where.sql} ORDER BY started_at DESC, seq DESC ${limit(filter.limit)}`, where.params).map(
-      toRun
-    );
+    return this.all(
+      `SELECT * FROM runs ${where.sql} ORDER BY started_at DESC, seq DESC ${limit(filter.limit)}`,
+      where.params
+    ).map(toRun);
   }
 
   insertNote(n: Note): void {
-    this.run(`INSERT INTO notes (${NOTE_COLUMNS}) VALUES (${placeholders(NOTE_COLUMNS)})`, noteParams(n));
+    this.run(
+      `INSERT INTO notes (${NOTE_COLUMNS}) VALUES (${placeholders(NOTE_COLUMNS)})`,
+      noteParams(n)
+    );
   }
 
   listNotes(filter: { projectId?: ProjectId; jobId?: JobId; limit?: number } = {}): Note[] {
     const where = new Where();
     where.eq('project_id', filter.projectId).eq('job_id', filter.jobId);
-    return this.all(`SELECT * FROM notes ${where.sql} ORDER BY seq ${limit(filter.limit)}`, where.params).map(toNote);
+    return this.all(
+      `SELECT * FROM notes ${where.sql} ORDER BY seq ${limit(filter.limit)}`,
+      where.params
+    ).map(toNote);
   }
 
   insertDone(d: DoneEntry): void {
-    this.run('INSERT INTO done_log (id, job_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
-      d.id,
-      d.jobId,
-      d.projectId,
-      d.laneId,
-      d.summary,
-      JSON.stringify(d.artifacts),
-      d.at,
-    ]);
+    this.run(
+      'INSERT INTO done_log (id, job_id, project_id, lane_id, summary, artifacts, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [d.id, d.jobId, d.projectId, d.laneId, d.summary, JSON.stringify(d.artifacts), d.at]
+    );
   }
 
   listDone(filter: { projectId?: ProjectId; limit?: number } = {}): DoneEntry[] {
     const where = new Where().eq('project_id', filter.projectId);
-    return this.all(`SELECT * FROM done_log ${where.sql} ORDER BY seq ${limit(filter.limit)}`, where.params).map(toDone);
+    return this.all(
+      `SELECT * FROM done_log ${where.sql} ORDER BY seq ${limit(filter.limit)}`,
+      where.params
+    ).map(toDone);
   }
 
   upsertLane(l: Lane): void {
@@ -253,7 +295,15 @@ export class SqliteBrainStore implements BrainStore {
        ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, provider = excluded.provider,
          status = excluded.status, recent_files = excluded.recent_files,
          active_job_id = excluded.active_job_id, updated_at = excluded.updated_at`,
-      [l.id, l.projectId, l.provider, l.status, JSON.stringify(l.recentFiles), l.activeJobId, l.updatedAt]
+      [
+        l.id,
+        l.projectId,
+        l.provider,
+        l.status,
+        JSON.stringify(l.recentFiles),
+        l.activeJobId,
+        l.updatedAt,
+      ]
     );
   }
 
@@ -277,8 +327,17 @@ export class SqliteBrainStore implements BrainStore {
   }
 
   readEvents(afterSeq: number, max = 500): StoredBrainEvent[] {
-    return this.all('SELECT * FROM event_log WHERE seq > ? ORDER BY seq LIMIT ?', [afterSeq, max]).map(
-      (r) => ({ seq: Number(r.seq), at: Number(r.at), type: r.type, payload: JSON.parse(r.payload as string) }) as StoredBrainEvent
+    return this.all('SELECT * FROM event_log WHERE seq > ? ORDER BY seq LIMIT ?', [
+      afterSeq,
+      max,
+    ]).map(
+      (r) =>
+        ({
+          seq: Number(r.seq),
+          at: Number(r.at),
+          type: r.type,
+          payload: JSON.parse(r.payload as string),
+        }) as StoredBrainEvent
     );
   }
 

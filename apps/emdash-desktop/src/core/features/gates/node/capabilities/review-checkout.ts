@@ -97,7 +97,9 @@ export interface PrepareReviewCheckoutDeps {
 }
 
 /** The gates-core `prepareReviewCheckout(job, { signal })` capability. */
-export function createPrepareReviewCheckout(deps: PrepareReviewCheckoutDeps): PrepareReviewCheckout {
+export function createPrepareReviewCheckout(
+  deps: PrepareReviewCheckoutDeps
+): PrepareReviewCheckout {
   return async (job, { signal }) => {
     signal.throwIfAborted();
     const checkout = await prepareReviewCheckout({
@@ -112,13 +114,17 @@ export function createPrepareReviewCheckout(deps: PrepareReviewCheckoutDeps): Pr
   };
 }
 
-export async function prepareReviewCheckout(request: ReviewCheckoutRequest): Promise<ReviewCheckout> {
+export async function prepareReviewCheckout(
+  request: ReviewCheckoutRequest
+): Promise<ReviewCheckout> {
   const source = await realpath(request.worktreePath);
   const head = (await git(source, ['rev-parse', '--verify', 'HEAD^{commit}'])).trim();
   let commit = head;
   if (request.commit !== undefined) {
     if (!COMMIT.test(request.commit)) throw new Error(`Invalid review commit: ${request.commit}`);
-    commit = (await git(source, ['rev-parse', '--verify', '--end-of-options', `${request.commit}^{commit}`])).trim();
+    commit = (
+      await git(source, ['rev-parse', '--verify', '--end-of-options', `${request.commit}^{commit}`])
+    ).trim();
   }
 
   const root = await realpath(request.root ?? tmpdir());

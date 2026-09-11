@@ -7,16 +7,13 @@
     "name": "Advance Labs Inc.",
     "email": "lucas@advancelabs.dev"
   },
+  "bin": {
+    "ninebrains-brain-mcp": "./dist/bin.mjs"
+  },
   "files": [
     "dist"
   ],
   "type": "module",
-  "engines": {
-    "node": ">=22.13.0"
-  },
-  "bin": {
-    "ninebrains-brain-mcp": "./dist/bin.mjs"
-  },
   "exports": {
     ".": {
       "development": "./src/index.ts",
@@ -45,5 +42,8 @@
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
     "vitest": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

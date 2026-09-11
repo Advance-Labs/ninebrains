@@ -1,11 +1,6 @@
 import type { JobId, JobState } from './types';
 
-export type BrainErrorCode =
-  | 'ILLEGAL_TRANSITION'
-  | 'NOT_FOUND'
-  | 'FORBIDDEN'
-  | 'CYCLE'
-  | 'INVALID';
+export type BrainErrorCode = 'ILLEGAL_TRANSITION' | 'NOT_FOUND' | 'FORBIDDEN' | 'CYCLE' | 'INVALID';
 
 /** Base class for every error the Brain throws on purpose. */
 export class BrainError extends Error {

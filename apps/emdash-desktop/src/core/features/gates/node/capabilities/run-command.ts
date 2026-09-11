@@ -22,7 +22,11 @@ import { accessSync, constants, existsSync, realpathSync, statSync } from 'node:
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path';
-import { signalGroup, spawnInGroup, terminateGroup } from '@core/features/exec-runs/api/node/process-group';
+import {
+  signalGroup,
+  spawnInGroup,
+  terminateGroup,
+} from '@core/features/exec-runs/api/node/process-group';
 import { buildScrubbedCommandEnv } from '@core/features/exec-runs/api/node/run-env';
 import { resolveRunCwd } from '@core/features/exec-runs/api/node/run-paths';
 import { credentialDenyPaths } from '@core/features/exec-runs/api/node/sandbox-settings';
@@ -64,8 +68,11 @@ export function buildSeatbeltProfile(input: {
 }): string {
   const writable = [input.worktree, input.tempDir, '/dev'];
   // A denied ancestor of the cwd (e.g. the review-checkout root) would deny the cwd itself.
-  const denied = [...new Set(input.deniedPaths.map(real))].filter((p) => !isInside(input.worktree, p));
-  const subpaths = (paths: readonly string[]) => paths.map((p) => `(subpath ${sbplString(p)})`).join(' ');
+  const denied = [...new Set(input.deniedPaths.map(real))].filter(
+    (p) => !isInside(input.worktree, p)
+  );
+  const subpaths = (paths: readonly string[]) =>
+    paths.map((p) => `(subpath ${sbplString(p)})`).join(' ');
   return [
     '(version 1)',
     '(allow default)',
@@ -75,7 +82,12 @@ export function buildSeatbeltProfile(input: {
 }
 
 /** SEC-16: absolute, or found on PATH outside the cwd. Never a relative or worktree binary. */
-export function resolveExecutable(command: string, envPath: string, cwd: string, platform: NodeJS.Platform): string {
+export function resolveExecutable(
+  command: string,
+  envPath: string,
+  cwd: string,
+  platform: NodeJS.Platform
+): string {
   if (isAbsolute(command)) return command;
   if (command.includes('/') || command.includes('\\')) {
     throw new Error(`Relative executable paths are refused: ${command}`);
@@ -108,7 +120,9 @@ class TailBuffer {
     }
   }
   toString(): string {
-    return this.truncated ? `[output truncated to the last ${this.max} bytes]\n${this.text}` : this.text;
+    return this.truncated
+      ? `[output truncated to the last ${this.max} bytes]\n${this.text}`
+      : this.text;
   }
 }
 
@@ -116,7 +130,8 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
   const platform = options.platform ?? process.platform;
   const graceMs = options.killGraceMs ?? 2000;
   const maxOutput = options.maxOutputBytes ?? 1024 * 1024;
-  const useSeatbelt = platform === 'darwin' && options.sandbox !== 'off' && existsSync(SANDBOX_EXEC);
+  const useSeatbelt =
+    platform === 'darwin' && options.sandbox !== 'off' && existsSync(SANDBOX_EXEC);
 
   return async (command, opts) => {
     const cwd = await resolveRunCwd(opts.cwd, options.allowedRoots());
@@ -172,10 +187,13 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
 
     let timedOut = false;
     const stop = () => void terminateGroup(child, graceMs, platform);
-    const timer = setTimeout(() => {
-      timedOut = true;
-      stop();
-    }, opts.timeoutMs ?? options.defaultTimeoutMs ?? 10 * 60_000);
+    const timer = setTimeout(
+      () => {
+        timedOut = true;
+        stop();
+      },
+      opts.timeoutMs ?? options.defaultTimeoutMs ?? 10 * 60_000
+    );
     opts.signal.addEventListener('abort', stop, { once: true });
     // A background process that keeps our pipes open would otherwise hold 'close' forever.
     child.once('exit', () => setTimeout(() => signalGroup(child, 'SIGKILL', platform), 50));
@@ -189,7 +207,12 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
       child.once('error', (err) => void finish().finally(() => reject(err)));
       child.once('close', (code) => {
         void finish().finally(() =>
-          resolve({ exitCode: code, stdout: stdout.toString(), stderr: stderr.toString(), timedOut })
+          resolve({
+            exitCode: code,
+            stdout: stdout.toString(),
+            stderr: stderr.toString(),
+            timedOut,
+          })
         );
       });
     });

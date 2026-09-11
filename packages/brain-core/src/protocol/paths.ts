@@ -17,7 +17,9 @@ export function resolveAttachmentPath(input: string, roots: readonly string[]): 
   }
   if (input.includes('\0')) throw new InvalidInputError('attachment path contains a NUL byte');
   if (roots.length === 0) {
-    throw new InvalidInputError('attachments are disabled: no project or evidence directory is configured');
+    throw new InvalidInputError(
+      'attachments are disabled: no project or evidence directory is configured'
+    );
   }
 
   const candidate = path.resolve(roots[0]!, input);
@@ -28,7 +30,10 @@ export function resolveAttachmentPath(input: string, roots: readonly string[]): 
     throw new InvalidInputError(`attachment ${input} does not exist`);
   }
   const allowed = roots.some((root) => isInside(real, canonical(root)));
-  if (!allowed) throw new InvalidInputError(`attachment ${input} is outside the project and evidence directories`);
+  if (!allowed)
+    throw new InvalidInputError(
+      `attachment ${input} is outside the project and evidence directories`
+    );
   return real;
 }
 

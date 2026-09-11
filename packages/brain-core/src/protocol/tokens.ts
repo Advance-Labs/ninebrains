@@ -34,7 +34,10 @@ export class TokenRegistry {
     if (grant.runId !== undefined) assertId('runId', grant.runId);
 
     const token = randomBytes(TOKEN_BYTES).toString('base64url');
-    this.entries.push({ digest: digest(token), grant: Object.freeze({ ...grant, attachmentRoots: [...grant.attachmentRoots] }) });
+    this.entries.push({
+      digest: digest(token),
+      grant: Object.freeze({ ...grant, attachmentRoots: [...grant.attachmentRoots] }),
+    });
     return token;
   }
 
@@ -43,7 +46,11 @@ export class TokenRegistry {
     const candidate = digest(typeof presented === 'string' ? presented : '');
     let found: Readonly<BrainGrant> | null = null;
     for (const entry of this.entries) {
-      if (timingSafeEqual(entry.digest, candidate) && typeof presented === 'string' && presented.length > 0) {
+      if (
+        timingSafeEqual(entry.digest, candidate) &&
+        typeof presented === 'string' &&
+        presented.length > 0
+      ) {
         found ??= entry.grant;
       }
     }

@@ -33,7 +33,12 @@ export interface ClaudeSandboxSettings {
     failIfUnavailable: true;
     allowUnsandboxedCommands: false;
     autoAllowBashIfSandboxed: boolean;
-    filesystem: { denyRead: string[]; allowRead: string[]; allowWrite: string[]; denyWrite: string[] };
+    filesystem: {
+      denyRead: string[];
+      allowRead: string[];
+      allowWrite: string[];
+      denyWrite: string[];
+    };
     network?: { allowedDomains: string[] };
   };
   permissions: { deny: string[] };

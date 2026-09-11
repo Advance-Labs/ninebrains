@@ -13,7 +13,8 @@ export interface SendMessageInput {
 }
 
 function checkAddress(to: Address): Address {
-  if (!ADDRESS_KINDS.includes(to.kind)) throw new InvalidInputError('address kind must be "lane" or "brain"');
+  if (!ADDRESS_KINDS.includes(to.kind))
+    throw new InvalidInputError('address kind must be "lane" or "brain"');
   return { kind: to.kind, id: assertId('address id', to.id) };
 }
 
@@ -22,11 +23,17 @@ function checkAddress(to: Address): Address {
  * recipient reads its inbox, whether or not that lane is awake. A lane may
  * message the Brain and lanes of its own project.
  */
-export function sendMessage(ctx: BrainContext, tx: Tx, identity: Identity, input: SendMessageInput): Message {
+export function sendMessage(
+  ctx: BrainContext,
+  tx: Tx,
+  identity: Identity,
+  input: SendMessageInput
+): Message {
   const to = checkAddress(input.to);
   checkText('body', input.body, LIMITS.bodyBytes);
   const attachments = input.attachments ?? [];
-  if (attachments.length > LIMITS.attachments) throw new InvalidInputError(`at most ${LIMITS.attachments} attachments`);
+  if (attachments.length > LIMITS.attachments)
+    throw new InvalidInputError(`at most ${LIMITS.attachments} attachments`);
   if (identity.role === 'lane' && to.kind === 'lane') {
     const target = ctx.store.getLane(to.id);
     if (target && target.projectId !== identity.projectId) {
@@ -48,7 +55,9 @@ export function broadcast(
   const from = addressOf(identity);
   return ctx.store
     .listLanes({ projectId: input.projectId })
-    .map((lane) => deliver(ctx, tx, from, laneAddress(lane.id), input.body, input.attachments ?? []));
+    .map((lane) =>
+      deliver(ctx, tx, from, laneAddress(lane.id), input.body, input.attachments ?? [])
+    );
 }
 
 /** Returns unread messages and marks them read in the same transaction. */
@@ -58,7 +67,11 @@ export function readInbox(
   options: { address?: Address; limit?: number; includeRead?: boolean } = {}
 ): Message[] {
   const to = inboxAddress(identity, options.address);
-  const messages = ctx.store.listMessages({ to, unreadOnly: !options.includeRead, limit: options.limit ?? 50 });
+  const messages = ctx.store.listMessages({
+    to,
+    unreadOnly: !options.includeRead,
+    limit: options.limit ?? 50,
+  });
   const at = ctx.now();
   const unread = messages.filter((m) => m.readAt === null).map((m) => m.id);
   ctx.store.markMessagesRead(unread, at);
@@ -92,8 +105,23 @@ export function addNote(
   return note;
 }
 
-function deliver(ctx: BrainContext, tx: Tx, from: Address, to: Address, body: string, attachments: Attachment[]): Message {
-  const message: Message = { id: ctx.newId(), from, to, body, attachments, createdAt: ctx.now(), readAt: null };
+function deliver(
+  ctx: BrainContext,
+  tx: Tx,
+  from: Address,
+  to: Address,
+  body: string,
+  attachments: Attachment[]
+): Message {
+  const message: Message = {
+    id: ctx.newId(),
+    from,
+    to,
+    body,
+    attachments,
+    createdAt: ctx.now(),
+    readAt: null,
+  };
   ctx.store.insertMessage(message);
   tx.raise({ type: 'messageSent', payload: { message } });
   return message;

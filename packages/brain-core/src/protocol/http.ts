@@ -1,5 +1,11 @@
 import type { Brain } from '../brain/brain';
-import { BEARER_PATTERN, BRAIN_ENDPOINT, LANE_HINT_HEADER, RESPONSE_HEADERS, isBrowserHeader } from './endpoint';
+import {
+  BEARER_PATTERN,
+  BRAIN_ENDPOINT,
+  LANE_HINT_HEADER,
+  RESPONSE_HEADERS,
+  isBrowserHeader,
+} from './endpoint';
 import { type BrainGrant, type ExecuteOptions, executeBrainRequest } from './execute';
 import { type BrainResponse, type BrainResponseErrorCode, brainFailure } from './ops';
 import type { RateLimiter } from './rate-limit';
@@ -36,14 +42,19 @@ export interface BrainHttpOptions extends ExecuteOptions {
  * mount it on any Node HTTP server. Checks run cheapest and most hostile
  * first; nothing reaches the Brain until the caller is authenticated.
  */
-export function handleBrainHttpRequest(request: BrainHttpRequest, options: BrainHttpOptions): BrainHttpResponse {
+export function handleBrainHttpRequest(
+  request: BrainHttpRequest,
+  options: BrainHttpOptions
+): BrainHttpResponse {
   const headers = lowercase(request.headers);
   const reject = (status: number, code: BrainResponseErrorCode, message: string) =>
     reply(status, brainFailure(code, message));
 
   if (request.path !== BRAIN_ENDPOINT.path) return reject(404, 'BAD_REQUEST', 'unknown path');
-  if (request.method.toUpperCase() !== BRAIN_ENDPOINT.method) return reject(405, 'BAD_REQUEST', 'use POST');
-  if (headers.host !== options.expectedHost) return reject(421, 'BAD_REQUEST', 'unexpected Host header');
+  if (request.method.toUpperCase() !== BRAIN_ENDPOINT.method)
+    return reject(405, 'BAD_REQUEST', 'use POST');
+  if (headers.host !== options.expectedHost)
+    return reject(421, 'BAD_REQUEST', 'unexpected Host header');
   if (Object.keys(headers).some(isBrowserHeader)) {
     return reject(403, 'FORBIDDEN', 'browser requests are not accepted');
   }

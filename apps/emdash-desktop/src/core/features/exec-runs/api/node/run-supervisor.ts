@@ -224,7 +224,12 @@ export class ExecRunSupervisor {
     }
 
     const startedAt = Date.now();
-    const child = spawnInGroup(binary, argv, { cwd, env, stdin: spec.prompt, platform: this.platform });
+    const child = spawnInGroup(binary, argv, {
+      cwd,
+      env,
+      stdin: spec.prompt,
+      platform: this.platform,
+    });
     const run: ActiveRun = { child, done: undefined as unknown as Promise<ExecRunResult> };
     this.active.set(spec.runId, run);
 
@@ -284,7 +289,8 @@ export class ExecRunSupervisor {
                   : 'completed');
         const errors = [...outcome.errors];
         if (spawnError) errors.push(spawnError.message);
-        if (reason !== 'completed' && stderrTail.trim()) errors.push(stderrTail.trim().slice(-2000));
+        if (reason !== 'completed' && stderrTail.trim())
+          errors.push(stderrTail.trim().slice(-2000));
         const result: ExecRunResult = {
           runId: spec.runId,
           ok: reason === 'completed',

@@ -4,7 +4,16 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,14 +25,21 @@ export const FAKE_CLAUDE = join(FAKE_AGENT_DIR, 'bin/fake-claude.mjs');
 export const ECHO_MCP_SERVER = join(FAKE_AGENT_DIR, 'test/fixtures/echo-mcp-server.mjs');
 
 export const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).trim();
+  execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  }).trim();
 
 export function tempRoot(prefix: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
 
 /** A main repo with one commit, plus a linked worktree per lane under `<root>/worktrees`. */
-export function makeRepoWithLanes(root: string, lanes: string[]): { repo: string; worktrees: string; lanePaths: string[] } {
+export function makeRepoWithLanes(
+  root: string,
+  lanes: string[]
+): { repo: string; worktrees: string; lanePaths: string[] } {
   const repo = join(root, 'repo');
   const worktrees = join(root, 'worktrees');
   mkdirSync(repo, { recursive: true });
@@ -50,7 +66,10 @@ const q = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
 export function fakeClaudeWrapper(dir: string, env: Record<string, string>): string {
   const path = join(dir, `fake-${randomUUID()}.sh`);
   const exports = Object.entries(env).map(([k, v]) => `export ${k}=${q(v)}`);
-  writeFileSync(path, ['#!/bin/sh', ...exports, `exec ${q(process.execPath)} ${q(FAKE_CLAUDE)} "$@"`, ''].join('\n'));
+  writeFileSync(
+    path,
+    ['#!/bin/sh', ...exports, `exec ${q(process.execPath)} ${q(FAKE_CLAUDE)} "$@"`, ''].join('\n')
+  );
   chmodSync(path, 0o755);
   return path;
 }

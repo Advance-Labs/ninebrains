@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { Brain } from '../brain/brain';
 import { InvalidInputError, isBrainError } from '../errors';
 import type { Attachment, Identity, ProjectId } from '../types';
-import { type BrainResponse, type ParsedBrainRequest, brainFailure, brainRequestSchema } from './ops';
+import {
+  type BrainResponse,
+  type ParsedBrainRequest,
+  brainFailure,
+  brainRequestSchema,
+} from './ops';
 import { resolveAttachmentPath } from './paths';
 import { jobDetail, jobSummary, messageView } from './results';
 
@@ -58,11 +63,14 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
   const resolve = (p: string) => resolveAttachmentPath(p, grant.attachmentRoots);
   const attach = (items: Attachment[]): Attachment[] =>
     items.map((item) =>
-      item.kind === 'file' ? { kind: 'file', path: resolve(item.path) } : { kind: 'screenshot', ref: resolve(item.ref) }
+      item.kind === 'file'
+        ? { kind: 'file', path: resolve(item.path) }
+        : { kind: 'screenshot', ref: resolve(item.ref) }
     );
   const project = (requested: ProjectId | undefined): ProjectId => {
     const projectId = requested ?? grant.projectId;
-    if (!projectId) throw new InvalidInputError('projectId is required: this session has no default project');
+    if (!projectId)
+      throw new InvalidInputError('projectId is required: this session has no default project');
     return projectId;
   };
 
@@ -84,11 +92,16 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
           if (!isBrainError(error) || error.code !== 'ILLEGAL_TRANSITION') throw error;
         }
       }
-      return { claimed: null, message: 'No ready jobs in this project. Check read_inbox, or wait.' };
+      return {
+        claimed: null,
+        message: 'No ready jobs in this project. Check read_inbox, or wait.',
+      };
     }
     case 'complete_job': {
       const { jobId, summary, artifacts } = request.args;
-      return jobSummary(brain.completeJob(me, jobId, { summary, artifacts: artifacts.map(resolve) }));
+      return jobSummary(
+        brain.completeJob(me, jobId, { summary, artifacts: artifacts.map(resolve) })
+      );
     }
     case 'block_job':
       return jobSummary(brain.blockJob(me, request.args.jobId, request.args.reason));
@@ -98,17 +111,28 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
       return { id: message.id, to: message.to, delivered: true };
     }
     case 'read_inbox':
-      return brain.readInbox(me, { limit: request.args.limit, address: request.args.address }).map(messageView);
+      return brain
+        .readInbox(me, { limit: request.args.limit, address: request.args.address })
+        .map(messageView);
     case 'list_jobs': {
       const { states, mine, projectId, laneId, limit } = request.args;
       const holder = mine && me.role === 'lane' ? me.laneId : laneId;
       return brain
-        .listJobs(me, { states, limit, laneId: holder, projectId: projectId ?? grant.projectId ?? undefined })
+        .listJobs(me, {
+          states,
+          limit,
+          laneId: holder,
+          projectId: projectId ?? grant.projectId ?? undefined,
+        })
         .map(jobSummary);
     }
     case 'add_note': {
       const { body, jobId, projectId } = request.args;
-      const note = brain.addNote(me, { body, jobId, projectId: projectId ?? grant.projectId ?? undefined });
+      const note = brain.addNote(me, {
+        body,
+        jobId,
+        projectId: projectId ?? grant.projectId ?? undefined,
+      });
       return { id: note.id, projectId: note.projectId, jobId: note.jobId };
     }
     case 'create_job': {
@@ -131,7 +155,9 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
     case 'requeue_job':
       return jobSummary(brain.requeueJob(me, request.args.jobId));
     case 'list_lanes':
-      return brain.listLanes(me, { projectId: request.args.projectId ?? grant.projectId ?? undefined });
+      return brain.listLanes(me, {
+        projectId: request.args.projectId ?? grant.projectId ?? undefined,
+      });
     case 'broadcast': {
       const { body, projectId, attachments } = request.args;
       return brain

@@ -42,7 +42,10 @@ describe('codex exec argv (experimental)', () => {
 
   it('rejects env keys that would inject TOML', () => {
     expect(() =>
-      buildCodexExecArgv(spec({ mcpServers: { b: { command: '/n', env: { 'a=1,x': 'v' } } } }), '/wt')
+      buildCodexExecArgv(
+        spec({ mcpServers: { b: { command: '/n', env: { 'a=1,x': 'v' } } } }),
+        '/wt'
+      )
     ).toThrow(/env key/);
   });
 });
@@ -54,9 +57,17 @@ describe('codex exec event parser (experimental)', () => {
       { type: 'turn.started' },
       { type: 'item.completed', item: { id: 'i1', type: 'command_execution', command: 'ls' } },
       { type: 'item.completed', item: { id: 'i2', type: 'agent_message', text: 'done' } },
-      { type: 'turn.completed', usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 10 } },
+      {
+        type: 'turn.completed',
+        usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 10 },
+      },
     ]);
-    expect(outcome).toMatchObject({ sawResult: true, isError: false, text: 'done', sessionId: 't1' });
+    expect(outcome).toMatchObject({
+      sawResult: true,
+      isError: false,
+      text: 'done',
+      sessionId: 't1',
+    });
     expect(totalTokens(outcome.usage)).toBe(110);
   });
 

@@ -11,7 +11,12 @@ import { describe, expect, it } from 'vitest';
 import { BRAIN, LANE_A, finish, tempDir } from '../../../test/helpers';
 import { Brain } from '../../brain/brain';
 import { nodeSqliteDriver } from './connection';
-import { BRAIN_BUNDLED_MIGRATIONS, CORE_MIGRATIONS_TABLE, MIGRATIONS, migrationTag } from './migrations';
+import {
+  BRAIN_BUNDLED_MIGRATIONS,
+  CORE_MIGRATIONS_TABLE,
+  MIGRATIONS,
+  migrationTag,
+} from './migrations';
 import { SqliteBrainStore } from './sqlite-store';
 
 const brainStoreDefinition = defineDurableSqliteStore({
@@ -22,7 +27,9 @@ const brainStoreDefinition = defineDurableSqliteStore({
 
 describe('Brain on core defineDurableSqliteStore', () => {
   it('exposes the history in core BundledMigration shape', () => {
-    expect(BRAIN_BUNDLED_MIGRATIONS.map((m) => [m.idx, m.tag])).toEqual(MIGRATIONS.map((m, i) => [i, migrationTag(m)]));
+    expect(BRAIN_BUNDLED_MIGRATIONS.map((m) => [m.idx, m.tag])).toEqual(
+      MIGRATIONS.map((m, i) => [i, migrationTag(m)])
+    );
     for (const m of BRAIN_BUNDLED_MIGRATIONS) expect(m.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -33,11 +40,17 @@ describe('Brain on core defineDurableSqliteStore', () => {
     const brain = new Brain({ store });
     brain.upsertLane(BRAIN, { id: 'A', projectId: 'p1', provider: 'claude', status: 'idle' });
     const first = brain.createJob(BRAIN, { projectId: 'p1', title: 'first' });
-    const second = brain.createJob(BRAIN, { projectId: 'p1', title: 'second', dependsOn: [first.id] });
+    const second = brain.createJob(BRAIN, {
+      projectId: 'p1',
+      title: 'second',
+      dependsOn: [first.id],
+    });
     finish(brain, LANE_A, first.id);
     expect(brain.getJob(BRAIN, second.id).state).toBe('ready');
 
-    const tags = handle.connection.all<{ tag: string }>(`SELECT tag FROM ${CORE_MIGRATIONS_TABLE}`).map((r) => r.tag);
+    const tags = handle.connection
+      .all<{ tag: string }>(`SELECT tag FROM ${CORE_MIGRATIONS_TABLE}`)
+      .map((r) => r.tag);
     expect(tags).toEqual(BRAIN_BUNDLED_MIGRATIONS.map((m) => m.tag));
 
     // The store does not own core's connection: closing it leaves the handle usable.
@@ -46,14 +59,19 @@ describe('Brain on core defineDurableSqliteStore', () => {
     handle.close();
 
     const reopened = brainStoreDefinition.open(file);
-    expect(new Brain({ store: SqliteBrainStore.fromConnection(reopened.connection) }).listJobs(BRAIN)).toHaveLength(2);
+    expect(
+      new Brain({ store: SqliteBrainStore.fromConnection(reopened.connection) }).listJobs(BRAIN)
+    ).toHaveLength(2);
     reopened.close();
   });
 
   it('lets direct mode open a core-managed file without re-running DDL', () => {
     const file = path.join(tempDir(), 'ninebrains-brain.db');
     const handle = brainStoreDefinition.open(file);
-    new Brain({ store: SqliteBrainStore.fromConnection(handle.connection) }).createJob(BRAIN, { projectId: 'p1', title: 'from app' });
+    new Brain({ store: SqliteBrainStore.fromConnection(handle.connection) }).createJob(BRAIN, {
+      projectId: 'p1',
+      title: 'from app',
+    });
     handle.close();
 
     const direct = SqliteBrainStore.open(file);

@@ -21,7 +21,9 @@ export interface PlannedAssignment {
  * entry simply fails its assignment, so racing ticks are harmless.
  */
 export function dispatchTick(state: DispatchState): PlannedAssignment[] {
-  const free = new Map(state.lanes.filter((lane) => lane.status === 'idle').map((lane) => [lane.id, lane]));
+  const free = new Map(
+    state.lanes.filter((lane) => lane.status === 'idle').map((lane) => [lane.id, lane])
+  );
   const ready = state.jobs
     .filter((job) => job.state === 'ready' && job.archivedAt === null)
     .sort((a, b) => a.createdAt - b.createdAt);

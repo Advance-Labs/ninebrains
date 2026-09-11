@@ -63,7 +63,8 @@ function parseTarget(raw: string): URL {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new FetchBlockedError(`Only http and https are allowed, got ${url.protocol}`);
   }
-  if (url.username || url.password) throw new FetchBlockedError('URLs with credentials are refused');
+  if (url.username || url.password)
+    throw new FetchBlockedError('URLs with credentials are refused');
   return url;
 }
 
@@ -86,7 +87,8 @@ export function createFetchText(options: FetchTextOptions = {}): FetchText {
       : await resolve(host);
     if (answers.length === 0) throw new FetchBlockedError(`${host} did not resolve`);
     const blocked = answers.find((a) => !allowed(a.address));
-    if (blocked) throw new FetchBlockedError(`${host} resolves to a blocked address (${blocked.address})`);
+    if (blocked)
+      throw new FetchBlockedError(`${host} resolves to a blocked address (${blocked.address})`);
     return answers[0];
   }
 
@@ -106,7 +108,11 @@ export function createFetchText(options: FetchTextOptions = {}): FetchText {
           port: url.port || undefined,
           path: `${url.pathname}${url.search}`,
           method: 'GET',
-          headers: { 'user-agent': userAgent, accept: 'text/*, application/json, */*;q=0.5', 'accept-encoding': 'identity' },
+          headers: {
+            'user-agent': userAgent,
+            accept: 'text/*, application/json, */*;q=0.5',
+            'accept-encoding': 'identity',
+          },
           lookup,
           agent: false,
           signal,

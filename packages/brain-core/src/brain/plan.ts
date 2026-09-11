@@ -47,7 +47,12 @@ export interface CompileResult {
  * - A cycle, in the plan or in the plan plus the project's other edges,
  *   rejects the whole compile with the cycle path; nothing is written.
  */
-export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input: PlanInput): CompileResult {
+export function compilePlan(
+  ctx: BrainContext,
+  tx: Tx,
+  identity: Identity,
+  input: PlanInput
+): CompileResult {
   requireBrain(identity, 'compile_plan');
   validatePlan(input);
 
@@ -74,7 +79,12 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
     const content = {
       title: node.title,
       body: node.body ?? '',
-      gateSpec: withGateFloor(ctx, input.projectId, node.hints?.kind ?? 'work', node.gateSpec ?? null),
+      gateSpec: withGateFloor(
+        ctx,
+        input.projectId,
+        node.hints?.kind ?? 'work',
+        node.gateSpec ?? null
+      ),
       hints: node.hints ?? {},
     };
     if (!existing) {
@@ -100,7 +110,9 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
       touched.push(job);
     } else {
       if (existing.projectId !== input.projectId) {
-        throw new InvalidInputError(`plan ${input.planId} already belongs to project ${existing.projectId}`);
+        throw new InvalidInputError(
+          `plan ${input.planId} already belongs to project ${existing.projectId}`
+        );
       }
       const changed =
         existing.archivedAt !== null ||
@@ -118,7 +130,10 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
   const keep = new Set(Object.values(result.jobIds));
   for (const job of ctx.store.listJobs({ planId: input.planId })) {
     if (keep.has(job.id)) continue;
-    for (const edge of [...ctx.store.listEdges({ from: job.id }), ...ctx.store.listEdges({ to: job.id })]) {
+    for (const edge of [
+      ...ctx.store.listEdges({ from: job.id }),
+      ...ctx.store.listEdges({ to: job.id }),
+    ]) {
       if (edge.planId === input.planId) {
         ctx.store.deleteEdge(edge.from, edge.to);
         result.edgesRemoved++;
@@ -140,10 +155,17 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
       result.edgesRemoved++;
     }
   }
-  const present = new Set(ctx.store.listEdges({ projectId: input.projectId }).map((e) => `${e.from}>${e.to}`));
+  const present = new Set(
+    ctx.store.listEdges({ projectId: input.projectId }).map((e) => `${e.from}>${e.to}`)
+  );
   for (const [key, edge] of wanted) {
     if (present.has(key)) continue;
-    ctx.store.insertEdge({ ...edge, projectId: input.projectId, planId: input.planId, createdAt: now });
+    ctx.store.insertEdge({
+      ...edge,
+      projectId: input.projectId,
+      planId: input.planId,
+      createdAt: now,
+    });
     result.edgesAdded++;
   }
 
@@ -169,7 +191,8 @@ export function compilePlan(ctx: BrainContext, tx: Tx, identity: Identity, input
 function validatePlan(input: PlanInput): void {
   assertId('planId', input.planId);
   assertId('projectId', input.projectId);
-  if (input.nodes.length > LIMITS.planNodes) throw new InvalidInputError(`a plan has at most ${LIMITS.planNodes} nodes`);
+  if (input.nodes.length > LIMITS.planNodes)
+    throw new InvalidInputError(`a plan has at most ${LIMITS.planNodes} nodes`);
   const ids = new Set<string>();
   for (const node of input.nodes) {
     assertId('plan node id', node.id);

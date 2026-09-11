@@ -30,7 +30,11 @@ describe.each(STORES)('compilePlan (%s store)', (_name, createStore) => {
     const byNode = (id: string) => brain.getJob(BRAIN, result.jobIds[id]!);
     expect(byNode('design').state).toBe('ready');
     expect(byNode('api').state).toBe('proposed');
-    expect(byNode('qa')).toMatchObject({ planId: 'plan-1', planNodeId: 'qa', gateSpec: { gates: ['screenshot'] } });
+    expect(byNode('qa')).toMatchObject({
+      planId: 'plan-1',
+      planNodeId: 'qa',
+      gateSpec: { gates: ['screenshot'] },
+    });
   });
 
   it('is idempotent: re-running never duplicates jobs or edges', () => {
@@ -38,7 +42,13 @@ describe.each(STORES)('compilePlan (%s store)', (_name, createStore) => {
     const first = brain.compilePlan(BRAIN, plan());
     const second = brain.compilePlan(BRAIN, plan());
     expect(second.jobIds).toEqual(first.jobIds);
-    expect(second).toMatchObject({ created: [], updated: [], archived: [], edgesAdded: 0, edgesRemoved: 0 });
+    expect(second).toMatchObject({
+      created: [],
+      updated: [],
+      archived: [],
+      edgesAdded: 0,
+      edgesRemoved: 0,
+    });
     expect(second.unchanged).toHaveLength(4);
     expect(brain.listJobs(BRAIN)).toHaveLength(4);
     expect(brain.listEdges(BRAIN)).toHaveLength(4);
@@ -99,7 +109,9 @@ describe.each(STORES)('compilePlan (%s store)', (_name, createStore) => {
     const second = brain.compilePlan(BRAIN, rewired);
     expect(second).toMatchObject({ edgesAdded: 1, edgesRemoved: 4 });
     const edges = brain.listEdges(BRAIN).map((e) => `${e.from}>${e.to}`);
-    expect(edges.sort()).toEqual([`${first.jobIds.design}>${first.jobIds.qa}`, `${first.jobIds.qa}>${extra.id}`].sort());
+    expect(edges.sort()).toEqual(
+      [`${first.jobIds.design}>${first.jobIds.qa}`, `${first.jobIds.qa}>${extra.id}`].sort()
+    );
     expect(brain.getJob(BRAIN, first.jobIds.api!).state).toBe('ready');
   });
 
@@ -107,10 +119,7 @@ describe.each(STORES)('compilePlan (%s store)', (_name, createStore) => {
     const brain = makeBrain(createStore());
     let caught: unknown;
     try {
-      brain.compilePlan(
-        BRAIN,
-        plan({ edges: [...plan().edges, { from: 'qa', to: 'design' }] })
-      );
+      brain.compilePlan(BRAIN, plan({ edges: [...plan().edges, { from: 'qa', to: 'design' }] }));
     } catch (error) {
       caught = error;
     }
@@ -129,16 +138,29 @@ describe.each(STORES)('compilePlan (%s store)', (_name, createStore) => {
     brain.linkJobs(BRAIN, first.jobIds.qa!, outside.id);
     brain.linkJobs(BRAIN, outside.id, first.jobIds.design!);
 
-    expect(() => brain.compilePlan(BRAIN, plan({ edges: [{ from: 'design', to: 'qa' }] }))).toThrow(CycleError);
+    expect(() => brain.compilePlan(BRAIN, plan({ edges: [{ from: 'design', to: 'qa' }] }))).toThrow(
+      CycleError
+    );
     expect(brain.listEdges(BRAIN, { projectId: 'p1' })).toHaveLength(2);
   });
 
   it('validates the plan shape', () => {
     const brain = makeBrain(createStore());
-    expect(() => brain.compilePlan(BRAIN, plan({ nodes: [{ id: 'a', title: 'A' }, { id: 'a', title: 'A2' }], edges: [] }))).toThrow(
-      InvalidInputError
-    );
-    expect(() => brain.compilePlan(BRAIN, plan({ edges: [{ from: 'design', to: 'nope' }] }))).toThrow(InvalidInputError);
+    expect(() =>
+      brain.compilePlan(
+        BRAIN,
+        plan({
+          nodes: [
+            { id: 'a', title: 'A' },
+            { id: 'a', title: 'A2' },
+          ],
+          edges: [],
+        })
+      )
+    ).toThrow(InvalidInputError);
+    expect(() =>
+      brain.compilePlan(BRAIN, plan({ edges: [{ from: 'design', to: 'nope' }] }))
+    ).toThrow(InvalidInputError);
     expect(() => brain.compilePlan(BRAIN, plan({ planId: ' ' }))).toThrow(InvalidInputError);
     brain.compilePlan(BRAIN, plan());
     expect(() => brain.compilePlan(BRAIN, plan({ projectId: 'p2' }))).toThrow(InvalidInputError);

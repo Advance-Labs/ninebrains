@@ -6,7 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { Brain, type BrainHttpServer, SqliteBrainStore, startBrainHttpServer } from '@ninebrains/brain-core';
+import {
+  Brain,
+  type BrainHttpServer,
+  SqliteBrainStore,
+  startBrainHttpServer,
+} from '@ninebrains/brain-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type LaunchOptions, brainMcpServerEntry } from '../src/launch';
 import { LANE_TOOLS } from '../src/tools';
@@ -18,7 +23,9 @@ const HUB = { role: 'brain', brainId: 'main' } as const;
 /** The Electron binary the desktop app pins, if it is installed in this checkout. */
 function findElectron(): string | null {
   try {
-    const require = createRequire(path.resolve(packageDir, '..', '..', 'apps', 'emdash-desktop', 'package.json'));
+    const require = createRequire(
+      path.resolve(packageDir, '..', '..', 'apps', 'emdash-desktop', 'package.json')
+    );
     const exe = require('electron') as unknown;
     return typeof exe === 'string' && existsSync(exe) ? exe : null;
   } catch {
@@ -26,7 +33,10 @@ function findElectron(): string | null {
   }
 }
 
-type Call = (name: string, args?: Record<string, unknown>) => Promise<{ isError: boolean; text: string; json: any }>;
+type Call = (
+  name: string,
+  args?: Record<string, unknown>
+) => Promise<{ isError: boolean; text: string; json: any }>;
 
 let dir: string;
 let appBrain: Brain | null;
@@ -55,14 +65,21 @@ async function startApp() {
   const roots = [path.join(dir, 'project')];
   return {
     laneToken: (laneId: string) =>
-      app!.issueToken({ identity: { role: 'lane', laneId, projectId: 'p1' }, projectId: 'p1', attachmentRoots: roots }),
+      app!.issueToken({
+        identity: { role: 'lane', laneId, projectId: 'p1' },
+        projectId: 'p1',
+        attachmentRoots: roots,
+      }),
     hubToken: () => app!.issueToken({ identity: HUB, projectId: 'p1', attachmentRoots: roots }),
   };
 }
 
 const node = { kind: 'node', execPath: process.execPath } as const;
 
-async function launch(options: Omit<LaunchOptions, 'binPath'>, extraEnv: Record<string, string> = {}) {
+async function launch(
+  options: Omit<LaunchOptions, 'binPath'>,
+  extraEnv: Record<string, string> = {}
+) {
   const entry = brainMcpServerEntry({ ...options, binPath: bin });
   const transport = new StdioClientTransport({
     command: entry.command,
@@ -92,7 +109,10 @@ async function launch(options: Omit<LaunchOptions, 'binPath'>, extraEnv: Record<
 /** Runs the bin to completion (stdin closed at once). Async, so the in-process app can answer. */
 function runBin(env: Record<string, string>): Promise<{ code: number | null; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [bin], { env: { PATH: process.env.PATH ?? '', ...env }, cwd: dir });
+    const child = spawn(process.execPath, [bin], {
+      env: { PATH: process.env.PATH ?? '', ...env },
+      cwd: dir,
+    });
     let stderr = '';
     child.stderr.on('data', (chunk) => (stderr += chunk));
     child.on('close', (code) => resolve({ code, stderr }));
@@ -104,16 +124,32 @@ describe('built stdio shim', () => {
   it('SEC-01 brain-mcp has no DB access: every tool works with no DB setting, over one app process', async () => {
     const tokens = await startApp();
     const hub = await launch({ runtime: node, url: app!.url, token: tokens.hubToken() });
-    const laneA = await launch({ runtime: node, url: app!.url, token: tokens.laneToken('A'), laneHint: 'A' });
+    const laneA = await launch({
+      runtime: node,
+      url: app!.url,
+      token: tokens.laneToken('A'),
+      laneHint: 'A',
+    });
     const laneB = await launch({ runtime: node, url: app!.url, token: tokens.laneToken('B') });
 
     expect(laneA.client.getServerVersion()?.name).toBe('ninebrains-brain');
     expect(laneA.client.getInstructions()).toContain('claim_job');
 
     const job = (await hub.call('create_job', { title: 'Write the report' })).json;
-    expect((await laneA.call('claim_job', { jobId: job.id })).json).toMatchObject({ id: job.id, state: 'running' });
+    expect((await laneA.call('claim_job', { jobId: job.id })).json).toMatchObject({
+      id: job.id,
+      state: 'running',
+    });
     expect((await laneB.call('claim_job', { jobId: job.id })).text).toMatch(/^ILLEGAL_TRANSITION/);
-    expect((await laneA.call('complete_job', { jobId: job.id, summary: 'written', artifacts: ['report.md'] })).json).toMatchObject({
+    expect(
+      (
+        await laneA.call('complete_job', {
+          jobId: job.id,
+          summary: 'written',
+          artifacts: ['report.md'],
+        })
+      ).json
+    ).toMatchObject({
       state: 'verifying',
     });
     await laneA.call('send_message', {
@@ -122,13 +158,19 @@ describe('built stdio shim', () => {
       attachments: [{ kind: 'file', path: 'report.md' }],
     });
     const inbox = (await laneB.call('read_inbox')).json;
-    expect(inbox).toMatchObject([{ from: { kind: 'lane', id: 'A' }, body: 'report is in', untrusted: true }]);
+    expect(inbox).toMatchObject([
+      { from: { kind: 'lane', id: 'A' }, body: 'report is in', untrusted: true },
+    ]);
     expect(inbox[0].attachments[0].path).toBe(path.join(dir, 'project', 'report.md'));
     expect((await laneA.call('add_note', { body: 'uses port 3001' })).isError).toBe(false);
     const other = (await hub.call('create_job', { title: 'Needs credentials' })).json;
     await laneB.call('claim_job', { jobId: other.id });
-    expect((await laneB.call('block_job', { jobId: other.id, reason: 'no API key' })).json).toMatchObject({ state: 'blocked' });
-    expect((await laneA.call('list_jobs', { mine: true })).json.map((j: { id: string }) => j.id)).toEqual([job.id]);
+    expect(
+      (await laneB.call('block_job', { jobId: other.id, reason: 'no API key' })).json
+    ).toMatchObject({ state: 'blocked' });
+    expect(
+      (await laneA.call('list_jobs', { mine: true })).json.map((j: { id: string }) => j.id)
+    ).toEqual([job.id]);
     expect(appBrain!.getJob(HUB, job.id)).toMatchObject({ state: 'verifying', laneId: 'A' });
     // No shim created a database anywhere it could reach.
     expect(existsSync(path.join(dir, 'brain.sqlite'))).toBe(false);
@@ -143,9 +185,15 @@ describe('built stdio shim', () => {
     // Lane A's token, with env claiming the brain role and a brain DB: still a lane.
     const laneA = await launch(
       { runtime: node, url: app!.url, token: tokens.laneToken('A') },
-      { NINEBRAINS_ROLE: 'brain', NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: path.join(dir, 'brain.sqlite') }
+      {
+        NINEBRAINS_ROLE: 'brain',
+        NINEBRAINS_MODE: 'direct',
+        NINEBRAINS_BRAIN_DB: path.join(dir, 'brain.sqlite'),
+      }
     );
-    expect((await laneA.client.listTools()).tools.map((t) => t.name).sort()).toEqual([...LANE_TOOLS].sort());
+    expect((await laneA.client.listTools()).tools.map((t) => t.name).sort()).toEqual(
+      [...LANE_TOOLS].sort()
+    );
     let createText = '';
     try {
       createText = (await laneA.call('create_job', { title: 'escalate' })).text;
@@ -153,31 +201,50 @@ describe('built stdio shim', () => {
       createText = (error as Error).message;
     }
     expect(createText).toMatch(/not found|unknown tool/i);
-    expect((await laneA.call('complete_job', { jobId: job.id, summary: 'mine now' })).text).toMatch(/^FORBIDDEN/);
+    expect((await laneA.call('complete_job', { jobId: job.id, summary: 'mine now' })).text).toMatch(
+      /^FORBIDDEN/
+    );
     expect(existsSync(path.join(dir, 'brain.sqlite'))).toBe(false);
 
     // Lane B's token with a hint claiming to be A: main rejects it, so the shim refuses to start.
-    const mismatched = await runBin({ NINEBRAINS_BRAIN_URL: app!.url, NINEBRAINS_TOKEN: tokens.laneToken('B'), NINEBRAINS_LANE_ID: 'A' });
+    const mismatched = await runBin({
+      NINEBRAINS_BRAIN_URL: app!.url,
+      NINEBRAINS_TOKEN: tokens.laneToken('B'),
+      NINEBRAINS_LANE_ID: 'A',
+    });
     expect(mismatched.code).toBe(1);
     expect(mismatched.stderr).toContain('lane hint does not match');
   });
 
   it('exits with a clear error when misconfigured, and never enters direct mode', async () => {
-    const noUrl = await runBin({ NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: path.join(dir, 'brain.sqlite') });
+    const noUrl = await runBin({
+      NINEBRAINS_MODE: 'direct',
+      NINEBRAINS_BRAIN_DB: path.join(dir, 'brain.sqlite'),
+    });
     expect(noUrl.code).toBe(2);
     expect(noUrl.stderr).toContain('NINEBRAINS_BRAIN_URL is required');
     expect(existsSync(path.join(dir, 'brain.sqlite'))).toBe(false);
 
-    const badToken = await runBin({ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:9', NINEBRAINS_TOKEN: 'leaky-secret' });
+    const badToken = await runBin({
+      NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:9',
+      NINEBRAINS_TOKEN: 'leaky-secret',
+    });
     expect(badToken.code).toBe(2);
     expect(badToken.stderr).not.toContain('leaky-secret');
   });
 
   const electron = findElectron();
-  it.skipIf(!electron)('runs under the pinned Electron binary with ELECTRON_RUN_AS_NODE=1', async () => {
-    const tokens = await startApp();
-    const lane = await launch({ runtime: { kind: 'electron', execPath: electron! }, url: app!.url, token: tokens.laneToken('E') });
-    expect((await lane.client.listTools()).tools.map((t) => t.name)).toContain('claim_job');
-    expect((await lane.call('claim_job')).json).toMatchObject({ claimed: null });
-  });
+  it.skipIf(!electron)(
+    'runs under the pinned Electron binary with ELECTRON_RUN_AS_NODE=1',
+    async () => {
+      const tokens = await startApp();
+      const lane = await launch({
+        runtime: { kind: 'electron', execPath: electron! },
+        url: app!.url,
+        token: tokens.laneToken('E'),
+      });
+      expect((await lane.client.listTools()).tools.map((t) => t.name)).toContain('claim_job');
+      expect((await lane.call('claim_job')).json).toMatchObject({ claimed: null });
+    }
+  );
 });

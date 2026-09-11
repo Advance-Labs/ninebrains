@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { STORES, tempDir } from '../../test/helpers';
 import type { Job, Run } from '../types';
 import { openNodeSqliteConnection } from './sqlite/connection';
-import { CORE_MIGRATIONS_TABLE, LATEST_SCHEMA_VERSION, MIGRATIONS, migrate, migrationTag } from './sqlite/migrations';
+import {
+  CORE_MIGRATIONS_TABLE,
+  LATEST_SCHEMA_VERSION,
+  MIGRATIONS,
+  migrate,
+  migrationTag,
+} from './sqlite/migrations';
 import { DEFAULT_DB_FILENAME, SqliteBrainStore, resolveBrainDbPath } from './sqlite/sqlite-store';
 
 const job = (id: string, createdAt: number): Job => ({
@@ -150,7 +156,9 @@ describe('SqliteBrainStore', () => {
 
     const raw = new DatabaseSync(path.join(dir, DEFAULT_DB_FILENAME));
     expect(raw.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' });
-    expect(raw.prepare('SELECT max(version) AS v FROM brain_migrations').get()).toEqual({ v: LATEST_SCHEMA_VERSION });
+    expect(raw.prepare('SELECT max(version) AS v FROM brain_migrations').get()).toEqual({
+      v: LATEST_SCHEMA_VERSION,
+    });
     raw.close();
   });
 
@@ -196,7 +204,10 @@ describe('brain migration runner', () => {
     const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
     expect(migrate(connection)).toEqual(MIGRATIONS.map((m) => m.version));
     expect(migrate(connection)).toEqual([]);
-    const extra = [...MIGRATIONS, { version: 99, name: 'extra', when: 0, sql: 'CREATE TABLE extra (x INTEGER) STRICT' }];
+    const extra = [
+      ...MIGRATIONS,
+      { version: 99, name: 'extra', when: 0, sql: 'CREATE TABLE extra (x INTEGER) STRICT' },
+    ];
     expect(migrate(connection, extra)).toEqual([99]);
     // An older binary ignores newer applied versions instead of failing.
     expect(migrate(connection)).toEqual([]);
@@ -205,9 +216,14 @@ describe('brain migration runner', () => {
 
   it('rolls back a failed migration completely', () => {
     const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
-    const broken = [...MIGRATIONS, { version: 2, name: 'broken', when: 0, sql: 'CREATE TABLE ok (x) ; NOT VALID SQL' }];
+    const broken = [
+      ...MIGRATIONS,
+      { version: 2, name: 'broken', when: 0, sql: 'CREATE TABLE ok (x) ; NOT VALID SQL' },
+    ];
     expect(() => migrate(connection, broken)).toThrow();
-    expect(connection.get("SELECT count(*) AS n FROM sqlite_schema WHERE name IN ('jobs','ok')")).toEqual({ n: 0 });
+    expect(
+      connection.get("SELECT count(*) AS n FROM sqlite_schema WHERE name IN ('jobs','ok')")
+    ).toEqual({ n: 0 });
     connection.close();
   });
 
@@ -215,8 +231,12 @@ describe('brain migration runner', () => {
     const connection = openNodeSqliteConnection(path.join(tempDir(), 'brain.sqlite'));
     migrate(connection);
     connection.exec('DROP TABLE brain_migrations');
-    connection.exec(`CREATE TABLE ${CORE_MIGRATIONS_TABLE} (tag TEXT PRIMARY KEY, hash TEXT NOT NULL, applied_at INTEGER NOT NULL)`);
-    connection.run(`INSERT INTO ${CORE_MIGRATIONS_TABLE} VALUES (?, 'h', 0)`, [migrationTag(MIGRATIONS[0]!)]);
+    connection.exec(
+      `CREATE TABLE ${CORE_MIGRATIONS_TABLE} (tag TEXT PRIMARY KEY, hash TEXT NOT NULL, applied_at INTEGER NOT NULL)`
+    );
+    connection.run(`INSERT INTO ${CORE_MIGRATIONS_TABLE} VALUES (?, 'h', 0)`, [
+      migrationTag(MIGRATIONS[0]!),
+    ]);
     expect(migrate(connection)).toEqual([]);
     connection.close();
   });

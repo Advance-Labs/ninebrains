@@ -1,7 +1,12 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createFetchText, FetchBlockedError, type ResolvedAddress, type Resolver } from './fetch-text';
+import {
+  createFetchText,
+  FetchBlockedError,
+  type ResolvedAddress,
+  type Resolver,
+} from './fetch-text';
 
 const PUBLIC: ResolvedAddress = { address: '93.184.215.14', family: 4 };
 const LOOPBACK: ResolvedAddress = { address: '127.0.0.1', family: 4 };
@@ -31,12 +36,15 @@ describe('SEC-21 rebinding and redirects blocked (default policy)', () => {
     await expect(fetchText(url, {})).rejects.toBeInstanceOf(FetchBlockedError);
   });
 
-  it.each(['file:///etc/passwd', 'ftp://example.com/', 'gopher://x/', 'http://user:pw@example.com/', 'nonsense'])(
-    'refuses %s',
-    async (url) => {
-      await expect(fetchText(url, {})).rejects.toBeInstanceOf(FetchBlockedError);
-    }
-  );
+  it.each([
+    'file:///etc/passwd',
+    'ftp://example.com/',
+    'gopher://x/',
+    'http://user:pw@example.com/',
+    'nonsense',
+  ])('refuses %s', async (url) => {
+    await expect(fetchText(url, {})).rejects.toBeInstanceOf(FetchBlockedError);
+  });
 
   it('blocks a name whose answer mixes public and private addresses', async () => {
     const f = createFetchText({ resolve: async () => [PUBLIC, LOOPBACK] });
@@ -44,12 +52,16 @@ describe('SEC-21 rebinding and redirects blocked (default policy)', () => {
   });
 
   it('blocks a name that resolves to an IPv4-mapped IPv6 loopback', async () => {
-    const f = createFetchText({ resolve: async () => [{ address: '::ffff:127.0.0.1', family: 6 }] });
+    const f = createFetchText({
+      resolve: async () => [{ address: '::ffff:127.0.0.1', family: 6 }],
+    });
     await expect(f('http://mapped.test/', {})).rejects.toBeInstanceOf(FetchBlockedError);
   });
 
   it('blocks a name that does not resolve', async () => {
-    await expect(createFetchText({ resolve: async () => [] })('http://x.test/', {})).rejects.toThrow(/did not resolve/);
+    await expect(
+      createFetchText({ resolve: async () => [] })('http://x.test/', {})
+    ).rejects.toThrow(/did not resolve/);
   });
 });
 
@@ -103,7 +115,8 @@ describe('SEC-21 pinning, redirects and caps against a local server', () => {
 
   it('connects to the checked address even when the resolver would now answer differently', async () => {
     let calls = 0;
-    const resolve: Resolver = async () => (calls++ === 0 ? [LOOPBACK] : [{ address: '10.9.9.9', family: 4 }]);
+    const resolve: Resolver = async () =>
+      calls++ === 0 ? [LOOPBACK] : [{ address: '10.9.9.9', family: 4 }];
     const f = createFetchText({ resolve, addressPolicy: onlyLoopback });
     await expect(f(`http://pinned.test:${port}/ok`, {})).resolves.toBe('ok');
     expect(calls).toBe(1);
@@ -117,8 +130,12 @@ describe('SEC-21 pinning, redirects and caps against a local server', () => {
   it('re-checks every redirect hop', async () => {
     const f = createFetchText({ resolve: async () => [LOOPBACK], addressPolicy: onlyLoopback });
     await expect(f(`http://127.0.0.1:${port}/to-relative`, {})).resolves.toBe('ok');
-    await expect(f(`http://127.0.0.1:${port}/to-mapped`, {})).rejects.toBeInstanceOf(FetchBlockedError);
-    await expect(f(`http://127.0.0.1:${port}/to-private`, {})).rejects.toBeInstanceOf(FetchBlockedError);
+    await expect(f(`http://127.0.0.1:${port}/to-mapped`, {})).rejects.toBeInstanceOf(
+      FetchBlockedError
+    );
+    await expect(f(`http://127.0.0.1:${port}/to-private`, {})).rejects.toBeInstanceOf(
+      FetchBlockedError
+    );
   });
 
   it('stops after 5 redirects', async () => {

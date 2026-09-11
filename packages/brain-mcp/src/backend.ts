@@ -1,4 +1,8 @@
-import { type BrainRequest, type BrainResponse, createHttpBrainClient } from '@ninebrains/brain-core';
+import {
+  type BrainRequest,
+  type BrainResponse,
+  createHttpBrainClient,
+} from '@ninebrains/brain-core';
 
 /** Where tool calls go. */
 export interface BrainBackend {

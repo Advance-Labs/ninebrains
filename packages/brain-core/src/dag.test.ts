@@ -5,12 +5,16 @@ const e = (from: string, to: string) => ({ from, to });
 
 function isCyclePath(path: string[], edges: Array<{ from: string; to: string }>): boolean {
   if (path.length < 2 || path[0] !== path[path.length - 1]) return false;
-  return path.slice(1).every((to, i) => edges.some((edge) => edge.from === path[i] && edge.to === to));
+  return path
+    .slice(1)
+    .every((to, i) => edges.some((edge) => edge.from === path[i] && edge.to === to));
 }
 
 describe('findCycle', () => {
   it('returns null for a DAG', () => {
-    expect(findCycle(['a', 'b', 'c', 'd'], [e('a', 'b'), e('a', 'c'), e('b', 'd'), e('c', 'd')])).toBeNull();
+    expect(
+      findCycle(['a', 'b', 'c', 'd'], [e('a', 'b'), e('a', 'c'), e('b', 'd'), e('c', 'd')])
+    ).toBeNull();
   });
 
   it('returns null for an empty graph and isolated nodes', () => {

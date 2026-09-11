@@ -15,7 +15,8 @@ beforeAll(() => {
   project = path.join(root, 'project');
   evidence = path.join(root, 'evidence');
   outside = path.join(root, 'outside');
-  for (const dir of [project, evidence, outside, path.join(project, 'src')]) mkdirSync(dir, { recursive: true });
+  for (const dir of [project, evidence, outside, path.join(project, 'src')])
+    mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(project, 'src', 'app.ts'), '');
   writeFileSync(path.join(evidence, 'shot.png'), '');
   writeFileSync(path.join(outside, 'secret.txt'), '');
@@ -26,11 +27,15 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 describe('resolveAttachmentPath', () => {
   it('resolves relative paths against the project dir', () => {
-    expect(resolveAttachmentPath('src/app.ts', [project, evidence])).toBe(path.join(project, 'src', 'app.ts'));
+    expect(resolveAttachmentPath('src/app.ts', [project, evidence])).toBe(
+      path.join(project, 'src', 'app.ts')
+    );
   });
 
   it('accepts absolute paths inside any root', () => {
-    expect(resolveAttachmentPath(path.join(evidence, 'shot.png'), [project, evidence])).toBe(path.join(evidence, 'shot.png'));
+    expect(resolveAttachmentPath(path.join(evidence, 'shot.png'), [project, evidence])).toBe(
+      path.join(evidence, 'shot.png')
+    );
     expect(resolveAttachmentPath(project, [project])).toBe(project);
   });
 
@@ -47,7 +52,9 @@ describe('resolveAttachmentPath', () => {
   });
 
   it('rejects absolute paths outside every root', () => {
-    expect(() => resolveAttachmentPath(path.join(outside, 'secret.txt'), [project, evidence])).toThrow(/outside/);
+    expect(() =>
+      resolveAttachmentPath(path.join(outside, 'secret.txt'), [project, evidence])
+    ).toThrow(/outside/);
   });
 
   it('rejects a sibling dir that only shares a name prefix', () => {

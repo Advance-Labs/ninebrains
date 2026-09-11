@@ -32,7 +32,14 @@ export const REVIEWER_DENIED_TOOLS = [
 ] as const;
 
 /** Default pre-approvals for an unattended worker (SEC-31 preset). Bash runs sandboxed. */
-export const WORKER_DEFAULT_ALLOWED_TOOLS = ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash'] as const;
+export const WORKER_DEFAULT_ALLOWED_TOOLS = [
+  'Read',
+  'Grep',
+  'Glob',
+  'Edit',
+  'Write',
+  'Bash',
+] as const;
 
 export interface ClaudeArgvFiles {
   mcpConfigPath: string;
@@ -186,7 +193,8 @@ export class ClaudeStreamParser implements AgentStreamParser {
     }
     for (const block of Array.isArray(message.content) ? message.content : []) {
       const b = asObject(block);
-      if (b?.type === 'text' && typeof b.text === 'string') events.push({ kind: 'text', text: b.text });
+      if (b?.type === 'text' && typeof b.text === 'string')
+        events.push({ kind: 'text', text: b.text });
       if (b?.type === 'tool_use') {
         events.push({ kind: 'tool-use', id: String(b.id), name: String(b.name), input: b.input });
       }
@@ -199,7 +207,11 @@ export class ClaudeStreamParser implements AgentStreamParser {
     return (Array.isArray(content) ? content : [])
       .map(asObject)
       .filter((b): b is Json => b?.type === 'tool_result')
-      .map((b) => ({ kind: 'tool-result', toolUseId: String(b.tool_use_id), isError: b.is_error === true }));
+      .map((b) => ({
+        kind: 'tool-result',
+        toolUseId: String(b.tool_use_id),
+        isError: b.is_error === true,
+      }));
   }
 
   private onResult(msg: Json): AgentEvent {

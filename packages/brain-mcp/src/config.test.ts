@@ -7,7 +7,11 @@ const base = { NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100', NINEBRAINS_TOKEN: 
 
 describe('loadConfig', () => {
   it('reads only the URL, the token and an optional lane hint', () => {
-    expect(loadConfig(base)).toEqual({ url: 'http://127.0.0.1:4100', token: TOKEN, laneHint: null });
+    expect(loadConfig(base)).toEqual({
+      url: 'http://127.0.0.1:4100',
+      token: TOKEN,
+      laneHint: null,
+    });
     expect(loadConfig({ ...base, NINEBRAINS_LANE_ID: 'lane-1' }).laneHint).toBe('lane-1');
   });
 
@@ -23,15 +27,18 @@ describe('loadConfig', () => {
   });
 
   it('direct mode is not reachable through env: a DB path without a URL is still an error', () => {
-    expect(() => loadConfig({ NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: '/tmp/brain.sqlite' })).toThrow(
-      /NINEBRAINS_BRAIN_URL is required/
-    );
+    expect(() =>
+      loadConfig({ NINEBRAINS_MODE: 'direct', NINEBRAINS_BRAIN_DB: '/tmp/brain.sqlite' })
+    ).toThrow(/NINEBRAINS_BRAIN_URL is required/);
   });
 
   it.each([
     [{}, /NINEBRAINS_BRAIN_URL is required/],
     [{ NINEBRAINS_BRAIN_URL: 'http://localhost:4100', NINEBRAINS_TOKEN: TOKEN }, /127\.0\.0\.1/],
-    [{ NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: TOKEN }, /127\.0\.0\.1/],
+    [
+      { NINEBRAINS_BRAIN_URL: 'https://brain.example.com', NINEBRAINS_TOKEN: TOKEN },
+      /127\.0\.0\.1/,
+    ],
     [{ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:4100' }, /NINEBRAINS_TOKEN is missing or malformed/],
     [{ ...base, NINEBRAINS_TOKEN: 'short' }, /NINEBRAINS_TOKEN is missing or malformed/],
     [{ ...base, NINEBRAINS_LANE_ID: 'a:b' }, /NINEBRAINS_LANE_ID must be/],
@@ -56,7 +63,10 @@ describe('brainMcpServerEntry', () => {
     expect(
       brainMcpServerEntry({
         binPath: '/app/brain-mcp/bin.mjs',
-        runtime: { kind: 'electron', execPath: '/Applications/Ninebrains.app/Contents/MacOS/Ninebrains' },
+        runtime: {
+          kind: 'electron',
+          execPath: '/Applications/Ninebrains.app/Contents/MacOS/Ninebrains',
+        },
         url: 'http://127.0.0.1:4100',
         token: TOKEN,
         laneHint: 'lane-1',
@@ -81,6 +91,9 @@ describe('brainMcpServerEntry', () => {
       url: 'http://127.0.0.1:1',
       token: TOKEN,
     });
-    expect(entry.env).toEqual({ NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1', NINEBRAINS_TOKEN: TOKEN });
+    expect(entry.env).toEqual({
+      NINEBRAINS_BRAIN_URL: 'http://127.0.0.1:1',
+      NINEBRAINS_TOKEN: TOKEN,
+    });
   });
 });

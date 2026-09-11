@@ -18,7 +18,10 @@ import { createBrainMcpServer } from './server';
 import { SessionError, discoverSession } from './session';
 import { BRAIN_TOOLS, LANE_TOOLS, type Role } from './tools';
 
-type Call = (name: string, args?: Record<string, unknown>) => Promise<{ isError: boolean; text: string; json: any }>;
+type Call = (
+  name: string,
+  args?: Record<string, unknown>
+) => Promise<{ isError: boolean; text: string; json: any }>;
 
 const HUB = { role: 'brain', brainId: 'main' } as const;
 
@@ -50,7 +53,11 @@ async function connect(backend: BrainBackend, role: Role): Promise<{ call: Call;
 }
 
 function grant(identity: BrainGrant['identity'], projectId: string): BrainGrant {
-  return { identity, projectId, attachmentRoots: [path.join(dir, 'project'), path.join(dir, 'evidence')] };
+  return {
+    identity,
+    projectId,
+    attachmentRoots: [path.join(dir, 'project'), path.join(dir, 'evidence')],
+  };
 }
 
 async function app(): Promise<BrainHttpServer> {
@@ -60,7 +67,10 @@ async function app(): Promise<BrainHttpServer> {
 
 /** The shipped transport (forward) and the test-only in-process one must behave identically. */
 const MODES: Array<[string, (g: BrainGrant) => Promise<BrainBackend>]> = [
-  ['forward', async (g) => forwardBackend({ url: (await app()).url, token: (await app()).issueToken(g) })],
+  [
+    'forward',
+    async (g) => forwardBackend({ url: (await app()).url, token: (await app()).issueToken(g) }),
+  ],
   ['in-process test backend', async (g) => directBackend(brain, g)],
 ];
 
@@ -88,17 +98,23 @@ afterEach(async () => {
 
 describe('tool surface', () => {
   it('lanes see lane tools without brain-only fields; brains see brain tools', async () => {
-    const lane = await connect(directBackend(brain, grant({ role: 'lane', laneId: 'A', projectId: 'p1' }, 'p1')), 'lane');
+    const lane = await connect(
+      directBackend(brain, grant({ role: 'lane', laneId: 'A', projectId: 'p1' }, 'p1')),
+      'lane'
+    );
     const hub = await connect(directBackend(brain, grant(HUB, 'p1')), 'brain');
     const laneTools = (await lane.client.listTools()).tools;
     const hubTools = (await hub.client.listTools()).tools;
     expect(laneTools.map((t) => t.name).sort()).toEqual([...LANE_TOOLS].sort());
     expect(hubTools.map((t) => t.name).sort()).toEqual([...BRAIN_TOOLS].sort());
     expect([...laneTools, ...hubTools].map((t) => t.name)).not.toContain('whoami');
-    for (const tool of [...laneTools, ...hubTools]) expect(tool.description!.length, tool.name).toBeGreaterThan(40);
+    for (const tool of [...laneTools, ...hubTools])
+      expect(tool.description!.length, tool.name).toBeGreaterThan(40);
 
     const props = (tools: typeof laneTools, name: string) =>
-      Object.keys((tools.find((t) => t.name === name)!.inputSchema.properties ?? {}) as object).sort();
+      Object.keys(
+        (tools.find((t) => t.name === name)!.inputSchema.properties ?? {}) as object
+      ).sort();
     expect(props(laneTools, 'read_inbox')).toEqual(['limit']);
     expect(props(hubTools, 'read_inbox')).toEqual(['address', 'limit']);
     expect(props(laneTools, 'list_jobs')).not.toContain('projectId');
@@ -108,7 +124,8 @@ describe('tool surface', () => {
 
 describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
   const lane = async (laneId: string, projectId = 'p1') =>
-    (await connect(await backendFor(grant({ role: 'lane', laneId, projectId }, projectId)), 'lane')).call;
+    (await connect(await backendFor(grant({ role: 'lane', laneId, projectId }, projectId)), 'lane'))
+      .call;
   const hubCall = async () => (await connect(await backendFor(grant(HUB, 'p1')), 'brain')).call;
 
   it('runs a plan -> claim -> complete -> message flow', async () => {
@@ -116,13 +133,19 @@ describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
     const laneA = await lane('A');
     const laneB = await lane('B');
 
-    const first = (await hub('create_job', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })).json;
+    const first = (
+      await hub('create_job', { title: 'Build login', body: 'x'.repeat(400), gates: ['tests'] })
+    ).json;
     expect(first.state).toBe('ready');
     expect(first.body.endsWith('...')).toBe(true);
-    const second = (await hub('create_job', { title: 'Review login', dependsOn: [first.id], kind: 'review' })).json;
+    const second = (
+      await hub('create_job', { title: 'Review login', dependsOn: [first.id], kind: 'review' })
+    ).json;
     expect(second.state).toBe('proposed');
 
-    expect((await laneA('list_jobs', { states: ['ready'] })).json.map((j: { id: string }) => j.id)).toEqual([first.id]);
+    expect(
+      (await laneA('list_jobs', { states: ['ready'] })).json.map((j: { id: string }) => j.id)
+    ).toEqual([first.id]);
     const claimed = (await laneA('claim_job')).json;
     expect(claimed).toMatchObject({ id: first.id, state: 'running', gates: ['tests'] });
     expect(claimed.body).toHaveLength(400);
@@ -158,7 +181,9 @@ describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
     expect((await laneB('read_inbox')).json).toEqual([]);
 
     await laneA('send_message', { to: { kind: 'brain', id: 'main' }, body: 'done with login' });
-    expect((await hub('read_inbox')).json.map((m: { body: string }) => m.body)).toEqual(['done with login']);
+    expect((await hub('read_inbox')).json.map((m: { body: string }) => m.body)).toEqual([
+      'done with login',
+    ]);
   });
 
   it('returns validation and authorization failures as tool errors', async () => {
@@ -170,10 +195,18 @@ describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
     const cases: Array<[string, Record<string, unknown>, RegExp]> = [
       ['send_message', { to: 'B', body: 'hi' }, /expected object|invalid/i],
       ['send_message', { to: { kind: 'lane', id: '..' }, body: 'hi' }, /ids are/],
-      ['send_message', { to: { kind: 'lane', id: 'B' }, body: 'x'.repeat(32 * 1024 + 1) }, /32768 bytes/],
       [
         'send_message',
-        { to: { kind: 'lane', id: 'B' }, body: 'hi', attachments: [{ kind: 'file', path: '../../etc/passwd' }] },
+        { to: { kind: 'lane', id: 'B' }, body: 'x'.repeat(32 * 1024 + 1) },
+        /32768 bytes/,
+      ],
+      [
+        'send_message',
+        {
+          to: { kind: 'lane', id: 'B' },
+          body: 'hi',
+          attachments: [{ kind: 'file', path: '../../etc/passwd' }],
+        },
         /outside|does not exist/,
       ],
       ['complete_job', { jobId: job.id, summary: 'x', artifacts: ['/etc/hosts'] }, /outside/],
@@ -211,19 +244,29 @@ describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
     expect(cycle.isError).toBe(true);
     expect(cycle.text).toContain(`CYCLE: dependency cycle: ${b.id} -> ${a.id} -> ${b.id}`);
 
-    expect((await hub('assign_job', { jobId: a.id, laneId: 'B' })).json).toMatchObject({ state: 'claimed', laneId: 'B' });
-    expect((await laneB('block_job', { jobId: a.id, reason: 'need an API key' })).json).toMatchObject({
+    expect((await hub('assign_job', { jobId: a.id, laneId: 'B' })).json).toMatchObject({
+      state: 'claimed',
+      laneId: 'B',
+    });
+    expect(
+      (await laneB('block_job', { jobId: a.id, reason: 'need an API key' })).json
+    ).toMatchObject({
       state: 'blocked',
       reason: 'need an API key',
     });
-    expect((await hub('requeue_job', { jobId: a.id })).json).toMatchObject({ state: 'ready', attempts: 0 });
+    expect((await hub('requeue_job', { jobId: a.id })).json).toMatchObject({
+      state: 'ready',
+      attempts: 0,
+    });
     expect((await hub('list_lanes')).json.map((l: { id: string }) => l.id)).toEqual(['A', 'B']);
     expect((await hub('broadcast', { body: 'standup at 10' })).json).toEqual([
       { kind: 'lane', id: 'A' },
       { kind: 'lane', id: 'B' },
     ]);
     expect((await hub('list_jobs', { states: ['proposed'] })).json).toMatchObject([{ id: b.id }]);
-    expect((await hub('add_note', { body: 'decided on OAuth' })).json).toMatchObject({ projectId: 'p1' });
+    expect((await hub('add_note', { body: 'decided on OAuth' })).json).toMatchObject({
+      projectId: 'p1',
+    });
     expect((await hub('read_inbox', { address: { kind: 'lane', id: 'A' } })).json).toHaveLength(1);
   });
 });
@@ -241,7 +284,10 @@ describe('forward mode specifics', () => {
   });
 
   it('rejects a forged token', async () => {
-    const { call } = await connect(forwardBackend({ url: (await app()).url, token: 'x'.repeat(43) }), 'lane');
+    const { call } = await connect(
+      forwardBackend({ url: (await app()).url, token: 'x'.repeat(43) }),
+      'lane'
+    );
     expect((await call('list_jobs')).text).toMatch(/^UNAUTHORIZED/);
   });
 });
@@ -250,10 +296,15 @@ describe('SEC-02 session discovery: role comes from the token', () => {
   it('learns lane or brain from main', async () => {
     const server = await app();
     const laneSession = await discoverSession(
-      forwardBackend({ url: server.url, token: server.issueToken(grant({ role: 'lane', laneId: 'A', projectId: 'p1' }, 'p1')) })
+      forwardBackend({
+        url: server.url,
+        token: server.issueToken(grant({ role: 'lane', laneId: 'A', projectId: 'p1' }, 'p1')),
+      })
     );
     expect(laneSession).toEqual({ role: 'lane', laneId: 'A', projectId: 'p1' });
-    const brainSession = await discoverSession(forwardBackend({ url: server.url, token: server.issueToken(grant(HUB, 'p1')) }));
+    const brainSession = await discoverSession(
+      forwardBackend({ url: server.url, token: server.issueToken(grant(HUB, 'p1')) })
+    );
     expect(brainSession).toMatchObject({ role: 'brain', brainId: 'main' });
   });
 
@@ -263,15 +314,22 @@ describe('SEC-02 session discovery: role comes from the token', () => {
     const counted = (backend: BrainBackend) => {
       let calls = 0;
       return {
-        backend: { ...backend, call: (r: Parameters<BrainBackend['call']>[0]) => (calls++, backend.call(r)) },
+        backend: {
+          ...backend,
+          call: (r: Parameters<BrainBackend['call']>[0]) => (calls++, backend.call(r)),
+        },
         calls: () => calls,
       };
     };
     const forged = counted(forwardBackend({ url: server.url, token: 'y'.repeat(43) }));
-    await expect(discoverSession(forged.backend, { attempts: 5, delayMs: 1 })).rejects.toThrow(/UNAUTHORIZED/);
+    await expect(discoverSession(forged.backend, { attempts: 5, delayMs: 1 })).rejects.toThrow(
+      /UNAUTHORIZED/
+    );
     expect(forged.calls()).toBe(1);
     const mismatched = counted(forwardBackend({ url: server.url, token, laneHint: 'B' }));
-    await expect(discoverSession(mismatched.backend, { attempts: 5, delayMs: 1 })).rejects.toThrow(SessionError);
+    await expect(discoverSession(mismatched.backend, { attempts: 5, delayMs: 1 })).rejects.toThrow(
+      SessionError
+    );
     expect(mismatched.calls()).toBe(1);
   });
 
@@ -288,14 +346,22 @@ describe('SEC-02 session discovery: role comes from the token', () => {
     expect(calls).toBe(3);
 
     const down: BrainBackend = {
-      call: async () => ({ ok: false, error: { code: 'UNAVAILABLE', message: 'connection refused' } }),
+      call: async () => ({
+        ok: false,
+        error: { code: 'UNAVAILABLE', message: 'connection refused' },
+      }),
       close: () => {},
     };
-    await expect(discoverSession(down, { attempts: 3, delayMs: 1 })).rejects.toThrow(/UNAVAILABLE: connection refused/);
+    await expect(discoverSession(down, { attempts: 3, delayMs: 1 })).rejects.toThrow(
+      /UNAVAILABLE: connection refused/
+    );
   });
 
   it('rejects a malformed whoami answer', async () => {
-    const weird: BrainBackend = { call: async () => ({ ok: true, result: { role: 'admin' } }), close: () => {} };
+    const weird: BrainBackend = {
+      call: async () => ({ ok: true, result: { role: 'admin' } }),
+      close: () => {},
+    };
     await expect(discoverSession(weird, { attempts: 1 })).rejects.toThrow(/malformed whoami/);
   });
 });

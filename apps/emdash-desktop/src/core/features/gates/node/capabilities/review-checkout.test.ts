@@ -1,9 +1,22 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createPrepareReviewCheckout, isReviewCheckout, prepareReviewCheckout } from './review-checkout';
-import type { GateJob } from './types';
+import {
+  createPrepareReviewCheckout,
+  isReviewCheckout,
+  prepareReviewCheckout,
+} from './review-checkout';
 import { git, makeRepoWithLanes, snapshotWorktree, tempRoot } from './test-fixtures';
+import type { GateJob } from './types';
 
 const root = tempRoot('nb-checkout-');
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -47,16 +60,22 @@ describe('prepareReviewCheckout', () => {
 
   it('checks out an explicit commit without mirroring', async () => {
     const head = git(lane, 'rev-parse', 'HEAD');
-    const checkout = await prepareReviewCheckout({ worktreePath: lane, commit: head.slice(0, 12), root: checkouts });
+    const checkout = await prepareReviewCheckout({
+      worktreePath: lane,
+      commit: head.slice(0, 12),
+      root: checkouts,
+    });
     expect(checkout.commit).toBe(head);
     await checkout.dispose();
   });
 
   it('refuses a malformed commit and a checkout root inside the worktree', async () => {
-    await expect(prepareReviewCheckout({ worktreePath: lane, commit: '--output=x', root: checkouts })).rejects.toThrow(
-      /Invalid review commit/
+    await expect(
+      prepareReviewCheckout({ worktreePath: lane, commit: '--output=x', root: checkouts })
+    ).rejects.toThrow(/Invalid review commit/);
+    await expect(prepareReviewCheckout({ worktreePath: lane, root: lane })).rejects.toThrow(
+      /inside the worktree/
     );
-    await expect(prepareReviewCheckout({ worktreePath: lane, root: lane })).rejects.toThrow(/inside the worktree/);
   });
 
   it('backs the gates-core capability: job → lane worktree → checkout, never the lane', async () => {

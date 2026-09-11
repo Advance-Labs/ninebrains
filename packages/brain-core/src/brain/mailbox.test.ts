@@ -34,7 +34,8 @@ describe.each(STORES)('mailbox (%s store)', (_name, createStore) => {
 
   it('honours the read limit and leaves the rest unread', () => {
     const brain = makeBrain(createStore());
-    for (const n of [1, 2, 3]) brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: `m${n}` });
+    for (const n of [1, 2, 3])
+      brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: `m${n}` });
     expect(brain.readInbox(LANE_A, { limit: 2 }).map((m) => m.body)).toEqual(['m1', 'm2']);
     expect(brain.readInbox(LANE_A).map((m) => m.body)).toEqual(['m3']);
   });
@@ -42,9 +43,9 @@ describe.each(STORES)('mailbox (%s store)', (_name, createStore) => {
   it('delivers to lanes that are not registered yet (store-and-forward)', () => {
     const brain = makeBrain(createStore(), { lanes: false });
     brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'future' }, body: 'when you wake up' });
-    expect(brain.readInbox({ role: 'lane', laneId: 'future', projectId: 'p1' }).map((m) => m.body)).toEqual([
-      'when you wake up',
-    ]);
+    expect(
+      brain.readInbox({ role: 'lane', laneId: 'future', projectId: 'p1' }).map((m) => m.body)
+    ).toEqual(['when you wake up']);
   });
 
   it('routes replies to the originating brain', () => {
@@ -58,18 +59,34 @@ describe.each(STORES)('mailbox (%s store)', (_name, createStore) => {
   it('broadcasts to every lane of one project only', () => {
     const brain = makeBrain(createStore());
     const sent = brain.broadcast(BRAIN, { projectId: 'p1', body: 'standup' });
-    expect(sent.map((m) => m.to)).toEqual([{ kind: 'lane', id: 'A' }, { kind: 'lane', id: 'B' }]);
+    expect(sent.map((m) => m.to)).toEqual([
+      { kind: 'lane', id: 'A' },
+      { kind: 'lane', id: 'B' },
+    ]);
     expect(brain.readInbox(BRAIN, { address: { kind: 'lane', id: 'X' } })).toEqual([]);
   });
 
   it('rejects bad addresses, empty bodies, oversized bodies and too many attachments', () => {
     const brain = makeBrain(createStore());
-    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'robot', id: 'A' } as never, body: 'x' })).toThrow(InvalidInputError);
-    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'a:b' }, body: 'x' })).toThrow(InvalidInputError);
-    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: ' ' })).toThrow(InvalidInputError);
-    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: 'x'.repeat(32 * 1024 + 1) })).toThrow(InvalidInputError);
-    const attachments = Array.from({ length: 21 }, (_, i) => ({ kind: 'file' as const, path: `f${i}` }));
-    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: 'x', attachments })).toThrow(InvalidInputError);
+    expect(() =>
+      brain.sendMessage(BRAIN, { to: { kind: 'robot', id: 'A' } as never, body: 'x' })
+    ).toThrow(InvalidInputError);
+    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'a:b' }, body: 'x' })).toThrow(
+      InvalidInputError
+    );
+    expect(() => brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: ' ' })).toThrow(
+      InvalidInputError
+    );
+    expect(() =>
+      brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: 'x'.repeat(32 * 1024 + 1) })
+    ).toThrow(InvalidInputError);
+    const attachments = Array.from({ length: 21 }, (_, i) => ({
+      kind: 'file' as const,
+      path: `f${i}`,
+    }));
+    expect(() =>
+      brain.sendMessage(BRAIN, { to: { kind: 'lane', id: 'A' }, body: 'x', attachments })
+    ).toThrow(InvalidInputError);
   });
 
   it('emits messageSent after commit', () => {

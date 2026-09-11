@@ -64,7 +64,13 @@ describe('SEC-13 unattended env is minimal', () => {
 
   it('SEC-32: carries no outbound credentials', () => {
     const env = buildUnattendedEnv(POLLUTED, { provider: 'claude', platform: 'posix' });
-    for (const key of ['GITHUB_TOKEN', 'GH_TOKEN', 'VERCEL_TOKEN', 'STRIPE_SECRET_KEY', 'AWS_SECRET_ACCESS_KEY']) {
+    for (const key of [
+      'GITHUB_TOKEN',
+      'GH_TOKEN',
+      'VERCEL_TOKEN',
+      'STRIPE_SECRET_KEY',
+      'AWS_SECRET_ACCESS_KEY',
+    ]) {
       expect(env[key]).toBeUndefined();
     }
   });
@@ -74,7 +80,9 @@ describe('SEC-20 tests gate env is scrubbed', () => {
   it('has no tokens, no NINEBRAINS_*, no provider secrets or accounts', () => {
     const env = buildScrubbedCommandEnv(POLLUTED, 'posix');
     const keys = Object.keys(env);
-    expect(keys.filter((k) => /TOKEN|KEY|SECRET|CREDENTIALS|NINEBRAINS|EMDASH|CLAUDE|CODEX/.test(k))).toEqual([]);
+    expect(
+      keys.filter((k) => /TOKEN|KEY|SECRET|CREDENTIALS|NINEBRAINS|EMDASH|CLAUDE|CODEX/.test(k))
+    ).toEqual([]);
     expect(env).toMatchObject({ PATH: '/usr/bin', HOME: '/home/u', CI: '1' });
   });
 });

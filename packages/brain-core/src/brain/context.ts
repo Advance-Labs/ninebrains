@@ -58,7 +58,12 @@ export function transition(
 }
 
 /** Writes a non-state change (content, archival) and records it. */
-export function touch(ctx: BrainContext, tx: Tx, job: Job, patch: Partial<Omit<Job, 'id' | 'state'>>): Job {
+export function touch(
+  ctx: BrainContext,
+  tx: Tx,
+  job: Job,
+  patch: Partial<Omit<Job, 'id' | 'state'>>
+): Job {
   const next: Job = { ...job, ...patch, updatedAt: ctx.now() };
   ctx.store.updateJob(next);
   tx.raise({ type: 'jobChanged', payload: { job: next, previousState: job.state } });
@@ -66,13 +71,16 @@ export function touch(ctx: BrainContext, tx: Tx, job: Job, patch: Partial<Omit<J
 }
 
 export function checkText(label: string, value: string, maxBytes: number, required = true): void {
-  if (required && value.trim().length === 0) throw new InvalidInputError(`${label} must not be empty`);
-  if (utf8Bytes(value) > maxBytes) throw new InvalidInputError(`${label} exceeds ${maxBytes} bytes`);
+  if (required && value.trim().length === 0)
+    throw new InvalidInputError(`${label} must not be empty`);
+  if (utf8Bytes(value) > maxBytes)
+    throw new InvalidInputError(`${label} exceeds ${maxBytes} bytes`);
 }
 
 export function checkTitle(title: string): void {
   if (title.trim().length === 0) throw new InvalidInputError('title must not be empty');
-  if (title.length > LIMITS.titleChars) throw new InvalidInputError(`title exceeds ${LIMITS.titleChars} characters`);
+  if (title.length > LIMITS.titleChars)
+    throw new InvalidInputError(`title exceeds ${LIMITS.titleChars} characters`);
 }
 
 /** Returns the gates a job must pass at minimum (from the project's rigor settings). */
@@ -89,7 +97,9 @@ export function withGateFloor(
   kind: JobKind,
   requested: GateSpec | null
 ): GateSpec | null {
-  const gates = [...new Set([...ctx.resolveGateFloor(projectId, kind), ...(requested?.gates ?? [])])];
+  const gates = [
+    ...new Set([...ctx.resolveGateFloor(projectId, kind), ...(requested?.gates ?? [])]),
+  ];
   if (gates.length === 0 && requested === null) return null;
   return { ...requested, gates };
 }

@@ -75,9 +75,14 @@ describe('dispatchTick', () => {
   });
 
   it('returns nothing without idle lanes', () => {
-    expect(dispatchTick({ jobs: [job('t', 1)], edges: [], lanes: [lane('a', { status: 'running' })], runs: [] })).toEqual(
-      []
-    );
+    expect(
+      dispatchTick({
+        jobs: [job('t', 1)],
+        edges: [],
+        lanes: [lane('a', { status: 'running' })],
+        runs: [],
+      })
+    ).toEqual([]);
   });
 
   it('is pure: the input is not modified', () => {

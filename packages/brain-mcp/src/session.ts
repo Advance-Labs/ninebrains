@@ -37,7 +37,8 @@ export async function discoverSession(
     const response = await backend.call({ v: BRAIN_PROTOCOL_VERSION, op: 'whoami', args: {} });
     if (response.ok) {
       const parsed = whoamiSchema.safeParse(response.result);
-      if (!parsed.success) throw new SessionError('the Brain endpoint returned a malformed whoami result');
+      if (!parsed.success)
+        throw new SessionError('the Brain endpoint returned a malformed whoami result');
       return parsed.data;
     }
     last = `${response.error.code}: ${response.error.message}`;

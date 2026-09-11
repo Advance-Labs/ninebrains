@@ -63,7 +63,10 @@ describe('claude stream-json parser', () => {
   it('counts a message once even when its usage repeats on every content block', () => {
     const usage = { input_tokens: 10, output_tokens: 5 };
     const block = (id: string, text: string) =>
-      JSON.stringify({ type: 'assistant', message: { id, content: [{ type: 'text', text }], usage } });
+      JSON.stringify({
+        type: 'assistant',
+        message: { id, content: [{ type: 'text', text }], usage },
+      });
     const { parser } = parseAll([block('m1', 'a'), block('m1', 'b'), block('m2', 'c')]);
     expect(totalTokens(parser.usage())).toBe(30);
   });
@@ -107,6 +110,10 @@ describe('claude argv builder', () => {
     const cfg = JSON.parse(
       buildClaudeMcpConfig(spec({ mcpServers: { brain: { command: '/n', env: { LANE: 'a' } } } }))
     );
-    expect(cfg.mcpServers.brain).toMatchObject({ type: 'stdio', command: '/n', env: { LANE: 'a' } });
+    expect(cfg.mcpServers.brain).toMatchObject({
+      type: 'stdio',
+      command: '/n',
+      env: { LANE: 'a' },
+    });
   });
 });

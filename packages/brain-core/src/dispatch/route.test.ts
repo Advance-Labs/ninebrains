@@ -32,22 +32,39 @@ const run = (laneId: string, jobId = 'old', startedAt = ++runSeq): Run => ({
   transcriptPath: null,
 });
 
-const edge = (from: string, to: string): JobEdge => ({ from, to, projectId: 'p1', planId: null, createdAt: 0 });
+const edge = (from: string, to: string): JobEdge => ({
+  from,
+  to,
+  projectId: 'p1',
+  planId: null,
+  createdAt: 0,
+});
 
 describe('pickLane', () => {
   it('returns null when no lane is idle in the job project', () => {
     expect(pickLane(job(), [], { runs: [] })).toBeNull();
-    const lanes = [lane('busy', { status: 'running' }), lane('asleep', { status: 'asleep' }), lane('far', { projectId: 'p2' })];
+    const lanes = [
+      lane('busy', { status: 'running' }),
+      lane('asleep', { status: 'asleep' }),
+      lane('far', { projectId: 'p2' }),
+    ];
     expect(pickLane(job(), lanes, { runs: [] })).toBeNull();
   });
 
   it('ignores non-idle and other-project lanes', () => {
-    const lanes = [lane('busy', { status: 'verifying' }), lane('far', { projectId: 'p2' }), lane('free')];
+    const lanes = [
+      lane('busy', { status: 'verifying' }),
+      lane('far', { projectId: 'p2' }),
+      lane('free'),
+    ];
     expect(pickLane(job(), lanes, { runs: [] })).toBe('free');
   });
 
   it('prefers the lane that recently touched the job files, even if it is busier', () => {
-    const lanes = [lane('fresh'), lane('warm', { recentFiles: ['src/auth/login.ts', 'README.md'] })];
+    const lanes = [
+      lane('fresh'),
+      lane('warm', { recentFiles: ['src/auth/login.ts', 'README.md'] }),
+    ];
     const history = { runs: [run('warm'), run('warm'), run('warm')] };
     expect(pickLane(job({ hints: { paths: ['src/auth/login.ts'] } }), lanes, history)).toBe('warm');
   });
@@ -56,7 +73,9 @@ describe('pickLane', () => {
     const lanes = [lane('a'), lane('b', { recentFiles: ['./src/auth/login.ts'] })];
     expect(pickLane(job({ hints: { paths: ['src/auth/'] } }), lanes, { runs: [] })).toBe('b');
     const dirLanes = [lane('a'), lane('b', { recentFiles: ['src/auth'] })];
-    expect(pickLane(job({ hints: { paths: ['src\\auth\\session.ts'] } }), dirLanes, { runs: [] })).toBe('b');
+    expect(
+      pickLane(job({ hints: { paths: ['src\\auth\\session.ts'] } }), dirLanes, { runs: [] })
+    ).toBe('b');
     expect(pickLane(job({ hints: { paths: ['src/authz.ts'] } }), dirLanes, { runs: [] })).toBe('a');
   });
 
@@ -69,7 +88,7 @@ describe('pickLane', () => {
     expect(pickLane(job(), lanes, history)).toBe('b');
   });
 
-  it('only counts the lane\'s most recent job for chain affinity', () => {
+  it("only counts the lane's most recent job for chain affinity", () => {
     const lanes = [lane('a'), lane('b')];
     const history = {
       runs: [run('b', 'schema', 1), run('b', 'unrelated', 9), run('a', 'x', 2), run('a', 'y', 3)],
@@ -94,12 +113,17 @@ describe('pickLane', () => {
       lane('claude-warm', { provider: 'claude', recentFiles: ['src/a.ts'] }),
       lane('codex-cold', { provider: 'codex' }),
     ];
-    const review = job({ hints: { kind: 'review', authorProvider: 'claude', paths: ['src/a.ts'] } });
+    const review = job({
+      hints: { kind: 'review', authorProvider: 'claude', paths: ['src/a.ts'] },
+    });
     expect(pickLane(review, lanes, { runs: [] })).toBe('codex-cold');
   });
 
   it('falls back to the same provider for review when no other is free', () => {
-    const lanes = [lane('c1', { provider: 'claude' }), lane('x1', { provider: 'codex', status: 'running' })];
+    const lanes = [
+      lane('c1', { provider: 'claude' }),
+      lane('x1', { provider: 'codex', status: 'running' }),
+    ];
     const review = job({ hints: { kind: 'review', authorProvider: 'claude' } });
     expect(pickLane(review, lanes, { runs: [] })).toBe('c1');
   });

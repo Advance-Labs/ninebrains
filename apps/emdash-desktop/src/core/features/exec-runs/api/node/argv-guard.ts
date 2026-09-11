@@ -42,7 +42,14 @@ const BANNED_VALUES: readonly RegExp[] = [
 const SANDBOX_OFF = /"sandbox"\s*:\s*\{[^}]*"enabled"\s*:\s*false/i;
 
 /** Flags whose next token is a value we must inspect (the non-`=` spelling). */
-const VALUE_FLAGS = new Set(['--permission-mode', '--sandbox', '-s', '--settings', '-c', '--config']);
+const VALUE_FLAGS = new Set([
+  '--permission-mode',
+  '--sandbox',
+  '-s',
+  '--settings',
+  '-c',
+  '--config',
+]);
 
 /**
  * Throws `UnsafeArgvError` on any permission or sandbox bypass. Also rejects non-string

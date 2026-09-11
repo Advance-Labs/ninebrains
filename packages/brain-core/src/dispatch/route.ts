@@ -33,8 +33,14 @@ export type RoutableJob = Pick<Job, 'id' | 'projectId' | 'hints'>;
 const FILE_OVERLAP_WEIGHT = 1;
 const DEPENDENCY_CHAIN_WEIGHT = 2;
 
-export function pickLane(job: RoutableJob, lanes: readonly Lane[], history: RoutingHistory): LaneId | null {
-  let candidates = lanes.filter((lane) => lane.status === 'idle' && lane.projectId === job.projectId);
+export function pickLane(
+  job: RoutableJob,
+  lanes: readonly Lane[],
+  history: RoutingHistory
+): LaneId | null {
+  let candidates = lanes.filter(
+    (lane) => lane.status === 'idle' && lane.projectId === job.projectId
+  );
   if (candidates.length === 0) return null;
 
   const author = job.hints.authorProvider;
@@ -50,7 +56,8 @@ export function pickLane(job: RoutableJob, lanes: readonly Lane[], history: Rout
   for (const run of history.runs) {
     load.set(run.laneId, (load.get(run.laneId) ?? 0) + 1);
     const last = lastJob.get(run.laneId);
-    if (!last || run.startedAt > last.at) lastJob.set(run.laneId, { jobId: run.jobId, at: run.startedAt });
+    if (!last || run.startedAt > last.at)
+      lastJob.set(run.laneId, { jobId: run.jobId, at: run.startedAt });
   }
 
   const scored = candidates.map((lane) => {
@@ -59,7 +66,9 @@ export function pickLane(job: RoutableJob, lanes: readonly Lane[], history: Rout
     if (last && chain.has(last.jobId)) affinity += DEPENDENCY_CHAIN_WEIGHT;
     return { lane, affinity, load: load.get(lane.id) ?? 0 };
   });
-  scored.sort((a, b) => b.affinity - a.affinity || a.load - b.load || a.lane.id.localeCompare(b.lane.id));
+  scored.sort(
+    (a, b) => b.affinity - a.affinity || a.load - b.load || a.lane.id.localeCompare(b.lane.id)
+  );
   return scored[0]!.lane.id;
 }
 
