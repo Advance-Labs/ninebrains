@@ -52,8 +52,9 @@ const archs: Array<'x64' | 'arm64'> =
 
 const defaultTargets: Record<string, string[]> = {
   mac: ['dmg', 'zip'],
-  linux: ['AppImage', 'deb', 'rpm'],
-  win: ['nsis', 'msi'],
+  // Ninebrains: rpm and msi dropped (docs/RELEASING.md, "Targets").
+  linux: ['AppImage', 'deb'],
+  win: ['nsis'],
 };
 const targetList = values.targets ? values.targets.split(',') : defaultTargets[platform];
 
@@ -75,26 +76,33 @@ if (isCanary) {
   info(`Canary build: packaging as version ${overrideVersion} (tag ${tag})`);
 }
 
-const releaseId = Number(values['release-id']);
-if (!Number.isSafeInteger(releaseId) || releaseId <= 0) {
-  fail('--release-id must be a positive integer from prepare-release');
-}
-const ghToken = requireEnv('GH_TOKEN');
-const octokit = new Octokit({ auth: ghToken });
-const { data: draft } = await octokit.rest.repos.getRelease({
-  owner: GITHUB_OWNER,
-  repo: GITHUB_REPO,
-  release_id: releaseId,
-});
-const ownership = {
-  runId: requireEnv('GITHUB_RUN_ID'),
-  sha: requireEnv('GITHUB_SHA'),
-};
-if (!draft.draft || draft.tag_name !== tag || !releaseHasOwnership(draft.body, ownership)) {
-  fail(`Release ${releaseId} is not the owned ${tag} draft for this workflow run and commit`);
-}
-if (draft.target_commitish !== ownership.sha) {
-  fail(`Release ${releaseId} targets ${draft.target_commitish}, expected ${ownership.sha}`);
+// Ninebrains: --release-id is optional. Without it the build is local-only: no GitHub token, no
+// draft check, artifacts land in release/. The Ninebrains release workflow uses this mode and
+// uploads from a separate job, so build jobs never hold contents:write (docs/RELEASING.md).
+if (values['release-id'] === undefined) {
+  info('No --release-id: local build, nothing is checked against or uploaded to GitHub');
+} else {
+  const releaseId = Number(values['release-id']);
+  if (!Number.isSafeInteger(releaseId) || releaseId <= 0) {
+    fail('--release-id must be a positive integer from prepare-release');
+  }
+  const ghToken = requireEnv('GH_TOKEN');
+  const octokit = new Octokit({ auth: ghToken });
+  const { data: draft } = await octokit.rest.repos.getRelease({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    release_id: releaseId,
+  });
+  const ownership = {
+    runId: requireEnv('GITHUB_RUN_ID'),
+    sha: requireEnv('GITHUB_SHA'),
+  };
+  if (!draft.draft || draft.tag_name !== tag || !releaseHasOwnership(draft.body, ownership)) {
+    fail(`Release ${releaseId} is not the owned ${tag} draft for this workflow run and commit`);
+  }
+  if (draft.target_commitish !== ownership.sha) {
+    fail(`Release ${releaseId} targets ${draft.target_commitish}, expected ${ownership.sha}`);
+  }
 }
 
 step('Creating deployment directory with production dependencies');
