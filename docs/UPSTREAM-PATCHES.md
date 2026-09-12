@@ -13,7 +13,7 @@ or are root files.
 |---|---|---|
 | `src/core/primitives/app-identity/api/fork-flags.ts` (new) | `UPDATES_ENABLED`, `HOSTED_ACCOUNT_ENABLED`, `TELEMETRY_SETTINGS_ENABLED`, all `false` | One switch per feature that needs Emdash servers |
 | `src/main/lib/telemetry.ts` | PostHog key/host forced to `undefined`; telemetry is opt-in (`storedEnabled !== 'true'`) | No telemetry to Emdash's PostHog; off by default and pointed at nothing. `isEnabled()` is false, so capture, identify, `/decide` feature flags, DAU, perf vitals and crash `$exception` events never send |
-| `.github/actions/setup-build/action.yml` | `posthog-key` / `posthog-host` inputs and the `VITE_POSTHOG_*` env lines removed | No telemetry key is ever baked into a build |
+| `.github/actions/setup-build/action.yml` | `posthog-key` / `posthog-host` inputs and the `VITE_POSTHOG_*` env lines removed; `pnpm/action-setup`, `actions/setup-node` and `actions/setup-python` pinned to commit SHAs (W7 CI) | No telemetry key is ever baked into a build. The release and e2e builds run through this action, so its actions are pinned like the workflows' |
 | `src/core/features/settings/browser/pages/general-settings-page.tsx` | Account section, UpdateCard and TelemetryCard gated by fork-flags | Remove UI that needs Emdash servers instead of leaving it broken |
 | `src/core/features/settings/browser/search/settings-search.ts` | `withoutForkHiddenEntries` drops the `version`, `privacy-telemetry`, `emdash-account` entries | Search must not land on hidden settings |
 | `src/main/host/updates/update-service.ts` | `initialize` returns early unless `UPDATES_ENABLED`; release-notes URL → `Advance-Labs/ninebrains`; `autoInstallOnAppQuit` `true` → `false` (`autoDownload` was already `false`) | No update polling of Emdash's feed; ours stays off until a release exists (the repo is private, so electron-updater could not read it anyway). Even with updates enabled, nothing downloads or installs without an explicit user action, because builds are unsigned until plan 7.1. Test: `src/main/host/updates/update-service.test.ts` |
@@ -89,7 +89,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `.github/workflows/workspace-server-package-check.yml` | `workflow_dispatch` only | Save Actions minutes on the private repo |
 | `.github/ISSUE_TEMPLATE/config.yml` | Links → our repo | |
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
-| `tooling/scripts/check.mjs`, `package.json` (root) | `check` runs `format:check` (was `format`, which rewrote files) and the new `test:tooling` step; `--write` / `check:write` restores the writing mode; `test:tooling` script runs the node tests in `tooling/scripts`, `tooling/fake-agent/test` and `scripts/release`; `hooks:install`, `merge`, `require-green` and `labels:sync` scripts for the merge guard (W7 CI) | `pnpm run check` now matches what CI runs and never edits the tree, so a green local check means a green `static` job |
+| `tooling/scripts/check.mjs`, `package.json` (root) | `check` runs `format:check` (was `format`, which rewrote files) and the new `test:tooling` step; `--write` / `check:write` restores the writing mode; `test:tooling` script runs the node tests in `tooling/scripts`, `tooling/fake-agent/test` and `scripts/release`; `hooks:install`, `merge`, `require-green`, `labels:sync` and `release:prepare` scripts for the merge guard and releases (W7 CI) | `pnpm run check` now matches what CI runs and never edits the tree, so a green local check means a green `static` job |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
 | `apps/emdash-desktop/vitest.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI`; new `node-spawn` project (`maxWorkers: 2`, `sequence.groupOrder: 1`) takes the spawn-heavy suites out of `node`; `browser` gets `testTimeout: 15_000` and `optimizeDeps.include` for the JSX runtime (W7 CI) | CI can run real-browser tests. Spawn-heavy suites (gates capabilities, exec-runs, brain stop/unattended, override-launch) get less contention instead of looser deadlines (SEC-30 keeps its 5 s). The late JSX-runtime discovery reloaded Vite mid-run and failed browser tests |
 | `packages/chat-ui/vite.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI` (W7 CI) | Same switch as the desktop app |
@@ -241,5 +241,8 @@ and their `*.test.mjs` (W7 CI).
 Merge guard: `tooling/scripts/{pre-push,require-green,merge-pr}.mjs` and their `*.test.mjs`,
 `tooling/git-hooks/pre-push`, `.github/CODEOWNERS` (W7 CI).
 Repo hygiene: `.github/dependabot.yml`, `tooling/scripts/sync-labels.mjs` and its test (W7 CI).
+Releases: `tooling/scripts/changelog.mjs` and its test; `CHANGELOG.md` (written by
+`release:prepare`). `.github/workflows/release.yml` (Ninebrains-only since W4) gained the ref and
+`ci-ok` gates, the `channel` input, `--prerelease`, changelog notes, the e2e job and SHA pins (W7 CI).
 
 Retired: `.github/workflows/licenses.yml` (W7 CI). The licence gate runs in `ci.yml`'s `static` job.

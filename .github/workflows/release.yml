@@ -1,62 +1,138 @@
 name: Release
 
 # Ninebrains: builds unsigned installers on macOS, Windows and Linux, writes SHA256SUMS, and
-# uploads everything to a DRAFT GitHub release. Manual only: no tag or push trigger, because Actions
-# minutes on the private repo are limited and publishing is a human decision. Publishing the draft
-# in the GitHub UI is what creates the tag. How to cut, verify and publish: docs/RELEASING.md.
+# uploads everything to a DRAFT GitHub release. Manual only, from main or a release/* branch, and
+# only for a commit whose `ci-ok` check (ci.yml) is green. Publishing the draft in the GitHub UI is
+# what creates the tag. How to cut, verify, publish and roll back: docs/RELEASING.md.
+#
+# Channels: `stable` releases the package.json version with notes from its CHANGELOG.md section.
+# `canary` releases X.Y.(Z+1)-canary.<run> from the same commit with the canary builder config
+# (scripts/release/lib/version.ts). Canary builds, and any version with a `-` suffix, are marked
+# as prereleases.
 #
 # Idempotent: re-running (or re-dispatching the same version from the same commit) rebuilds, reuses
 # the one draft for the tag, replaces its assets and deletes stale ones. It refuses to touch a
 # published release, or a draft that targets a different commit.
+#
+# Actions are pinned to commit SHAs; Dependabot (github-actions, weekly) moves the pins.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release, without the v. Must equal apps/emdash-desktop/package.json.
+        description: Version in apps/emdash-desktop/package.json, without the v. A canary derives X.Y.(Z+1)-canary.<run> from it.
         required: true
         type: string
+      channel:
+        description: stable, or canary (a prerelease with the canary app identity)
+        required: true
+        type: choice
+        options: [stable, canary]
+        default: stable
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.version }}
+  group: release-${{ inputs.channel }}-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: read
     outputs:
       tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
+      - name: Refuse refs other than main and release/*
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/heads/main | refs/heads/release/*) echo "Releasing from $REF" ;;
+            *) echo "::error::Releases run from main or a release/* branch, not $REF."; exit 1 ;;
+          esac
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # History and tags: canary notes list the commits since the last v* tag.
+          fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
-      - name: Check the version input against package.json
+      # The exact commit being built must have passed CI, not just its branch.
+      - name: Require ci-ok on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tooling/scripts/require-green.mjs "$GITHUB_SHA"
+
+      - name: Resolve the version
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
           pkg=$(node -p "require('./apps/emdash-desktop/package.json').version")
           if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
             echo "::error::'$INPUT_VERSION' is not a semver version like 0.1.0"; exit 1
           fi
           if [ "$INPUT_VERSION" != "$pkg" ]; then
-            echo "::error::Input $INPUT_VERSION does not match package.json $pkg. Commit the version bump first."; exit 1
+            echo "::error::Input $INPUT_VERSION does not match package.json $pkg. Merge the release:prepare PR first."; exit 1
           fi
-          echo "tag=v$pkg" >> "$GITHUB_OUTPUT"
+          if [ "$CHANNEL" = canary ]; then
+            # The derivation build.ts uses. GITHUB_RUN_NUMBER is the same in every job of this run,
+            # so preflight and the build jobs agree on the version.
+            version=$(cd apps/emdash-desktop && node --input-type=module -e "import { resolveReleaseVersion } from './scripts/release/lib/version.ts'; console.log(resolveReleaseVersion('canary').version)")
+          else
+            version="$pkg"
+          fi
+          prerelease=false
+          if [ "$CHANNEL" = canary ] || [[ "$version" == *-* ]]; then prerelease=true; fi
+          { echo "version=$version"; echo "tag=v$version"; echo "prerelease=$prerelease"; } >> "$GITHUB_OUTPUT"
+          echo "Releasing $version (tag v$version, prerelease: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Stable: the CHANGELOG.md section `pnpm run release:prepare` wrote; missing stops the release
+      # here. Canary: the Unreleased notes plus the commits since the last tag.
+      - name: Release notes from CHANGELOG.md
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$CHANNEL" = canary ]; then
+            node tooling/scripts/changelog.mjs notes --canary > changelog-notes.md
+          else
+            node tooling/scripts/changelog.mjs notes "$VERSION" > changelog-notes.md
+          fi
+          cat changelog-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-notes
+          path: changelog-notes.md
+          if-no-files-found: error
+          retention-days: 7
 
       # SEC-36 (no updater feed in the builder configs) and SEC-37 (checksum tooling). No install
       # needed: the tests only import types from electron-builder.
       - name: Release config and checksum tests
         working-directory: apps/emdash-desktop
         run: node --test scripts/release/*.test.mjs
+
+  # The built app under xvfb with the fake agent, on the commit being released.
+  e2e:
+    name: E2E
+    needs: preflight
+    uses: ./.github/workflows/e2e.yml
 
   build:
     name: Build ${{ matrix.platform }}
@@ -87,9 +163,10 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
       # Public OAuth App client ID (repository variable, not a secret); empty disables device flow.
       NINEBRAINS_GITHUB_OAUTH_CLIENT_ID: ${{ vars.NINEBRAINS_GITHUB_OAUTH_CLIENT_ID }}
+      CHANNEL: ${{ inputs.channel }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -99,6 +176,7 @@ jobs:
         uses: ./.github/actions/setup-build
         with:
           windows-native: ${{ matrix.windows-native }}
+          build-variant: ${{ inputs.channel == 'canary' && 'canary' || 'prod' }}
 
       - name: Export Python path for native modules
         if: runner.os == 'Windows'
@@ -116,6 +194,8 @@ jobs:
         shell: bash
         working-directory: apps/emdash-desktop
         env:
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -128,15 +208,18 @@ jobs:
           NINEBRAINS_AZURE_SIGNING_ACCOUNT: ${{ vars.NINEBRAINS_AZURE_SIGNING_ACCOUNT }}
           NINEBRAINS_AZURE_CERT_PROFILE: ${{ vars.NINEBRAINS_AZURE_CERT_PROFILE }}
           NINEBRAINS_AZURE_PUBLISHER: ${{ vars.NINEBRAINS_AZURE_PUBLISHER }}
-        run: >
-          node --experimental-strip-types scripts/release/build.ts
-          --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+        run: |
+          config=electron-builder.config.ts
+          if [ "$CHANNEL" = canary ]; then config=electron-builder.canary.config.ts; fi
+          node --experimental-strip-types scripts/release/build.ts \
+            --platform "$PLATFORM" --arch "$ARCH" --channel "$CHANNEL" --config "$config"
 
       - name: Verify macOS bundles (arch, bundle id, signature)
         if: runner.os == 'macOS'
         working-directory: apps/emdash-desktop
         run: node --experimental-strip-types scripts/release/verify-mac.ts
 
+      # Stable files are Ninebrains-<version>-…, canary files Ninebrains-Canary-<version>-….
       - name: Stage installers
         shell: bash
         working-directory: apps/emdash-desktop
@@ -149,7 +232,7 @@ jobs:
           ls -la ../../dist-release
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: installers-${{ matrix.platform }}
           path: dist-release/
@@ -169,22 +252,24 @@ jobs:
       attestations: write
     steps:
       - name: Download installers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: installers-*
           merge-multiple: true
           path: dist-release
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: dist-release/*
 
   release:
     name: Upload to draft release
-    needs: [preflight, build, attest]
-    # attest is skipped on a private repo; that must not block the draft.
-    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
+    needs: [preflight, e2e, build, attest]
+    # attest is skipped on a private repo; that must not block the draft. e2e must pass.
+    if: >-
+      ${{ !cancelled() && needs.e2e.result == 'success' && needs.build.result == 'success' &&
+      (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,22 +277,30 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       TAG: ${{ needs.preflight.outputs.tag }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.preflight.outputs.version }}
+      PRERELEASE: ${{ needs.preflight.outputs.prerelease }}
+      CHANNEL: ${{ inputs.channel }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
       - name: Download installers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: installers-*
           merge-multiple: true
           path: dist-release
+
+      - name: Download release notes
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+          path: .
 
       - name: Write and check SHA256SUMS
         run: |
@@ -217,7 +310,15 @@ jobs:
       - name: Write release notes
         run: |
           {
+            if [ "$CHANNEL" = canary ]; then
+              echo "**Canary build.** A prerelease with its own app identity (Ninebrains Canary) and data directory. Expect rough edges."
+              echo
+            fi
             echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn; see [RELEASING.md](https://github.com/$GH_REPO/blob/$GITHUB_SHA/docs/RELEASING.md) before installing."
+            echo
+            echo "## Changes"
+            echo
+            cat changelog-notes.md
             echo
             echo "Built from \`$GITHUB_SHA\` by workflow run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID)."
             echo
@@ -232,6 +333,8 @@ jobs:
 
       - name: Create or reuse the draft
         run: |
+          prerelease_flag=()
+          if [ "$PRERELEASE" = true ]; then prerelease_flag=(--prerelease); fi
           releases=$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | {id, draft, target_commitish}" | jq -s .)
           if [ "$(jq '[.[] | select(.draft | not)] | length' <<<"$releases")" != 0 ]; then
             echo "::error::$TAG is already published. Bump the version instead of rebuilding a shipped release."; exit 1
@@ -239,14 +342,14 @@ jobs:
           drafts=$(jq '[.[] | select(.draft)]' <<<"$releases")
           case "$(jq length <<<"$drafts")" in
             0)
-              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Ninebrains $VERSION" --notes-file release-notes.md
+              gh release create "$TAG" --draft "${prerelease_flag[@]}" --target "$GITHUB_SHA" --title "Ninebrains $VERSION" --notes-file release-notes.md
               ;;
             1)
               target=$(jq -r '.[0].target_commitish' <<<"$drafts")
               if [ "$target" != "$GITHUB_SHA" ]; then
                 echo "::error::The $TAG draft targets $target, not $GITHUB_SHA. Delete that draft or dispatch from its commit."; exit 1
               fi
-              gh release edit "$TAG" --notes-file release-notes.md
+              gh release edit "$TAG" --notes-file release-notes.md --prerelease="$PRERELEASE"
               ;;
             *)
               echo "::error::More than one draft exists for $TAG. Delete the extras and re-run."; exit 1
