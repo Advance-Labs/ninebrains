@@ -50,7 +50,10 @@ import type { AppSettingsService } from '@core/services/settings/node/app-settin
 import { createElectronCdpGateHost } from '@main/host/ninebrains/electron-gate-host';
 import { encryptedAppSecretsStore } from '@main/host/secrets/encrypted-app-secrets-store';
 import { resolveBrainMcpBin } from './brain-mcp-bin';
-import { createKeychainSecretResolver } from './keychain-secret-resolver';
+import {
+  createKeychainSecretResolver,
+  createKeychainSecretStore,
+} from './keychain-secret-resolver';
 import { createMementoRowPort } from './memento-row-port';
 import { routeReviewer } from './reviewer-route';
 
@@ -138,6 +141,7 @@ export async function createNinebrainsServices(
     userPacksDir: join(userDataDir, 'ninebrains', 'packs'),
     onWarning: (message) => deps.logger.warn(message),
   });
+    secretStore: createKeychainSecretStore(encryptedAppSecretsStore),
 
   let lanes: LaneService | null = null;
   const laneInfos = (): BrainLaneInfo[] => {

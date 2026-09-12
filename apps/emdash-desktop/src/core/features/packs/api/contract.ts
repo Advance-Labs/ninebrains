@@ -14,7 +14,12 @@ export const packSecretStatusSchema = z.object({
   present: z.boolean(),
   /** Where the user sets it, as described by the app's secret resolver. */
   location: z.string(),
+  /** Set in the app's keychain (so it can be cleared here). Never the value itself. */
+  storedInApp: z.boolean(),
 });
+
+/** Pack secret names: what `requiredSecrets` may declare. */
+export const packSecretNameSchema = z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/);
 
 export const packSummarySchema = z.object({
   id: z.string(),
@@ -83,7 +88,7 @@ export const packsListingSchema = z.object({
 });
 
 export const packsErrorSchema = z.object({
-  type: z.enum(['unknown-pack', 'persistence']),
+  type: z.enum(['unknown-pack', 'persistence', 'unknown-secret', 'secret-store']),
   message: z.string(),
 });
 
@@ -99,6 +104,20 @@ export const packsContract = defineContract({
       enabled: z.boolean(),
     }),
     data: z.object({ enabledPackIds: z.array(z.string()) }),
+    error: packsErrorSchema,
+  }),
+  /**
+   * Stores a pack secret in the app keychain. Write-only: no procedure returns a value, and
+   * `list` reports only `present` / `storedInApp`.
+   */
+  setSecret: fallible({
+    input: z.object({ name: packSecretNameSchema, value: z.string().min(1).max(16_384) }),
+    data: z.void(),
+    error: packsErrorSchema,
+  }),
+  clearSecret: fallible({
+    input: z.object({ name: packSecretNameSchema }),
+    data: z.void(),
     error: packsErrorSchema,
   }),
 });

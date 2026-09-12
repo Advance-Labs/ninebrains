@@ -1,7 +1,7 @@
 import { PageLayout, SettingsRow, SettingsSection } from '@emdash/ui/react/patterns';
-import { Alert, Badge, Button, Select, Switch } from '@emdash/ui/react/primitives';
+import { Alert, Badge, Button, Input, Select, Switch } from '@emdash/ui/react/primitives';
 import { observer } from 'mobx-react-lite';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   getProjectManagerStore,
   projectDisplayName,
@@ -23,7 +23,7 @@ export const PacksView = observer(function PacksView() {
 });
 
 function secretLine(secret: PackSecretStatus): string {
-  return `${secret.name}: ${secret.description} Set it in ${secret.location}. ${secret.howToGet}`;
+  return `${secret.name}: ${secret.description} Set it below, or in ${secret.location}. ${secret.howToGet}`;
 }
 
 function MissingSecrets({ pack }: { pack: PackSummary }) {
@@ -61,6 +61,108 @@ function MissingSecrets({ pack }: { pack: PackSummary }) {
   );
 }
 
+function secretState(secret: PackSecretStatus): string {
+  if (secret.storedInApp) return 'Set in the app keychain.';
+  if (secret.present) return 'Set outside the app (environment).';
+  return secret.optional ? 'Not set (optional).' : 'Not set.';
+}
+
+/**
+ * One secret: set or missing, and a field to replace it. The field starts empty and is
+ * cleared after saving. A stored value never comes back from main, so it can't be shown.
+ */
+function SecretRow({
+  secret,
+  busy,
+  onSave,
+  onClear,
+}: {
+  secret: PackSecretStatus;
+  busy: boolean;
+  onSave: (value: string) => Promise<boolean>;
+  onClear: () => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const save = async () => {
+    if (await onSave(draft)) setDraft('');
+  };
+  return (
+    <SettingsRow
+      label={
+        <span className="flex items-center gap-2 font-mono">
+          {secret.name}
+          <Badge tone={secret.present ? 'success' : secret.optional ? 'neutral' : 'warning'}>
+            {secret.present ? 'set' : 'missing'}
+          </Badge>
+        </span>
+      }
+      description={`${secret.description} ${secretState(secret)} ${secret.howToGet}`}
+      control={
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <Input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={`New value for ${secret.name}`}
+            placeholder={secret.present ? 'Replace…' : 'Paste value…'}
+            value={draft}
+            className="w-44"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <Button type="submit" size="sm" disabled={busy || !draft.trim()}>
+            Save
+          </Button>
+          {secret.storedInApp && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              aria-label={`Clear ${secret.name}`}
+              onClick={onClear}
+            >
+              Clear
+            </Button>
+          )}
+        </form>
+      }
+    />
+  );
+}
+
+function PackSecrets({
+  pack,
+  busy,
+  onSave,
+  onClear,
+}: {
+  pack: PackSummary;
+  busy: boolean;
+  onSave: (name: string, value: string) => Promise<boolean>;
+  onClear: (name: string) => void;
+}) {
+  if (pack.secrets.length === 0) return null;
+  return (
+    <SettingsSection title={`${pack.title} secrets`}>
+      {pack.secrets.map((secret) => (
+        <SecretRow
+          key={secret.name}
+          secret={secret}
+          busy={busy}
+          onSave={(value) => onSave(secret.name, value)}
+          onClear={() => onClear(secret.name)}
+        />
+      ))}
+    </SettingsSection>
+  );
+}
+
 function Disclosures({ pack }: { pack: PackSummary }) {
   if (pack.disclosures.length === 0) return null;
   return (
@@ -79,10 +181,16 @@ function PackSection({
   pack,
   canToggle,
   onToggle,
+  secretsBusy,
+  onSaveSecret,
+  onClearSecret,
 }: {
   pack: PackSummary;
   canToggle: boolean;
   onToggle: (enabled: boolean) => void;
+  secretsBusy: boolean;
+  onSaveSecret: (name: string, value: string) => Promise<boolean>;
+  onClearSecret: (name: string) => void;
 }) {
   // Packs whose settings disclose a data flow need an explicit second step to enable.
   const [confirming, setConfirming] = useState(false);
@@ -179,6 +287,7 @@ function PackSection({
         <Disclosures pack={pack} />
       )}
       <MissingSecrets pack={pack} />
+      <PackSecrets pack={pack} busy={secretsBusy} onSave={onSaveSecret} onClear={onClearSecret} />
     </div>
   );
 }
@@ -188,8 +297,14 @@ export function PacksPanel({ projects }: { projects: PacksProjectOption[] }) {
   const [listing, setListing] = useState<PacksListing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [secretPending, setSecretPending] = useState(false);
 
   const projectId = projects.some((p) => p.id === selected) ? selected : (projects[0]?.id ?? null);
+
+  const refresh = useCallback(async () => {
+    const client = await getPacksClient();
+    setListing(await client.list({ projectId }));
+  }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +340,29 @@ export function PacksPanel({ projects }: { projects: PacksProjectOption[] }) {
       setError(String(e));
     } finally {
       setPending(null);
+    }
+  };
+
+  // Secrets are write-only: main answers set or missing, never the value.
+  const changeSecret = async (
+    run: (
+      client: Awaited<ReturnType<typeof getPacksClient>>
+    ) => Promise<{ success: boolean; error?: { message: string } }>
+  ): Promise<boolean> => {
+    setSecretPending(true);
+    try {
+      const result = await run(await getPacksClient());
+      if (!result.success) {
+        setError(result.error?.message ?? 'The secret could not be changed.');
+        return false;
+      }
+      await refresh();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The secret could not be changed.');
+      return false;
+    } finally {
+      setSecretPending(false);
     }
   };
 
@@ -274,6 +412,9 @@ export function PacksPanel({ projects }: { projects: PacksProjectOption[] }) {
           pack={pack}
           canToggle={projectId !== null && pending === null}
           onToggle={(enabled) => void toggle(pack.id, enabled)}
+          secretsBusy={secretPending}
+          onSaveSecret={(name, value) => changeSecret((c) => c.setSecret({ name, value }))}
+          onClearSecret={(name) => void changeSecret((c) => c.clearSecret({ name }))}
         />
       ))}
     </div>
