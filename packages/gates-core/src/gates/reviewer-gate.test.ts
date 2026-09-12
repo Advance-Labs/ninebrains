@@ -273,20 +273,22 @@ describe('T32 the reviewer diff never lazy-fetches (real git)', () => {
       const blob = git('rev-parse', 'HEAD:a.txt');
       rmSync(join(repo, '.git', 'objects', blob.slice(0, 2), blob.slice(2)));
 
-      const runCommand = vi.fn(async (_command: string, o: { cwd: string; argv?: string[] }) => {
-        try {
-          const stdout = execFileSync('git', o.argv ?? [], {
-            cwd: o.cwd,
-            encoding: 'utf8',
-            env,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
-          return { exitCode: 0, stdout, stderr: '' };
-        } catch (error) {
-          const e = error as { status?: number; stdout?: string; stderr?: string };
-          return { exitCode: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+      const runCommand = vi.fn(
+        async (_command: string, o: { cwd: string; argv?: readonly string[] }) => {
+          try {
+            const stdout = execFileSync('git', o.argv ?? [], {
+              cwd: o.cwd,
+              encoding: 'utf8',
+              env,
+              stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            return { exitCode: 0, stdout, stderr: '' };
+          } catch (error) {
+            const e = error as { status?: number; stdout?: string; stderr?: string };
+            return { exitCode: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+          }
         }
-      });
+      );
       const spawnReviewer = vi.fn(async () => ({ text: APPROVE }));
       const ctx = makeContext({
         job: { kind: 'code' },
