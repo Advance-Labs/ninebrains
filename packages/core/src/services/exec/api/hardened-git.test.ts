@@ -159,6 +159,8 @@ describe('T36 createNonInteractiveGitExec (real git, app-driven reads)', () => {
 
       const plain = createBoundExec({ file: 'git', cwd: h.repo, env: h.env });
       await plain.exec(['status', '--porcelain']);
+      // status alone may skip the clean filter (a.txt changed size; see git-exec.test.ts).
+      await plain.exec(['diff', '--numstat', 'HEAD', '--']);
       await plain.exec(['cat-file', '-p', 'HEAD:b.txt']).catch(() => undefined);
       expect(h.ran()).toEqual(expect.arrayContaining(['filter', 'fsmonitor', 'ssh']));
     } finally {
