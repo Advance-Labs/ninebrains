@@ -93,12 +93,19 @@ relative to the settings file.
                    "<CLAUDE_CONFIG_DIR>/.credentials.json"],
       "allowRead": ["<worktree>"],
       "allowWrite": ["<worktree>"],
-      "denyWrite": []
+      "denyWrite": ["<common>/config", "<common>/config.worktree", "<gitdir>/config.worktree",
+                    "<common>/info/attributes", "<common>/hooks"]
     }
   },
-  "permissions": { "deny": ["Read(//<each denied path>/**)", "Edit(//<each denied path>/**)"] }
+  "permissions": { "deny": ["Read(//<each denied path>/**)", "Edit(//<each denied path>/**)",
+                            "Edit(//<each denyWrite path>)", "Edit(//<each denyWrite path>/**)"] }
 }
 ```
+
+`denyWrite` (T36) holds the worktree repo's git control files, resolved by `resolveLaneGitPaths`
+with read-only hardened git: config (fsmonitor, filter drivers, `sshCommand`, `hooksPath`),
+`info/attributes` and hooks. The app runs git against the repo outside any sandbox. Objects, refs
+and the index stay writable, so a lane can still commit. A plain directory gets no git entries.
 
 `SECRET_HOME_PATHS` (`sandbox-settings.ts`) is the one list the settings file, the macOS seatbelt
 profile and the Linux bubblewrap mounts all read: `~/.ssh`, `~/.aws`, `~/.azure`,
