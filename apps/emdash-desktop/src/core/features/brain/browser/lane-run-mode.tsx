@@ -28,9 +28,19 @@ export function describeBudgets(budgets: BrainRunBudgetsView): string {
 export function unattendedSummary(provider: LaneProvider, budgets: BrainRunBudgetsView): string {
   const experimental = provider === 'codex' ? ' (experimental for Codex)' : '';
   return (
-    `Each Brain job runs headless with \`${HEADLESS_COMMAND[provider]}\`${experimental}: no terminal ` +
+    `Each Brain job runs headless with ${HEADLESS_COMMAND[provider]}${experimental}: no terminal ` +
     `and no permission prompts. The sandbox and an allowed-tools preset limit what it can do. ` +
     `Budget per run: ${describeBudgets(budgets)}.`
+  );
+}
+
+/** The badge drops the command in a narrow lane header; the tooltip still names it. */
+function UnattendedBadge({ provider }: { provider: LaneProvider }) {
+  return (
+    <Badge tone="warning">
+      Unattended
+      <span className="hidden @[36rem]:inline">&nbsp;·&nbsp;{HEADLESS_COMMAND[provider]}</span>
+    </Badge>
   );
 }
 
@@ -70,7 +80,7 @@ export function LaneRunModeControl({
               data-mode="unattended"
               onClick={() => void setMode('attended')}
             >
-              <Badge tone="warning">Unattended · {HEADLESS_COMMAND[provider]}</Badge>
+              <UnattendedBadge provider={provider} />
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content className="max-w-80">

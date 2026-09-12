@@ -26,38 +26,22 @@ function secretLine(secret: PackSecretStatus): string {
   return `${secret.name}: ${secret.description} Set it below, or in ${secret.location}. ${secret.howToGet}`;
 }
 
+/** Only required secrets warn; optional ones are listed as missing in the secrets section. */
 function MissingSecrets({ pack }: { pack: PackSummary }) {
-  const missing = pack.secrets.filter((s) => !s.present);
-  const required = missing.filter((s) => !s.optional);
-  const optional = missing.filter((s) => s.optional);
+  const required = pack.secrets.filter((s) => !s.present && !s.optional);
+  if (required.length === 0) return null;
   return (
-    <>
-      {required.length > 0 && (
-        <Alert.Root status="warning">
-          <Alert.Title>Missing secrets</Alert.Title>
-          <Alert.Description>
-            Servers that need these are left out of lane launches until they are set.
-            <ul>
-              {required.map((s) => (
-                <li key={s.name}>{secretLine(s)}</li>
-              ))}
-            </ul>
-          </Alert.Description>
-        </Alert.Root>
-      )}
-      {optional.length > 0 && (
-        <Alert.Root status="info">
-          <Alert.Title>Optional secrets not set</Alert.Title>
-          <Alert.Description>
-            <ul>
-              {optional.map((s) => (
-                <li key={s.name}>{secretLine(s)}</li>
-              ))}
-            </ul>
-          </Alert.Description>
-        </Alert.Root>
-      )}
-    </>
+    <Alert.Root status="warning">
+      <Alert.Title>Missing secrets</Alert.Title>
+      <Alert.Description>
+        Servers that need these are left out of lane launches until they are set.
+        <ul>
+          {required.map((s) => (
+            <li key={s.name}>{secretLine(s)}</li>
+          ))}
+        </ul>
+      </Alert.Description>
+    </Alert.Root>
   );
 }
 
@@ -112,7 +96,7 @@ function SecretRow({
             aria-label={`New value for ${secret.name}`}
             placeholder={secret.present ? 'Replace…' : 'Paste value…'}
             value={draft}
-            className="w-44"
+            className="w-24 sm:w-44"
             onChange={(event) => setDraft(event.target.value)}
           />
           <Button type="submit" size="sm" disabled={busy || !draft.trim()}>
