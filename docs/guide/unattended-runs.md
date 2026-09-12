@@ -14,6 +14,22 @@ Ninebrains starts the CLI in print mode and reads its event stream:
 
 Unattended runs carry out Brain-dispatched work and the reviewer side of verification gates.
 
+## Making a lane unattended
+
+Every lane starts **attended**: the Brain pastes each job into the lane's terminal, where you can
+watch it and answer its prompts. To hand a lane's Brain jobs to headless runs instead, click the
+hand icon in the lane's header and confirm. The dialog says which command runs and with which
+budgets before anything changes.
+
+An unattended lane shows a warning badge in its header, **Unattended · claude -p** (or
+`codex exec`), so you never mistake it for a lane you are watching. Hover it to see the budgets;
+click it to switch back to attended straight away. Only jobs the Brain dispatches run headless.
+Anything you type into the lane's terminal yourself is unaffected.
+
+The mode is saved with the lane, so an unattended lane stays unattended after a restart.
+
+![A lane header showing the Unattended badge](../screenshots/lanes-run-mode-1440.png)
+
 Unattended runs use whatever login or API key your CLI uses. Ninebrains makes no claim about which
 plan, quota or billing they draw from. Check your provider's terms.
 
@@ -45,11 +61,19 @@ STOP ends every run the Brain owns:
 A test runs eight runs whose processes and child processes ignore SIGTERM, and checks that all are
 gone in under 5 seconds. STOP stays **latched**: nothing new starts until you clear it.
 
-<!-- VERIFY-AFTER-P2 -->
-STOP is in the tray menu, the app menu and a keyboard shortcut. All three are handled in the main
-process, so they work even if the window has frozen. STOP also stops the terminal sessions of lanes
-the Brain started.
-<!-- /VERIFY -->
+STOP is in four places:
+
+- the **Agents** menu in the app menu bar (**Stop All Agent Work**),
+- the tray icon's menu, when the tray icon is on,
+- the keyboard shortcut ⌘⇧⌫ (Ctrl+Shift+Backspace), which is also the Agents menu item's shortcut,
+- the **STOP** button in the Lanes view.
+
+The Agents menu and the tray menu call the Brain in the app's main process, not through the window,
+so they work even if the window has frozen. STOP also stops the terminal sessions of lanes that are
+working on a Brain-dispatched job.
+
+To lift STOP, use **Clear STOP** in the Agents menu, the tray menu or the Brain drawer. Clear STOP
+is only offered while STOP is latched.
 
 Known limits:
 

@@ -14,6 +14,22 @@ The planner is a canvas for one project's plan:
 
 Each job node shows its gates and, once the plan is running, its live state.
 
+## Opening the planner
+
+There are three ways in:
+
+- **Command palette:** run **Open Planner**. It opens the canvas of the project you are looking
+  at, or your first project if no project is in view.
+- **Lanes view:** the **Planner** button in the titlebar opens the canvas of the first lane's
+  project in the current tab.
+- **Brain drawer:** the **Plan** button opens the canvas of the project the selected Brain session
+  works in.
+
+Each project has its own canvas. Opening the planner again for the same project brings back the
+same canvas.
+
+![The Brain drawer's Plan button next to Pause](../screenshots/brain-drawer-plan-1440.png)
+
 ## Building a plan
 
 Use the toolbar to add a **Job**, a **Note** or a **Module**, and drag between nodes to connect

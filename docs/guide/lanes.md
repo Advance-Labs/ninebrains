@@ -18,9 +18,19 @@ Click an empty slot and choose:
 
 - **Project**: one of the projects you have added.
 - **Agent**: Claude Code or Codex. Only agents installed on your machine are listed.
+- **Role** (optional): a role from one of the [packs](packs.md) this project has enabled, such as
+  the coding pack's builder. The picker only appears once the project has a pack enabled. Picking
+  a role fills in its preferred agent and model when it has them.
+- **Model** (optional): the model the agent starts with. Leave it empty for the agent's default.
+
+![The add-lane form with a role picked from the coding pack](../screenshots/lanes-add-lane-role-1440.png)
 
 Ninebrains creates a worktree for the lane on its own branch (`lanes/<id>`) and starts the agent
 there. Lanes run on this machine only; SSH projects cannot host lanes in v0.1.
+
+A lane started with a role launches with that role's prompt appended to the agent's system prompt,
+and with the MCP servers of the project's enabled packs. The role stays with the lane across
+restarts.
 
 ## Status lights
 
@@ -43,6 +53,9 @@ are not installed yet, the header shows a warning triangle and the light cannot 
 
 The buttons in each lane's header, from left to right:
 
+- **Run mode**, next to the agent's name: a hand icon while the lane is attended, or an
+  **Unattended** badge. It decides how the Brain hands the lane its jobs. See
+  [Unattended runs](unattended-runs.md#making-a-lane-unattended).
 - **Editor** opens the lane's task in the task view, where Emdash's editor, diff and source control
   live.
 - **Browser** toggles the lane's browser, which previews the lane's dev server. Each lane owns a
@@ -66,8 +79,8 @@ the Brain is connected, it shows empty lists.
 
 ## What persists
 
-The tabs, which lane sits in which slot, sleep state and the grid's split sizes survive a restart.
-Which lane was maximized does not.
+The tabs, which lane sits in which slot, sleep state, each lane's run mode and role, and the
+grid's split sizes survive a restart. Which lane was maximized does not.
 
 ## Dev server ports
 

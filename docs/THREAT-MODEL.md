@@ -408,10 +408,10 @@ the agents or slices expected to close the gap.
 | SEC-24 | Partial | `evidence-hygiene.test.ts`: dirs 0700, files 0600, SEC-14 ids, redaction of all text evidence. Retention, deletion on project delete, per-job delete and the screenshot origin rule are open [w5-gates-wiring] |
 | SEC-25 | Open | Lane browser/CDP |
 | SEC-26 | Open | Exact npx versions without integrity (R10) |
-| SEC-27 | Not re-verified | No SEC-27 test on `main` |
+| SEC-27 | Partial | Settings → Packs writes pack secrets only through the keychain store, which refuses when safeStorage cannot encrypt (`keychain-secret-resolver.test.ts` › `SEC-27 refuses…`, `packs-secrets.test.ts` › `SEC-27 surfaces…`); values are write-only from the renderer [w7-daily]. No test yet scans the settings DB and `userData` for secret bytes |
 | SEC-28 | Open | No SEC-28 test on `main` |
 | SEC-29 | Done in the supervisor | `run-supervisor.test.ts`, `run-budgets.test.ts`: wall clock, tokens, concurrency, counters persisted to the transcript, and restart recovery closing open runs as `killed` (`ExecRunSupervisor.recover()`). Codex per R13. Writing counters into the Brain DB depends on wiring the `finished` events [w5-brain-wiring] |
-| SEC-30 | Done for unattended runs, the tests gate and review checkouts | `run-supervisor.test.ts`, `run-command.test.ts`, `review-checkout.test.ts` (one `ProcessGroupRegistry` that `killAll()` latches and kills). The tray, menu and shortcut entry points and PTY lanes are [w5-brain-wiring] |
+| SEC-30 | Done for unattended runs, the tests gate, review checkouts and the entry points | `run-supervisor.test.ts`, `run-command.test.ts`, `review-checkout.test.ts` (one `ProcessGroupRegistry` that `killAll()` latches and kills); `stop.test.ts` (dispatched attended PTY lanes, 4.5 s deadline). The app menu (with the STOP accelerator) and the tray call `BrainService.stopAll` in main: `main/host/ninebrains/agent-stop-controls.test.ts` drives a real BrainService from both with no renderer [w7-daily]. PTY lanes the user drives by hand are not stopped (only Brain-dispatched ones) |
 | SEC-31 | Done | `run-supervisor.test.ts`, `run-paths.test.ts` |
 | SEC-32 | Partial | `run-env.test.ts`: no outbound credentials in the env. The per-plan allowlist UI is open |
 | SEC-33 | Open | `security_events` table |

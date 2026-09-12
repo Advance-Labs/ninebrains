@@ -32,12 +32,15 @@ an MIT, Apache-2.0, ISC, BSD-2/3-Clause or 0BSD licence; the loader rejects anyt
 
 ## How a pack reaches a lane
 
-<!-- VERIFY-AFTER-P2 -->
 When a lane launches in a project, Ninebrains writes that launch's MCP config. It contains the
 Brain's server plus the servers of every pack the project has enabled, and nothing from other
-projects. If the lane was started from a role, the role's prompt is appended to the agent's system
-prompt, and the role's gates become the default gates for the lane's jobs.
-<!-- /VERIFY -->
+projects. If you picked a role when you [added the lane](lanes.md#adding-a-lane), the role's
+prompt is appended to the agent's system prompt, for attended Claude lanes and for unattended
+runs.
+
+A role's gates are **not yet** applied to the jobs its lane works on. A job's gates come from
+whoever created the job and from your rigor settings. Codex lanes don't receive the role prompt
+yet either: Codex has no flag to append to its system prompt.
 
 A server that needs a secret you have not provided is **left out with a warning**. It is never
 launched half-configured, and warnings never contain secret values.
@@ -57,14 +60,23 @@ consequences:
 A pack file names its secrets; it never contains them. Nothing is stored in the pack file or in
 your preferences.
 
-<!-- VERIFY-AFTER-P2 -->
-Secrets are read through a secret resolver. The resolver that ships reads environment variables
-named `NINEBRAINS_SECRET_<NAME>`, for example `NINEBRAINS_SECRET_GOOGLE_ACCESS_TOKEN`. Until the
-app's secret store is wired up, the settings page shows every secret as missing.
-<!-- /VERIFY -->
+Set them in **Settings → Packs**. Under each pack, a secrets section lists every secret its servers
+need, marked **set** or **missing**, with where to get it. Paste a value and press **Save**:
 
-A keychain-backed store (Electron `safeStorage`) is planned. It will refuse to store a secret when
-the OS offers no encryption, rather than fall back to plaintext.
+- The value goes into the OS keychain through Electron `safeStorage`, under
+  `ninebrains.pack.<NAME>`. If the OS offers no encryption (or Linux is on the `basic_text`
+  backend), saving fails and says so. It never falls back to plaintext.
+- **It is write-only.** The field empties after saving, and the app never sends a stored value
+  back to the window, so there is nothing to reveal. Errors and logs name the secret, never its
+  value.
+- **Clear** removes a value you stored here.
+- Only secrets that a loaded pack declares can be set.
+
+A value in the environment variable `NINEBRAINS_SECRET_<NAME>` (for example
+`NINEBRAINS_SECRET_GOOGLE_ACCESS_TOKEN`) still works, and the page marks it as set outside the app.
+The keychain value wins when both exist. New values reach a lane at its next launch.
+
+![Settings → Packs with one secret set and one missing](../screenshots/packs-secrets-1440.png)
 
 ## SEO pack
 
