@@ -1,3 +1,4 @@
+import { createFence } from '@emdash/gates-core/untrusted';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
@@ -54,10 +55,30 @@ const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> =
   broadcast: () => 'Send one message to every lane in a project at once.',
 };
 
+/**
+ * Gate-feedback provenance: every `read_inbox` message flagged untrusted (lane-written, gate
+ * feedback, relayed test output or web text) reaches the agent with its body inside a per-call
+ * nonce fence it cannot close (gates-core `createFence`), and the fence's rules alongside it.
+ */
+export function fenceInbox(result: unknown): unknown {
+  const untrusted = (m: unknown): m is { body: string } =>
+    typeof m === 'object' &&
+    m !== null &&
+    (m as { untrusted?: unknown }).untrusted === true &&
+    typeof (m as { body?: unknown }).body === 'string';
+  if (!Array.isArray(result) || !result.some(untrusted)) return result;
+  const fence = createFence();
+  return result.map((m) =>
+    untrusted(m) ? { ...m, body: fence.wrap('MESSAGE', m.body), fence: fence.preamble } : m
+  );
+}
+
 /** Brain errors come back as readable tool errors (`CODE: message`), never as protocol failures. */
-export function toToolResult(response: BrainResponse): CallToolResult {
-  if (response.ok)
-    return { content: [{ type: 'text', text: JSON.stringify(response.result, null, 2) }] };
+export function toToolResult(response: BrainResponse, op?: BrainOp): CallToolResult {
+  if (response.ok) {
+    const result = op === 'read_inbox' ? fenceInbox(response.result) : response.result;
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  }
   return {
     isError: true,
     content: [{ type: 'text', text: `${response.error.code}: ${response.error.message}` }],
@@ -87,7 +108,8 @@ export function registerTools(server: McpServer, backend: BrainBackend, role: Ro
       },
       (async (args: Record<string, unknown>) =>
         toToolResult(
-          await backend.call({ v: BRAIN_PROTOCOL_VERSION, op, args } as BrainRequest)
+          await backend.call({ v: BRAIN_PROTOCOL_VERSION, op, args } as BrainRequest),
+          op
         )) as never
     );
   }

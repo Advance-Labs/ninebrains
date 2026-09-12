@@ -32,6 +32,7 @@
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@emdash/gates-core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@ninebrains/brain-core": "workspace:*",
     "zod": "^4.4.3"

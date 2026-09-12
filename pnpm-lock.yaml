@@ -377,6 +377,9 @@ importers:
 
   packages/brain-mcp:
     dependencies:
+      '@emdash/gates-core':
+        specifier: workspace:*
+        version: link:../gates-core
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)

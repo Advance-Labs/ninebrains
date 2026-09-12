@@ -25,6 +25,10 @@ type Call = (
 
 const HUB = { role: 'brain', brainId: 'main' } as const;
 
+/** Untrusted inbox bodies arrive fenced (gate-feedback provenance); this undoes it for comparison. */
+const FENCED = /^<<<MESSAGE-([0-9a-f]{16})>>>\n([\s\S]*)\n<<<END-MESSAGE-\1>>>$/;
+const unfence = (body: string) => FENCED.exec(body)?.[2] ?? body;
+
 let dir: string;
 let brain: Brain;
 let http: BrainHttpServer | null;
@@ -181,13 +185,14 @@ describe.each(MODES)('lane and brain tools (%s)', (_mode, backendFor) => {
       body: 'please review',
       attachments: [{ kind: 'screenshot', ref: path.join(dir, 'evidence', 'shot.png') }],
     });
-    expect((await laneB('read_inbox')).json).toMatchObject([
-      { from: { kind: 'lane', id: 'A' }, body: 'please review', untrusted: true },
-    ]);
+    const fromA = (await laneB('read_inbox')).json;
+    expect(fromA).toMatchObject([{ from: { kind: 'lane', id: 'A' }, untrusted: true }]);
+    expect(fromA[0].body).toMatch(FENCED);
+    expect(unfence(fromA[0].body)).toBe('please review');
     expect((await laneB('read_inbox')).json).toEqual([]);
 
     await laneA('send_message', { to: { kind: 'brain', id: 'main' }, body: 'done with login' });
-    expect((await hub('read_inbox')).json.map((m: { body: string }) => m.body)).toEqual([
+    expect((await hub('read_inbox')).json.map((m: { body: string }) => unfence(m.body))).toEqual([
       'done with login',
     ]);
   });
