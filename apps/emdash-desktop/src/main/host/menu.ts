@@ -12,6 +12,10 @@ import {
   EMDASH_ISSUES_NEW_URL,
   EMDASH_RELEASES_URL,
 } from '@core/primitives/urls/api/urls';
+import {
+  agentStopMenuItems,
+  onAgentStopStateChange,
+} from '@main/host/ninebrains/agent-stop-controls';
 import { telemetryService } from '@main/lib/telemetry';
 
 export interface MenuKeybindingSnapshotEntry {
@@ -171,6 +175,8 @@ export function setupApplicationMenu(
         { role: 'togglefullscreen' as const },
       ],
     },
+    // Ninebrains: STOP answered in main, so it works when the window has hung (SEC-30).
+    { label: 'Agents', submenu: agentStopMenuItems({ accelerator: true }) },
     // Window menu
     { role: 'windowMenu' as const },
     // Help menu
@@ -232,3 +238,6 @@ export function setApplicationMenuKeybindings(
 ): void {
   setupApplicationMenu(snapshot);
 }
+
+// Ninebrains: rebuild so the Agents menu shows the current STOP latch.
+onAgentStopStateChange(() => setupApplicationMenu());

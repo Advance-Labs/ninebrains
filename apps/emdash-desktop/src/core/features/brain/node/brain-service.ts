@@ -388,6 +388,25 @@ export class BrainService {
     return ok(undefined);
   }
 
+  private readonly stopListeners = new Set<() => void>();
+
+  /** Fires when STOP latches or clears, from any entry point (renderer, app menu, tray). */
+  onStopChange(listener: () => void): () => void {
+    this.stopListeners.add(listener);
+    return () => this.stopListeners.delete(listener);
+  }
+
+  private notifyStop(latched: boolean): void {
+    brainEvents.emit(undefined, { type: 'stop', latched });
+    for (const listener of this.stopListeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.deps.onError('brain: STOP listener failed', error);
+      }
+    }
+  }
+
   /** Global STOP (SEC-30). Latches until `clearStop`. */
   async stopAll(): Promise<Result<{ killedRuns: number; stoppedLanes: number }, BrainError>> {
     const { supervisor, lanes, onError } = this.deps;
@@ -412,7 +431,7 @@ export class BrainService {
       onError,
       onStopped: () => {
         this.views.schedule();
-        brainEvents.emit(undefined, { type: 'stop', latched: true });
+        this.notifyStop(true);
       },
     });
     return ok({ killedRuns: result.killedRuns, stoppedLanes: result.stoppedLanes });
@@ -422,7 +441,7 @@ export class BrainService {
     this.deps.supervisor.clearStop();
     this.dispatcher.clearStop();
     this.dispatcher.setPaused(false);
-    brainEvents.emit(undefined, { type: 'stop', latched: false });
+    this.notifyStop(false);
     return ok(undefined);
   }
 
@@ -449,6 +468,7 @@ export class BrainService {
   /** A project's pack launch for one role (or none): its prompt, servers and gates differ. */
   private async pack(projectId: string, roleId?: string): Promise<PackLaunch | undefined> {
     if (!this.deps.packs) return undefined;
+    const key = packCacheKey(projectId, roleId);
     try {
       const launch = await this.deps.packs.resolvePackLaunch(projectId, roleId);
       this.packCache.set(key, launch);
@@ -468,7 +488,6 @@ export class BrainService {
       .list()
       .filter((lane) => lane.laneId !== laneId)
       .flatMap((lane) => (lane.worktreePath ? [lane.worktreePath] : []));
-    const key = packCacheKey(projectId, roleId);
     const sessions = this.sessions
       .ids()
       .flatMap((brainId) => this.sessions.worktreeOf(brainId) ?? []);
@@ -491,7 +510,7 @@ export class BrainService {
       laneModes: state.laneModes,
       activeRuns: this.deps.supervisor.activeRunIds.length,
       gatesConnected: this.deps.gateRunner !== undefined,
+      unattendedBudgets: this.deps.unattendedBudgets ?? DEFAULT_UNATTENDED_BUDGETS,
     };
   }
 }
-      unattendedBudgets: this.deps.unattendedBudgets ?? DEFAULT_UNATTENDED_BUDGETS,

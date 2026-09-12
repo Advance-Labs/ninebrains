@@ -6,6 +6,7 @@ import stableIcon from '@/assets/images/emdash/emdash.png?asset';
 import trayTemplate1x from '@/assets/images/emdash/trayTemplate.png?asset';
 import trayTemplate2x from '@/assets/images/emdash/trayTemplate@2x.png?asset';
 import { IS_CANARY, PRODUCT_NAME } from '@core/primitives/app-identity/api/app-identity';
+import { agentStopMenuItems, onAgentStopStateChange } from './ninebrains/agent-stop-controls';
 import { showMainWindow } from './window';
 
 let tray: Tray | null = null;
@@ -37,24 +38,34 @@ export function setTrayVisible(visible: boolean): void {
   }
 }
 
+function buildTrayMenu(): Electron.Menu {
+  return Menu.buildFromTemplate([
+    {
+      label: `Open ${PRODUCT_NAME}`,
+      click: () => showMainWindow(),
+    },
+    { type: 'separator' },
+    // Ninebrains: STOP answered in main, so it works when the window has hung (SEC-30).
+    ...agentStopMenuItems(),
+    { type: 'separator' },
+    {
+      label: `Quit ${PRODUCT_NAME}`,
+      click: () => app.quit(),
+    },
+  ]);
+}
+
+// Ninebrains: rebuild so the STOP items show the current latch.
+onAgentStopStateChange(() => {
+  if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu());
+});
+
 function initializeTray(): Tray {
   if (tray && !tray.isDestroyed()) return tray;
 
   tray = new Tray(createTrayIcon());
   tray.setToolTip(PRODUCT_NAME);
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: `Open ${PRODUCT_NAME}`,
-        click: () => showMainWindow(),
-      },
-      { type: 'separator' },
-      {
-        label: `Quit ${PRODUCT_NAME}`,
-        click: () => app.quit(),
-      },
-    ])
-  );
+  tray.setContextMenu(buildTrayMenu());
 
   if (process.platform !== 'darwin') {
     tray.on('click', () => showMainWindow());

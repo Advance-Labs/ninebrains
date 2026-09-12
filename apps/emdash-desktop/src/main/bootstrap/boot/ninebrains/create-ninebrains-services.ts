@@ -47,6 +47,10 @@ import type { PreviewServerAccessOperations } from '@core/features/preview-serve
 import { previewServerUrl } from '@core/primitives/preview-servers/api';
 import { tasks } from '@core/services/app-db/node/schema';
 import type { AppSettingsService } from '@core/services/settings/node/app-settings-service';
+import {
+  brainStopControls,
+  registerAgentStopControls,
+} from '@main/host/ninebrains/agent-stop-controls';
 import { createElectronCdpGateHost } from '@main/host/ninebrains/electron-gate-host';
 import { encryptedAppSecretsStore } from '@main/host/secrets/encrypted-app-secrets-store';
 import { resolveBrainMcpBin } from './brain-mcp-bin';
@@ -137,11 +141,11 @@ export async function createNinebrainsServices(
       encryptedAppSecretsStore,
       createEnvSecretResolver(process.env)
     ),
+    secretStore: createKeychainSecretStore(encryptedAppSecretsStore),
     skills: createRuntimeSkillsPort(deps.runtimes),
     userPacksDir: join(userDataDir, 'ninebrains', 'packs'),
     onWarning: (message) => deps.logger.warn(message),
   });
-    secretStore: createKeychainSecretStore(encryptedAppSecretsStore),
 
   let lanes: LaneService | null = null;
   const laneInfos = (): BrainLaneInfo[] => {
@@ -161,6 +165,9 @@ export async function createNinebrainsServices(
                 sessionRunning: lane.session === 'running',
                 agent: service.agentStateOf(lane.conversationId),
                 worktreePath: service.worktreePathOf(lane.laneId),
+                mode: lane.runMode ?? 'attended',
+                ...(lane.roleId ? { roleId: lane.roleId } : {}),
+                ...(lane.model ? { model: lane.model } : {}),
               },
             ]
           : []
@@ -169,9 +176,6 @@ export async function createNinebrainsServices(
   };
   const laneWorktrees = () => laneInfos().flatMap((lane) => lane.worktreePath ?? []);
 
-                mode: lane.runMode ?? 'attended',
-                ...(lane.roleId ? { roleId: lane.roleId } : {}),
-                ...(lane.model ? { model: lane.model } : {}),
   // Review checkouts live outside <userData>: gate commands run in them, and M4 denies all of
   // <userData> to gate commands. realpath, because macOS's tmpdir is a symlink into /private.
   const checkoutRoot = join(realpathSync(tmpdir()), 'ninebrains-review');
@@ -200,6 +204,10 @@ export async function createNinebrainsServices(
       const stopped = await lanes?.stopLane(laneId);
       if (stopped && !stopped.success) throw new Error(stopped.error.message);
     },
+    async setMode(laneId, mode) {
+      const set = await lanes?.setLaneMode(laneId, mode);
+      if (!set?.success) throw new Error(set?.error.message ?? 'Lanes are not ready.');
+    },
     subscribe: (listener) => lanes?.onChange(listener) ?? (() => {}),
     refresh: () => lanes?.refresh(),
   };
@@ -208,10 +216,6 @@ export async function createNinebrainsServices(
     brain,
     endpoint,
     userDataDir,
-    async setMode(laneId, mode) {
-      const set = await lanes?.setLaneMode(laneId, mode);
-      if (!set?.success) throw new Error(set?.error.message ?? 'Lanes are not ready.');
-    },
     brainMcp: { execPath: process.execPath, binPath: resolveBrainMcpBin(app.getAppPath()) },
     lanes: brainLanes,
     sessions: {
@@ -233,6 +237,8 @@ export async function createNinebrainsServices(
   });
   lanes = createLaneService(deps, brainService.laneBrainPort());
   brainService.start();
+  // SEC-30: the app menu and tray STOP call the Brain in main, never through the renderer.
+  deps.scope.add(registerAgentStopControls(brainStopControls(brainService)));
 
   const previewUrlOf = async (projectId: string, taskId: string) => {
     const [row] = await deps.db
