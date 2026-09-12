@@ -168,9 +168,22 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
       : err({ type: 'unknown-secret', message: `No loaded pack declares a secret "${name}".` });
   }
 
-  /** The store's own message, which names no value. A thrown non-Error is not trusted. */
-  function storeFailure(action: string, name: string, error: unknown): Result<never, PacksError> {
-    const reason = error instanceof Error ? error.message : 'the secret store failed';
+  /**
+   * The store's own message, first line only and with the value cut out wherever it appears: a
+   * store or database error may quote its input (drizzle puts query params on a later line).
+   * A thrown non-Error is not trusted at all.
+   */
+  function storeFailure(
+    action: string,
+    name: string,
+    error: unknown,
+    value?: string
+  ): Result<never, PacksError> {
+    let reason =
+      error instanceof Error ? (error.message.split('\n')[0] ?? '') : 'the secret store failed';
+    for (const needle of [value, value?.trim()]) {
+      if (needle) reason = reason.replaceAll(needle, '[redacted]');
+    }
     warn(`pack secret ${name}: ${action} failed: ${reason}`);
     return err({ type: 'secret-store', message: `Could not ${action} ${name}: ${reason}` });
   }
@@ -247,7 +260,7 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
       try {
         await store.set(name, trimmed);
       } catch (error) {
-        return storeFailure('store', name, error);
+        return storeFailure('store', name, error, value);
       }
       return ok(undefined);
     },
