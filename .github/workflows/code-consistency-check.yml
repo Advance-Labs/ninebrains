@@ -8,10 +8,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Ninebrains: nrwl/nx-set-shas reads workflow runs, so the token needs actions: read. Without this
+# block the repo default token cannot, and every run failed at that step in about 20 s.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: code-consistency-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   checks:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

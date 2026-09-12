@@ -85,7 +85,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | File | What | Why |
 |---|---|---|
 | `.github/workflows/release-{canary,prod,linux,workspace-server}.yml` | Deleted | They publish to Emdash's R2/GitHub and need Emdash's signing and PostHog secrets |
-| `.github/workflows/code-consistency-check.yml` | Also runs on `push` to `main` | Lint, typecheck and test on ubuntu-latest for every push and PR |
+| `.github/workflows/code-consistency-check.yml` | Also runs on `push` to `main`; `permissions` (`contents: read`, `actions: read`), a per-PR `concurrency` group and `timeout-minutes: 30` (W7 CI) | Lint, typecheck and test on ubuntu-latest for every push and PR. `nrwl/nx-set-shas` needs `actions: read`; without it every run failed in about 20 s with "Resource not accessible by integration" |
 | `.github/workflows/workspace-server-package-check.yml` | `workflow_dispatch` only | Save Actions minutes on the private repo |
 | `.github/ISSUE_TEMPLATE/config.yml` | Links → our repo | |
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
