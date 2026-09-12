@@ -201,6 +201,8 @@ the composition root passes one (`src/core/features/gates/README.md`, "Wiring").
 | `electron.vite.config.ts` | `copyBrainMcpPlugin` → `out/main/brain-mcp/` | Bundle the brain-mcp shim like the adapter assets (SEAMS §3.6) |
 | `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `asarUnpack` `out/main/brain-mcp/**` | Electron-as-Node runs the shim from a real file |
 | `package.json` (desktop) | `e2e:brain` script | The fan-out demo |
+| `src/main/bootstrap/boot/phases/services.ts` | Also passes `appSettings`, `previewServers` and a late-bound `notifications` getter to `createNinebrainsServices` (W7 integration) | The gates: rigor settings, a lane's preview URL, blocked-job notifications. The notification service is built after the call |
+| `src/main/bootstrap/boot/wiring.ts` | `gates` from `services.ninebrains` (W7 integration) | The Job verification modal gets the real service instead of the "unavailable" fallback |
 
 Ninebrains files also touched: `lanes/node/{lane-ports,lane-service,agent-feed,ninebrains-services}.ts`
 (Brain port, job override, `activeJobId`, launch release, hook detail), `lanes/browser/grid/{lanes-view,lane-cell,lane-side-panel}.tsx`

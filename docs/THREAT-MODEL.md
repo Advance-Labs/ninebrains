@@ -112,7 +112,7 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T28 | Unsigned build auto-updates from a feed we don't control (upstream Emdash feed, hijacked release) | M | H | updater compiled out until signing; checksums + provenance | SEC-36, SEC-37 |
 | T29 | Telemetry or a crash report leaves the machine | L | M | default off; no key or host compiled in; egress test | SEC-38 |
 | T30 | An incident can't be reconstructed because the logs were in memory (remediation lesson 4) | M | M | append-only `security_events` in the Brain DB | SEC-33 |
-| T31 | The reviewer gate's `git diff` runs in the review checkout, which shares the lane-writable repo config, so a `filter.<x>.clean` driver in `.git/config` runs during the diff. Review checkouts themselves empty every filter driver (L4); gates-core's `SAFE_GIT` flags do not yet. It runs under the tests-gate sandbox on macOS and on Linux with bubblewrap, but unsandboxed on Linux without it and on Windows | M | H | give `reviewer-gate.ts` the same filter-driver overrides as `review-checkout.ts` (open, gates-core owner) | SEC-18, SEC-20 |
+| T31 | The reviewer gate's `git diff` runs in the review checkout, which shares the lane-writable repo config, so a `filter.<x>.clean` driver in `.git/config` runs during the diff. Review checkouts themselves empty every filter driver (L4). It runs under the tests-gate sandbox on macOS and on Linux with bubblewrap, but unsandboxed on Linux without it and on Windows | M | H | **Fixed 2026-09-12:** `reviewer-gate.ts` lists the repo's filter drivers with `git config` and blanks `smudge`/`clean`/`process` for the diff and the untracked listing, the same rule as `review-checkout.ts`; it fails closed on an unreadable config or an unsafe name (`T31` tests in `reviewer-gate.test.ts`) | SEC-18, SEC-20 |
 
 ## 5. Requirements
 
@@ -399,7 +399,7 @@ the agents or slices expected to close the gap.
 | SEC-15 | Open | Dispatcher paste [w5-brain-wiring] |
 | SEC-16 | Done | `argv-guard.test.ts`, `run-command.test.ts` |
 | SEC-17 | Done | `run-supervisor.test.ts` |
-| SEC-18 | Done | `spawn-reviewer.test.ts`, `reviewer-gate.test.ts`. See T31 |
+| SEC-18 | Done | `spawn-reviewer.test.ts`, `reviewer-gate.test.ts`, including T31 (the reviewer's `git diff` blanks every repo filter driver) |
 | SEC-19 | Done | gates-core `untrusted.test.ts`, `reviewer-gate.test.ts` |
 | SEC-20 | Done on macOS, partial elsewhere | `run-command.test.ts`, `tests-sandbox.test.ts`. macOS seatbelt denies secrets, `<userData>` and non-loopback network, checked with real `sandbox-exec`. Linux bubblewrap argv is tested with a stand-in `bwrap`, not yet on a Linux host. Linux without `bwrap` and Windows refuse the tests gate unless the project opts in (R11) |
 | SEC-21 | Done | `fetch-text.test.ts`, `ip-policy.test.ts` |
