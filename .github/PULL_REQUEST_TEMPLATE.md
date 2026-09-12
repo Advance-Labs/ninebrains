@@ -1,31 +1,25 @@
-### Description
+### What and why
 
-Give a short summary of what changed, why it's needed, and any important implementation notes.
+What changed, why it is needed, and anything a reviewer should look at first.
 
-### Related issues
+Fixes #
 
-Link related issues. If this PR fixes an issue, mention it like: Fixes #123.
+### How it was tested
 
-### Testing
+The commands you ran, and what you checked by hand.
 
-List the checks you ran, for example `pnpm run format`, `pnpm run lint`,
-`pnpm run typecheck`, `pnpm run test`, and any manual testing.
+### Screenshots (UI changes)
 
-### Screenshot/Recording (if applicable)
+At 1440 px and 390 px wide.
 
-Attach a screenshot, GIF, or recording of the change. This is optional, but helps reviewers
-understand UI or workflow changes.
+### Checklist
 
-<details>
-<summary>Checklist</summary>
-
-- [ ] I kept this PR small and focused
-- [ ] I ran a self-review before opening this PR
-- [ ] I ran the relevant local checks or explained why not
-- [ ] I updated docs when behavior or setup changed
-- [ ] I added or updated tests when behavior changed, or explained why not
-- [ ] I only added comments where the logic is not obvious
-- [ ] I used [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit
-  messages and, when possible, the PR title
-
-</details>
+- [ ] `pnpm run check` passes locally (it edits nothing; `pnpm run check:write` fixes formatting)
+- [ ] Every commit is signed off (`git commit -s`) and the PR title is a Conventional Commit
+- [ ] Tests added or updated for the behaviour change, or I said why not
+- [ ] UI change: browser tests run locally (`pnpm --dir apps/emdash-desktop exec vitest run --project browser`) and screenshots at 1440 and 390 px added above, or this is not a UI change
+- [ ] Every edit to a file inherited from Emdash is logged in `docs/UPSTREAM-PATCHES.md` (CI checks this), or there are none
+- [ ] New dependency: named here with its licence, and `pnpm run licenses` passes, or there is none
+- [ ] Security-sensitive area (Brain, gates, packs, lanes, exec runs, anything that spawns a process, release, CI): the SEC-IDs are listed here and a security review is requested, or none is touched
+- [ ] A real `claude` or `codex` CLI was used: said so here, with what I ran, or only the fake agent was used
+- [ ] Docs in `docs/guide/` updated when behaviour or setup changed
