@@ -12,8 +12,11 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Tip of w7/integrate when DCO became required. Its ancestors predate the policy. */
-export const DCO_CUTOFF = '4330fed1e50f629fedb9d2ddc79c292ee18454a1';
+/**
+ * Tip of w7/integrate when it was merged into the branch that introduced DCO. It and its ancestors
+ * predate the policy; every commit after it must be signed off.
+ */
+export const DCO_CUTOFF = '321928d68ef4095ec5c87145ee9ed872a81ce3e9';
 
 export const COMMIT_TYPES = [
   'build',
