@@ -24,7 +24,16 @@ export const packSummarySchema = z.object({
   license: licence,
   source: z.enum(['bundled', 'user']),
   enabled: z.boolean(),
-  roles: z.array(z.object({ id: z.string(), title: z.string(), kind: z.enum(ROLE_KINDS) })),
+  roles: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      kind: z.enum(ROLE_KINDS),
+      /** The role's preferred agent and model, used to prefill the add-lane form. */
+      provider: z.enum(['claude', 'codex']).optional(),
+      model: z.string().optional(),
+    })
+  ),
   mcpServers: z.array(
     z.object({
       name: z.string(),

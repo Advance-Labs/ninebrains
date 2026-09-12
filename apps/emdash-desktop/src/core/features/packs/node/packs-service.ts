@@ -110,7 +110,13 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
       license: manifest.license,
       source: pack.source,
       enabled,
-      roles: manifest.roles.map(({ id, title, kind }) => ({ id, title, kind })),
+      roles: manifest.roles.map(({ id, title, kind, provider, model }) => ({
+        id,
+        title,
+        kind,
+        ...(provider ? { provider } : {}),
+        ...(model ? { model } : {}),
+      })),
       mcpServers: manifest.mcpServers.map((s) => ({
         name: s.name,
         description: s.description,

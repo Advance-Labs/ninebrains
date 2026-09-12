@@ -48,6 +48,10 @@ async function setup() {
       list: () => [lane],
       sendInput: async (_id, data) => void writes.push(data),
       stop: async (laneId) => void stopped.push(laneId),
+      setMode: async (laneId, mode) => {
+        if (laneId !== lane.laneId) throw new Error('That lane no longer exists.');
+        lane.mode = mode;
+      },
       subscribe: () => () => {},
       refresh,
     },
@@ -87,6 +91,24 @@ const laneConfig = (lane: BrainLaneInfo): LaneConfig => ({
 });
 
 describe('BrainService', () => {
+  it('persists a lane run mode through the lanes port before the dispatcher uses it', async () => {
+    const { service, lane } = await setup();
+    service.start();
+    expect(await service.setLaneMode('lane-1', 'unattended')).toEqual({
+      success: true,
+      data: undefined,
+    });
+    expect(lane.mode).toBe('unattended');
+    expect(service.dispatcher.modeOf('lane-1')).toBe('unattended');
+    expect(peek(service.views.dispatcher).unattendedBudgets).toMatchObject({
+      wallClockMs: 1_800_000,
+    });
+
+    const missing = await service.setLaneMode('gone', 'unattended');
+    expect(missing).toMatchObject({ success: false, error: { type: 'not-found' } });
+    expect(service.dispatcher.modeOf('gone')).toBe('attended');
+  });
+
   it('constructs, starts and serves the overview before any lane has launched', async () => {
     const { service } = await setup();
     service.start();

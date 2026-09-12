@@ -1,5 +1,6 @@
 import { defineContract, eventStream, fallible, liveModel, liveState } from '@emdash/wire/rpc';
 import { z } from 'zod';
+import { laneRunModeSchema } from '@core/features/lanes/api';
 import {
   brainAddressSchema,
   brainDispatcherViewSchema,
@@ -11,7 +12,6 @@ import {
   brainNoteViewSchema,
   brainSessionViewSchema,
   brainUnreadSchema,
-  laneRunModeSchema,
   type BrainWireEvent,
 } from './schemas';
 

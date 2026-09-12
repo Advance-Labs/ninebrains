@@ -165,6 +165,9 @@ export async function createNinebrainsServices(
   };
   const laneWorktrees = () => laneInfos().flatMap((lane) => lane.worktreePath ?? []);
 
+                mode: lane.runMode ?? 'attended',
+                ...(lane.roleId ? { roleId: lane.roleId } : {}),
+                ...(lane.model ? { model: lane.model } : {}),
   // Review checkouts live outside <userData>: gate commands run in them, and M4 denies all of
   // <userData> to gate commands. realpath, because macOS's tmpdir is a symlink into /private.
   const checkoutRoot = join(realpathSync(tmpdir()), 'ninebrains-review');
@@ -201,6 +204,10 @@ export async function createNinebrainsServices(
     brain,
     endpoint,
     userDataDir,
+    async setMode(laneId, mode) {
+      const set = await lanes?.setLaneMode(laneId, mode);
+      if (!set?.success) throw new Error(set?.error.message ?? 'Lanes are not ready.');
+    },
     brainMcp: { execPath: process.execPath, binPath: resolveBrainMcpBin(app.getAppPath()) },
     lanes: brainLanes,
     sessions: {

@@ -4,6 +4,8 @@ import {
   laneBoardSchema,
   laneErrorSchema,
   laneProviderSchema,
+  laneRoleIdSchema,
+  laneRunModeSchema,
   laneSlotSchema,
   laneStatusMapSchema,
   type LaneEvent,
@@ -56,9 +58,17 @@ export const lanesContract = defineContract({
       slot: laneSlotSchema,
       projectId: z.string().min(1),
       provider: laneProviderSchema,
-      model: z.string().min(1).optional(),
+      model: z.string().trim().min(1).max(128).optional(),
+      /** A role of one of the project's enabled packs; its prompt and servers apply at launch. */
+      roleId: laneRoleIdSchema.optional(),
     }),
     data: z.object({ laneId: z.string() }),
+    error: laneErrorSchema,
+  }),
+  /** Attended (paste into the terminal) or unattended (headless runs). Persisted with the lane. */
+  setLaneMode: fallible({
+    input: laneKey.extend({ mode: laneRunModeSchema }),
+    data: z.void(),
     error: laneErrorSchema,
   }),
   startLane: fallible({ input: laneKey, data: z.void(), error: laneErrorSchema }),

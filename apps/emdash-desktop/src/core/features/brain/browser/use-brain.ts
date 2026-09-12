@@ -38,6 +38,7 @@ const IDLE_DISPATCHER: BrainDispatcherView = {
   laneModes: {},
   activeRuns: 0,
   gatesConnected: false,
+  unattendedBudgets: { wallClockMs: 0 },
 };
 
 export function useBrainOverview() {
