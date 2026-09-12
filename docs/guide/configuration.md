@@ -9,13 +9,15 @@ description: >-
 
 The app stores gate settings under the key `ninebrains.gates`.
 
-| Field | Range | Default | Where to change it |
-|---|---|---|---|
-| `testingRigor` | 0 to 10 | 5 | **Settings → Gates**, Testing rigor |
-| `securityRigor` | 0 to 10 | 5 | **Settings → Gates**, Security rigor |
-| `evidenceRetentionDays` | 1 to 3650 | 30 | No control; the Gates page shows the current value |
+| Field | Range | Default |
+|---|---|---|
+| `testingRigor` | 0–10 | 5 |
+| `securityRigor` | 0–10 | 5 |
+| `evidenceRetentionDays` | 1–3650 | 30 |
 
-[Verification gates](gates.md#rigor) explains what each rigor level attaches.
+Change both rigor values with the sliders in **Settings → Gates**. The evidence retention has no
+control; the Gates page shows the current value. [Verification gates](gates.md#rigor) explains what
+each rigor level attaches.
 
 ## Per-project gate preferences
 
