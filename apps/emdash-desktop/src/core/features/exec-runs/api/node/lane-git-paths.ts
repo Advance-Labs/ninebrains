@@ -5,8 +5,9 @@
  * Synchronous because the attended launch path (`buildLaneLaunch`) is.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildScrubbedCommandEnv } from './run-env';
 
 export interface LaneGitPaths {
@@ -14,6 +15,11 @@ export interface LaneGitPaths {
   gitDir: string;
   /** `$GIT_COMMON_DIR`: the repo's `.git`, shared by every worktree. */
   commonDir: string;
+  /**
+   * `<worktree>/.git` when it is a gitfile (a linked worktree). It names the git dir that git
+   * uses, so a lane that rewrote it could point the app's git at a config it controls.
+   */
+  gitFile?: string;
 }
 
 export interface ResolveLaneGitPathsOptions {
@@ -64,5 +70,11 @@ export function resolveLaneGitPaths(
   }
   const [gitDir, commonDir] = out.trim().split('\n');
   if (!gitDir || !commonDir) throw new Error(`Unexpected git rev-parse output: ${out}`);
-  return { gitDir: realpathSync(gitDir), commonDir: realpathSync(commonDir) };
+  const dotGit = join(realpathSync(worktree), '.git');
+  const isGitFile = lstatSync(dotGit, { throwIfNoEntry: false })?.isFile() === true;
+  return {
+    gitDir: realpathSync(gitDir),
+    commonDir: realpathSync(commonDir),
+    ...(isGitFile ? { gitFile: dotGit } : {}),
+  };
 }

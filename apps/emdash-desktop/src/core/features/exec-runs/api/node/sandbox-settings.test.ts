@@ -134,6 +134,20 @@ describe('SEC-11 lane sandbox settings', () => {
     ]);
   });
 
+  it("T36 denies rewriting a linked worktree's .git gitfile", () => {
+    const s = buildClaudeSandboxSettings({
+      ...base,
+      preset: 'worker',
+      git: {
+        gitDir: '/repo/.git/worktrees/lane-a',
+        commonDir: '/repo/.git',
+        gitFile: '/wt/proj/lane-a/.git',
+      },
+    });
+    expect(s.sandbox.filesystem.denyWrite[0]).toBe('/wt/proj/lane-a/.git');
+    expect(s.permissions.deny).toContain('Edit(//wt/proj/lane-a/.git)');
+  });
+
   it('refuses a run directory inside a denied path', () => {
     expect(() =>
       buildClaudeSandboxSettings({ ...base, preset: 'worker', worktree: '/ud/ninebrains/lanes/x' })
