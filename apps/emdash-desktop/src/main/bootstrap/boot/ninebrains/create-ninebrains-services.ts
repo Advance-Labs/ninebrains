@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { LOCAL_HOST_REF } from '@emdash/core/primitives/host/api';
 import type { Result } from '@emdash/shared';
@@ -52,6 +50,7 @@ import { encryptedAppSecretsStore } from '@main/host/secrets/encrypted-app-secre
 import { resolveBrainMcpBin } from './brain-mcp-bin';
 import { createKeychainSecretResolver } from './keychain-secret-resolver';
 import { createMementoRowPort } from './memento-row-port';
+import { createReviewRoot } from './review-root';
 import { routeReviewer } from './reviewer-route';
 
 /** What upstream passes to `resolveLaneLaunch` (the patched TuiConversationProvider). */
@@ -166,9 +165,10 @@ export async function createNinebrainsServices(
   const laneWorktrees = () => laneInfos().flatMap((lane) => lane.worktreePath ?? []);
 
   // Review checkouts live outside <userData>: gate commands run in them, and M4 denies all of
-  // <userData> to gate commands. realpath, because macOS's tmpdir is a symlink into /private.
-  const checkoutRoot = join(realpathSync(tmpdir()), 'ninebrains-review');
-  mkdirSync(checkoutRoot, { recursive: true, mode: 0o700 });
+  // <userData> to gate commands. A new mkdtemp root per boot (T34), removed on shutdown.
+  const reviewRoot = createReviewRoot();
+  deps.scope.add(() => reviewRoot.dispose());
+  const checkoutRoot = reviewRoot.path;
 
   const supervisor = new ExecRunSupervisor({
     userDataDir,

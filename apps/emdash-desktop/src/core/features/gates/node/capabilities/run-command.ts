@@ -7,6 +7,7 @@
  *   at a private per-command temp dir that is deleted afterwards.
  * - With `argv`, no shell: `command` is resolved to an absolute executable from the scrubbed PATH,
  *   skipping any PATH entry inside the cwd, so a binary planted in the worktree never runs (SEC-16).
+ *   These are the gates' own git calls, so they also get `GIT_NO_LAZY_FETCH=1` (T32).
  * - New process group, registered with the SEC-30 registry so the global STOP reaches it. SIGTERM
  *   then SIGKILL on abort or timeout, and leftovers are reaped when the command exits. Output is
  *   capped at 1 MiB per stream (the tail is kept: failures are there).
@@ -170,6 +171,8 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
       ...base,
       TMPDIR: tempDir,
       ...(platform === 'win32' ? { TEMP: tempDir, TMP: tempDir } : {}),
+      // T32: a gate-built git call never lazy-fetches a missing object through a promisor remote.
+      ...(exec ? { GIT_NO_LAZY_FETCH: '1' } : {}),
     };
     const sandboxed = {
       worktree: cwd,
