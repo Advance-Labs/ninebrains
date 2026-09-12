@@ -97,8 +97,17 @@ describe('Dispatcher', () => {
     expect(await dispatcher.tick()).toEqual([]);
     expect(pasted).toEqual([]);
     dispatcher.clearStop();
-    dispatcher.setPaused(false);
     expect(await dispatcher.tick()).toHaveLength(1);
+  });
+
+  it('T37 keeps a user pause across STOP and Clear STOP', async () => {
+    const { dispatcher, job } = setup([lane('A')]);
+    job('work');
+    dispatcher.setPaused(true);
+    dispatcher.latch();
+    dispatcher.clearStop();
+    expect(dispatcher.state).toMatchObject({ paused: true, stopLatched: false });
+    expect(await dispatcher.tick()).toEqual([]);
   });
 
   it('hands unattended lanes to the run path instead of pasting', async () => {

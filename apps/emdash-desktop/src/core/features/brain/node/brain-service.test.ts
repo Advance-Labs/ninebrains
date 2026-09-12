@@ -157,4 +157,15 @@ describe('BrainService', () => {
     expect(supervisor.clearStop).toHaveBeenCalledOnce();
     expect(service.dispatcher.state).toMatchObject({ paused: false, stopLatched: false });
   });
+
+  it('T37 Clear STOP keeps a pause the user set before STOP', async () => {
+    const { service, brain } = await setup();
+    service.start();
+    expect(service.setDispatcherPaused(true).success).toBe(true);
+    await service.stopAll();
+    expect(service.clearStop().success).toBe(true);
+    expect(service.dispatcher.state).toMatchObject({ paused: true, stopLatched: false });
+    brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'Work' });
+    expect(await service.dispatcher.tick()).toEqual([]);
+  });
 });
