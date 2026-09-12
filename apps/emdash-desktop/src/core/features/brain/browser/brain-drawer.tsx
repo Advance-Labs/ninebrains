@@ -1,7 +1,12 @@
 import { Alert, Badge, Button, Spinner, Textarea } from '@emdash/ui/react/primitives';
 import { useState, type ReactNode } from 'react';
 import { cn } from '@core/primitives/styling/browser/cn';
-import { addressKey, type BrainAddress, type BrainMessageView, type BrainSessionView } from '../api';
+import {
+  addressKey,
+  type BrainAddress,
+  type BrainMessageView,
+  type BrainSessionView,
+} from '../api';
 import { runBrainAction, useBrainJobs, useBrainOverview } from './use-brain';
 
 export type BrainDrawerProps = {
@@ -42,7 +47,11 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           {dispatcher.stopLatched ? 'stopped' : dispatcher.paused ? 'paused' : 'dispatching'}
         </Badge>
         {!dispatcher.gatesConnected && (
-          <Badge tone="warning" variant="outline" title="No gate runner is connected: finished work is marked unverified.">
+          <Badge
+            tone="warning"
+            variant="outline"
+            title="No gate runner is connected: finished work is marked unverified."
+          >
             gates off
           </Badge>
         )}
@@ -79,7 +88,10 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
         </div>
       )}
 
-      <div role="tablist" className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-1">
+      <div
+        role="tablist"
+        className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-1"
+      >
         {visible.map((session) => {
           const count = unread[addressKey({ kind: 'brain', id: session.brainId })] ?? 0;
           return (
@@ -89,7 +101,10 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
               size="sm"
               variant="ghost"
               aria-selected={session.brainId === active?.brainId}
-              className={cn('h-6 px-2 text-xs', session.brainId === active?.brainId && 'bg-(--em-accent-3)')}
+              className={cn(
+                'h-6 px-2 text-xs',
+                session.brainId === active?.brainId && 'bg-(--em-accent-3)'
+              )}
               onClick={() => setSelected(session.brainId)}
             >
               {session.title}
@@ -105,9 +120,9 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           title={projectId === null ? 'Add a lane to this tab first' : undefined}
           onClick={() =>
             projectId &&
-            void runBrainAction('Could not start the Brain', (c) => c.startBrain({ projectId })).then(
-              (started) => started && setSelected(started.brainId)
-            )
+            void runBrainAction('Could not start the Brain', (c) =>
+              c.startBrain({ projectId })
+            ).then((started) => started && setSelected(started.brainId))
           }
         >
           {visible.length === 0 ? 'Start Brain' : '+ Brain'}
@@ -126,7 +141,12 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           )}
         </div>
         <JobCounts states={jobs.map((job) => job.state)} />
-        <Inboxes lanes={lanes} unread={unread} fromBrainId={fromBrainId} brainInbox={active?.brainId ?? 'user'} />
+        <Inboxes
+          lanes={lanes}
+          unread={unread}
+          fromBrainId={fromBrainId}
+          brainInbox={active?.brainId ?? 'user'}
+        />
       </div>
     </aside>
   );
@@ -161,7 +181,10 @@ function JobCounts({ states }: { states: readonly string[] }) {
       {STATE_ORDER.map((state) => {
         const count = states.filter((candidate) => candidate === state).length;
         return count > 0 ? (
-          <Badge key={state} tone={state === 'blocked' ? 'error' : state === 'done' ? 'success' : 'neutral'}>
+          <Badge
+            key={state}
+            tone={state === 'blocked' ? 'error' : state === 'done' ? 'success' : 'neutral'}
+          >
             {count} {state}
           </Badge>
         ) : null;
@@ -198,7 +221,10 @@ function Inboxes({
   };
 
   return (
-    <section aria-label="Inboxes" className="flex max-h-72 min-h-0 flex-col overflow-y-auto p-2 text-xs">
+    <section
+      aria-label="Inboxes"
+      className="flex max-h-72 min-h-0 flex-col overflow-y-auto p-2 text-xs"
+    >
       <div className="flex items-center gap-1 px-1 pb-1">
         <span className="font-medium text-foreground">Inboxes</span>
         <Button

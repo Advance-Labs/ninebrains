@@ -142,15 +142,15 @@ import { setTrayVisible } from '@main/host/tray';
 import { installUpdateNotifications } from '@main/host/updates/update-notifications';
 import { applyNativeTheme, isAppFocused } from '@main/host/window';
 import { log } from '@main/lib/logger';
+import { telemetryService } from '@main/lib/telemetry';
+import { appScope } from '../../core/app-scope';
+import { step } from '../../core/phase';
+import { setCoreServiceInstances } from '../../core/service-instances';
 import {
   createNinebrainsServices,
   type NinebrainsLaunchInput,
   type NinebrainsServices,
 } from '../ninebrains/create-ninebrains-services';
-import { telemetryService } from '@main/lib/telemetry';
-import { appScope } from '../../core/app-scope';
-import { step } from '../../core/phase';
-import { setCoreServiceInstances } from '../../core/service-instances';
 import { registerProviderTokenHandlers, wireAccountTelemetry } from '../wiring';
 import type { DatabaseBundle } from './database';
 import type { InfrastructureBundle } from './infrastructure';

@@ -29,11 +29,38 @@ const data: LanePanelData = {
     },
   ],
   done: [
-    { id: 'd1', jobId: 'j0', title: 'Old', projectId: 'p1', laneId: 'A', summary: 'did it', artifacts: [], at: 5, verified: false },
-    { id: 'd2', jobId: 'j1', title: 'New', projectId: 'p1', laneId: 'A', summary: 'checked', artifacts: [], at: 9, verified: true },
+    {
+      id: 'd1',
+      jobId: 'j0',
+      title: 'Old',
+      projectId: 'p1',
+      laneId: 'A',
+      summary: 'did it',
+      artifacts: [],
+      at: 5,
+      verified: false,
+    },
+    {
+      id: 'd2',
+      jobId: 'j1',
+      title: 'New',
+      projectId: 'p1',
+      laneId: 'A',
+      summary: 'checked',
+      artifacts: [],
+      at: 9,
+      verified: true,
+    },
   ],
   notes: [
-    { id: 'n1', projectId: 'p1', jobId: null, author: { kind: 'lane', id: 'A' }, body: 'first line\nsecond', at: 1 },
+    {
+      id: 'n1',
+      projectId: 'p1',
+      jobId: null,
+      author: { kind: 'lane', id: 'A' },
+      body: 'first line\nsecond',
+      at: 1,
+    },
   ],
 };
 

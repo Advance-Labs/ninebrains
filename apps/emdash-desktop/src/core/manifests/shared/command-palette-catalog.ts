@@ -1,5 +1,5 @@
-import { DEV_PERF_COMMAND_PALETTE_ITEMS } from '@core/features/dev-perf/contributions/palette';
 import { BRAIN_COMMAND_PALETTE_ITEMS } from '@core/features/brain/contributions/palette';
+import { DEV_PERF_COMMAND_PALETTE_ITEMS } from '@core/features/dev-perf/contributions/palette';
 import { LANES_COMMAND_PALETTE_ITEMS } from '@core/features/lanes/contributions/palette';
 import { TASK_COMMAND_PALETTE_ITEMS } from '@core/features/tasks/contributions/palette';
 import { WORKBENCH_COMMAND_PALETTE_ITEMS } from '@core/features/workbench/contributions/palette';

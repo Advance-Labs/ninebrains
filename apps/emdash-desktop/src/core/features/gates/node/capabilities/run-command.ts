@@ -147,7 +147,8 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
         : bwrap
           ? 'bwrap'
           : 'none';
-  if (mode === 'bwrap' && !bwrap) throw new Error('sandbox "bwrap" needs bwrapPath or bwrap on PATH');
+  if (mode === 'bwrap' && !bwrap)
+    throw new Error('sandbox "bwrap" needs bwrapPath or bwrap on PATH');
 
   return async (command, opts) => {
     const cwd = await resolveRunCwd(opts.cwd, options.allowedRoots());

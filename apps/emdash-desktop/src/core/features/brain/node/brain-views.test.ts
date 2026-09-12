@@ -17,13 +17,21 @@ function setup(gateRunner?: GateRunnerPort) {
     activeRuns: 0,
     gatesConnected: gateRunner !== undefined,
   };
-  const views = new BrainViews(brain, () => [{ kind: 'lane', id: 'A' }], () => dispatcher);
+  const views = new BrainViews(
+    brain,
+    () => [{ kind: 'lane', id: 'A' }],
+    () => dispatcher
+  );
   const verification = startVerification({ brain, gateRunner, onError: () => {} });
   return { brain, views, verification };
 }
 
 async function finishJob(brain: Brain, title: string) {
-  const job = brain.createJob(APP_IDENTITY, { projectId: 'p1', title, gateSpec: { gates: ['tests'] } });
+  const job = brain.createJob(APP_IDENTITY, {
+    projectId: 'p1',
+    title,
+    gateSpec: { gates: ['tests'] },
+  });
   brain.assignJob(APP_IDENTITY, job.id, 'A');
   brain.startRun(APP_IDENTITY, { jobId: job.id, laneId: 'A', mode: 'attended' });
   brain.completeJob(LANE, job.id, { summary: `${title} done` });
@@ -44,9 +52,17 @@ describe('lane side panel source (Brain DB read model)', () => {
 
     expect(peekCell(panel.jobs).map((j) => [j.title, j.state])).toEqual([['second', 'claimed']]);
     const [entry] = peekCell(panel.done);
-    expect(entry).toMatchObject({ jobId: done.id, title: 'first', summary: 'first done', verified: false });
+    expect(entry).toMatchObject({
+      jobId: done.id,
+      title: 'first',
+      summary: 'first done',
+      verified: false,
+    });
     expect(peekCell(panel.notes).map((n) => n.body)).toEqual(
-      expect.arrayContaining(['remember the cache', expect.stringMatching(/^\[gates\] unverified:/)])
+      expect.arrayContaining([
+        'remember the cache',
+        expect.stringMatching(/^\[gates\] unverified:/),
+      ])
     );
     expect(brain.getJob(APP_IDENTITY, done.id).state).toBe('done');
     expect(peekCell(views.unread)).toEqual({ 'lane:A': 0 });

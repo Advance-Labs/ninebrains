@@ -1,3 +1,4 @@
+import { brainSessionsMemento } from '@core/features/brain/contributions/mementos';
 import {
   acpDraftMemento,
   providerPreferencesMemento,
@@ -6,7 +7,6 @@ import {
   gatesPrefsIndexMemento,
   gatesProjectPrefsMemento,
 } from '@core/features/gates/contributions/mementos';
-import { brainSessionsMemento } from '@core/features/brain/contributions/mementos';
 import { lanesGridMemento } from '@core/features/lanes/contributions/mementos';
 import {
   packsPrefsIndexMemento,

@@ -1,6 +1,9 @@
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { betterSqlite3Driver, defineDurableSqliteStore } from '@emdash/core/primitives/sqlite-store/node';
+import {
+  betterSqlite3Driver,
+  defineDurableSqliteStore,
+} from '@emdash/core/primitives/sqlite-store/node';
 import {
   BRAIN_BUNDLED_MIGRATIONS,
   SqliteBrainStore,

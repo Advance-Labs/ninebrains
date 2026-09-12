@@ -11,7 +11,13 @@
 import { appendFile, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runsDir } from './run-paths';
-import { emptyUsage, totalTokens, type ExecPreset, type ExecProvider, type TokenUsage } from './types';
+import {
+  emptyUsage,
+  totalTokens,
+  type ExecPreset,
+  type ExecProvider,
+  type TokenUsage,
+} from './types';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 

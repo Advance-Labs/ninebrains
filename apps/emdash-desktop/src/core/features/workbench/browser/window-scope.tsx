@@ -1,7 +1,7 @@
 import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
-import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
 import { stopAllAgentWork } from '@core/features/brain/contributions/stop-action';
+import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { toggleAppTheme } from '@core/features/settings/api/browser/theme-toggle';

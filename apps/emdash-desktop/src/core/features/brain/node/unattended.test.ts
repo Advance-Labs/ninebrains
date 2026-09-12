@@ -10,7 +10,8 @@ import { APP_IDENTITY, type DispatchLane } from './dispatcher';
 import { startBrainEndpoint, type BrainEndpoint } from './endpoint';
 import { runJobUnattended } from './unattended';
 
-const repo = (path: string) => fileURLToPath(new URL(`../../../../../../../${path}`, import.meta.url));
+const repo = (path: string) =>
+  fileURLToPath(new URL(`../../../../../../../${path}`, import.meta.url));
 const FAKE_CLAUDE = repo('tooling/fake-agent/bin/fake-claude.mjs');
 const BRAIN_MCP_BIN = repo('packages/brain-mcp/dist/bin.mjs');
 
@@ -40,7 +41,12 @@ afterEach(async () => {
 async function setup(steps: (jobId: string) => unknown[]) {
   const brain = new Brain({ store: new InMemoryBrainStore() });
   endpoint = await startBrainEndpoint({ brain, onInternalError: () => {} });
-  brain.upsertLane(APP_IDENTITY, { id: 'lane-A', projectId: 'p1', provider: 'claude', status: 'idle' });
+  brain.upsertLane(APP_IDENTITY, {
+    id: 'lane-A',
+    projectId: 'p1',
+    provider: 'claude',
+    status: 'idle',
+  });
   const job = brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'Write the report' });
   const assigned = brain.assignJob(APP_IDENTITY, job.id, 'lane-A');
   const worktree = join(worktrees, `lane-${randomUUID().slice(0, 8)}`);
@@ -73,8 +79,20 @@ async function setup(steps: (jobId: string) => unknown[]) {
 
 describe('unattended run over the real brain-mcp and endpoint', () => {
   it('runs claude -p with a run-scoped token; complete_job lands and the token is revoked', async () => {
-    const { brain, endpoint: ep, job, lane, deps } = await setup((jobId) => [
-      { callTool: { server: 'brain', tool: 'complete_job', args: { jobId, summary: 'done via -p' } } },
+    const {
+      brain,
+      endpoint: ep,
+      job,
+      lane,
+      deps,
+    } = await setup((jobId) => [
+      {
+        callTool: {
+          server: 'brain',
+          tool: 'complete_job',
+          args: { jobId, summary: 'done via -p' },
+        },
+      },
       { say: 'reported' },
     ]);
     const result = await runJobUnattended(deps, lane, job);

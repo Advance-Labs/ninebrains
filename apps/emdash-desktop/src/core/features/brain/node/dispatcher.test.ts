@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { LaneAgentState, PasteOutcome } from './attended';
 import { APP_IDENTITY, Dispatcher, type DispatchLane } from './dispatcher';
 
-function lane(id: string, agent: LaneAgentState | undefined = { status: 'completed' }): DispatchLane {
+function lane(
+  id: string,
+  agent: LaneAgentState | undefined = { status: 'completed' }
+): DispatchLane {
   return {
     laneId: id,
     projectId: 'p1',
@@ -15,7 +18,10 @@ function lane(id: string, agent: LaneAgentState | undefined = { status: 'complet
   };
 }
 
-function setup(lanes: DispatchLane[], paste: (lane: DispatchLane) => PasteOutcome = () => 'pasted') {
+function setup(
+  lanes: DispatchLane[],
+  paste: (lane: DispatchLane) => PasteOutcome = () => 'pasted'
+) {
   let clock = 1_000;
   const brain = new Brain({ store: new InMemoryBrainStore(), now: () => clock++ });
   const pasted: Array<{ laneId: string; prompt: string }> = [];

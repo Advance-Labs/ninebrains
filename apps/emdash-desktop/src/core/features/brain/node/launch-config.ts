@@ -142,7 +142,11 @@ export function buildLaneLaunch(
       settingsPath,
       JSON.stringify({ ...sandbox, hooks: buildLaneStatusHooks() }, null, 2)
     );
-    extraArgs = [`--mcp-config=${mcpConfigPath}`, '--strict-mcp-config', `--settings=${settingsPath}`];
+    extraArgs = [
+      `--mcp-config=${mcpConfigPath}`,
+      '--strict-mcp-config',
+      `--settings=${settingsPath}`,
+    ];
     if (target.pack?.appendSystemPrompt) {
       extraArgs.push(`--append-system-prompt=${target.pack.appendSystemPrompt}`);
     }
@@ -173,7 +177,10 @@ const tomlTable = (record: Record<string, string>) =>
  */
 export function codexMcpOverrides(brain: StdioServerEntry, pack: PackLaunch | undefined): string[] {
   const out: string[] = [];
-  const stdio = (name: string, entry: { command: string; args: string[]; env: Record<string, string> }) => {
+  const stdio = (
+    name: string,
+    entry: { command: string; args: string[]; env: Record<string, string> }
+  ) => {
     out.push(`--config=mcp_servers.${name}.command=${toml(entry.command)}`);
     out.push(`--config=mcp_servers.${name}.args=${tomlArray(entry.args)}`);
     if (Object.keys(entry.env).length > 0) {

@@ -142,7 +142,9 @@ export class LaneService {
   /** Hook state for a conversation, with the detail the paste rule needs. */
   agentStateOf(
     conversationId: string
-  ): ({ status: NonNullable<ReturnType<LaneAgentSnapshot['agents']['get']>> } & LaneAgentDetail) | undefined {
+  ):
+    | ({ status: NonNullable<ReturnType<LaneAgentSnapshot['agents']['get']>> } & LaneAgentDetail)
+    | undefined {
     const status = this.snapshot.agents.get(conversationId);
     if (!status) return undefined;
     return { status, ...this.snapshot.details?.get(conversationId) };

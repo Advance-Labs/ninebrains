@@ -183,7 +183,10 @@ function checkName(name: string, token: string): void {
 
 function checkValue(name: string, raw: string, trusted: ReadonlySet<string>): void {
   if (CONFIG_FLAGS.has(name) && !trusted.has(raw)) {
-    throw new UnsafeArgvError(`${name} ${raw}`, 'a config flag whose value Ninebrains did not write');
+    throw new UnsafeArgvError(
+      `${name} ${raw}`,
+      'a config flag whose value Ninebrains did not write'
+    );
   }
   const decoded =
     name === '--settings' ? decodeSettings(raw) : name === '--config' ? decodeToml(raw) : raw;

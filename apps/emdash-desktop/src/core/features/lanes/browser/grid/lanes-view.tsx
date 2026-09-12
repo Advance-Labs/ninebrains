@@ -12,8 +12,8 @@ import {
   BrainDrawer,
   BrainTitlebarControls,
 } from '@core/features/brain/contributions/lanes-drawer';
-import { workbenchPanelLayoutsMemento } from '@core/features/workbench/contributions/mementos';
 import { Titlebar } from '@core/features/workbench/contributions/browser/Titlebar';
+import { workbenchPanelLayoutsMemento } from '@core/features/workbench/contributions/mementos';
 import { createLayoutStorage } from '@core/primitives/mementos/browser/layout-storage';
 import { useSubjectSpace } from '@core/primitives/mementos/react';
 import { useViewParams } from '@core/primitives/navigation/browser/navigation-hooks';

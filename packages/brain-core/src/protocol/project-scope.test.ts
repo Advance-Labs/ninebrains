@@ -9,7 +9,10 @@ import { TokenRegistry } from './tokens';
 const ADMIN = { role: 'brain' as const, brainId: 'main' };
 
 function setup() {
-  const brain = new Brain({ store: new InMemoryBrainStore(), resolveGateFloor: () => ['reviewer'] });
+  const brain = new Brain({
+    store: new InMemoryBrainStore(),
+    resolveGateFloor: () => ['reviewer'],
+  });
   for (const [id, projectId] of [
     ['laneA1', 'projA'],
     ['laneA2', 'projA'],

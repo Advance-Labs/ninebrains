@@ -15,8 +15,8 @@ import {
 } from '@core/features/brain/node/brain-service';
 import { startBrainEndpoint } from '@core/features/brain/node/endpoint';
 import { createMementoBrainSessionsPersistence } from '@core/features/brain/node/sessions-persistence';
-import type { ExecProvider } from '@core/features/exec-runs/api/node/types';
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
+import type { ExecProvider } from '@core/features/exec-runs/api/node/types';
 import { createFetchText } from '@core/features/gates/node/capabilities/fetch-text';
 import { createPrepareReviewCheckout } from '@core/features/gates/node/capabilities/review-checkout';
 import { createRunCommand } from '@core/features/gates/node/capabilities/run-command';

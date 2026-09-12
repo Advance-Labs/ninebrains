@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 // Phase 2 exit demo: the Brain fans a 5-job brief with 2 dependencies out to
 // 3 lanes, waits on the dependencies, lanes report back, and the done log is
 // complete. Every lane runs tooling/fake-agent over the REAL brain-mcp shim and
@@ -6,10 +7,15 @@
 // offscreen BrowserWindow, and the brain-drawer screenshots.
 // Run with `pnpm e2e:brain` (builds first). Kept out of CI like lanes-smoke.
 import http from 'node:http';
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { launchApp, repoRoot, setContentSize, setMinimumSize, stubDirectoryPicker } from './harness.mjs';
+import {
+  launchApp,
+  repoRoot,
+  setContentSize,
+  setMinimumSize,
+  stubDirectoryPicker,
+} from './harness.mjs';
 
 const SCREENSHOTS = join(repoRoot, 'docs/screenshots');
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -88,7 +94,14 @@ function launchConfigs(userData) {
     const file = join(root, dir, 'mcp.json');
     if (!existsSync(file)) return [];
     const env = JSON.parse(readFileSync(file, 'utf8')).mcpServers.brain.env;
-    return [{ dir, url: env.NINEBRAINS_BRAIN_URL, token: env.NINEBRAINS_TOKEN, laneId: env.NINEBRAINS_LANE_ID }];
+    return [
+      {
+        dir,
+        url: env.NINEBRAINS_BRAIN_URL,
+        token: env.NINEBRAINS_TOKEN,
+        laneId: env.NINEBRAINS_LANE_ID,
+      },
+    ];
   });
 }
 
@@ -106,18 +119,25 @@ async function addProject(app, page, repo) {
 async function openLanes(page) {
   await page.keyboard.press(`${MOD}+K`);
   await page.keyboard.type('Open Lanes');
-  await page.getByRole('option', { name: /Open Lanes/ }).first().click();
+  await page
+    .getByRole('option', { name: /Open Lanes/ })
+    .first()
+    .click();
   await page.getByTestId('lanes-grid').waitFor({ timeout: LONG });
 }
 
 async function addLane(page, slot) {
   const selector = `[data-testid="lane-cell"][data-slot="${slot}"] button`;
   await page.waitForFunction(
-    (sel) => [...document.querySelectorAll(sel)].some((b) => b.textContent === 'Add lane' && !b.disabled),
+    (sel) =>
+      [...document.querySelectorAll(sel)].some((b) => b.textContent === 'Add lane' && !b.disabled),
     selector,
     { timeout: LONG }
   );
-  await page.locator(`[data-testid="lane-cell"][data-slot="${slot}"]`).getByRole('button', { name: 'Add lane' }).click();
+  await page
+    .locator(`[data-testid="lane-cell"][data-slot="${slot}"]`)
+    .getByRole('button', { name: 'Add lane' })
+    .click();
 }
 
 /** SEC-05: a page inside the app (offscreen, own partition) tries the endpoint with a real token. */
@@ -171,8 +191,10 @@ async function main() {
       LANES.length,
       { timeout: LONG * 2 }
     );
-    await until('lane launch configs', () =>
-      launchConfigs(userData).filter((c) => !c.dir.startsWith('brain-')).length === LANES.length
+    await until(
+      'lane launch configs',
+      () =>
+        launchConfigs(userData).filter((c) => !c.dir.startsWith('brain-')).length === LANES.length
     );
     step('3 lanes up, each with its own 0600 mcp.json and token');
 
@@ -209,7 +231,8 @@ async function main() {
         const now = Date.now() - started;
         for (const job of list) {
           if (!names[job.id]) continue;
-          if (['claimed', 'running', 'verifying', 'done'].includes(job.state)) firstTaken[job.id] ??= now;
+          if (['claimed', 'running', 'verifying', 'done'].includes(job.state))
+            firstTaken[job.id] ??= now;
           if (job.state === 'done') firstDone[job.id] ??= now;
           if (job.laneId) lanesUsed.add(job.laneId);
         }
@@ -231,7 +254,8 @@ async function main() {
     await brainCall(brain.url, brain.token, 'read_inbox', { address, limit: 200 });
     const attack = await browserAttack(app, lane.url, lane.token, lane.laneId);
     const leaked = await brainCall(brain.url, brain.token, 'read_inbox', { address, limit: 200 });
-    if (leaked.length > 0) throw new Error(`browser request reached the Brain: ${JSON.stringify(leaked)}`);
+    if (leaked.length > 0)
+      throw new Error(`browser request reached the Brain: ${JSON.stringify(leaked)}`);
     step(`  rejected (${attack.join(', ')}); inbox unchanged`);
 
     step('screenshots: drawer open, lane 1 side panel on the done log');
@@ -244,13 +268,18 @@ async function main() {
     const minimum = await setMinimumSize(app);
     await page.waitForTimeout(1_000);
     await page.screenshot({ path: join(SCREENSHOTS, 'brain-drawer-min.png') });
-    step(`saved brain-drawer-1440.png and brain-drawer-min.png (${minimum.width}×${minimum.height})`);
+    step(
+      `saved brain-drawer-1440.png and brain-drawer-min.png (${minimum.width}×${minimum.height})`
+    );
     if (consoleErrors.length > 0) step(`renderer console errors:\n  ${consoleErrors.join('\n  ')}`);
   } catch (error) {
     const failure = join(root, 'failure.png');
     await page.screenshot({ path: failure }).catch(() => {});
-    process.stderr.write(`FAIL: ${error instanceof Error ? error.stack : error}\nfailure screenshot: ${failure}\n`);
-    if (consoleErrors.length > 0) process.stderr.write(`console errors:\n  ${consoleErrors.join('\n  ')}\n`);
+    process.stderr.write(
+      `FAIL: ${error instanceof Error ? error.stack : error}\nfailure screenshot: ${failure}\n`
+    );
+    if (consoleErrors.length > 0)
+      process.stderr.write(`console errors:\n  ${consoleErrors.join('\n  ')}\n`);
     process.exitCode = 1;
   } finally {
     await app.close();
@@ -265,7 +294,9 @@ async function main() {
   const doneIds = new Set(done.map((row) => row.job_id));
   const missing = Object.entries(jobs).filter(([, job]) => !doneIds.has(job.id));
   if (missing.length > 0 || done.length !== 5) {
-    process.stderr.write(`FAIL: done log has ${done.length} rows; missing ${missing.map(([k]) => k)}\n`);
+    process.stderr.write(
+      `FAIL: done log has ${done.length} rows; missing ${missing.map(([k]) => k)}\n`
+    );
     process.exitCode = 1;
     return;
   }

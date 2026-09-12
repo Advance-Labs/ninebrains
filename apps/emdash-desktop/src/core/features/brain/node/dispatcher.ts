@@ -125,7 +125,9 @@ export class Dispatcher {
     if (this.scheduled) return;
     this.scheduled = setTimeout(() => {
       this.scheduled = null;
-      void this.tick().catch((error: unknown) => this.ports.onError('brain: dispatch failed', error));
+      void this.tick().catch((error: unknown) =>
+        this.ports.onError('brain: dispatch failed', error)
+      );
     }, this.options.debounceMs ?? 50);
   }
 

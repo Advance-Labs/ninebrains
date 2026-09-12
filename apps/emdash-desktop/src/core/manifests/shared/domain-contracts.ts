@@ -1,6 +1,7 @@
 import { accountContract, accountDomain } from '@core/features/account/api';
 import { agentsContract, agentsDomain } from '@core/features/agents/api';
 import { automationsContract, automationsDomain } from '@core/features/automations/api';
+import { brainContract, brainDomain } from '@core/features/brain/api';
 import { browserContract, browserDomain } from '@core/features/browser/api';
 import { catalogDomain, catalogWireContract } from '@core/features/catalog/api';
 import { conversationsContract, conversationsDomain } from '@core/features/conversations/api';
@@ -11,7 +12,6 @@ import { gatesContract, gatesDomain } from '@core/features/gates/api';
 import { githubContract, githubDomain } from '@core/features/github/api';
 import { integrationsContract, integrationsDomain } from '@core/features/integrations/api';
 import { issuesContract, issuesDomain } from '@core/features/issues/api';
-import { brainContract, brainDomain } from '@core/features/brain/api';
 import { lanesContract, lanesDomain } from '@core/features/lanes/api';
 import { legacyPortContract, legacyPortDomain } from '@core/features/legacy-port/api';
 import { promptLibraryContract, promptLibraryDomain } from '@core/features/library/api';

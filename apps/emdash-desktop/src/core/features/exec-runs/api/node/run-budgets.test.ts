@@ -139,7 +139,9 @@ describe('SEC-29 budgets survive restart', () => {
 
 describe('SEC-29 Codex budgets come from its event stream', () => {
   it('enforces the wall clock on a Codex run', async () => {
-    const sup = supervisor(fakeCodex([`echo '{"type":"thread.started","thread_id":"t1"}'`, 'sleep 30']));
+    const sup = supervisor(
+      fakeCodex([`echo '{"type":"thread.started","thread_id":"t1"}'`, 'sleep 30'])
+    );
     const result = await sup.run(spec({ provider: 'codex', budgets: { wallClockMs: 300 } }));
     expect(result).toMatchObject({ ok: false, reason: 'wall-clock' });
     expect(result.durationMs).toBeLessThan(4000);

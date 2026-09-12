@@ -1,7 +1,7 @@
+import { BRAIN_WINDOW_COMMAND_DEFS } from '@core/features/brain/contributions/commands';
 import { DEV_PERF_COMMAND_DEFS } from '@core/features/dev-perf/contributions/commands';
 import { fileTreeScope } from '@core/features/editor/contributions/scopes';
 import { GATES_WINDOW_COMMAND_DEFS } from '@core/features/gates/contributions/commands';
-import { BRAIN_WINDOW_COMMAND_DEFS } from '@core/features/brain/contributions/commands';
 import { LANES_WINDOW_COMMAND_DEFS } from '@core/features/lanes/contributions/commands';
 import { lanesViewScope } from '@core/features/lanes/contributions/scopes';
 import { settingsScope } from '@core/features/settings/contributions/scopes';

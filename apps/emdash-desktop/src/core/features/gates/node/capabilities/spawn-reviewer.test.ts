@@ -182,7 +182,13 @@ describe('spawnReviewer options', () => {
             url: 'https://aeo.example.invalid/mcp',
             headers: { Authorization: 'Bearer t0k3n-value' },
           },
-          { name: 'echo', type: 'stdio', command: process.execPath, args: [ECHO_MCP_SERVER], env: {} },
+          {
+            name: 'echo',
+            type: 'stdio',
+            command: process.execPath,
+            args: [ECHO_MCP_SERVER],
+            env: {},
+          },
         ],
       })
     );
@@ -213,9 +219,9 @@ describe('spawnReviewer options', () => {
   it('rejects nameless, duplicate and non-http entries', async () => {
     const { spawnReviewer } = reviewerWith({ FAKE_AGENT_SCRIPT: '[]' });
     const echo = { name: 'e', type: 'stdio' as const, command: '/bin/echo', args: [], env: {} };
-    await expect(
-      spawnReviewer('p', opts({ mcpServers: [{ ...echo, name: '' }] }))
-    ).rejects.toThrow(/has no name/);
+    await expect(spawnReviewer('p', opts({ mcpServers: [{ ...echo, name: '' }] }))).rejects.toThrow(
+      /has no name/
+    );
     await expect(spawnReviewer('p', opts({ mcpServers: [echo, echo] }))).rejects.toThrow(
       /duplicate MCP server "e"/
     );

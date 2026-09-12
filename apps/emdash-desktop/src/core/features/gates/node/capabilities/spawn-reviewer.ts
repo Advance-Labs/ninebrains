@@ -23,12 +23,7 @@ import type {
   RunBudgets,
 } from '@core/features/exec-runs/api/node/types';
 import { isReviewCheckout, prepareReviewCheckout } from './review-checkout';
-import type {
-  Evidence,
-  ReviewerMcpServers,
-  SpawnReviewer,
-  SpawnReviewerOptions,
-} from './types';
+import type { Evidence, ReviewerMcpServers, SpawnReviewer, SpawnReviewerOptions } from './types';
 
 const KNOWN_OPTIONS = new Set(['signal', 'cwd', 'tools', 'attachments', 'purpose', 'mcpServers']);
 const EVIDENCE_DIR = '.ninebrains-evidence';

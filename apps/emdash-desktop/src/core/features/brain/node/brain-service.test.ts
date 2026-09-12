@@ -53,7 +53,10 @@ async function setup() {
     },
     sessions: {
       projects: { get: async () => null },
-      tasks: { createWorktreeTask: async () => ok(undefined), provision: async () => ok({ path: '/x' }) },
+      tasks: {
+        createWorktreeTask: async () => ok(undefined),
+        provision: async () => ok({ path: '/x' }),
+      },
       conversations: { create: async () => {}, launch: async () => {}, stop: async () => {} },
       persistence: { load: async () => [], save: async () => {} },
       newId: () => 'b1',

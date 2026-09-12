@@ -41,9 +41,15 @@ const IDLE_DISPATCHER: BrainDispatcherView = {
 };
 
 export function useBrainOverview() {
-  const unread = useRemoteModelState(brainContract.overview, getOverviewRemote, undefined, 'unread', {
-    initialValue: NO_UNREAD,
-  });
+  const unread = useRemoteModelState(
+    brainContract.overview,
+    getOverviewRemote,
+    undefined,
+    'unread',
+    {
+      initialValue: NO_UNREAD,
+    }
+  );
   const sessions = useRemoteModelState(
     brainContract.overview,
     getOverviewRemote,

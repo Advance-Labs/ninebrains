@@ -17,8 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
 import type { ArgvGuardOptions } from './argv-guard';
+import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
 import { buildCodexExecLaunch, CodexEventParser } from './codex-exec';
 import {
   processGroups,
@@ -28,9 +28,9 @@ import {
   type ProcessGroupRegistry,
 } from './process-group';
 import { createRedactor, describeEnvForTranscript } from './redact';
-import { recoverInterruptedRuns } from './run-recovery';
 import { buildUnattendedEnv } from './run-env';
 import { ensurePrivateDir, ninebrainsDir, resolveRunCwd, runPaths } from './run-paths';
+import { recoverInterruptedRuns } from './run-recovery';
 import { buildClaudeSandboxSettings } from './sandbox-settings';
 import { TranscriptWriter } from './transcript';
 import {

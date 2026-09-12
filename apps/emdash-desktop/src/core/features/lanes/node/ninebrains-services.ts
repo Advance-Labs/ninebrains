@@ -44,7 +44,10 @@ export type LaneServicesDependencies = {
  * Builds LaneService from upstream services. The Ninebrains composition root
  * (`app/main/bootstrap/boot/ninebrains/`) calls it with the Brain's port.
  */
-export function createLaneService(deps: LaneServicesDependencies, brain?: LaneBrainPort): LaneService {
+export function createLaneService(
+  deps: LaneServicesDependencies,
+  brain?: LaneBrainPort
+): LaneService {
   const onError = (context: string, error: unknown) =>
     deps.logger.warn(context, { error: error instanceof Error ? error.message : String(error) });
   const lanes = new LaneService(
@@ -97,7 +100,9 @@ export function createProjectsPort(
   };
 }
 
-export function createTasksPort(deps: Pick<LaneServicesDependencies, 'taskService'>): LaneTasksPort {
+export function createTasksPort(
+  deps: Pick<LaneServicesDependencies, 'taskService'>
+): LaneTasksPort {
   return {
     async createWorktreeTask({ taskId, projectId, name, branchName, baseRef }) {
       const result = await deps.taskService.createTask({

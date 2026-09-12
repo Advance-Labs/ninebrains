@@ -144,7 +144,12 @@ describe('SEC-03 token lifecycle', () => {
 describe('SEC-05 browser-shaped requests rejected', () => {
   it('refuses Origin, Sec-Fetch, a foreign Host and non-JSON bodies, and changes nothing', async () => {
     const ep = await start();
-    brain.upsertLane(APP_IDENTITY, { id: 'A', projectId: 'p1', provider: 'claude', status: 'idle' });
+    brain.upsertLane(APP_IDENTITY, {
+      id: 'A',
+      projectId: 'p1',
+      provider: 'claude',
+      status: 'idle',
+    });
     const token = ep.mint('lane:A', laneGrant('A'));
     const send = op('send_message', { to: { kind: 'lane', id: 'A' }, body: 'hi' });
 

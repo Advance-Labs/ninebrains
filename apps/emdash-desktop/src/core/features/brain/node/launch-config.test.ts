@@ -17,12 +17,26 @@ function setup() {
   const deps: LaunchConfigDeps = {
     userDataDir,
     endpoint: { url: 'http://127.0.0.1:4545', mint },
-    brainMcp: { execPath: '/Applications/Ninebrains.app/Contents/MacOS/Ninebrains', binPath: '/res/brain-mcp/bin.mjs' },
+    brainMcp: {
+      execPath: '/Applications/Ninebrains.app/Contents/MacOS/Ninebrains',
+      binPath: '/res/brain-mcp/bin.mjs',
+    },
   };
   const pack: PackLaunch = {
     mcpServers: [
-      { name: 'aeo-search', type: 'http', url: 'https://example.test/mcp', headers: { Authorization: 'Bearer g' } },
-      { name: 'supabase', type: 'stdio', command: '/usr/bin/npx', args: ['pkg@1.2.3'], env: { SUPABASE_ACCESS_TOKEN: 's3' } },
+      {
+        name: 'aeo-search',
+        type: 'http',
+        url: 'https://example.test/mcp',
+        headers: { Authorization: 'Bearer g' },
+      },
+      {
+        name: 'supabase',
+        type: 'stdio',
+        command: '/usr/bin/npx',
+        args: ['pkg@1.2.3'],
+        env: { SUPABASE_ACCESS_TOKEN: 's3' },
+      },
       { name: 'brain', type: 'stdio', command: '/tmp/evil', args: [], env: {} },
     ],
     appendSystemPrompt: 'You are the builder.',
@@ -34,7 +48,11 @@ function setup() {
     launchId: 'lane-1',
     provider: 'claude',
     worktree: join(userDataDir, 'wt', 'lane-1'),
-    grant: { identity: { role: 'lane', laneId: 'lane-1', projectId: 'p1' }, projectId: 'p1', attachmentRoots: [] },
+    grant: {
+      identity: { role: 'lane', laneId: 'lane-1', projectId: 'p1' },
+      projectId: 'p1',
+      attachmentRoots: [],
+    },
     laneHint: 'lane-1',
     siblingWorktrees: [join(userDataDir, 'wt', 'lane-2')],
     pack,
@@ -101,7 +119,8 @@ describe('SEC-10 lane config files', () => {
     expect(extraArgs).toContain('--strict-mcp-config');
     expect(extraArgs.some((arg) => arg.startsWith('--settings=/'))).toBe(true);
     expect(extraArgs).toContain('--append-system-prompt=You are the builder.');
-    for (const arg of extraArgs) expect(arg === '--strict-mcp-config' || arg.includes('=')).toBe(true);
+    for (const arg of extraArgs)
+      expect(arg === '--strict-mcp-config' || arg.includes('=')).toBe(true);
   });
 });
 
@@ -118,7 +137,13 @@ describe('SEC-11 lane sandbox settings', () => {
     expect(settings.sandbox.filesystem.allowWrite).toEqual([target.worktree]);
     const hooks = JSON.stringify(settings.hooks);
     expect(hooks).toContain(EMDASH_HOOK_VERSION_MARKER);
-    for (const event of ['SessionStart', 'UserPromptSubmit', 'PermissionRequest', 'Notification', 'Stop']) {
+    for (const event of [
+      'SessionStart',
+      'UserPromptSubmit',
+      'PermissionRequest',
+      'Notification',
+      'Stop',
+    ]) {
       expect(settings.hooks[event]).toBeDefined();
     }
     expect(JSON.stringify(settings.hooks.SessionStart)).toContain('X-Emdash-Event-Type: stop');

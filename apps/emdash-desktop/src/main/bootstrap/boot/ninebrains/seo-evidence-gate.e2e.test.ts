@@ -17,8 +17,8 @@ import {
   makeRepoWithLanes,
   tempRoot,
 } from '@core/features/gates/node/capabilities/test-fixtures';
-import type { McpServerEntry } from '../../api/launch';
-import { seoEvidenceGate } from './seo-evidence-gate';
+import type { McpServerEntry } from '@core/features/packs/api/launch';
+import { seoEvidenceGate } from '@core/features/packs/node/gates/seo-evidence-gate';
 
 const root = tempRoot('nb-seo-e2e-');
 afterAll(() => rmSync(root, { recursive: true, force: true }));

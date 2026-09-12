@@ -40,7 +40,9 @@ function mcpOverrides(spec: ExecRunSpec): string[] {
       if (!ENV_KEY.test(key)) throw new Error(`Unsafe MCP env key: ${JSON.stringify(key)}`);
     }
     if (env.length) {
-      out.push(`mcp_servers.${name}.env={${env.map(([k, v]) => `${k}=${tomlString(v)}`).join(',')}}`);
+      out.push(
+        `mcp_servers.${name}.env={${env.map(([k, v]) => `${k}=${tomlString(v)}`).join(',')}}`
+      );
     }
   }
   return out;

@@ -15,6 +15,8 @@ import { createAgentOperations } from '@core/features/agents/node/controller';
 import { createAgentsWireController } from '@core/features/agents/node/wire-controller';
 import type { AutomationsService } from '@core/features/automations/api/node/automations-service';
 import { createAutomationsWireController } from '@core/features/automations/node/wire-controller';
+import type { BrainService } from '@core/features/brain/node/brain-service';
+import { createBrainWireController } from '@core/features/brain/node/wire-controller';
 import {
   createBrowserWireController,
   type BrowserOperations,
@@ -39,8 +41,6 @@ import { createGithubWireController } from '@core/features/github/node/wire-cont
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
 import type { IssueProviderRegistry } from '@core/features/issues/node/registry';
 import { createIssuesWireController } from '@core/features/issues/node/wire-controller';
-import type { BrainService } from '@core/features/brain/node/brain-service';
-import { createBrainWireController } from '@core/features/brain/node/wire-controller';
 import type { LaneService } from '@core/features/lanes/node/lane-service';
 import { createLanesWireController } from '@core/features/lanes/node/wire-controller';
 import {

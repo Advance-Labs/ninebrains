@@ -1,5 +1,5 @@
-import type { Brain, DoneEntry, Job, Note } from '@ninebrains/brain-core';
 import { cell, type Cell } from '@emdash/wire/state';
+import type { Brain, DoneEntry, Job, Note } from '@ninebrains/brain-core';
 import {
   addressKey,
   type BrainAddress,
@@ -83,8 +83,8 @@ export class BrainViews {
     private readonly dispatcherState: () => BrainDispatcherView
   ) {
     this.dispatcher = cell(dispatcherState());
-    const offs = (['jobChanged', 'jobBlocked', 'messageSent', 'laneChanged'] as const).map(
-      (type) => brain.events.on(type, () => this.schedule())
+    const offs = (['jobChanged', 'jobBlocked', 'messageSent', 'laneChanged'] as const).map((type) =>
+      brain.events.on(type, () => this.schedule())
     );
     this.off = () => offs.forEach((unsubscribe) => unsubscribe());
   }

@@ -141,7 +141,8 @@ async function hardenedGit(source: string, options: GitOptions): Promise<Git> {
       .map((key) => key.slice('filter.'.length, key.lastIndexOf('.')))
   );
   for (const name of drivers) {
-    if (!DRIVER.test(name)) throw new Error(`Refusing a repo with filter driver ${JSON.stringify(name)}`);
+    if (!DRIVER.test(name))
+      throw new Error(`Refusing a repo with filter driver ${JSON.stringify(name)}`);
     for (const key of ['smudge', 'clean', 'process']) flags.push('-c', `filter.${name}.${key}=`);
     flags.push('-c', `filter.${name}.required=false`);
   }

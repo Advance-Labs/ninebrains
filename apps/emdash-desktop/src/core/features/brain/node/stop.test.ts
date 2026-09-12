@@ -57,7 +57,12 @@ describe('SEC-30 global STOP', () => {
     await until(() => supervisor.activeRunIds.length === 2);
 
     const brain = new Brain({ store: new InMemoryBrainStore() });
-    brain.upsertLane(APP_IDENTITY, { id: 'L', projectId: 'p1', provider: 'claude', status: 'idle' });
+    brain.upsertLane(APP_IDENTITY, {
+      id: 'L',
+      projectId: 'p1',
+      provider: 'claude',
+      status: 'idle',
+    });
     brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'must not dispatch' });
     const dispatcher = new Dispatcher({
       brain,

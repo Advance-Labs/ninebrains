@@ -56,7 +56,11 @@ export interface BrainSessionPorts {
   onError(context: string, error: unknown): void;
 }
 
-type Runtime = { status: BrainSessionView['status']; error: string | null; worktree: string | null };
+type Runtime = {
+  status: BrainSessionView['status'];
+  error: string | null;
+  worktree: string | null;
+};
 
 const brainError = (type: BrainError['type'], message: string): BrainError => ({ type, message });
 
@@ -162,7 +166,11 @@ export class BrainSessions {
       this.ports.onError('brain: session stop failed', error);
     }
     this.release(brainId);
-    this.setRuntime(brainId, { status: 'stopped', error: null, worktree: this.worktreeOf(brainId) });
+    this.setRuntime(brainId, {
+      status: 'stopped',
+      error: null,
+      worktree: this.worktreeOf(brainId),
+    });
     return ok(undefined);
   }
 
@@ -175,7 +183,11 @@ export class BrainSessions {
     try {
       const provisioned = await this.ports.tasks.provision(session.taskId);
       if (!provisioned.success) throw new Error(provisioned.error);
-      this.setRuntime(brainId, { status: 'starting', error: null, worktree: provisioned.data.path });
+      this.setRuntime(brainId, {
+        status: 'starting',
+        error: null,
+        worktree: provisioned.data.path,
+      });
       const ids = {
         conversationId: session.conversationId,
         projectId: session.projectId,
@@ -193,10 +205,18 @@ export class BrainSessions {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.setRuntime(brainId, { status: 'failed', error: message, worktree: this.worktreeOf(brainId) });
+      this.setRuntime(brainId, {
+        status: 'failed',
+        error: message,
+        worktree: this.worktreeOf(brainId),
+      });
       return err(brainError('internal', message));
     }
-    this.setRuntime(brainId, { status: 'running', error: null, worktree: this.worktreeOf(brainId) });
+    this.setRuntime(brainId, {
+      status: 'running',
+      error: null,
+      worktree: this.worktreeOf(brainId),
+    });
     return ok({ brainId });
   }
 

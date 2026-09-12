@@ -6,7 +6,11 @@ const commandLine = () => ({ appendSwitch: vi.fn(), hasSwitch: vi.fn(() => false
 describe('e2e mock keychain', () => {
   it('appends use-mock-keychain only when NINEBRAINS_E2E=1', () => {
     const e2e = commandLine();
-    configureChromiumCommandLine({ commandLine: e2e, env: { NINEBRAINS_E2E: '1' }, platform: 'darwin' });
+    configureChromiumCommandLine({
+      commandLine: e2e,
+      env: { NINEBRAINS_E2E: '1' },
+      platform: 'darwin',
+    });
     expect(e2e.appendSwitch).toHaveBeenCalledWith('use-mock-keychain');
 
     for (const env of [{}, { NINEBRAINS_E2E: 'true' }, { NINEBRAINS_E2E: '0' }]) {

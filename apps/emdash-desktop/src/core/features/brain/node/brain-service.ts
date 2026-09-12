@@ -8,7 +8,11 @@ import {
   type Brain,
   type Identity,
 } from '@ninebrains/brain-core';
-import type { ExecRunResult, ExecRunSpec, RunBudgets } from '@core/features/exec-runs/api/node/types';
+import type {
+  ExecRunResult,
+  ExecRunSpec,
+  RunBudgets,
+} from '@core/features/exec-runs/api/node/types';
 import type { LaneConfig } from '@core/features/lanes/api';
 import type { PackLaunch } from '@core/features/packs/api/launch';
 import type { BrainAddress, BrainDispatcherView, BrainError, LaneRunMode } from '../api';
@@ -157,7 +161,11 @@ export class BrainService {
       },
       deps.dispatch
     );
-    this.views = new BrainViews(deps.brain, () => this.inboxes(), () => this.dispatcherView());
+    this.views = new BrainViews(
+      deps.brain,
+      () => this.inboxes(),
+      () => this.dispatcherView()
+    );
     this.verification =
       deps.verification === 'external'
         ? { settled: async () => undefined, dispose: () => undefined }
@@ -184,7 +192,12 @@ export class BrainService {
         });
       }),
       brain.events.on('jobBlocked', ({ job, reason }) =>
-        brainEvents.emit(undefined, { type: 'job-blocked', jobId: job.id, projectId: job.projectId, reason })
+        brainEvents.emit(undefined, {
+          type: 'job-blocked',
+          jobId: job.id,
+          projectId: job.projectId,
+          reason,
+        })
       ),
       brain.events.on('messageSent', ({ message }) =>
         brainEvents.emit(undefined, { type: 'message', messageId: message.id, to: message.to })
@@ -215,15 +228,24 @@ export class BrainService {
     const session = this.sessions.byConversation(conversationId);
     if (!session) return undefined;
     const { brainId, projectId } = session;
-    return buildLaneLaunch(this.launchDeps(), {
-      launchKey: brainLaunchKey(brainId),
-      launchId: brainLaunchId(brainId),
-      provider: 'claude',
-      worktree: upstream.cwd,
-      grant: { identity: { role: 'brain', brainId }, projectId, attachmentRoots: [upstream.cwd] },
-      siblingWorktrees: this.siblingWorktrees(null),
-      pack: { mcpServers: [], appendSystemPrompt: BRAIN_MODE_PROMPT, defaultGates: [], warnings: [] },
-    }, upstream);
+    return buildLaneLaunch(
+      this.launchDeps(),
+      {
+        launchKey: brainLaunchKey(brainId),
+        launchId: brainLaunchId(brainId),
+        provider: 'claude',
+        worktree: upstream.cwd,
+        grant: { identity: { role: 'brain', brainId }, projectId, attachmentRoots: [upstream.cwd] },
+        siblingWorktrees: this.siblingWorktrees(null),
+        pack: {
+          mcpServers: [],
+          appendSystemPrompt: BRAIN_MODE_PROMPT,
+          defaultGates: [],
+          warnings: [],
+        },
+      },
+      upstream
+    );
   }
 
   /** The lanes slice's `LaneBrainPort` (structurally typed; lanes node may not be imported). */
@@ -233,20 +255,24 @@ export class BrainService {
         await this.pack(lane.projectId);
       },
       resolveLaunch: (lane: LaneConfig, upstream: UpstreamLaunchArgs & { cwd: string }) =>
-        buildLaneLaunch(this.launchDeps(), {
-          launchKey: laneLaunchKey(lane.laneId),
-          launchId: lane.laneId,
-          provider: lane.provider,
-          worktree: upstream.cwd,
-          grant: {
-            identity: { role: 'lane', laneId: lane.laneId, projectId: lane.projectId },
-            projectId: lane.projectId,
-            attachmentRoots: [upstream.cwd],
+        buildLaneLaunch(
+          this.launchDeps(),
+          {
+            launchKey: laneLaunchKey(lane.laneId),
+            launchId: lane.laneId,
+            provider: lane.provider,
+            worktree: upstream.cwd,
+            grant: {
+              identity: { role: 'lane', laneId: lane.laneId, projectId: lane.projectId },
+              projectId: lane.projectId,
+              attachmentRoots: [upstream.cwd],
+            },
+            laneHint: lane.laneId,
+            siblingWorktrees: this.siblingWorktrees(lane.laneId),
+            pack: this.packCache.get(lane.projectId),
           },
-          laneHint: lane.laneId,
-          siblingWorktrees: this.siblingWorktrees(lane.laneId),
-          pack: this.packCache.get(lane.projectId),
-        }, upstream),
+          upstream
+        ),
       releaseLaunch: (laneId: string) => this.release(laneLaunchKey(laneId), laneId),
       override: (laneId: string) => {
         const held = this.brain.listJobs(APP_IDENTITY, {

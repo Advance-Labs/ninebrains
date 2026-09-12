@@ -14,6 +14,8 @@ export async function stopAllAgentWork(): Promise<void> {
       description: `${killedRuns} run(s) killed, ${stoppedLanes} lane(s) stopped. Dispatch stays paused until you clear STOP.`,
     });
   } catch (error) {
-    toast.error('STOP failed', { description: error instanceof Error ? error.message : String(error) });
+    toast.error('STOP failed', {
+      description: error instanceof Error ? error.message : String(error),
+    });
   }
 }
