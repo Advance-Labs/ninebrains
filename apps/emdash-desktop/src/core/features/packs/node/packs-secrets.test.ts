@@ -118,6 +118,21 @@ describe('pack secrets from the settings page', () => {
     expect(warnings.join('\n')).not.toContain(VALUE);
   });
 
+  it('cuts the value and later lines out of a store error that quotes its input', async () => {
+    const { packs, warnings, store } = service();
+    store.set.mockRejectedValueOnce(
+      new Error(`insert failed for ${VALUE}\nparams: ninebrains.pack.ALPHA_KEY,${VALUE}`)
+    );
+    const result = await packs.setSecret('ALPHA_KEY', `  ${VALUE}  `);
+    expect(result).toMatchObject({
+      success: false,
+      error: { type: 'secret-store', message: expect.stringContaining('failed for [redacted]') },
+    });
+    expect(JSON.stringify(result)).not.toContain(VALUE);
+    expect(JSON.stringify(result)).not.toContain('params');
+    expect(warnings.join('\n')).not.toContain(VALUE);
+  });
+
   it('refuses to write when no secret store is configured', async () => {
     const { packs } = service({ noStore: true });
     expect(await packs.setSecret('ALPHA_KEY', VALUE)).toMatchObject({
