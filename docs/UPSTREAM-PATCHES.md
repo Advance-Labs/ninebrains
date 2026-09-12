@@ -185,6 +185,30 @@ the composition root passes one (`src/core/features/gates/README.md`, "Wiring").
 | `src/core/features/workbench/browser/window-scope.tsx` | `'gates.openJobVerification'` handler (`openModal`) | Window-scope commands must be implemented here |
 | `package.json` (desktop), `pnpm-lock.yaml` | `@ninebrains/brain-core` workspace dependency | The runner, rigor resolver and verification service type against the Brain |
 
+## 11. Brain wiring (W5 `brain`, Phase 2)
+
+| File | What | Why |
+|---|---|---|
+| `src/main/bootstrap/boot/phases/services.ts` | `await createNinebrainsServices({...})` from `boot/ninebrains/` (adds `hostDependencies`); `resolveLaneLaunch` late-binds to `ninebrains.resolveLaneLaunch(id, upstream)` | One composition root for lanes, Brain, packs, planner, supervisor |
+| `src/main/bootstrap/boot/wiring.ts` | `brain`, `packs`, `planner` from `services.ninebrains` | Real services instead of the fallbacks |
+| `src/core/features/conversations/node/tui-conversation-provider.ts` | `resolveLaneLaunch` also receives `{ extraArgs, autoApprove, cwd }` | The Brain guards the full flag list (SEC-12) and scopes the sandbox to the cwd |
+| `src/core/manifests/shared/domain-contracts.ts` | `+[brainDomain]: brainContract` | Register the `brain` contract |
+| `src/core/manifests/node/controllers.ts` | `readonly brain: BrainService` + `brain` controller | Serve the `brain` contract |
+| `src/core/manifests/shared/memento-catalog.ts` | `+brainSessionsMemento` | Persist Brain sessions |
+| `src/core/manifests/shared/command-catalog.ts`, `command-palette-catalog.ts`, `browser/scope-catalog.ts` | `+BRAIN_COMMAND_DEFS`, `+BRAIN_COMMAND_PALETTE_ITEMS`, window scope `+BRAIN_WINDOW_COMMAND_DEFS` | Global STOP command |
+| `src/core/features/workbench/browser/window-scope.tsx` | `'brain.stopAll'` handler | Window-scope commands are implemented here |
+| `src/main/host/chromium-command-line.ts` | `use-mock-keychain` when `NINEBRAINS_E2E=1` | e2e runs never touch or prompt for the real login keychain |
+| `electron.vite.config.ts` | `copyBrainMcpPlugin` → `out/main/brain-mcp/` | Bundle the brain-mcp shim like the adapter assets (SEAMS §3.6) |
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `asarUnpack` `out/main/brain-mcp/**` | Electron-as-Node runs the shim from a real file |
+| `package.json` (desktop) | `e2e:brain` script | The fan-out demo |
+
+Ninebrains files also touched: `lanes/node/{lane-ports,lane-service,agent-feed,ninebrains-services}.ts`
+(Brain port, job override, `activeJobId`, launch release, hook detail), `lanes/browser/grid/{lanes-view,lane-cell,lane-side-panel}.tsx`
+and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes/api/lane-side-panel.ts` (`badge`),
+`packs/node/packs-service.ts` + `app-identity/api/fork-flags.ts` (`USER_PACKS_ENABLED`, SEC-26),
+`e2e/harness.mjs` (`--use-mock-keychain`, `NINEBRAINS_E2E`, extra env), `tooling/fake-agent/src/steps.mjs`
+(`{{prompt:<regex>}}` in `callTool` args).
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -201,4 +225,7 @@ the composition root passes one (`src/core/features/gates/README.md`, "Wiring").
 `scripts/release/checksums.test.mjs`, `scripts/release/release-config.test.mjs`,
 `scripts/release/lib/signing.ts`, `src/core/features/gates/**` (beyond `capabilities/`),
 `src/main/host/ninebrains/**`, `src/renderer/tests/browser/gates-screenshots.test.tsx`,
-`src/renderer/tests/browser/.gitignore`, `docs/screenshots/gates-*.png`.
+`src/renderer/tests/browser/.gitignore`, `docs/screenshots/gates-*.png`, `src/core/features/brain/**`,
+`src/main/bootstrap/boot/ninebrains/**`, `src/main/host/mock-keychain.test.ts`,
+`e2e/brain-fanout.e2e.mjs`, `tooling/fake-agent/test/interpolate-args.test.mjs`,
+`docs/screenshots/brain-*.png`.

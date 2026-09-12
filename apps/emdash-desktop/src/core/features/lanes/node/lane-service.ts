@@ -16,10 +16,12 @@ import {
   type LaneTabConfig,
 } from '../api';
 import type {
+  LaneAgentDetail,
   LaneAgentSnapshot,
   LaneLaunchOverrides,
   LaneProjectInfo,
   LaneServicePorts,
+  LaneUpstreamLaunch,
 } from './lane-ports';
 import { mapLaneSession, mapLaneStatus } from './lane-status';
 
@@ -62,6 +64,8 @@ export class LaneService {
   private saveChain: Promise<void> = Promise.resolve();
   private initializing: Promise<void> | null = null;
   private unsubscribeFeed: (() => void) | null = null;
+  private readonly worktrees = new Map<string, string>();
+  private readonly listeners = new Set<() => void>();
 
   constructor(
     private readonly ports: LaneServicePorts,
@@ -109,11 +113,44 @@ export class LaneService {
   }
 
   /**
-   * Launch hook for `TuiConversationProvider` (SEAMS §3.7). Phase 2 returns the
-   * per-lane `--mcp-config` and env here; Phase 1 leaves launches untouched.
+   * Launch hook for `TuiConversationProvider` (SEAMS §3.7): the Brain returns
+   * the per-lane `--mcp-config`/`--settings` flags. Non-lane conversations and
+   * a service without a Brain launch untouched.
    */
-  resolveLaneLaunch(_conversationId: string): LaneLaunchOverrides | undefined {
-    return undefined;
+  resolveLaneLaunch(
+    conversationId: string,
+    upstream?: LaneUpstreamLaunch
+  ): LaneLaunchOverrides | undefined {
+    if (!this.ports.brain || !upstream) return undefined;
+    const lane = this.findConfigByConversation(conversationId);
+    if (!lane) return undefined;
+    this.worktrees.set(lane.laneId, upstream.cwd);
+    return this.ports.brain.resolveLaunch(lane, upstream);
+  }
+
+  /** Called after every publish (board, lights). Returns an unsubscribe. */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** Re-derives the lights, e.g. after a Brain job changed state. */
+  refresh(): void {
+    this.publish();
+  }
+
+  /** Hook state for a conversation, with the detail the paste rule needs. */
+  agentStateOf(
+    conversationId: string
+  ): ({ status: NonNullable<ReturnType<LaneAgentSnapshot['agents']['get']>> } & LaneAgentDetail) | undefined {
+    const status = this.snapshot.agents.get(conversationId);
+    if (!status) return undefined;
+    return { status, ...this.snapshot.details?.get(conversationId) };
+  }
+
+  /** The lane's worktree, once a session has been provisioned or launched this run. */
+  worktreePathOf(laneId: string): string | null {
+    return this.worktrees.get(laneId) ?? null;
   }
 
   async createTab(title?: string): Promise<Result<{ tabId: string }, LaneError>> {
@@ -210,6 +247,7 @@ export class LaneService {
     } catch (error) {
       return err(laneError('stop-failed', messageOf(error)));
     }
+    this.ports.brain?.releaseLaunch(laneId);
     this.setRuntime(laneId, { session: 'stopped', error: null });
     return ok(undefined);
   }
@@ -245,8 +283,10 @@ export class LaneService {
         this.ports.onError('lanes: stop on remove failed', error);
       }
     }
+    this.ports.brain?.releaseLaunch(laneId);
     tab.slots[slot] = null;
     this.runtime.delete(laneId);
+    this.worktrees.delete(laneId);
     this.commit();
     this.emit({ type: 'lane-removed', laneId });
     if (deleteWorktree) {
@@ -341,6 +381,10 @@ export class LaneService {
     try {
       const provisioned = await this.ports.tasks.provision(initial.config.taskId);
       if (!provisioned.success) return this.failStart(laneId, provisioned.error);
+      this.worktrees.set(laneId, provisioned.data.path);
+      await this.ports.brain
+        ?.prepareLaunch(initial.config)
+        .catch((error: unknown) => this.ports.onError('lanes: Brain launch prep failed', error));
       // Re-read: the lane may have moved or been removed while provisioning.
       const location = this.locate(laneId);
       if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
@@ -391,6 +435,14 @@ export class LaneService {
     this.publish();
   }
 
+  private findConfigByConversation(conversationId: string): LaneConfig | undefined {
+    for (const tab of this.grid.tabs) {
+      const lane = tab.slots.find((candidate) => candidate?.conversationId === conversationId);
+      if (lane) return lane;
+    }
+    return undefined;
+  }
+
   private locate(laneId: string): LaneLocation | undefined {
     for (const tab of this.grid.tabs) {
       const slot = tab.slots.findIndex((lane) => lane?.laneId === laneId);
@@ -437,13 +489,16 @@ export class LaneService {
         title: tab.title,
         slots: tab.slots.map((config, slot) => {
           if (!config) return null;
+          const override = this.ports.brain?.override(config.laneId);
           const status = mapLaneStatus({
             asleep: config.asleep,
             agent: this.snapshot.agents.get(config.conversationId),
+            job: override?.job,
           });
           statuses[config.laneId] = status;
           return {
             ...config,
+            ...(override?.activeJobId ? { activeJobId: override.activeJobId } : {}),
             tabId: tab.tabId,
             slot: slot as LaneSlot,
             session: this.sessionOf(config),
@@ -457,5 +512,12 @@ export class LaneService {
     };
     this.board.set(board);
     this.statuses.set(statuses);
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.ports.onError('lanes: change listener failed', error);
+      }
+    }
   }
 }

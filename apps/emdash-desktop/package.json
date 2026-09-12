@@ -35,6 +35,7 @@
     "build": "electron-vite build",
     "e2e": "pnpm run build && node e2e/lanes-smoke.e2e.mjs",
     "e2e:run": "node e2e/lanes-smoke.e2e.mjs",
+    "e2e:brain": "pnpm run build && node e2e/brain-fanout.e2e.mjs",
     "build:main": "electron-vite build --filter main",
     "build:renderer": "electron-vite build --filter renderer",
     "package": "pnpm run build && electron-builder --config electron-builder.config.ts",

@@ -6,6 +6,7 @@ import {
   gatesPrefsIndexMemento,
   gatesProjectPrefsMemento,
 } from '@core/features/gates/contributions/mementos';
+import { brainSessionsMemento } from '@core/features/brain/contributions/mementos';
 import { lanesGridMemento } from '@core/features/lanes/contributions/mementos';
 import {
   packsPrefsIndexMemento,
@@ -59,6 +60,7 @@ export const mementoCatalog: readonly MementoCatalogEntry[] = [
   lanesGridMemento,
   gatesProjectPrefsMemento,
   gatesPrefsIndexMemento,
+  brainSessionsMemento,
   plannerViewportMemento,
 ];
 

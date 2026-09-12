@@ -1,6 +1,7 @@
 import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
 import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
+import { stopAllAgentWork } from '@core/features/brain/contributions/stop-action';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { toggleAppTheme } from '@core/features/settings/api/browser/theme-toggle';
@@ -147,6 +148,9 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
       execute: (input) => {
         if (input?.jobId) void openModal('jobVerificationModal', { jobId: input.jobId });
       },
+    }),
+    'brain.stopAll': () => ({
+      execute: () => void stopAllAgentWork(),
     }),
   } satisfies ViewScopeImpl<typeof windowScope>;
 

@@ -53,10 +53,6 @@ import { IntegrationCredentialStore } from '@core/features/integrations/node/int
 import { setIntegrationCredentialStore } from '@core/features/integrations/node/integration-credential-store-instance';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
 import {
-  createNinebrainsServices,
-  type NinebrainsServices,
-} from '@core/features/lanes/node/ninebrains-services';
-import {
   createPromptLibraryService,
   type PromptLibraryKV,
 } from '@core/features/library/node/prompt-library-service';
@@ -146,6 +142,11 @@ import { setTrayVisible } from '@main/host/tray';
 import { installUpdateNotifications } from '@main/host/updates/update-notifications';
 import { applyNativeTheme, isAppFocused } from '@main/host/window';
 import { log } from '@main/lib/logger';
+import {
+  createNinebrainsServices,
+  type NinebrainsLaunchInput,
+  type NinebrainsServices,
+} from '../ninebrains/create-ninebrains-services';
 import { telemetryService } from '@main/lib/telemetry';
 import { appScope } from '../../core/app-scope';
 import { step } from '../../core/phase';
@@ -281,9 +282,9 @@ export async function bootServices(
     // this phase; sessions only call this after boot completes.
     resolveSessionGitCredentials: (params: { projectId: string; host: HostRef }) =>
       gitCredentials.resolveSessionSpec(params),
-    // Late-bound: Ninebrains lanes are constructed after the task service.
-    resolveLaneLaunch: (conversationId: string) =>
-      ninebrains.lanes.resolveLaneLaunch(conversationId),
+    // Late-bound: Ninebrains lanes and Brain sessions are constructed after the task service.
+    resolveLaneLaunch: (conversationId: string, upstream: NinebrainsLaunchInput) =>
+      ninebrains.resolveLaneLaunch(conversationId, upstream),
   };
   const projectAttachmentAdapter = createProjectAttachmentAdapter({
     db,
@@ -406,8 +407,8 @@ export async function bootServices(
       evictFileSearchRoot: fileSearchRuntime.evictRoot,
     },
   });
-  // Ninebrains (docs/UPSTREAM-PATCHES.md): lanes and later the Brain.
-  const ninebrains = createNinebrainsServices({
+  // Ninebrains (docs/UPSTREAM-PATCHES.md): lanes, the Brain, packs and the planner.
+  const ninebrains = await createNinebrainsServices({
     db,
     runtimes,
     scope: appScope,
@@ -415,6 +416,7 @@ export async function bootServices(
     taskService,
     workspaceIdentity,
     getMementosRuntimeClient,
+    hostDependencies: clients.hostDependencies,
     conversations: {
       create: (params) =>
         createConversation(params, {

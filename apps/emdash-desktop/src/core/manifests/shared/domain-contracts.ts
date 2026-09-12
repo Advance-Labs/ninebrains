@@ -11,6 +11,7 @@ import { gatesContract, gatesDomain } from '@core/features/gates/api';
 import { githubContract, githubDomain } from '@core/features/github/api';
 import { integrationsContract, integrationsDomain } from '@core/features/integrations/api';
 import { issuesContract, issuesDomain } from '@core/features/issues/api';
+import { brainContract, brainDomain } from '@core/features/brain/api';
 import { lanesContract, lanesDomain } from '@core/features/lanes/api';
 import { legacyPortContract, legacyPortDomain } from '@core/features/legacy-port/api';
 import { promptLibraryContract, promptLibraryDomain } from '@core/features/library/api';
@@ -95,5 +96,6 @@ export const desktopDomainContracts = {
   [packsDomain]: packsContract,
   [lanesDomain]: lanesContract,
   [gatesDomain]: gatesContract,
+  [brainDomain]: brainContract,
   [plannerDomain]: plannerContract,
 } as const;

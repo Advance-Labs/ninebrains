@@ -7,7 +7,9 @@ grid of lanes. The Brain's unit of work is a Job; lanes only carry `activeJobId`
   `LaneSidePanelSource`, which Phase 2 implements.
 - `node/lane-service.ts`: owns lane state in main and persists it in the `lanes.grid` memento.
   Sleep hides a lane and never stops its PTY.
-- `node/ninebrains-services.ts`: the single factory `services.ts` calls.
+- `node/ninebrains-services.ts`: `createLaneService` plus the port builders. The Ninebrains
+  composition root (`app/main/bootstrap/boot/ninebrains/`) calls it with the Brain's
+  `LaneBrainPort`: per-launch config, job-state light override, `activeJobId`, launch release.
 - `browser/grid/`: the view, grid, lane cells and add-lane form.
 
 ## Decisions made while blocked

@@ -71,8 +71,16 @@ contain secret values.
 ## Secrets
 
 Secrets are resolved through the injected `SecretResolver { resolve(name), describeLocation(name) }`.
-`createEnvSecretResolver(process.env)` reads `NINEBRAINS_SECRET_<NAME>`; a keychain-backed resolver
-should replace it. No secret value is ever stored in a pack file or in prefs.
+`createEnvSecretResolver(process.env)` reads `NINEBRAINS_SECRET_<NAME>`. The app wires
+`createKeychainSecretResolver` (`app/main/bootstrap/boot/ninebrains/`): the OS keychain via
+upstream's safeStorage store under `ninebrains.pack.<NAME>`, then the env resolver. No secret value
+is ever stored in a pack file, in prefs or in plaintext.
+
+## SEC-26: bundled packs only in v0.1
+
+User packs from `<userData>/ninebrains/packs` load only when the `USER_PACKS_ENABLED` fork flag
+(`core/primitives/app-identity/api/fork-flags.ts`) is on, and it is **off**: the directory is not
+even listed. Tests can opt in with `allowUserPacks: true`. Test: `node/user-packs-flag.test.ts`.
 
 ## Skills
 

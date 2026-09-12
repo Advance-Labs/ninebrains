@@ -1,6 +1,7 @@
 import { EmptyState } from '@emdash/ui/react/components';
 import { Button, Spinner } from '@emdash/ui/react/primitives';
 import { useState } from 'react';
+import { brainLaneSidePanelSource } from '@core/features/brain/api/browser/side-panel-source';
 import { cn } from '@core/primitives/styling/browser/cn';
 import type { Lane, LaneSlot, LaneStatus } from '../../api';
 import { LaneTerminal } from '../lane-terminal';
@@ -70,7 +71,9 @@ export function LaneCell({
             <div className="min-w-0 flex-1">
               <LaneBody lane={lane} focused={focused} browserOpen={browserOpen} />
             </div>
-            {sidePanelOpen && <LaneSidePanel laneId={lane.laneId} />}
+            {sidePanelOpen && (
+              <LaneSidePanel laneId={lane.laneId} source={brainLaneSidePanelSource} />
+            )}
           </div>
         </>
       )}

@@ -17,6 +17,9 @@ export function configureChromiumCommandLine({
   env = process.env,
   platform = process.platform,
 }: ConfigureChromiumCommandLineOptions): void {
+  // Ninebrains e2e only: a mock keychain, so safeStorage never touches (or prompts for)
+  // the real login keychain on each unsigned rebuild. Never set in normal runs.
+  if (env.NINEBRAINS_E2E === '1') commandLine.appendSwitch('use-mock-keychain');
   if (platform !== 'linux') return;
 
   commandLine.appendSwitch('ozone-platform-hint', 'auto');
