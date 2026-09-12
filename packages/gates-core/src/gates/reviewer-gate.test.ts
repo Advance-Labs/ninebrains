@@ -12,6 +12,9 @@ interface Setup {
   diff?: string;
   diffResult?: Partial<CommandResult>;
   untracked?: string;
+  /** `git config --null --name-only --get-regexp ^filter\.` stdout. Unset: no keys (exit 1). */
+  filterKeys?: string;
+  configResult?: Partial<CommandResult>;
   job?: Partial<GateJob>;
   prepareError?: Error;
   reviewerError?: Error;
@@ -21,6 +24,10 @@ function setup(reply: string, opts: Setup = {}) {
   const runCommand = vi.fn(
     async (_command: string, o: { cwd: string; argv?: readonly string[] }) => {
       const argv = o.argv ?? [];
+      if (argv.includes('config')) {
+        const exitCode = opts.filterKeys === undefined ? 1 : 0;
+        return { exitCode, stdout: opts.filterKeys ?? '', stderr: '', ...opts.configResult };
+      }
       if (argv.includes('diff')) {
         return { exitCode: 0, stdout: opts.diff ?? DIFF, stderr: '', ...opts.diffResult };
       }
@@ -45,16 +52,21 @@ function setup(reply: string, opts: Setup = {}) {
   return { ctx, runCommand, spawnReviewer, prepareReviewCheckout, dispose };
 }
 
+/** The argv of the first git call that runs `sub`, or `[]` when none did. */
+function argvOf(runCommand: ReturnType<typeof setup>['runCommand'], sub: string) {
+  return runCommand.mock.calls.find(([, o]) => o.argv?.includes(sub))?.[1].argv ?? [];
+}
+
 describe('reviewerGate', () => {
   it('reviews the diff from a disposable checkout and passes on approval', async () => {
     const { ctx, runCommand, spawnReviewer } = setup(APPROVE);
     const result = await reviewerGate().run(ctx);
 
     expect(result.pass).toBe(true);
-    const [command, o] = runCommand.mock.calls[0];
-    expect(command).toBe('git');
-    expect(o.argv).toEqual(expect.arrayContaining(['diff', '--no-ext-diff', 'HEAD', '--']));
-    expect(o.argv).toEqual(expect.arrayContaining(['core.fsmonitor=false', 'diff.external=']));
+    for (const [command] of runCommand.mock.calls) expect(command).toBe('git');
+    const argv = argvOf(runCommand, 'diff');
+    expect(argv).toEqual(expect.arrayContaining(['diff', '--no-ext-diff', 'HEAD', '--']));
+    expect(argv).toEqual(expect.arrayContaining(['core.fsmonitor=false', 'diff.external=']));
     const [prompt, opts] = spawnReviewer.mock.calls[0];
     expect(prompt).toContain('Add a pricing table');
     expect(prompt).toContain('+export const plans = 3;');
@@ -126,10 +138,43 @@ describe('reviewerGate', () => {
       job: { baseRef: 'abc1234' },
     });
     await reviewerGate().run(ctx);
-    expect(runCommand.mock.calls[0][1].argv).toContain('abc1234');
+    expect(argvOf(runCommand, 'diff')).toContain('abc1234');
     expect(spawnReviewer.mock.calls[0][0]).toMatch(
       /<<<UNTRACKED-[0-9a-f]{16}>>>\nsrc\/new-file\.ts/
     );
+  });
+
+  it('T31 blanks every repo filter driver for the diff and the untracked listing', async () => {
+    const { ctx, runCommand } = setup(APPROVE, {
+      untracked: 'src/new-file.ts\n',
+      filterKeys: 'filter.lfs.clean\0filter.lfs.smudge\0filter.pwn.v2.clean\0',
+    });
+    expect((await reviewerGate().run(ctx)).pass).toBe(true);
+    for (const sub of ['diff', 'ls-files']) {
+      const argv = argvOf(runCommand, sub);
+      for (const name of ['lfs', 'pwn.v2']) {
+        for (const key of ['clean=', 'smudge=', 'process=', 'required=false']) {
+          const at = argv.indexOf(`filter.${name}.${key}`);
+          expect(argv[at - 1]).toBe('-c');
+          expect(at).toBeLessThan(argv.indexOf(sub)); // a global option, before the subcommand
+        }
+      }
+    }
+  });
+
+  it('T31 fails closed when the filter drivers cannot be listed or look hostile', async () => {
+    for (const opts of [
+      { configResult: { exitCode: 128, stderr: 'fatal: bad config line 3' } },
+      { filterKeys: 'filter.a=b;touch x.clean\0' },
+    ]) {
+      const { ctx, runCommand, spawnReviewer, dispose } = setup(APPROVE, opts);
+      const result = await reviewerGate().run(ctx);
+      expect(result.pass).toBe(false);
+      expect(result.feedback).toMatch(/Could not compute the diff/);
+      expect(argvOf(runCommand, 'diff')).toEqual([]);
+      expect(spawnReviewer).not.toHaveBeenCalled();
+      expect(dispose).toHaveBeenCalledOnce();
+    }
   });
 
   it('fails on a malformed reply', async () => {

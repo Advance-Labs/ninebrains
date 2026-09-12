@@ -71,6 +71,48 @@ const fail = (feedback: string, evidence: GateResult['evidence'] = []): GateResu
   feedback,
 });
 
+/** A filter driver name that is safe inside `-c filter.<name>.<key>=`. */
+const DRIVER = /^[A-Za-z0-9._-]{1,128}$/;
+
+type Git = (argv: string[]) => ReturnType<GateContext['capabilities']['runCommand']>;
+
+/**
+ * T31. `git diff` against the checkout's files runs each changed file's `clean`
+ * filter, and both `.gitattributes` and the repo config are lane-writable. git
+ * has no switch that turns every filter off, so read the drivers the config
+ * defines (`git config` runs no filter) and blank each one, the same rule as the
+ * app's review checkout. Fails closed on an unreadable config or an odd name.
+ */
+async function filterDriverOverrides(git: Git): Promise<string[]> {
+  const listed = await git([
+    ...SAFE_GIT,
+    'config',
+    '--null',
+    '--name-only',
+    '--get-regexp',
+    '^filter\\.',
+  ]);
+  if (listed.exitCode === 1) return []; // no filter.* keys
+  if (listed.exitCode !== 0) {
+    throw new Error(`git config exited with ${listed.exitCode}.\n${tailLines(listed.stderr, 5)}`);
+  }
+  const names = new Set(
+    listed.stdout
+      .split('\0')
+      .filter(Boolean)
+      .map((key) => key.slice('filter.'.length, key.lastIndexOf('.')))
+  );
+  const flags: string[] = [];
+  for (const name of names) {
+    if (!DRIVER.test(name)) {
+      throw new Error(`Refusing a repo with filter driver ${JSON.stringify(name)}.`);
+    }
+    for (const key of ['smudge', 'clean', 'process']) flags.push('-c', `filter.${name}.${key}=`);
+    flags.push('-c', `filter.${name}.required=false`);
+  }
+  return flags;
+}
+
 export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
   const id = options.id ?? 'reviewer';
   const title = options.title ?? 'Reviewer';
@@ -79,12 +121,14 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
   const diffArgs = options.diffArgs ?? defaultDiffArgs;
 
   async function review(ctx: GateContext, checkout: ReviewCheckout, base: string) {
-    const git = (argv: string[]) =>
+    const run: Git = (argv) =>
       ctx.capabilities.runCommand('git', { argv, cwd: checkout.path, signal: ctx.signal });
 
     let diff: string;
     let untracked = '';
     try {
+      const hardening = await filterDriverOverrides(run);
+      const git: Git = (argv) => run([...hardening, ...argv]);
       const result = await git(diffArgs(ctx.job, base));
       if (result.exitCode !== 0) {
         return fail(
