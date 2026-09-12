@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -142,6 +143,86 @@ describe('M1 macOS seatbelt profile', () => {
     );
   });
 });
+
+describe('T36 git control files are read-only in the tests-gate sandbox', () => {
+  it('seatbelt denies writing them and pins the git dirs, after the writable-tree rule', () => {
+    const p = buildSeatbeltProfile({
+      worktree: '/wt/a',
+      tempDir: '/t',
+      deniedPaths: [],
+      readOnlyPaths: ['/wt/a/.git/config', '/wt/a/.git/hooks'],
+      pinnedPaths: ['/wt/a/.git'],
+    });
+    const rule =
+      '(deny file-write* (subpath "/wt/a/.git/config") (subpath "/wt/a/.git/hooks") (literal "/wt/a/.git"))';
+    expect(p).toContain(rule);
+    expect(p.indexOf(rule)).toBeGreaterThan(p.indexOf('(require-not'));
+  });
+
+  it('bwrap re-binds the existing ones read-only after the worktree bind, and skips missing ones', () => {
+    const repo = join(root, 'bwrap-repo');
+    mkdirSync(join(repo, '.git', 'hooks'), { recursive: true });
+    writeFileSync(join(repo, '.git', 'config'), '[core]\n');
+    const [config, hooks, attributes] = ['config', 'hooks', 'info/attributes'].map((p) =>
+      join(repo, '.git', p)
+    );
+    const args = buildBwrapArgs({
+      worktree: repo,
+      tempDir: root,
+      deniedPaths: [],
+      readOnlyPaths: [config, hooks, attributes],
+    });
+    const worktreeBind = args.findIndex((a, i) => a === '--bind' && args[i + 1] === repo);
+    for (const path of [config, hooks]) {
+      const at = args.findIndex((a, i) => a === '--ro-bind' && args[i + 1] === path);
+      expect(at).toBeGreaterThan(worktreeBind);
+    }
+    expect(args).not.toContain(attributes);
+  });
+});
+
+describe.skipIf(process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec'))(
+  'T36 tests-gate commands cannot rewrite the repo git control files (real sandbox-exec)',
+  () => {
+    const run = createRunCommand(base);
+    const repo = join(worktrees, 'main-checkout');
+    const linked = join(worktrees, 'linked');
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    mkdirSync(repo, { recursive: true });
+    git(repo, 'init', '-q', '-b', 'main');
+    git(repo, 'config', 'user.email', 'test@example.invalid');
+    git(repo, 'config', 'user.name', 'Test');
+    git(repo, 'config', 'commit.gpgsign', 'false');
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'init');
+    git(repo, 'worktree', 'add', '-q', '-b', 'linked', linked);
+    const sh = (command: string, cwd = repo) => run(command, { cwd, signal: signal() });
+
+    it('refuses config, attributes, hooks and renaming .git from a lane on the main checkout', async () => {
+      const config = readFileSync(join(repo, '.git', 'config'), 'utf8');
+      for (const command of [
+        "git config core.fsmonitor 'touch /tmp/pwned'",
+        "echo '* filter=evil' > .git/info/attributes",
+        "printf '#!/bin/sh\\n' > .git/hooks/pre-commit",
+        'mv .git .git-moved',
+      ]) {
+        expect((await sh(command)).exitCode, command).not.toBe(0);
+      }
+      expect(readFileSync(join(repo, '.git', 'config'), 'utf8')).toBe(config);
+      expect(existsSync(join(repo, '.git', 'info', 'attributes'))).toBe(false);
+      expect(existsSync(join(repo, '.git', 'hooks', 'pre-commit'))).toBe(false);
+      // Objects, refs and the index stay writable.
+      const commit = await sh('git commit -q --allow-empty -m from-tests');
+      expect(commit.exitCode, commit.stderr).toBe(0);
+    });
+
+    it("refuses rewriting a linked worktree's .git gitfile", async () => {
+      const gitFile = readFileSync(join(linked, '.git'), 'utf8');
+      expect((await sh("echo 'gitdir: /tmp/evil' > .git", linked)).exitCode).not.toBe(0);
+      expect(readFileSync(join(linked, '.git'), 'utf8')).toBe(gitFile);
+    });
+  }
+);
 
 describe.skipIf(process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec'))(
   'M1 seatbelt under real sandbox-exec',
