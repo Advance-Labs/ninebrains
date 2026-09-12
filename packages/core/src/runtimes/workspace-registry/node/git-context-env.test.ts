@@ -52,6 +52,8 @@ describe('T36 registry git hardening (real git)', () => {
       // Control: plain git runs every planted path.
       const plain = createBoundExec({ file: 'git', cwd: h.repo, env: h.env });
       await plain.exec(['status', '--porcelain']);
+      // status alone may skip the clean filter (a.txt changed size; see git-exec.test.ts).
+      await plain.exec(['diff', '--numstat', 'HEAD', '--']);
       await plain.exec(['branch', 'plain-branch']);
       await plain.exec(['fetch', 'origin']).catch(() => undefined);
       expect(h.ran()).toEqual(
