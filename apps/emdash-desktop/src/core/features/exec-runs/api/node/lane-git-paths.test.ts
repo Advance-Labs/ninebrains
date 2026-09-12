@@ -26,6 +26,7 @@ describe('T36 resolveLaneGitPaths', () => {
     expect(resolveLaneGitPaths(lane)).toEqual({
       gitDir: join(repo, '.git', 'worktrees', 'lane-a'),
       commonDir: join(repo, '.git'),
+      gitFile: join(lane, '.git'),
     });
     expect(resolveLaneGitPaths(repo)).toEqual({
       gitDir: join(repo, '.git'),

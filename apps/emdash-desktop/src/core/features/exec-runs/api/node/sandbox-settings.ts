@@ -90,13 +90,15 @@ export function secretDenyPaths(input: { homeDir?: string; userDataDir?: string 
 
 /**
  * T36: the repo files that make git run programs or pick filters: config (fsmonitor, filter
- * drivers, sshCommand, hooksPath), per-worktree config, `info/attributes` and hooks. The app runs
- * git against the repo outside any sandbox, so a lane may not write them. Objects, refs and the
- * index stay writable, so a lane can still commit.
+ * drivers, sshCommand, hooksPath), per-worktree config, `info/attributes`, hooks, and a linked
+ * worktree's `.git` gitfile (which names the git dir, config included). The app runs git against
+ * the repo outside any sandbox, so a lane may not write them. Objects, refs and the index stay
+ * writable, so a lane can still commit.
  */
 export function gitControlPaths(git: LaneGitPaths): string[] {
   return [
     ...new Set([
+      ...(git.gitFile ? [git.gitFile] : []),
       join(git.commonDir, 'config'),
       join(git.commonDir, 'config.worktree'),
       join(git.gitDir, 'config.worktree'),
