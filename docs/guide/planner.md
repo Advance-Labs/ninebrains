@@ -5,7 +5,11 @@ description: >-
   modules that group nodes. Run plan compiles it into Brain jobs, idempotently and without cycles.
 ---
 
-The planner is a canvas for one project's plan:
+The planner is a canvas for one project's plan. This build has no menu item or command that opens
+it yet.
+<!-- VERIFY: an entry point for the planner is being added -->
+
+On the canvas:
 
 - **Nodes** are jobs or notes.
 - **Edges** are dependencies: the job at the arrow's end waits for the one at its start.
@@ -38,7 +42,6 @@ Rules worth knowing:
 
 ## Running a plan
 
-<!-- VERIFY-AFTER-P2 -->
 **Run plan** compiles the canvas into Brain jobs and dependencies:
 
 - **It is idempotent.** Each node keeps its identity, so running the plan again updates jobs rather
@@ -48,7 +51,6 @@ Rules worth knowing:
 - Every job gets at least the gates your rigor settings require.
 
 Once jobs exist, each node's colour follows its job's state as lanes pick it up.
-<!-- /VERIFY -->
 
 If the Brain is not connected, Run plan says so. It never pretends to succeed.
 

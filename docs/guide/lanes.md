@@ -59,10 +59,8 @@ Keyboard shortcuts work even while a terminal has focus:
 | Focus lane 1–4 | ⌘1 – ⌘4 | Ctrl+1 – Ctrl+4 |
 | Maximize the focused lane | ⌘⇧Enter | Ctrl+Shift+Enter |
 
-<!-- VERIFY-AFTER-P2 -->
-The side panel reads the lane's jobs, finished work and notes from the Brain as they change. Before
-the Brain is connected, it shows empty lists.
-<!-- /VERIFY -->
+The side panel reads the lane's jobs, finished work and notes from the Brain as they change. Each
+finished job shows a verified or unverified badge.
 
 ## What persists
 

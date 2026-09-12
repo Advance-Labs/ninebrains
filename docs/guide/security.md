@@ -65,12 +65,16 @@ stdin, and a guard against permission-bypass flags. See [Unattended runs](unatte
 - The app does not contact Emdash or General Action servers.
 - Pack secrets are referenced by name and never written into pack files or preferences.
 
-<!-- VERIFY-AFTER-P2 -->
-**Lane launches:** attended Claude lanes start with a per-lane settings file that turns the Claude
-Code sandbox on and denies reads of Ninebrains' data folder, other lanes' worktrees and credential
-folders. You can turn the sandbox off per project, and the lane then shows a warning badge. Each
-lane's MCP config file is created with mode `0600` and deleted when the lane exits.
-<!-- /VERIFY -->
+**Lane launches:**
+
+- Attended Claude lanes start with a per-lane settings file that turns the Claude Code sandbox on
+  and denies reads of Ninebrains' data folder, other lanes' worktrees and credential folders. There
+  is no setting to turn it off per project.
+- Each lane's MCP config file is created with mode `0600` in a folder with mode `0700`. It is
+  deleted when the lane stops, and any left over are deleted when the app starts.
+- Codex lanes get their Brain settings as command-line flags instead of a file, so the lane's token
+  is visible in the process list to other programs running as you.
+- A lane never starts with auto-approve on, and a guard rejects permission-bypass flags.
 
 ## Accepted risks for v0.1
 
@@ -94,5 +98,5 @@ Email **security@advancelabs.dev**. Do not open a public issue. The
 
 ## Verifying a download
 
-Until builds are signed, check every download against the release's `SHA256SUMS` file and its build
-attestation. [RELEASING.md](../RELEASING.md) has the commands.
+Until builds are signed, check every download against the release's `SHA256SUMS` file.
+[Verify and open a download](verify-download.md) has the commands.

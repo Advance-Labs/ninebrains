@@ -41,19 +41,22 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 - **Nothing phones home.** Telemetry is off, with no endpoint built in. No hosted account. No
   update feed until builds are signed.
 
-<!-- VERIFY-AFTER-P2 -->
-**Being wired into the app for v0.1:**
-
-- **The Brain.** A drawer in the Lanes view where you give the Brain a brief. It creates jobs,
-  links their dependencies and dispatches ready jobs to idle lanes.
-- **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
-  into Brain jobs, idempotently, and refuses cycles.
+- **The Brain.** A drawer in the Lanes view runs a Claude Code session as the Brain. You type a
+  brief into it; it creates jobs and links their dependencies, and the app dispatches ready jobs to
+  idle lanes.
 - **Gates in the loop.** A failed gate sends feedback to the lane and retries, up to three
   attempts, then blocks and tells you. The screenshot gate captures the lane's own browser at
   three widths.
-- **Rigor settings.** Two 0–10 sliders, global with a per-project override, decide which gates
-  every job gets.
-<!-- /VERIFY -->
+- **Rigor settings.** Two 0–10 sliders in Settings → Gates decide which gates every job gets.
+
+**In the code, not yet reachable from the app:**
+
+<!-- VERIFY: each item below is being wired into the app -->
+- **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
+  into Brain jobs, idempotently, and refuses cycles. Nothing opens it yet.
+- **Per-project gate settings.** The test command the tests gate runs, and a rigor override. Until
+  a project has a test command, jobs are blocked at the default rigor.
+- **Lane roles and modes.** Starting a lane from a pack role, and switching a lane to unattended.
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
 with a morning digest, a video pack, signed builds and auto-update.
@@ -95,11 +98,15 @@ them; it never logs in for you.
 2. **Open Lanes.** Press ⌘K (Ctrl+K on Windows and Linux) and run **Open Lanes**.
 3. **Add lanes.** Click an empty slot, choose the project and an agent. Each lane gets its own
    worktree on a `lanes/<id>` branch. Add up to four per tab; use **+** for another tab.
-4. **Give the Brain a brief.** <!-- VERIFY-AFTER-P2 --> Open the Brain drawer and describe the
-   work. The Brain breaks it into jobs and hands them to idle lanes. <!-- /VERIFY -->
-5. **Watch the gates.** <!-- VERIFY-AFTER-P2 --> When a lane finishes a job, its light turns to
-   *verifying* while the gates run. A failed gate sends the lane back to work with the feedback;
-   a passed job lands in the lane's Done list. <!-- /VERIFY -->
+4. **Set up gates.** At the default rigor, jobs need a test command that cannot be set yet, so
+   set **Testing rigor** below 3 in Settings → Gates. Jobs then finish as unverified.
+   <!-- VERIFY: a per-project test command setting is being added -->
+5. **Give the Brain a brief.** Click **Brain** in the Lanes title bar, then **Start Brain**, and
+   type the brief into the Brain's terminal. The Brain breaks it into jobs, and the app hands them
+   to idle lanes.
+6. **Watch the gates.** When a lane finishes a job, its light turns to *verifying* while the gates
+   run. A failed gate sends the lane back to work with the feedback; a passed job lands in the
+   lane's Done list.
 
 The [getting-started guide](docs/guide/getting-started.md) covers each step in detail.
 
