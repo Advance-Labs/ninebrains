@@ -84,5 +84,5 @@ GitHub release (`shasum -a 256 -c SHA256SUMS`). That proves you have the exact b
 not who built them. Build-provenance attestations are not available while the repository is
 private. Once the repository is public, `gh attestation verify <file> --repo
 Advance-Labs/ninebrains` will also prove which workflow built the file. Until then that command
-fails, and a failure means nothing about the file. Unsigned builds do not auto-update. Details:
-[RELEASING.md](RELEASING.md#verifying-a-download-for-users).
+fails, and a failure means nothing about the file. Unsigned builds do not auto-update. The release
+guide in the repository (`docs/RELEASING.md`, "Verifying a download") has the commands for each OS.
