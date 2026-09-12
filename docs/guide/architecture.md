@@ -49,7 +49,7 @@ lane = worktree + terminal (claude | codex) + editor + browser
 | Unattended runs | `apps/emdash-desktop/src/core/features/exec-runs/` |
 | Gate capabilities (fetch, run command, reviewer, checkout) | `apps/emdash-desktop/src/core/features/gates/` |
 | Brain: DAG, state machine, mailbox, routing, store, endpoint | `packages/brain-core/` |
-| MCP shim each lane runs ([reference](brain-mcp.md)) | `packages/brain-mcp/` |
+| MCP shim each lane runs (its README covers the env contract and tools) | `packages/brain-mcp/` |
 | Gate logic, rigor mapping, self-heal | `packages/gates-core/` |
 | Claim checking (grounded / imprecise / invented) | `packages/citations/` |
 | Stand-in CLI for tests | `tooling/fake-agent/` |

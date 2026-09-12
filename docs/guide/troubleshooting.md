@@ -63,11 +63,15 @@ Give the project a run script that starts the dev server:
 
 1. Open the project, then its **Settings** tab.
 2. Under the lifecycle scripts, set **Run script**, for example `PORT=$EMDASH_PORT pnpm dev`.
-3. Turn on auto-run for it. It is off by default, while the setup script runs automatically.
+3. Turn on **Auto-run on task creation** for it, so it starts in new tasks. It is off by default;
+   the setup script's auto-run is on by default.
 
-The run script is saved for this machine. To share it with your team, write it to the repository's
-`.emdash.json` as `scripts.run` (the settings footer offers **Write .emdash.json**). The auto-run
-switch stays a setting on each machine.
+For a lane that already exists, open its task (the **Editor** button in the lane header) and start
+the script from the **Scripts** tab of the terminal drawer (⌘J, or Ctrl+J).
+
+The run script is saved for this machine. To share it with your team, use the project's share
+option, which writes it to the repository's `.emdash.json` as `scripts.run` (**Write
+.emdash.json**). The auto-run switch stays a setting on each machine.
 
 ### An unattended run finished but did nothing
 
@@ -141,9 +145,9 @@ Also check the SEO server address (`NINEBRAINS_SECRET_AEO_MCP_BASE_URL`): anythi
 | Brain database | `ninebrains-brain.db` inside that folder |
 | Lane, run and evidence files | `ninebrains/` inside that folder |
 
-On Linux the app data folder is under `~/.config`, and on Windows under `%APPDATA%`. The full list,
-including what Ninebrains writes outside this folder, is in
-[Configuration](configuration.md#file-locations).
+On Linux the app data folder is under `~/.config`, and on Windows under `%APPDATA%`. The full list
+is in [Configuration](configuration.md#file-locations). What Ninebrains writes elsewhere on your
+machine is in [Files outside the data folder](files-outside-data-folder.md).
 
 ## Building from source
 
