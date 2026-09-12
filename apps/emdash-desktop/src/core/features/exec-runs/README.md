@@ -104,7 +104,9 @@ relative to the settings file.
 
 `denyWrite` (T36) holds the worktree repo's git control files, resolved by `resolveLaneGitPaths`
 with read-only hardened git: config (fsmonitor, filter drivers, `sshCommand`, `hooksPath`),
-`info/attributes` and hooks. The app runs git against the repo outside any sandbox. Objects, refs
+`info/attributes`, hooks and a linked worktree's `.git` gitfile. The tests gate's seatbelt and
+bubblewrap profiles make the same paths read-only. The app runs git against the repo outside any
+sandbox. Objects, refs
 and the index stay writable, so a lane can still commit. A plain directory gets no git entries.
 
 `SECRET_HOME_PATHS` (`sandbox-settings.ts`) is the one list the settings file, the macOS seatbelt
