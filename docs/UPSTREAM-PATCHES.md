@@ -175,6 +175,7 @@ the composition root passes one (`src/core/features/gates/README.md`, "Wiring").
 | `src/core/manifests/shared/domain-contracts.ts` | `+[gatesDomain]: gatesContract` | The `gates` wire contract (Job verification modal) |
 | `src/core/manifests/node/controllers.ts` | Optional `gates?: GatesVerificationService` on the context + `gates` controller entry | Serve the contract with key parity and no `wiring.ts` edit |
 | `src/core/manifests/browser/browser-contributions.ts` | `+...gatesBrowserContributions.modalDefs` | The `jobVerificationModal` modal |
+| `src/renderer/tests/browser/modal-catalog.test.ts` | `'jobVerificationModal'` in `expectedModalIds` | The test pins every registered modal id |
 | `src/core/manifests/shared/settings-contributions.ts` | `+'ninebrains.gates': gatesSettingsContribution` | Rigor sliders and evidence retention |
 | `src/core/manifests/browser/settings-page-contributions.ts` | `+gatesSettingsPage` | Settings → Gates |
 | `src/core/features/settings/contributions/views.ts` | `'gates'` in `settingsPageTabSchema` | Settings tab id |
