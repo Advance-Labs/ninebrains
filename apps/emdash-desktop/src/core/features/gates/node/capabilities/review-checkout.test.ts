@@ -194,10 +194,7 @@ describe('SEC-30 kill switch reaches review-checkout git', () => {
       groups,
     });
     pending.catch(() => undefined);
-    for (let i = 0; i < 100 && !(existsSync(pidFile) && readFileSync(pidFile, 'utf8')); i++) {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    const pid = await waitForPid(pidFile, 5_000);
     const t0 = Date.now();
     await groups.killAll(2000);
     await expect(pending).rejects.toThrow();
@@ -210,6 +207,25 @@ describe('SEC-30 kill switch reaches review-checkout git', () => {
     expect(readdirSync(checkouts)).toEqual([]);
   }, 20_000);
 });
+
+/**
+ * Waits for the hung git's grandchild to write its pid. On the deadline it fails with a named
+ * setup error: reading the missing file used to surface as a bare ENOENT, which looked like a
+ * SEC-30 regression when the host was only too loaded to spawn. An empty file is still "not yet",
+ * so a half-written pid can never become `0` (which `process.kill` reads as the process group).
+ */
+async function waitForPid(file: string, timeoutMs: number): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const text = existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
+    if (text) return Number(text);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(
+    `SEC-30 setup: the hung git never started its grandchild (no pid in ${file} after ` +
+      `${timeoutMs} ms). The host was too loaded to spawn; this is not a kill-switch failure.`
+  );
+}
 
 function alive(pid: number): boolean {
   try {

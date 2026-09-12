@@ -91,6 +91,9 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
 | `tooling/scripts/check.mjs`, `package.json` (root) | `check` runs `format:check` (was `format`, which rewrote files) and the new `test:tooling` step; `--write` / `check:write` restores the writing mode; `test:tooling` script runs the node tests in `tooling/scripts`, `tooling/fake-agent/test` and `scripts/release` (W7 CI) | `pnpm run check` now matches what CI runs and never edits the tree, so a green local check means a green `static` job |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
+| `apps/emdash-desktop/vitest.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI`; new `node-spawn` project (`maxWorkers: 2`, `sequence.groupOrder: 1`) takes the spawn-heavy suites out of `node`; `browser` gets `testTimeout: 15_000` and `optimizeDeps.include` for the JSX runtime (W7 CI) | CI can run real-browser tests. Spawn-heavy suites (gates capabilities, exec-runs, brain stop/unattended, override-launch) get less contention instead of looser deadlines (SEC-30 keeps its 5 s). The late JSX-runtime discovery reloaded Vite mid-run and failed browser tests |
+| `packages/chat-ui/vite.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI` (W7 CI) | Same switch as the desktop app |
+| `nx.json` | `EMDASH_TEST_BROWSER` added to the `test` target's env inputs (W7 CI) | A forced browser run must not reuse a cached result from a run that skipped the browser project |
 
 ## 5. Unattended exec path (W2 `exec-runs`)
 

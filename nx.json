@@ -47,6 +47,9 @@
         },
         {
           "env": "EMDASH_TEST_SKIP_BROWSER"
+        },
+        {
+          "env": "EMDASH_TEST_BROWSER"
         }
       ],
       "cache": true
