@@ -86,6 +86,20 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm run test:tooling
 
+      # The link checker reads the built site, so this builds it: the docs `build` target runs
+      # `astro build`, then scripts/check-links.mjs (docs:check). Its own unit tests run in
+      # test-node (packages).
+      - name: Is the docs site affected?
+        id: docs
+        if: ${{ !cancelled() }}
+        env:
+          PROJECT: '@ninebrains/docs'
+        run: node tooling/scripts/nx-affected.mjs "$PROJECT"
+
+      - name: Docs site build and link check
+        if: ${{ !cancelled() && steps.docs.outputs.run == 'true' }}
+        run: pnpm exec nx run @ninebrains/docs:build
+
   test-node:
     name: test-node (${{ matrix.shard }})
     runs-on: ubuntu-latest

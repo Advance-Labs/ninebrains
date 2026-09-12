@@ -157,7 +157,7 @@ on demand:
 
 | Job | What it runs |
 |---|---|
-| `static` | `format:check`, lint, the boundary allowlist ratchet, typecheck, the licence gate, and the node tests of the release scripts, the fake agent and `tooling/scripts` |
+| `static` | `format:check`, lint, the boundary allowlist ratchet, typecheck, the licence gate, the node tests of the release scripts, the fake agent and `tooling/scripts`, and, when the docs site is affected, its build plus the link checker (`@ninebrains/docs:build`) |
 | `test-node` | Vitest in four shards: every package except the desktop app; desktop `node`; desktop `main-db`, `migrations` and `scripts`; desktop `node-spawn` (suites that spawn real processes, two files at a time). No retries: SEC-* tests are never retried to green |
 | `test-browser` | The desktop and chat-ui `browser` projects in headless Chromium, with one retry. A test that passes only on the retry is shown as a warning annotation and in the job summary. Open a `flaky-test` issue for it |
 | `pr-hygiene` | DCO sign-offs, a Conventional Commit PR title, and the upstream-patch log: every changed file that existed at `dbf690c` must be named in the lines your PR adds to `docs/UPSTREAM-PATCHES.md` |
