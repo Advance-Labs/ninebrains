@@ -439,8 +439,8 @@ export class BrainService {
 
   clearStop(): Result<void, BrainError> {
     this.deps.supervisor.clearStop();
+    // Not `setPaused(false)`: Clear STOP must not resume a dispatcher the user paused (T37).
     this.dispatcher.clearStop();
-    this.dispatcher.setPaused(false);
     this.notifyStop(false);
     return ok(undefined);
   }

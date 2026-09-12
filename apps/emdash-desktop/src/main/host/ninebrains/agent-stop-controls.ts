@@ -76,7 +76,7 @@ export async function stopAllAgentWorkFromMain(): Promise<void> {
 }
 
 export function clearAgentStopFromMain(): void {
-  // Clear only a latched STOP: clearing also resumes dispatch, which a user pause must keep.
+  // Clear only a latched STOP. A user pause stays either way (T37).
   if (controls?.isLatched()) controls.clearStop();
 }
 

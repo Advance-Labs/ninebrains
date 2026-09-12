@@ -103,10 +103,12 @@ export class Dispatcher {
     if (!paused) this.schedule();
   }
 
-  /** Global STOP: refuse all work until `clearStop`. */
+  /**
+   * Global STOP: refuse all work until `clearStop`. The user's pause is separate state, so a
+   * pause set before STOP is still there after Clear STOP (T37).
+   */
   latch(): void {
     this.latched = true;
-    this.paused = true;
     this.ports.onChange?.();
   }
 
