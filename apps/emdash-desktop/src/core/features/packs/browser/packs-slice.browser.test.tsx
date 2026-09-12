@@ -1,4 +1,4 @@
-import { ok } from '@emdash/shared';
+import { err, ok } from '@emdash/shared';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +8,8 @@ import { PacksPanel } from './packs-view';
 
 // The packs slice renders against a fake controller seeded through
 // `seedSliceWire`: no renderer host, no Electron, no other slices.
+
+const SECRET_VALUE = 'ya29.super-secret-google-token';
 
 function pack(overrides: Partial<PackSummary> = {}): PackSummary {
   return {
@@ -44,6 +46,7 @@ function pack(overrides: Partial<PackSummary> = {}): PackSummary {
         optional: false,
         present: false,
         location: 'environment variable NINEBRAINS_SECRET_GOOGLE_ACCESS_TOKEN',
+        storedInApp: false,
       },
     ],
     ...overrides,
@@ -53,7 +56,9 @@ function pack(overrides: Partial<PackSummary> = {}): PackSummary {
 describe('packs settings through the wire seam', () => {
   const listCalls: unknown[] = [];
   const setCalls: unknown[] = [];
+  const secretCalls: Array<{ op: 'set' | 'clear'; name: string; value?: string }> = [];
   let listing: PacksListing;
+  let failNextSet = false;
   let handle: { dispose: () => Promise<void> };
   let container: HTMLDivElement;
   let root: Root;
@@ -61,6 +66,8 @@ describe('packs settings through the wire seam', () => {
   beforeEach(() => {
     listCalls.length = 0;
     setCalls.length = 0;
+    secretCalls.length = 0;
+    failNextSet = false;
     listing = {
       packs: [pack()],
       errors: [
@@ -75,6 +82,30 @@ describe('packs settings through the wire seam', () => {
       setEnabled: async (input: { packId: string; enabled: boolean }) => {
         setCalls.push(input);
         return ok({ enabledPackIds: input.enabled ? [input.packId] : [] });
+      },
+      // A fake main: records the call and, like the real one, answers set/missing only.
+      setSecret: async ({ name, value }: { name: string; value: string }) => {
+        secretCalls.push({ op: 'set', name, value });
+        if (failNextSet) {
+          return err({
+            type: 'secret-store' as const,
+            message: `Could not store ${name}: Secure secret storage is unavailable on this system.`,
+          });
+        }
+        listing = {
+          ...listing,
+          packs: [
+            pack({
+              secrets: [{ ...pack().secrets[0]!, present: true, storedInApp: true }],
+            }),
+          ],
+        };
+        return ok(undefined);
+      },
+      clearSecret: async ({ name }: { name: string }) => {
+        secretCalls.push({ op: 'clear', name });
+        listing = { ...listing, packs: [pack()] };
+        return ok(undefined);
       },
     });
     container = document.createElement('div');
@@ -124,5 +155,67 @@ describe('packs settings through the wire seam', () => {
     });
     await vi.waitFor(() => expect(container.textContent).toContain('Add a project'));
     expect(listCalls).toEqual([{ projectId: null }]);
+  });
+
+  async function typeSecret(value: string) {
+    const input = await vi.waitFor(() => {
+      const el = container.querySelector<HTMLInputElement>(
+        'input[aria-label="New value for GOOGLE_ACCESS_TOKEN"]'
+      );
+      expect(el).not.toBeNull();
+      return el as HTMLInputElement;
+    });
+    expect(input.type).toBe('password');
+    expect(input.value).toBe('');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    return input;
+  }
+
+  const saveButton = () =>
+    [...container.querySelectorAll('button')].find((b) => b.textContent === 'Save')!;
+
+  it('writes a secret once and never shows it back (write-only)', async () => {
+    await act(async () => {
+      root.render(<PacksPanel projects={[{ id: 'p1', name: 'Site' }]} />);
+    });
+    const input = await typeSecret(SECRET_VALUE);
+    await act(async () => saveButton().click());
+
+    await vi.waitFor(() =>
+      expect(secretCalls).toEqual([{ op: 'set', name: 'GOOGLE_ACCESS_TOKEN', value: SECRET_VALUE }])
+    );
+    await vi.waitFor(() => expect(container.textContent).toContain('Set in the app keychain.'));
+    // The field empties after saving, and the value is nowhere in the page.
+    expect(input.value).toBe('');
+    expect(container.innerHTML).not.toContain(SECRET_VALUE);
+    expect(container.textContent).not.toContain('Missing secrets');
+
+    const clear = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Clear GOOGLE_ACCESS_TOKEN"]'
+    )!;
+    await act(async () => clear.click());
+    await vi.waitFor(() =>
+      expect(secretCalls.at(-1)).toEqual({ op: 'clear', name: 'GOOGLE_ACCESS_TOKEN' })
+    );
+    await vi.waitFor(() => expect(container.textContent).toContain('Missing secrets'));
+  });
+
+  it('keeps the draft and shows the store error when the keychain refuses', async () => {
+    failNextSet = true;
+    await act(async () => {
+      root.render(<PacksPanel projects={[{ id: 'p1', name: 'Site' }]} />);
+    });
+    const input = await typeSecret(SECRET_VALUE);
+    await act(async () => saveButton().click());
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain('Secure secret storage is unavailable')
+    );
+    // The error names the secret, never its value.
+    expect(container.textContent).not.toContain(SECRET_VALUE);
+    expect(input.value).toBe(SECRET_VALUE);
   });
 });

@@ -9,6 +9,7 @@ import {
   type LaneError,
   type LaneEvent,
   type LaneProvider,
+  type LaneRunMode,
   type LaneSession,
   type LanesGridConfig,
   type LaneSlot,
@@ -194,6 +195,7 @@ export class LaneService {
     projectId: string;
     provider: LaneProvider;
     model?: string;
+    roleId?: string;
   }): Promise<Result<{ laneId: string }, LaneError>> {
     await this.initialize();
     const tab = this.grid.tabs.find((candidate) => candidate.tabId === input.tabId);
@@ -221,6 +223,7 @@ export class LaneService {
       browserId: `lane-${laneId}`,
       asleep: false,
       conversationReady: false,
+      ...(input.roleId ? { roleId: input.roleId } : {}),
     };
     tab.slots[input.slot] = config;
     this.projectNames.set(project.projectId, project.name);
@@ -271,6 +274,17 @@ export class LaneService {
 
   async wakeLane(laneId: string): Promise<Result<void, LaneError>> {
     return this.setAsleep(laneId, false);
+  }
+
+  /** Persists how the Brain hands this lane its jobs. Attended is stored as no field. */
+  async setLaneMode(laneId: string, mode: LaneRunMode): Promise<Result<void, LaneError>> {
+    await this.initialize();
+    const location = this.locate(laneId);
+    if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    if (mode === 'unattended') location.config.runMode = 'unattended';
+    else delete location.config.runMode;
+    this.commit();
+    return ok(undefined);
   }
 
   async removeLane(laneId: string, deleteWorktree: boolean): Promise<Result<void, LaneError>> {

@@ -217,6 +217,26 @@ and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes
 `e2e/harness.mjs` (`--use-mock-keychain`, `NINEBRAINS_E2E`, extra env), `tooling/fake-agent/src/steps.mjs`
 (`{{prompt:<regex>}}` in `callTool` args).
 
+## 12. Daily-use fixes (W7 `w7/daily-use`)
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/command-catalog.ts` | `+PLANNER_COMMAND_DEFS` | The `planner.open` command |
+| `src/core/manifests/shared/command-palette-catalog.ts` | `+PLANNER_COMMAND_PALETTE_ITEMS` | "Open Planner" in the command palette |
+| `src/core/manifests/browser/scope-catalog.ts` | Window scope gains `PLANNER_WINDOW_COMMAND_DEFS` | `planner.open` works from any view |
+| `src/core/features/workbench/browser/window-scope.tsx` | `'planner.open'` handler: the given, current or first project's canvas | Window-scope commands are implemented here |
+| `src/main/host/menu.ts` | An **Agents** submenu from `agentStopMenuItems({ accelerator: true })`; rebuilt on `onAgentStopStateChange` | SEC-30: STOP and Clear STOP answered in main, so they work with a hung renderer |
+| `src/main/host/tray.ts` | The tray menu is built by `buildTrayMenu()` and gains the STOP items; rebuilt on the latch | Same |
+
+Ninebrains files also touched: `lanes/api/{lane-model,contract,index}.ts` (`runMode`, `roleId`,
+`setLaneMode`), `lanes/node/{lane-service,wire-controller}.ts`,
+`lanes/browser/grid/{add-lane-form,lane-header,lanes-view}.tsx`, `brain/api/*` (lane run mode from
+the lanes api, `unattendedBudgets`), `brain/node/{brain-service,dispatcher,unattended}.ts`,
+`brain/browser/{brain-drawer,use-brain}.tsx`, `brain/contributions/lanes-drawer.ts`,
+`packs/api/{contract,index}.ts` (`setSecret`, `clearSecret`, `storedInApp`, role provider/model),
+`packs/node/{packs-service,secrets,wire-controller}.ts`, `packs/browser/packs-view.tsx`,
+`main/bootstrap/boot/ninebrains/{create-ninebrains-services,keychain-secret-resolver}.ts`.
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -236,7 +256,10 @@ and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes
 `src/renderer/tests/browser/.gitignore`, `docs/screenshots/gates-*.png`, `src/core/features/brain/**`,
 `src/main/bootstrap/boot/ninebrains/**`, `src/main/host/mock-keychain.test.ts`,
 `e2e/brain-fanout.e2e.mjs`, `tooling/fake-agent/test/interpolate-args.test.mjs`,
-`docs/screenshots/brain-*.png`,
+`docs/screenshots/brain-*.png`, `src/core/features/planner/contributions/{commands,palette}.ts`,
+`src/main/bootstrap/boot/ninebrains/keychain-secret-resolver.test.ts`,
+`src/renderer/tests/browser/daily-use-screenshots.test.tsx`,
+`docs/screenshots/{lanes-run-mode,lanes-add-lane-role,packs-secrets}-*.png`,
 `.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `.github/actions/ci-setup/action.yml`,
 `tooling/scripts/{check-upstream-patches,pr-hygiene,ci-ok,nx-affected,vitest-flaky-reporter}.mjs`
 and their `*.test.mjs` (W7 CI).

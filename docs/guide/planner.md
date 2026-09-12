@@ -5,7 +5,11 @@ description: >-
   modules that group nodes. Run plan compiles it into Brain jobs, idempotently and without cycles.
 ---
 
-The planner is a canvas for one project's plan:
+The planner is a canvas for one project's plan. This build has no menu item or command that opens
+it yet.
+<!-- VERIFY: an entry point for the planner is being added -->
+
+On the canvas:
 
 - **Nodes** are jobs or notes.
 - **Edges** are dependencies: the job at the arrow's end waits for the one at its start.
@@ -13,6 +17,22 @@ The planner is a canvas for one project's plan:
   breadcrumbs take you back out.
 
 Each job node shows its gates and, once the plan is running, its live state.
+
+## Opening the planner
+
+There are three ways in:
+
+- **Command palette:** run **Open Planner**. It opens the canvas of the project you are looking
+  at, or your first project if no project is in view.
+- **Lanes view:** the **Planner** button in the titlebar opens the canvas of the first lane's
+  project in the current tab.
+- **Brain drawer:** the **Plan** button opens the canvas of the project the selected Brain session
+  works in.
+
+Each project has its own canvas. Opening the planner again for the same project brings back the
+same canvas.
+
+![The Brain drawer's Plan button next to Pause](../screenshots/brain-drawer-plan-1440.png)
 
 ## Building a plan
 
@@ -38,7 +58,6 @@ Rules worth knowing:
 
 ## Running a plan
 
-<!-- VERIFY-AFTER-P2 -->
 **Run plan** compiles the canvas into Brain jobs and dependencies:
 
 - **It is idempotent.** Each node keeps its identity, so running the plan again updates jobs rather
@@ -48,7 +67,6 @@ Rules worth knowing:
 - Every job gets at least the gates your rigor settings require.
 
 Once jobs exist, each node's colour follows its job's state as lanes pick it up.
-<!-- /VERIFY -->
 
 If the Brain is not connected, Run plan says so. It never pretends to succeed.
 

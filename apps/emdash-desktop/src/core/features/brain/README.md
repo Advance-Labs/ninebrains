@@ -95,12 +95,24 @@ packs service (keychain `SecretResolver`), the planner (`createBrainPlanTarget`
    never the type alone, so an idle lane stays dispatchable.
 7. **Attended lanes use `--strict-mcp-config`** (spike recommendation), so a
    lane sees the Brain and its project's pack servers, not the user's global MCP.
-8. **Lane run mode is in memory** (attended by default; `setLaneMode`). A
-   restart makes every lane attended again.
+8. **Lane run mode is persisted with the lane** (`runMode` on the lane config;
+   absent means attended). `setLaneMode` writes it through the lanes port, and the
+   dispatcher adopts each lane's stored mode every round, so a restart keeps it.
+   The lane header toggles it (`browser/lane-run-mode.tsx`, exported to lanes
+   through `contributions/lanes-drawer.ts`); unattended shows the headless command
+   and the budgets from the overview (`dispatcher.unattendedBudgets`).
 9. **Pack secrets:** keychain (upstream `EncryptedAppSecretsStore`, safeStorage)
    under `ninebrains.pack.<NAME>`, falling back to the read-only env resolver.
-   Nothing is written in plaintext; there is no UI to set a keychain value yet.
-10. **fake-agent** gained `{{prompt:<regex>}}` interpolation in `callTool` args
+   Nothing is written in plaintext. Settings → Packs sets and clears keychain
+   values through `createKeychainSecretStore` (write-only; see the packs README).
+10. **Pack launches are per role.** A lane's `roleId` reaches
+   `resolvePackLaunch(projectId, roleId)`, cached per project and role, for
+   attended launches and unattended runs. A role's gates are not applied to the
+   lane's jobs: a job's gate spec is set by its creator.
+11. **STOP from main.** `onStopChange` lets `main/host/ninebrains/agent-stop-controls.ts`
+   rebuild the app menu and tray on the latch; both call `stopAll`/`clearStop`
+   directly, never through the renderer.
+12. **fake-agent** gained `{{prompt:<regex>}}` interpolation in `callTool` args
     (additive, tested) so scripted lanes can report the job they were pasted.
 
 ## Accepted risks and open items
@@ -109,8 +121,9 @@ packs service (keychain `SecretResolver`), the planner (`createBrainPlanTarget`
   process list (same class as R2). Codex attended lanes are untested.
 - HTTP pack servers are skipped for unattended runs (the supervisor's MCP
   config is stdio-only).
-- STOP runs in main but is reachable only from the renderer (command, button);
-  a tray/menu entry that works with a hung renderer is still to do (SEC-30).
+- STOP only stops PTY lanes that hold a Brain-dispatched job; a lane the user
+  drives by hand keeps running. The app menu and tray entries run in main and
+  work with a hung renderer (SEC-30).
 - The live sandbox deny (SEC-11) is proven only as settings content; the real
   CLI check stays a manual pre-release step.
 - Brain tokens are per project (v0.1 has no global Brain); a session can only

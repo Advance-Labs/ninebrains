@@ -15,7 +15,7 @@ import {
   type PackPrefsStore,
 } from './prefs-store';
 import { resolvePackLaunch } from './resolve-launch';
-import { unconfiguredSecretResolver, type SecretResolver } from './secrets';
+import { unconfiguredSecretResolver, type PackSecretStore, type SecretResolver } from './secrets';
 import { createRuntimeSkillsPort } from './skills-runtime-port';
 import {
   desiredPackSkills,
@@ -28,6 +28,8 @@ import {
 export interface PacksServiceDeps {
   prefs: PackPrefsStore;
   secrets: SecretResolver;
+  /** Where Settings → Packs stores secrets (the keychain). Omit and set/clear refuse. */
+  secretStore?: PackSecretStore;
   /** Omit to skip skill installation (tests, remote hosts). */
   skills?: SkillsPort;
   /** `<userData>/ninebrains/packs`. Ignored unless user packs are allowed (SEC-26). */
@@ -46,6 +48,12 @@ export interface PacksService {
     packId: string,
     enabled: boolean
   ): Promise<Result<{ enabledPackIds: string[] }, PacksError>>;
+  /**
+   * Stores a secret some loaded pack declares. Write-only: the value is never returned,
+   * logged or put in an error, and `list` only reports whether it is set.
+   */
+  setSecret(name: string, value: string): Promise<Result<void, PacksError>>;
+  clearSecret(name: string): Promise<Result<void, PacksError>>;
   /** Merged into a lane's launch config by the Phase-2 launch builder. */
   resolvePackLaunch(projectId: string, roleId?: string): Promise<PackLaunch>;
   /** Installs skills of packs enabled anywhere; removes stale `nb-*` skills. */
@@ -56,6 +64,11 @@ export interface PacksService {
 }
 
 const EMPTY_SYNC: SkillSyncReport = { installed: [], removed: [], unchanged: [], errors: [] };
+
+const NO_SECRET_STORE: PacksError = {
+  type: 'secret-store',
+  message: 'No secret store is configured in this build.',
+};
 
 export function createPacksService(deps: PacksServiceDeps): PacksService {
   let loading: Promise<PackLoadResult> | null = null;
@@ -76,11 +89,13 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
   async function summarize(pack: LoadedPack, enabled: boolean): Promise<PackSummary> {
     const { manifest } = pack;
     const resolve = (name: string) => deps.secrets.resolve(name).catch(() => undefined);
+    const inStore = (name: string) => deps.secretStore?.has(name).catch(() => false) ?? false;
     const secrets = await Promise.all(
       manifest.requiredSecrets.map(async (secret) => ({
         ...secret,
         present: (await resolve(secret.name)) !== undefined,
         location: deps.secrets.describeLocation(secret.name),
+        storedInApp: await inStore(secret.name),
       }))
     );
     const declared = manifest.settings ?? [];
@@ -110,7 +125,13 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
       license: manifest.license,
       source: pack.source,
       enabled,
-      roles: manifest.roles.map(({ id, title, kind }) => ({ id, title, kind })),
+      roles: manifest.roles.map(({ id, title, kind, provider, model }) => ({
+        id,
+        title,
+        kind,
+        ...(provider ? { provider } : {}),
+        ...(model ? { model } : {}),
+      })),
       mcpServers: manifest.mcpServers.map((s) => ({
         name: s.name,
         description: s.description,
@@ -134,6 +155,24 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
     const projects = await deps.prefs.listProjects();
     const lists = await Promise.all(projects.map((id) => deps.prefs.getEnabled(id)));
     return new Set(lists.flat());
+  }
+
+  /** Only names a loaded pack declares may be written, so the page is no keychain editor. */
+  async function declaredSecret(name: string): Promise<Result<void, PacksError>> {
+    const { packs } = await load();
+    const declared = packs.some((pack) =>
+      pack.manifest.requiredSecrets.some((secret) => secret.name === name)
+    );
+    return declared
+      ? ok(undefined)
+      : err({ type: 'unknown-secret', message: `No loaded pack declares a secret "${name}".` });
+  }
+
+  /** The store's own message, which names no value. A thrown non-Error is not trusted. */
+  function storeFailure(action: string, name: string, error: unknown): Result<never, PacksError> {
+    const reason = error instanceof Error ? error.message : 'the secret store failed';
+    warn(`pack secret ${name}: ${action} failed: ${reason}`);
+    return err({ type: 'secret-store', message: `Could not ${action} ${name}: ${reason}` });
   }
 
   const syncSkills = (): Promise<SkillSyncReport> => {
@@ -196,6 +235,34 @@ export function createPacksService(deps: PacksServiceDeps): PacksService {
       }));
       for (const message of report.errors) warn(`pack skill sync: ${message}`);
       return ok({ enabledPackIds });
+    },
+
+    async setSecret(name, value) {
+      const store = deps.secretStore;
+      if (!store) return err(NO_SECRET_STORE);
+      const declared = await declaredSecret(name);
+      if (!declared.success) return declared;
+      const trimmed = value.trim();
+      if (!trimmed) return err({ type: 'unknown-secret', message: `${name} cannot be empty.` });
+      try {
+        await store.set(name, trimmed);
+      } catch (error) {
+        return storeFailure('store', name, error);
+      }
+      return ok(undefined);
+    },
+
+    async clearSecret(name) {
+      const store = deps.secretStore;
+      if (!store) return err(NO_SECRET_STORE);
+      const declared = await declaredSecret(name);
+      if (!declared.success) return declared;
+      try {
+        await store.clear(name);
+      } catch (error) {
+        return storeFailure('clear', name, error);
+      }
+      return ok(undefined);
     },
 
     async resolvePackLaunch(projectId, roleId) {

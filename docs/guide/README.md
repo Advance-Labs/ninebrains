@@ -21,6 +21,8 @@ Ninebrains is free and open source (Apache-2.0), and a fork of
 ## Start here
 
 - [Getting started](getting-started.md): install, add a project, open your first lanes.
+- [Install from source](install-from-source.md), [first run](first-run.md), and how to
+  [verify and open a download](verify-download.md).
 - [Lanes](lanes.md): the grid, status lights, sleep and maximize.
 - [Brain and jobs](brain-and-jobs.md): how work is planned, routed and reported.
 - [Planner](planner.md): draw the plan as a graph and run it.
@@ -28,10 +30,16 @@ Ninebrains is free and open source (Apache-2.0), and a fork of
 - [Packs](packs.md): coding, SEO and research bundles, and what the SEO pack sends where.
 - [Unattended runs](unattended-runs.md): budgets, the STOP switch, and what never runs on its own.
 - [Accounts](accounts.md): several Claude Code or Codex logins.
+- [Everyday workflow](ide-workflow.md): tasks, the editor, diffs, pull requests, MCP, skills and
+  automations.
+- [Keyboard shortcuts](keyboard-shortcuts.md).
+- [Configuration](configuration.md) and
+  [files outside the data folder](files-outside-data-folder.md): settings, environment variables
+  and file locations.
 - [Security overview](security.md), [security policy](../SECURITY.md) and
   [threat model](../THREAT-MODEL.md).
 - [Troubleshooting](troubleshooting.md).
-- [Architecture](architecture.md), for contributors.
+- [Architecture](architecture.md) and [contributing](contributing.md), for contributors.
 
 ## What Ninebrains adds
 

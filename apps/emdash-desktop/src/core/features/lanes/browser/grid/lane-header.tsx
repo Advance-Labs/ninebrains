@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useAgentHooksStatus } from '@core/features/agents/api/browser/use-agent-hooks-status';
+import { LaneRunModeControl } from '@core/features/brain/contributions/lanes-drawer';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
 import { useNavigate } from '@core/primitives/navigation/browser/navigation-hooks';
 import { cn } from '@core/primitives/styling/browser/cn';
@@ -120,6 +121,11 @@ export function LaneHeader({
         <Badge variant="outline" tone="neutral" className="shrink-0">
           {PROVIDER_LABELS[lane.provider]}
         </Badge>
+        <LaneRunModeControl
+          laneId={lane.laneId}
+          provider={lane.provider}
+          mode={lane.runMode ?? 'attended'}
+        />
         {hooksMissing && (
           <Tooltip.Root>
             <Tooltip.Trigger>

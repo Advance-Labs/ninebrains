@@ -111,4 +111,29 @@ describe('Dispatcher', () => {
     expect(unattended.map((u) => u.job.id)).toEqual([work.id]);
     dispatcher.dispose();
   });
+
+  it("adopts each lane's persisted mode, so a restart keeps it", async () => {
+    const persisted: DispatchLane = { ...lane('A'), mode: 'unattended' };
+    const { dispatcher, pasted, unattended, job } = setup([persisted]);
+    // A fresh dispatcher knows nothing yet: attended until the first round reads the lane.
+    expect(dispatcher.modeOf('A')).toBe('attended');
+    const work = job('work');
+    const [record] = await dispatcher.tick();
+    expect(record).toMatchObject({ jobId: work.id, mode: 'unattended', outcome: 'started' });
+    expect(pasted).toEqual([]);
+    expect(unattended).toHaveLength(1);
+    expect(dispatcher.state.laneModes).toEqual({ A: 'unattended' });
+  });
+
+  it('lets the lane record win over an unpersisted mode change', async () => {
+    const attended: DispatchLane = { ...lane('A'), mode: 'attended' };
+    const { dispatcher, pasted, unattended, job } = setup([attended]);
+    dispatcher.setMode('A', 'unattended');
+    job('work');
+    const [record] = await dispatcher.tick();
+    expect(record).toMatchObject({ mode: 'attended', outcome: 'pasted' });
+    expect(pasted).toHaveLength(1);
+    expect(unattended).toEqual([]);
+    dispatcher.dispose();
+  });
 });

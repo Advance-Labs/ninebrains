@@ -123,6 +123,12 @@ describe('SEC-20 tests gate is sandboxed', () => {
     expect(r).toMatchObject({ exitCode: 0, stdout: 'a b|$HOME|;id|' });
   });
 
+  it('T32 gate-built argv commands (the reviewer git calls) get GIT_NO_LAZY_FETCH=1', async () => {
+    const r = await runCommand('env', { argv: [], cwd: laneA, signal: signal() });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toMatch(/^GIT_NO_LAZY_FETCH=1$/m);
+  });
+
   it('SEC-16 never executes a binary planted in the worktree', async () => {
     const planted = join(laneA, 'node_modules', '.bin');
     mkdirSync(planted, { recursive: true });

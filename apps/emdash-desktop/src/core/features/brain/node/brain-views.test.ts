@@ -16,6 +16,7 @@ function setup(gateRunner?: GateRunnerPort) {
     laneModes: {},
     activeRuns: 0,
     gatesConnected: gateRunner !== undefined,
+    unattendedBudgets: { wallClockMs: 1_800_000 },
   };
   const views = new BrainViews(
     brain,

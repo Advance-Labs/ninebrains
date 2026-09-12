@@ -66,6 +66,10 @@ its own flags, upstream's `providerConfig.extraArgs` and the `autoApproveFlag` i
 | SEC-29 | `SEC-29 enforces the wall-clock budget` / `token budget` / `caps concurrent runs`, `SEC-29 budgets survive restart`, `SEC-29 Codex budgets come from its event stream` |
 | SEC-30 | `SEC-30 kill switch`: 8 runs whose leader and grandchild ignore SIGTERM are all gone in under 5 s, and the switch stays latched. `SEC-30 kill switch reaches tests-gate commands` and `… reaches review-checkout git` |
 | L4 | `L4 review checkout runs no repo-controlled code`: hooks, fsmonitor, `file://` and repo filter drivers off, scrubbed env |
+| T32 | `T32 no lazy fetch from a review checkout` (real git, with a control); `T32 gate-built argv commands (the reviewer git calls) get GIT_NO_LAZY_FETCH=1` |
+| T33 | `T33 the review checkout is its own repository`: config, attributes and a promisor added to the lane repo mid-review never apply in the checkout |
+| T34 | `T34 review root` (`main/bootstrap/boot/ninebrains/review-root.test.ts`) |
+| T35 | `T35 mirroring never follows a symlink or a hard link`, `isSafeReviewPath` |
 | M4 | `M4 denies every listed home secret and all of <userData>` |
 | SEC-31 | `SEC-31 unattended scope` (root and symlink checks), `refuses a cwd outside the allowed roots` |
 | SEC-32 | `SEC-32: carries no outbound credentials` (env). Egress is set only when a plan passes `egressAllowedDomains` |
@@ -133,8 +137,19 @@ codex exec --json --cd <wt> --sandbox workspace-write|read-only -c approval_poli
 7. **The token budget** counts input, output, cache-creation and cache-read tokens.
 8. **`--permission-prompts=none`, `--max-budget-usd` and `failIfUnavailable`** appear in
    claude 2.1.x help or the docs, but I haven't exercised them against a real model (zero real runs).
-9. **Review checkouts mirror the lane's working state at HEAD**: tracked edits, untracked files and
-   deletions. Only regular files are copied, up to 5 MB each, and git hooks and fsmonitor are off.
+9. **Review checkouts are independent repositories** (T33). Each is made with
+   `git init --template=` and `core.symlinks=false`. It reads objects through
+   `objects/info/alternates`, and the lane's branch, remote and tag refs are copied with
+   `update-ref --stdin`. It is populated with `read-tree -u --reset`: from an unborn branch,
+   `checkout --detach` exits 0 without a file whose blob is missing. Alternatives rejected:
+   `clone --no-local` and `fetch` run `upload-pack` in the lane repo under its config, and
+   `git archive` drops the history `baseRef` needs. The checkout mirrors the lane's working state
+   at HEAD (tracked edits, untracked files, deletions), reaching every path through real
+   directories only (T35). A symlink becomes a file holding its target. A file over 5 MB or with
+   several hard links keeps HEAD's version (R16). Every git call gets `--no-lazy-fetch` and
+   `GIT_NO_LAZY_FETCH=1` (T32), plus hooks, fsmonitor and repo filter drivers off, so git 2.44 or
+   later is required; older git fails closed. The root is a new `mkdtemp` directory per boot
+   (`createReviewRoot`, T34).
 10. **`runCommand` gets a private `TMPDIR`.** The shared system temp dir isn't writable, because
     review checkouts live there.
 11. **Process groups are SIGKILLed when a run closes**, so leftover dev servers and watchers are

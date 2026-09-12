@@ -13,9 +13,9 @@ import type {
   ExecRunSpec,
   RunBudgets,
 } from '@core/features/exec-runs/api/node/types';
-import type { LaneConfig } from '@core/features/lanes/api';
+import type { LaneConfig, LaneRunMode } from '@core/features/lanes/api';
 import type { PackLaunch } from '@core/features/packs/api/launch';
-import type { BrainAddress, BrainDispatcherView, BrainError, LaneRunMode } from '../api';
+import type { BrainAddress, BrainDispatcherView, BrainError } from '../api';
 import { pastePrompt, type LaneAgentState } from './attended';
 import { BrainSessions, type BrainSessionPorts } from './brain-sessions';
 import { BrainViews, doneView, noteView } from './brain-views';
@@ -25,7 +25,7 @@ import { brainEvents } from './event-host';
 import { removeLaunchDir, sweepLaunchDirs } from './lane-files';
 import { buildLaneLaunch, type BrainMcpRuntime, type UpstreamLaunchArgs } from './launch-config';
 import { stopEverything } from './stop';
-import { runJobUnattended } from './unattended';
+import { DEFAULT_UNATTENDED_BUDGETS, runJobUnattended } from './unattended';
 import { startVerification, type GateRunnerPort, type VerificationHandler } from './verification';
 
 /** The user acting in the UI. Lane replies to a user message land in `brain:user`. */
@@ -44,6 +44,8 @@ export interface BrainLanesPort {
   list(): BrainLaneInfo[];
   sendInput(conversationId: string, data: string): Promise<void>;
   stop(laneId: string): Promise<void>;
+  /** Persists the lane's run mode with the lane. Throws when the lane does not exist. */
+  setMode(laneId: string, mode: LaneRunMode): Promise<void>;
   subscribe(listener: () => void): () => void;
   /** Re-derives lane lights after job state changed. */
   refresh(): void;
@@ -64,7 +66,7 @@ export interface BrainServiceDeps {
   lanes: BrainLanesPort;
   sessions: BrainSessionPorts;
   supervisor: BrainSupervisorPort;
-  packs?: { resolvePackLaunch(projectId: string): Promise<PackLaunch> };
+  packs?: { resolvePackLaunch(projectId: string, roleId?: string): Promise<PackLaunch> };
   /** For `verification: 'internal'` only; without it a verifying job is marked done unverified. */
   gateRunner?: GateRunnerPort;
   /**
@@ -81,6 +83,10 @@ export interface BrainServiceDeps {
 }
 
 const brainLaunchId = (brainId: string) => `brain-${brainId}`.slice(0, 64);
+
+/** Pack launches differ by role (prompt, gates), so the cache is per project and role. */
+const packCacheKey = (projectId: string, roleId: string | undefined) =>
+  `${projectId}|${roleId ?? ''}`;
 
 function toBrainError(error: unknown): BrainError {
   const message = error instanceof Error ? error.message : String(error);
@@ -148,7 +154,7 @@ export class BrainService {
               supervisor: deps.supervisor,
               endpoint: deps.endpoint,
               brainMcp: deps.brainMcp,
-              pack: (projectId) => this.pack(projectId),
+              pack: (projectId, roleId) => this.pack(projectId, roleId),
               siblingWorktrees: (laneId) => this.siblingWorktrees(laneId),
               budgets: deps.unattendedBudgets,
             },
@@ -252,7 +258,7 @@ export class BrainService {
   laneBrainPort() {
     return {
       prepareLaunch: async (lane: LaneConfig) => {
-        await this.pack(lane.projectId);
+        await this.pack(lane.projectId, lane.roleId);
       },
       resolveLaunch: (lane: LaneConfig, upstream: UpstreamLaunchArgs & { cwd: string }) =>
         buildLaneLaunch(
@@ -269,7 +275,7 @@ export class BrainService {
             },
             laneHint: lane.laneId,
             siblingWorktrees: this.siblingWorktrees(lane.laneId),
-            pack: this.packCache.get(lane.projectId),
+            pack: this.packCache.get(packCacheKey(lane.projectId, lane.roleId)),
           },
           upstream
         ),
@@ -368,9 +374,37 @@ export class BrainService {
     return ok(undefined);
   }
 
-  setLaneMode(laneId: string, mode: LaneRunMode): Result<void, BrainError> {
+  /** Persists the mode with the lane first, so a restart keeps it (the dispatcher mirrors it). */
+  async setLaneMode(laneId: string, mode: LaneRunMode): Promise<Result<void, BrainError>> {
+    try {
+      await this.deps.lanes.setMode(laneId, mode);
+    } catch (error) {
+      return err({
+        type: 'not-found',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     this.dispatcher.setMode(laneId, mode);
     return ok(undefined);
+  }
+
+  private readonly stopListeners = new Set<() => void>();
+
+  /** Fires when STOP latches or clears, from any entry point (renderer, app menu, tray). */
+  onStopChange(listener: () => void): () => void {
+    this.stopListeners.add(listener);
+    return () => this.stopListeners.delete(listener);
+  }
+
+  private notifyStop(latched: boolean): void {
+    brainEvents.emit(undefined, { type: 'stop', latched });
+    for (const listener of this.stopListeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.deps.onError('brain: STOP listener failed', error);
+      }
+    }
   }
 
   /** Global STOP (SEC-30). Latches until `clearStop`. */
@@ -397,7 +431,7 @@ export class BrainService {
       onError,
       onStopped: () => {
         this.views.schedule();
-        brainEvents.emit(undefined, { type: 'stop', latched: true });
+        this.notifyStop(true);
       },
     });
     return ok({ killedRuns: result.killedRuns, stoppedLanes: result.stoppedLanes });
@@ -407,7 +441,7 @@ export class BrainService {
     this.deps.supervisor.clearStop();
     this.dispatcher.clearStop();
     this.dispatcher.setPaused(false);
-    brainEvents.emit(undefined, { type: 'stop', latched: false });
+    this.notifyStop(false);
     return ok(undefined);
   }
 
@@ -431,15 +465,17 @@ export class BrainService {
     }
   }
 
-  private async pack(projectId: string): Promise<PackLaunch | undefined> {
+  /** A project's pack launch for one role (or none): its prompt, servers and gates differ. */
+  private async pack(projectId: string, roleId?: string): Promise<PackLaunch | undefined> {
     if (!this.deps.packs) return undefined;
+    const key = packCacheKey(projectId, roleId);
     try {
-      const launch = await this.deps.packs.resolvePackLaunch(projectId);
-      this.packCache.set(projectId, launch);
+      const launch = await this.deps.packs.resolvePackLaunch(projectId, roleId);
+      this.packCache.set(key, launch);
       return launch;
     } catch (error) {
       this.deps.onError('brain: pack launch failed', error);
-      return this.packCache.get(projectId);
+      return this.packCache.get(key);
     }
   }
 
@@ -474,6 +510,7 @@ export class BrainService {
       laneModes: state.laneModes,
       activeRuns: this.deps.supervisor.activeRunIds.length,
       gatesConnected: this.deps.gateRunner !== undefined,
+      unattendedBudgets: this.deps.unattendedBudgets ?? DEFAULT_UNATTENDED_BUDGETS,
     };
   }
 }

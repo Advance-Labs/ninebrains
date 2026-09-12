@@ -6,7 +6,8 @@ description: >-
 ---
 
 This is a summary for contributors. The full seam map, with the exact upstream files, is
-[SEAMS.md](../SEAMS.md). Read it before you touch Emdash code.
+`docs/SEAMS.md` in the repository. Read it before you touch Emdash code. For the test setup, see
+[Contributing](contributing.md).
 
 ## Vocabulary: read this first
 
@@ -48,7 +49,7 @@ lane = worktree + terminal (claude | codex) + editor + browser
 | Unattended runs | `apps/emdash-desktop/src/core/features/exec-runs/` |
 | Gate capabilities (fetch, run command, reviewer, checkout) | `apps/emdash-desktop/src/core/features/gates/` |
 | Brain: DAG, state machine, mailbox, routing, store, endpoint | `packages/brain-core/` |
-| MCP shim each lane runs | `packages/brain-mcp/` |
+| MCP shim each lane runs (its README covers the env contract and tools) | `packages/brain-mcp/` |
 | Gate logic, rigor mapping, self-heal | `packages/gates-core/` |
 | Claim checking (grounded / imprecise / invented) | `packages/citations/` |
 | Stand-in CLI for tests | `tooling/fake-agent/` |
@@ -104,10 +105,10 @@ entries.** If the lint blocks you, change the design.
 Upstream moves fast: about 700 commits in the 30 days before the fork. So:
 
 - Prefer a new slice to a patch.
-- Log every change to an inherited file in [UPSTREAM-PATCHES.md](../UPSTREAM-PATCHES.md), and
-  start the code comment on the patched line with `Ninebrains:`.
+- Log every change to an inherited file in `docs/UPSTREAM-PATCHES.md`, and start the code comment
+  on the patched line with `Ninebrains:`.
 - Keep hot-spot patches small. Boot wiring goes through one call to `createNinebrainsServices()`.
 - Regenerate `pnpm-lock.yaml` on a rebase. Never hand-merge it.
 
-The fork baseline, toolchain and CI are in [FORK.md](../FORK.md). The exec-path findings behind the
-launch flags are in [SPIKE-EXEC-PATHS.md](../SPIKE-EXEC-PATHS.md).
+The fork baseline, toolchain and CI are in `docs/FORK.md`. The exec-path findings behind the launch
+flags are in `docs/SPIKE-EXEC-PATHS.md`. Both are in the repository, not on this site.

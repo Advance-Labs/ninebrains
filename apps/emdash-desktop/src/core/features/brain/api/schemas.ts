@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { laneRunModeSchema } from '@core/features/lanes/api';
 
 /** Brain job states (brain-core `JOB_STATES`), mirrored here so the renderer needs no brain-core. */
 export const brainJobStateSchema = z.enum([
@@ -86,8 +87,14 @@ export const brainSessionViewSchema = z.object({
 });
 export type BrainSessionView = z.infer<typeof brainSessionViewSchema>;
 
-export const laneRunModeSchema = z.enum(['attended', 'unattended']);
-export type LaneRunMode = z.infer<typeof laneRunModeSchema>;
+/** What an unattended run is allowed, so the lane chrome can say so before you switch. */
+export const brainRunBudgetsViewSchema = z.object({
+  wallClockMs: z.number(),
+  maxTurns: z.number().optional(),
+  maxTokens: z.number().optional(),
+  maxBudgetUsd: z.number().optional(),
+});
+export type BrainRunBudgetsView = z.infer<typeof brainRunBudgetsViewSchema>;
 
 export const brainDispatcherViewSchema = z.object({
   paused: z.boolean(),
@@ -96,6 +103,8 @@ export const brainDispatcherViewSchema = z.object({
   laneModes: z.record(z.string(), laneRunModeSchema),
   activeRuns: z.number().int(),
   gatesConnected: z.boolean(),
+  /** The budgets every unattended run gets. */
+  unattendedBudgets: brainRunBudgetsViewSchema,
 });
 export type BrainDispatcherView = z.infer<typeof brainDispatcherViewSchema>;
 
