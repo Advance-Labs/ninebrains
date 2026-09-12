@@ -43,8 +43,11 @@ jobs:
         with:
           windows-native: ${{ matrix.windows-native }}
 
+      # The renderer build runs out of the default ~2 GB heap on runners (same as release.yml).
       - name: Build workspace
         shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm run build
 
       - name: Install Playwright browser for renderer tests

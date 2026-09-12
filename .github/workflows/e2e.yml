@@ -28,7 +28,10 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-build
 
+      # The renderer build runs out of the default ~2 GB heap on the runner (same as release.yml).
       - name: Build workspace
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm run build
 
       # Each suite gets a hard timeout. The built app stays in the tray after its window closes, so
