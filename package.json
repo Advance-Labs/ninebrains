@@ -16,6 +16,7 @@
     "hooks:install": "git config core.hooksPath tooling/git-hooks",
     "merge": "node tooling/scripts/merge-pr.mjs",
     "require-green": "node tooling/scripts/require-green.mjs",
+    "labels:sync": "node tooling/scripts/sync-labels.mjs",
     "test:tooling":"node --test tooling/scripts/*.test.mjs tooling/fake-agent/test/*.test.mjs apps/emdash-desktop/scripts/release/*.test.mjs",
     "licenses": "node --test tooling/scripts/check-licenses.test.mjs && node tooling/scripts/check-licenses.mjs",
     "doctor": "pnpm --dir apps/emdash-desktop run doctor",

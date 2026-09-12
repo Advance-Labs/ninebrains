@@ -240,5 +240,6 @@ and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes
 and their `*.test.mjs` (W7 CI).
 Merge guard: `tooling/scripts/{pre-push,require-green,merge-pr}.mjs` and their `*.test.mjs`,
 `tooling/git-hooks/pre-push`, `.github/CODEOWNERS` (W7 CI).
+Repo hygiene: `.github/dependabot.yml`, `tooling/scripts/sync-labels.mjs` and its test (W7 CI).
 
 Retired: `.github/workflows/licenses.yml` (W7 CI). The licence gate runs in `ci.yml`'s `static` job.

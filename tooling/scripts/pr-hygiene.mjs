@@ -55,11 +55,19 @@ export function parseCommits(logText) {
     });
 }
 
+/**
+ * GitHub App bots (Dependabot) cannot sign the DCO; a human still reviews and merges their PRs.
+ * Only GitHub's own `<id>+<name>[bot]@users.noreply.github.com` addresses count.
+ */
+export function isBotAuthor(commit) {
+  return /^\d+\+[\w-]+\[bot\]@users\.noreply\.github\.com$/i.test(commit.email);
+}
+
 /** Commits that fail DCO. `isExempt(sha)` marks commits that predate the policy. */
 export function dcoProblems(commits, { isExempt = () => false } = {}) {
   const problems = [];
   for (const commit of commits) {
-    if (commit.parents.length > 1 || isExempt(commit.sha)) continue;
+    if (commit.parents.length > 1 || isBotAuthor(commit) || isExempt(commit.sha)) continue;
     const signoffs = [...commit.body.matchAll(/^Signed-off-by: .+ <([^>]+)>\s*$/gim)].map((m) => m[1]);
     if (signoffs.length === 0) {
       problems.push({ sha: commit.sha, reason: 'no Signed-off-by trailer' });

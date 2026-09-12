@@ -1,0 +1,34 @@
+# Ninebrains-only. Actions weekly (they are SHA-pinned, so Dependabot is what moves the pins);
+# npm security updates only. Security updates also need "Dependabot security updates" switched on
+# in the repository settings.
+#
+# PR titles are Conventional Commits (ci(deps): / fix(deps):), so pr-hygiene accepts them.
+# Dependabot commits cannot carry a DCO sign-off; pr-hygiene exempts GitHub App bot authors.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/ci-setup
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ['*']
+
+  # open-pull-requests-limit 0 turns off version updates; security updates are not affected by it.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 0
+    labels: [dependencies, security]
+    commit-message:
+      prefix: fix
+      include: scope

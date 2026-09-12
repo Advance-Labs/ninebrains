@@ -59,6 +59,13 @@ describe('dcoProblems', () => {
     assert.deepEqual(problems, []);
   });
 
+  it('exempts GitHub App bots such as Dependabot, but not a look-alike address', () => {
+    const unsigned = { body: 'ci(deps): bump actions/checkout\n' };
+    const dependabot = commit({ ...unsigned, email: '49699333+dependabot[bot]@users.noreply.github.com' });
+    const lookAlike = commit({ ...unsigned, email: 'dependabot[bot]@example.com' });
+    assert.deepEqual(dcoProblems([dependabot, lookAlike]).map((p) => p.sha), [lookAlike.sha]);
+  });
+
   it('does not accept a sign-off quoted mid-line', () => {
     const body = 'fix: x\n\nsee "Signed-off-by: Lukce <dev@example.com>" above\n';
     assert.equal(dcoProblems([commit({ body })]).length, 1);
