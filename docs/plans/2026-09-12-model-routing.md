@@ -180,10 +180,10 @@ SEC-08 and SEC-32).
 - **SEC-46 No gateway without hardening.** No code path starts an HTTP model gateway unless it meets
   the R8 checklist. A dependency check keeps `omniroute` and similar packages out of the graph.
 
-New threats: **T32** a subscription token sent to a third-party base URL (SEC-39, SEC-41). **T33** a
+New threats: **T37** a subscription token sent to a third-party base URL (SEC-39, SEC-41). **T38** a
 lane's Bash reads the profile key from its env and spends directly: the guide tells users to set a
-vendor-side spend limit per key; accepted risk R16. **T34** a reviewer silently downgraded
-(SEC-42). **T35** a mispriced or unpriced model makes the budget meaningless (SEC-43).
+vendor-side spend limit per key; accepted risk R18. **T39** a reviewer silently downgraded
+(SEC-42). **T40** a mispriced or unpriced model makes the budget meaningless (SEC-43).
 
 Compression stays off. Any future "lite" compression needs its own eval and is never applied to
 reviewer or tests-gate evidence (research §3).
@@ -194,7 +194,7 @@ reviewer or tests-gate evidence (research §3).
 |---|---|---|---|
 | **R0 spike + vendors** | (1) `apiKeySource` values for AUTH_TOKEN, API_KEY and login under `-p`. (2) Codex provider overrides under `codex exec`, and which event shows the provider. (3) Whether our `--settings` file or the user's `settings.json` `env` wins. (4) How `--max-budget-usd` prices a non-Claude model. (5) `CLAUDE_CODE_SUBAGENT_MODEL` under `-p` and in attended sessions. (6) Each candidate vendor's endpoint, protocol, streaming usage fields, free tier and terms (DeepSeek, Moonshot/Kimi, Z.ai, MiniMax, OpenRouter, Groq, Together, Fireworks, Bedrock/Vertex/Foundry, Ollama/LM Studio). Results in `docs/research/VENDORS.md` and `docs/SPIKE-EXEC-PATHS.md` §Routing | vendor list SAFE/REVIEW | 1–2 d |
 | **R1 Lever A** | Per-lane/role `subagentModel` (Claude alias or ID), persisted, emitted as `CLAUDE_CODE_SUBAGENT_MODEL` for attended and unattended claude; lane badge | SEC-39 snapshots | 1–2 d |
-| **R2 profiles + keys** | Schema, `vendors.json`, repo + migration, `keys.ts`, Settings → Models (add, test, delete; write-only key). SEC-39–46 and T32–T35 into the threat model | SEC-40, SEC-44 | 2–3 d |
+| **R2 profiles + keys** | Schema, `vendors.json`, repo + migration, `keys.ts`, Settings → Models (add, test, delete; write-only key). SEC-39–46 and T37–T40 into the threat model | SEC-40, SEC-44 | 2–3 d |
 | **R3 exec + lane wiring** | `launch-env.ts` per §4.3; `ResolvedRoute` through `ExecRunSpec`; lane auth mode "subscription / API key: <profile>"; SEC-12 trusted values and SEC-13 env allowlist updated deliberately; SEC-41 check in the supervisor | SEC-39, SEC-41, SEC-45; a run against a local mock Anthropic-compatible server | 3–4 d |
 | **R4 policy** | `policy.ts`, tiers, pack role `tier`, planner per-job profile, reviewer pin via `reviewer-route.ts` | SEC-42, policy table | 2–3 d |
 | **R5 budgets + cost** | `usd()`, `maxUsd` in the supervisor, `run_costs` persisted (survives restart, SEC-29), daily/plan caps, cost view per job/lane/plan/day | SEC-43, SEC-29 extended | 3–4 d |
@@ -222,7 +222,7 @@ weeks for R0–R7.
 1. Non-Claude models under Claude Code are unsupported: labels, per-vendor R0 tests, reviewers stay
    on strong Claude/GPT-class profiles.
 2. Stale prices: visible and editable, `priced_at_version` stored, unpriced refused.
-3. A lane spends a key directly (T33): accepted risk R16, bounded by vendor-side limits.
+3. A lane spends a key directly (T38): accepted risk R18, bounded by vendor-side limits.
 4. Scope creep toward OmniRoute's feature set: anything beyond this plan needs a new decision.
 
 ## 9. Decisions for Lucas
