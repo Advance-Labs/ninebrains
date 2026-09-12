@@ -417,6 +417,10 @@ export async function bootServices(
     workspaceIdentity,
     getMementosRuntimeClient,
     hostDependencies: clients.hostDependencies,
+    appSettings: appSettingsService,
+    previewServers: previewServerAccess,
+    // Built further down; the gates only publish once a job blocks, after boot.
+    notifications: () => notificationService,
     conversations: {
       create: (params) =>
         createConversation(params, {

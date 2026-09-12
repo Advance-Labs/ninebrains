@@ -61,8 +61,14 @@ export interface BrainServiceDeps {
   sessions: BrainSessionPorts;
   supervisor: BrainSupervisorPort;
   packs?: { resolvePackLaunch(projectId: string): Promise<PackLaunch> };
-  /** Optional until the gates slice exports `createGateRunnerService`. */
+  /** For `verification: 'internal'` only; without it a verifying job is marked done unverified. */
   gateRunner?: GateRunnerPort;
+  /**
+   * `'external'` when the gates slice's runner (`createGatesServices`) owns `verifying` jobs:
+   * the internal hand-off then stays off, or the two race (gates README, "Wiring").
+   * Default `'internal'`.
+   */
+  verification?: 'internal' | 'external';
   claudeConfigDir?: string;
   onError(context: string, error: unknown): void;
   sleep?(ms: number): Promise<void>;
@@ -152,11 +158,14 @@ export class BrainService {
       deps.dispatch
     );
     this.views = new BrainViews(deps.brain, () => this.inboxes(), () => this.dispatcherView());
-    this.verification = startVerification({
-      brain: deps.brain,
-      gateRunner: deps.gateRunner,
-      onError: deps.onError,
-    });
+    this.verification =
+      deps.verification === 'external'
+        ? { settled: async () => undefined, dispose: () => undefined }
+        : startVerification({
+            brain: deps.brain,
+            gateRunner: deps.gateRunner,
+            onError: deps.onError,
+          });
   }
 
   start(): void {

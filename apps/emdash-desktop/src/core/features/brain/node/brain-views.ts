@@ -58,7 +58,8 @@ export function doneView(brain: Brain, entry: DoneEntry, notes: readonly Note[])
     summary: entry.summary,
     artifacts: entry.artifacts,
     at: entry.at,
-    verified: isVerified(notes, entry.jobId),
+    // The gate runner records its verdict on the job; notes are the unwired fallback's record.
+    verified: job?.result?.verification?.verified ?? isVerified(notes, entry.jobId),
   };
 }
 
