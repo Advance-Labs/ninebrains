@@ -7,7 +7,7 @@
  *
  * Usage: node tooling/scripts/require-green.mjs <40-hex sha> [--repo owner/name] [--wait]
  *        [--timeout <seconds>]
- * The repo defaults to $GITHUB_REPOSITORY, then to `gh repo view`. Needs `gh` with a token that
+ * The repo defaults to $GITHUB_REPOSITORY, then to the `origin` remote. Needs `gh` with a token that
  * can read checks (in Actions: `checks: read`).
  */
 import { execFileSync } from 'node:child_process';
@@ -64,9 +64,33 @@ export async function waitForStatus({
   }
 }
 
-export function resolveRepo(gh = defaultGh) {
-  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
-  return gh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']).trim();
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** `git remote get-url origin` for the checkout this script lives in. */
+export function defaultOriginUrl() {
+  return execFileSync('git', ['remote', 'get-url', 'origin'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+const GITHUB_REMOTE =
+  /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
+
+/**
+ * The repo to act on: $GITHUB_REPOSITORY in Actions, otherwise the `origin` remote. Never
+ * `gh repo view`: in a checkout that also has an `upstream` remote and no gh default, gh answers
+ * the upstream repo (generalaction/emdash), so a merge or a label sync would target it.
+ */
+export function resolveRepo({ env = process.env, originUrl = defaultOriginUrl } = {}) {
+  if (env.GITHUB_REPOSITORY) return env.GITHUB_REPOSITORY;
+  const url = originUrl();
+  const match = GITHUB_REMOTE.exec(url);
+  if (!match) {
+    throw new Error(`Cannot tell the GitHub repo from origin (${url}); pass --repo owner/name.`);
+  }
+  return `${match[1]}/${match[2]}`;
 }
 
 function parseArgs(argv) {

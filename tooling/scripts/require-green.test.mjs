@@ -1,7 +1,7 @@
 // Run: node --test tooling/scripts/require-green.test.mjs
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { checkStatus, latestCheck, waitForStatus } from './require-green.mjs';
+import { checkStatus, latestCheck, resolveRepo, waitForStatus } from './require-green.mjs';
 
 const SHA = 'a'.repeat(40);
 const run = (overrides = {}) => ({
@@ -89,5 +89,32 @@ describe('waitForStatus', () => {
     });
     assert.equal(status.state, 'pending');
     assert.equal(clock, 30);
+  });
+});
+
+describe('resolveRepo', () => {
+  const origin = (url) => () => url;
+
+  it('prefers $GITHUB_REPOSITORY in Actions', () => {
+    const repo = resolveRepo({ env: { GITHUB_REPOSITORY: 'Advance-Labs/ninebrains' }, originUrl: origin('x') });
+    assert.equal(repo, 'Advance-Labs/ninebrains');
+  });
+
+  it('reads the origin remote, never gh: an upstream remote cannot win', () => {
+    for (const url of [
+      'https://github.com/Advance-Labs/ninebrains.git',
+      'https://github.com/Advance-Labs/ninebrains',
+      'https://github.com/Advance-Labs/ninebrains/',
+      'git@github.com:Advance-Labs/ninebrains.git',
+      'ssh://git@github.com/Advance-Labs/ninebrains.git',
+    ]) {
+      assert.equal(resolveRepo({ env: {}, originUrl: origin(url) }), 'Advance-Labs/ninebrains', url);
+    }
+  });
+
+  it('refuses an origin it cannot read as a GitHub repo, and names --repo', () => {
+    for (const url of ['https://gitlab.com/o/r.git', '/local/path/repo', '']) {
+      assert.throws(() => resolveRepo({ env: {}, originUrl: origin(url) }), /pass --repo owner\/name/, url);
+    }
   });
 });
