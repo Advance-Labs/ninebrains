@@ -1,3 +1,4 @@
+import { gatesSettingsPage } from '@core/features/gates/contributions/settings-page';
 import { promptsSettingsPage } from '@core/features/library/contributions/settings-page';
 import {
   conversationsSettingsPage,
@@ -33,5 +34,6 @@ export const settingsPageContributions = [
   mcpSettingsPage,
   skillsSettingsPage,
   packsSettingsPage,
+  gatesSettingsPage,
   machinesConnectionsPage,
 ] as const satisfies readonly SettingsPageContribution<Exclude<SettingsPageTab, 'docs'>>[];

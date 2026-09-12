@@ -163,6 +163,28 @@ Upstream release scripts left in place but unused by our workflow: `prepare-rele
 `upload-github-assets.ts`, `finalize-release.ts` (R2 promotion), `notarize-mac.ts`,
 `verify-linux.ts` (keyed to upstream's artifact names), `verify-win.ts` (needs a valid signature).
 
+## 10. Gates wiring (W5 `gates-wiring`, Phase 4)
+
+Append-only registrations, plus one accessor. The slice doesn't touch `services.ts` or
+`wiring.ts`; the `gates` controller falls back to an "unavailable" verification service until
+the composition root passes one (`src/core/features/gates/README.md`, "Wiring").
+
+| File | What | Why |
+|---|---|---|
+| `src/main/host/browser/browser-webcontents-registry.ts` | `+getWebContents(browserId)` (5 lines) | The CDP gate host attaches to a lane's webview by browserId (SEAMS §3.12) |
+| `src/core/manifests/shared/domain-contracts.ts` | `+[gatesDomain]: gatesContract` | The `gates` wire contract (Job verification modal) |
+| `src/core/manifests/node/controllers.ts` | Optional `gates?: GatesVerificationService` on the context + `gates` controller entry | Serve the contract with key parity and no `wiring.ts` edit |
+| `src/core/manifests/browser/browser-contributions.ts` | `+...gatesBrowserContributions.modalDefs` | The `jobVerificationModal` modal |
+| `src/renderer/tests/browser/modal-catalog.test.ts` | `'jobVerificationModal'` in `expectedModalIds` | The test pins every registered modal id |
+| `src/core/manifests/shared/settings-contributions.ts` | `+'ninebrains.gates': gatesSettingsContribution` | Rigor sliders and evidence retention |
+| `src/core/manifests/browser/settings-page-contributions.ts` | `+gatesSettingsPage` | Settings → Gates |
+| `src/core/features/settings/contributions/views.ts` | `'gates'` in `settingsPageTabSchema` | Settings tab id |
+| `src/core/features/settings/browser/search/settings-search.ts` | `+gates` search entry | Every settings tab needs a search entry |
+| `src/core/manifests/shared/memento-catalog.ts` | `+gatesProjectPrefsMemento`, `+gatesPrefsIndexMemento` | Per-project rigor override and test command |
+| `src/core/manifests/shared/command-catalog.ts`, `src/core/manifests/browser/scope-catalog.ts` | `+GATES_COMMAND_DEFS`, `+GATES_WINDOW_COMMAND_DEFS` | `gates.openJobVerification({ jobId })`, so other slices open the modal without importing this one |
+| `src/core/features/workbench/browser/window-scope.tsx` | `'gates.openJobVerification'` handler (`openModal`) | Window-scope commands must be implemented here |
+| `package.json` (desktop), `pnpm-lock.yaml` | `@ninebrains/brain-core` workspace dependency | The runner, rigor resolver and verification service type against the Brain |
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -177,4 +199,6 @@ Upstream release scripts left in place but unused by our workflow: `prepare-rele
 `docs/screenshots/planner-*.png`,
 `.github/workflows/release.yml`, `docs/RELEASING.md`, `scripts/release/checksums.mjs`,
 `scripts/release/checksums.test.mjs`, `scripts/release/release-config.test.mjs`,
-`scripts/release/lib/signing.ts`.
+`scripts/release/lib/signing.ts`, `src/core/features/gates/**` (beyond `capabilities/`),
+`src/main/host/ninebrains/**`, `src/renderer/tests/browser/gates-screenshots.test.tsx`,
+`src/renderer/tests/browser/.gitignore`, `docs/screenshots/gates-*.png`.

@@ -157,6 +157,12 @@ export class BrowserWebContentsRegistry {
     return this.activeBrowserId;
   }
 
+  /** Ninebrains: the CDP gate host attaches to a lane's webview by browserId (SEAMS §3.12). */
+  getWebContents(browserId: string): WebContents | undefined {
+    const webContents = this.webContentsByBrowserId.get(browserId);
+    return webContents && !webContents.isDestroyed() ? webContents : undefined;
+  }
+
   openDevTools(browserId: string): boolean {
     const webContents = this.webContentsByBrowserId.get(browserId);
     if (!webContents || webContents.isDestroyed()) return false;

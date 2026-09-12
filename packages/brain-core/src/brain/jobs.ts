@@ -18,8 +18,10 @@ import type {
   Job,
   JobHints,
   JobId,
+  JobVerification,
+  VerificationStatus,
 } from '../types';
-import { addressOf, laneAddress } from '../types';
+import { VERIFICATION_STATUSES, addressOf, laneAddress } from '../types';
 import { loadLiveJob, requireBrain, requireHolder, requireLane } from './authz';
 import {
   type BrainContext,
@@ -240,6 +242,60 @@ export function completeJob(
   return transition(ctx, tx, job, 'verifying', { result: { summary: report.summary, artifacts } });
 }
 
+export interface GateOutcomeInput {
+  pass: boolean;
+  feedback?: string;
+  /**
+   * The runner's verdict, stored on `result.verification`. `passed` and
+   * `unverified` need `pass: true`; `failed` needs `pass: false`.
+   */
+  status?: VerificationStatus;
+  /**
+   * The 1-based attempt the verdict is for. When set it must equal
+   * `attempts + 1`, so a replayed verdict (a runner that crashed after
+   * recording, then ran again) can never count an attempt twice.
+   */
+  attempt?: number;
+  /** Absolute path of the attempt's evidence manifest. */
+  evidencePath?: string;
+}
+
+function verificationOf(
+  ctx: BrainContext,
+  job: Job,
+  outcome: GateOutcomeInput
+): JobVerification | undefined {
+  const current = job.attempts + 1;
+  const target = outcome.pass ? 'done' : 'running';
+  if (outcome.attempt !== undefined && outcome.attempt !== current) {
+    throw new IllegalTransitionError(
+      job.id,
+      job.state,
+      target,
+      `verdict is for attempt ${outcome.attempt}, the job is on attempt ${current}`
+    );
+  }
+  if (outcome.evidencePath !== undefined && outcome.evidencePath.length > LIMITS.pathChars)
+    throw new InvalidInputError(`evidencePath exceeds ${LIMITS.pathChars} characters`);
+  if (outcome.status === undefined) return undefined;
+  if (!VERIFICATION_STATUSES.includes(outcome.status))
+    throw new InvalidInputError(`unknown verification status ${outcome.status}`);
+  if ((outcome.status === 'failed') === outcome.pass)
+    throw new InvalidInputError(`status ${outcome.status} contradicts pass: ${outcome.pass}`);
+  return {
+    status: outcome.status,
+    verified: outcome.status === 'passed',
+    attempt: current,
+    evidencePath: outcome.evidencePath ?? null,
+    at: ctx.now(),
+  };
+}
+
+function withVerification(job: Job, verification: JobVerification | undefined): Partial<Job> {
+  if (!verification) return {};
+  return { result: { summary: '', artifacts: [], ...job.result, verification } };
+}
+
 /**
  * Outcome of the job's gates. Pass: `done`, logged, dependents promoted.
  * Fail: `attempts += 1` and back to `running` with the feedback in the lane's
@@ -250,7 +306,7 @@ export function recordGateResult(
   tx: Tx,
   identity: Identity,
   jobId: JobId,
-  outcome: { pass: boolean; feedback?: string }
+  outcome: GateOutcomeInput
 ): Job {
   requireBrain(identity, 'record_gate_result');
   const job = loadLiveJob(ctx.store, identity, jobId);
@@ -262,8 +318,9 @@ export function recordGateResult(
       'job is not verifying'
     );
   }
+  const verified = withVerification(job, verificationOf(ctx, job, outcome));
   if (outcome.pass) {
-    const done = transition(ctx, tx, job, 'done', { reason: null });
+    const done = transition(ctx, tx, job, 'done', { reason: null, ...verified });
     ctx.store.insertDone({
       id: ctx.newId(),
       jobId: done.id,
@@ -295,11 +352,11 @@ export function recordGateResult(
   }
   if (attempts >= MAX_ATTEMPTS) {
     const reason = `gate failed ${attempts} times${feedback ? `: ${feedback}` : ''}`;
-    const blocked = transition(ctx, tx, job, 'blocked', { attempts, reason });
+    const blocked = transition(ctx, tx, job, 'blocked', { attempts, reason, ...verified });
     tx.raise({ type: 'jobBlocked', payload: { job: blocked, reason } });
     return blocked;
   }
-  return transition(ctx, tx, job, 'running', { attempts });
+  return transition(ctx, tx, job, 'running', { attempts, ...verified });
 }
 
 export function blockJob(

@@ -4,6 +4,7 @@ import {
   browserSettingsContribution,
 } from '@core/features/browser/contributions/settings';
 import { filesSettingsContribution } from '@core/features/editor/contributions/settings';
+import { gatesSettingsContribution } from '@core/features/gates/contributions/settings';
 import {
   localProjectSettingsSchemaContribution,
   projectSettingsContribution,
@@ -44,6 +45,7 @@ export const appSettingsSchemaContributions = {
   browser: browserSettingsContribution,
   changesViewMode: changesViewModeSettingsContribution,
   remoteMachine: hostSettingsSchemaContribution,
+  'ninebrains.gates': gatesSettingsContribution,
 } as const;
 
 export type AppSettings = SettingsValues<typeof appSettingsSchemaContributions>;

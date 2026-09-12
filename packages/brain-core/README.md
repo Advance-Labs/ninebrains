@@ -24,6 +24,15 @@ blocked / failed --requeue--> ready | proposed
   The feedback goes to the lane's inbox. On the third failure the job goes to
   `blocked` and a `jobBlocked` event fires.
 - `requeueJob` puts a `blocked` or `failed` job back with 0 attempts.
+- **Verdicts.** The gate runner calls `recordGateResult(brain, jobId, { pass,
+  feedback, status, attempt, evidencePath })`. `status` is `passed | failed |
+  unverified` and lands on `result.verification` with `verified: status ===
+  'passed'`, the attempt and the evidence manifest path. `attempt` is a
+  compare-and-set: it must equal `attempts + 1`, so a verdict replayed after a
+  crash can never count an attempt twice. `unverified` passes the job to `done`
+  but must never be shown as passed.
+- `resolveGateFloor(projectId, kind, requested)` also receives the requested
+  spec, so the app can read a gate-level job kind (`gateSpec.kind`) from it.
 - Every other transition throws `IllegalTransitionError`.
 - `compilePlan` upserts a planner graph keyed by `(planId, node id)`. It is
   idempotent, archives removed nodes rather than deleting them, and rejects a

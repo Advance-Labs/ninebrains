@@ -100,11 +100,7 @@ export class Brain {
     return mutate(this.ctx, (tx) => jobs.completeJob(this.ctx, tx, identity, jobId, report));
   }
 
-  recordGateResult(
-    identity: Identity,
-    jobId: JobId,
-    outcome: { pass: boolean; feedback?: string }
-  ): Job {
+  recordGateResult(identity: Identity, jobId: JobId, outcome: jobs.GateOutcomeInput): Job {
     return mutate(this.ctx, (tx) => jobs.recordGateResult(this.ctx, tx, identity, jobId, outcome));
   }
 
