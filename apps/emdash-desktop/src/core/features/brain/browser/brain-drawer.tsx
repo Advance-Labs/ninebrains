@@ -1,5 +1,7 @@
 import { Alert, Badge, Button, Spinner, Textarea } from '@emdash/ui/react/primitives';
 import { useState, type ReactNode } from 'react';
+import { plannerViewDef } from '@core/features/planner/contributions/views';
+import { useNavigate } from '@core/primitives/navigation/browser/navigation-hooks';
 import { cn } from '@core/primitives/styling/browser/cn';
 import {
   addressKey,
@@ -27,6 +29,7 @@ const STATE_ORDER = ['ready', 'running', 'verifying', 'blocked', 'done'] as cons
  */
 export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProps) {
   const { unread, sessions, dispatcher } = useBrainOverview();
+  const { navigate } = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const projectIds = new Set(projects.map((project) => project.projectId));
   const visible = sessions.filter((session) => projectIds.has(session.projectId));
@@ -57,6 +60,16 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
         )}
         <Button
           className="ml-auto"
+          size="sm"
+          variant="ghost"
+          data-testid="brain-open-planner"
+          disabled={projectId === null}
+          title={projectId === null ? 'Add a lane to this tab first' : 'Draw the plan on a canvas'}
+          onClick={() => projectId && navigate(plannerViewDef({ projectId }))}
+        >
+          Plan
+        </Button>
+        <Button
           size="sm"
           variant="ghost"
           disabled={dispatcher.stopLatched}

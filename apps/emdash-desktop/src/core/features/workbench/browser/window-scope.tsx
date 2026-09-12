@@ -3,6 +3,8 @@ import { useLayoutEffect, type ReactNode } from 'react';
 import { stopAllAgentWork } from '@core/features/brain/contributions/stop-action';
 import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
+import { plannerViewDef } from '@core/features/planner/contributions/views';
+import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { toggleAppTheme } from '@core/features/settings/api/browser/theme-toggle';
 import {
@@ -151,6 +153,20 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
     }),
     'brain.stopAll': () => ({
       execute: () => void stopAllAgentWork(),
+    }),
+    // Ninebrains: the planner canvas for the given, current or first project.
+    'planner.open': () => ({
+      availability: () =>
+        currentProjectId || getProjectManagerStore().projects.size > 0
+          ? enabled
+          : disabled('Add a project first'),
+      execute: (input) => {
+        const projectId =
+          input?.projectId ??
+          currentProjectId ??
+          getProjectManagerStore().projects.keys().next().value;
+        if (projectId) getNavigation().navigate(plannerViewDef({ projectId }));
+      },
     }),
   } satisfies ViewScopeImpl<typeof windowScope>;
 
