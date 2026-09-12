@@ -85,7 +85,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | File | What | Why |
 |---|---|---|
 | `.github/workflows/release-{canary,prod,linux,workspace-server}.yml` | Deleted | They publish to Emdash's R2/GitHub and need Emdash's signing and PostHog secrets |
-| `.github/workflows/code-consistency-check.yml` | Also runs on `push` to `main`; `permissions` (`contents: read`, `actions: read`), a per-PR `concurrency` group and `timeout-minutes: 30` (W7 CI) | Lint, typecheck and test on ubuntu-latest for every push and PR. `nrwl/nx-set-shas` needs `actions: read`; without it every run failed in about 20 s with "Resource not accessible by integration" |
+| `.github/workflows/code-consistency-check.yml` | `workflow_dispatch` only (was PR + push to `main`); `permissions` (`contents: read`, `actions: read`), a per-PR `concurrency` group and `timeout-minutes: 30` (W7 CI) | Superseded by `.github/workflows/ci.yml`, which runs the same checks and more; running both doubles the minutes. `nrwl/nx-set-shas` needs `actions: read`; without it every run failed in about 20 s with "Resource not accessible by integration" |
 | `.github/workflows/workspace-server-package-check.yml` | `workflow_dispatch` only | Save Actions minutes on the private repo |
 | `.github/ISSUE_TEMPLATE/config.yml` | Links → our repo | |
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
@@ -219,7 +219,7 @@ and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
 `tooling/scripts/check-licenses.mjs`, `tooling/scripts/check-licenses.test.mjs`,
-`tooling/scripts/allowlist-exceptions.json`, `.github/workflows/licenses.yml`,
+`tooling/scripts/allowlist-exceptions.json`,
 `.github/workflows/build-matrix.yml`, `src/core/primitives/app-identity/api/fork-flags.ts`,
 `src/main/db/default-path.test.ts`, `src/core/features/exec-runs/**`,
 `src/core/features/gates/node/capabilities/**`, `tooling/fake-agent/**` (moved from `spikes/`),
@@ -234,4 +234,9 @@ and `lanes/browser/lane-terminal.tsx` (drawer, side-panel source, badge), `lanes
 `src/renderer/tests/browser/.gitignore`, `docs/screenshots/gates-*.png`, `src/core/features/brain/**`,
 `src/main/bootstrap/boot/ninebrains/**`, `src/main/host/mock-keychain.test.ts`,
 `e2e/brain-fanout.e2e.mjs`, `tooling/fake-agent/test/interpolate-args.test.mjs`,
-`docs/screenshots/brain-*.png`.
+`docs/screenshots/brain-*.png`,
+`.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `.github/actions/ci-setup/action.yml`,
+`tooling/scripts/{check-upstream-patches,pr-hygiene,ci-ok,nx-affected,vitest-flaky-reporter}.mjs`
+and their `*.test.mjs` (W7 CI).
+
+Retired: `.github/workflows/licenses.yml` (W7 CI). The licence gate runs in `ci.yml`'s `static` job.

@@ -1,11 +1,8 @@
 name: Code Consistency Check
 
+# Ninebrains: manual only. .github/workflows/ci.yml runs these checks (and more) on every PR and
+# push; running both would double the Actions minutes on the private repo.
 on:
-  pull_request:
-    branches: [main]
-  # Ninebrains: also runs on push to main (lint, typecheck, test on ubuntu-latest only).
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # Ninebrains: nrwl/nx-set-shas reads workflow runs, so the token needs actions: read. Without this

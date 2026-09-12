@@ -1,0 +1,267 @@
+name: CI
+
+# Ninebrains-only (docs/UPSTREAM-PATCHES.md). One aggregate status, `ci-ok`, is the merge gate:
+# `pnpm run merge <pr>` (tooling/scripts/merge-pr.mjs) and the release preflight require it green on
+# the exact commit. The repo is private on the free plan, so GitHub cannot mark it "required" yet.
+# Once it can (public repo or GitHub Team), add a ruleset on main and release/** that requires the
+# `ci-ok` check (CONTRIBUTING.md, "CI and merging").
+#
+# Retries: none on node, main-db, migrations or node-spawn (SEC-* tests must never be retried to
+# green). The browser projects get one retry, and every test that passes only on the retry is
+# reported as a warning annotation (tooling/scripts/vitest-flaky-reporter.mjs).
+on:
+  pull_request:
+    branches: [main, 'release/**']
+    # `labeled` so adding run-e2e starts a run that includes e2e.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  push:
+    branches: [main, 'release/**']
+  schedule:
+    # Mondays 06:00 UTC: everything, including e2e.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: Also run the Electron e2e job
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # nrwl/nx-set-shas reads workflow runs to find the last green commit on a branch.
+  actions: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  NX_DAEMON: 'false'
+  NX_NO_CLOUD: 'true'
+  # `nx affected` on PRs and pushes; every project on the weekly and manual runs.
+  NX_SCOPE: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'run-many --all' || 'affected' }}
+
+jobs:
+  static:
+    name: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/ci-setup
+        with:
+          nx-cache-key: static
+
+      # Later steps run even when an earlier one fails, so one push reports every problem.
+      - name: format:check
+        run: |
+          read -ra scope <<<"$NX_SCOPE"
+          pnpm exec nx "${scope[@]}" -t format:check
+
+      - name: lint
+        if: ${{ !cancelled() }}
+        run: |
+          read -ra scope <<<"$NX_SCOPE"
+          pnpm exec nx "${scope[@]}" -t lint
+
+      - name: Boundary allowlist ratchet
+        if: ${{ !cancelled() }}
+        run: node tooling/oxlint/scripts/check-allowlists.mjs
+
+      - name: typecheck
+        if: ${{ !cancelled() }}
+        run: |
+          read -ra scope <<<"$NX_SCOPE"
+          pnpm exec nx "${scope[@]}" -t typecheck
+
+      - name: Licence gate
+        if: ${{ !cancelled() }}
+        run: pnpm run licenses
+
+      - name: Tooling tests (release scripts, fake agent, tooling/scripts)
+        if: ${{ !cancelled() }}
+        run: pnpm run test:tooling
+
+  test-node:
+    name: test-node (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: packages
+          - shard: desktop-node
+            vitest: --project node
+          - shard: desktop-db
+            vitest: --project main-db --project migrations --project scripts
+          # Spawn-heavy suites, two files at a time (vitest.config.ts, `node-spawn`).
+          - shard: desktop-spawn
+            vitest: --project node-spawn
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/ci-setup
+        with:
+          nx-cache-key: test-${{ matrix.shard }}
+          native: 'true'
+
+      - name: Test every project except the desktop app
+        if: matrix.shard == 'packages'
+        run: |
+          read -ra scope <<<"$NX_SCOPE"
+          pnpm exec nx "${scope[@]}" -t test --exclude @emdash/emdash-desktop
+
+      - name: Is the desktop app affected?
+        id: affected
+        if: matrix.shard != 'packages'
+        env:
+          PROJECT: '@emdash/emdash-desktop'
+        run: node tooling/scripts/nx-affected.mjs "$PROJECT"
+
+      - name: Build workspace packages
+        if: steps.affected.outputs.run == 'true'
+        run: node tooling/scripts/ensure-packages-built.mjs
+
+      - name: vitest ${{ matrix.vitest }}
+        if: steps.affected.outputs.run == 'true'
+        working-directory: apps/emdash-desktop
+        env:
+          VITEST_ARGS: ${{ matrix.vitest }}
+        run: |
+          read -ra args <<<"$VITEST_ARGS"
+          pnpm exec vitest run "${args[@]}"
+
+  test-browser:
+    name: test-browser (${{ matrix.key }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: desktop
+            project: '@emdash/emdash-desktop'
+            dir: apps/emdash-desktop
+          - key: chat-ui
+            project: '@emdash/chat-ui'
+            dir: packages/chat-ui
+    env:
+      # Forces the browser project on under CI (vitest.config.ts, vite.config.ts).
+      EMDASH_TEST_BROWSER: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/ci-setup
+        with:
+          nx-cache-key: browser-${{ matrix.key }}
+
+      - name: Is ${{ matrix.project }} affected?
+        id: affected
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: node tooling/scripts/nx-affected.mjs "$PROJECT"
+
+      - name: Cache Playwright browsers
+        if: steps.affected.outputs.run == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium headless shell
+        if: steps.affected.outputs.run == 'true'
+        run: pnpm --dir apps/emdash-desktop exec playwright install --with-deps chromium-headless-shell
+
+      - name: Build workspace packages
+        if: steps.affected.outputs.run == 'true'
+        run: node tooling/scripts/ensure-packages-built.mjs
+
+      - name: vitest --project browser (one retry, flakes annotated)
+        if: steps.affected.outputs.run == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: >
+          pnpm exec vitest run --project browser --retry 1
+          --reporter=default
+          --reporter="$GITHUB_WORKSPACE/tooling/scripts/vitest-flaky-reporter.mjs"
+
+  pr-hygiene:
+    name: pr-hygiene
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+
+      # Read live, not from the event payload, so re-running this job after a title edit checks
+      # the new title. The title never touches a shell command line.
+      - name: DCO sign-off and Conventional Commit title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PR_TITLE="$(gh api "repos/$REPO/pulls/$NUMBER" --jq .title)"
+          export PR_TITLE
+          node tooling/scripts/pr-hygiene.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+
+      - name: Upstream-patch log
+        if: ${{ !cancelled() }}
+        run: node tooling/scripts/check-upstream-patches.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  e2e:
+    name: e2e
+    # Keep in step with E2E_REQUESTED in ci-ok below.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.e2e) ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')) ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+    uses: ./.github/workflows/e2e.yml
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [static, test-node, test-browser, pr-hygiene, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: tooling/scripts
+
+      - name: Aggregate
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          E2E_REQUESTED: >-
+            ${{ github.event_name == 'schedule' ||
+            (github.event_name == 'workflow_dispatch' && inputs.e2e) ||
+            (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')) ||
+            (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
+        run: |
+          required=static,test-node,test-browser
+          optional=
+          if [ "$IS_PR" = true ]; then required="$required,pr-hygiene"; else optional="pr-hygiene"; fi
+          if [ "$E2E_REQUESTED" = true ]; then required="$required,e2e"; else optional="${optional:+$optional,}e2e"; fi
+          node tooling/scripts/ci-ok.mjs --required "$required" --optional "$optional"
