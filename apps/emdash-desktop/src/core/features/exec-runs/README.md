@@ -14,31 +14,59 @@ Don't edit `services.ts`/`wiring.ts` from this slice. Construct these in `create
 | Factory | From | Inputs |
 |---|---|---|
 | `new ExecRunSupervisor(opts)` | `api/node/run-supervisor` | `userDataDir` (`app.getPath('userData')`), `resolveBinary(provider)` → **absolute** path (adapt the HostDependencies resolver), `allowedRoots()` (worktree root + review-checkout root), `maxConcurrentRuns`, `killGraceMs` 2000 |
-| `supervisor.killAll()` / `clearStop()` | same | Global STOP: tray, menu and shortcut, all in main so it works with a hung renderer. It latches until cleared |
+| `await supervisor.recover()` | same | **Once at app start, before any run** (SEC-29). Closes runs a dead app instance left open as `killed`, with their last persisted counters, and emits a `finished` event for each |
+| `supervisor.killAll()` / `clearStop()` | same | Global STOP: tray, menu and shortcut, all in main so it works with a hung renderer. It latches until cleared, and also kills and latches the app-wide `processGroups` registry (tests gate, review-checkout git) |
 | `supervisor.onEvent(fn)` | same | Bridge to an `eventStream` for the UI and to `security_events` (SEC-33). Budget counters arrive here for the Brain DB (SEC-29 restart part) |
-| `assertSafeArgv(argv)` | `api/node/argv-guard` | The attended launch-config builder must call it on every PTY spawn (SEC-12) |
+| `assertSafeArgv(argv, { trusted, provider })` | `api/node/argv-guard` | See **Attended launches** below (SEC-12, M2) |
 | `createSpawnReviewer({ supervisor, route, auth, checkoutRoot, laneWorktrees })` | `gates/node/capabilities/spawn-reviewer` | `route(purpose)` picks the provider/model per gate |
 | `createPrepareReviewCheckout({ worktreeForJob, root })` | `gates/node/capabilities/review-checkout` | `worktreeForJob` maps from lane state, never from the job record |
-| `createRunCommand({ allowedRoots, ninebrainsDataDir, siblingWorktrees, deniedPaths })` | `gates/node/capabilities/run-command` | Pass the review-checkout root in `deniedPaths` |
+| `createRunCommand({ allowedRoots, ninebrainsDataDir, userDataDir, siblingWorktrees, deniedPaths, projectSettings })` | `gates/node/capabilities/run-command` | Pass the review-checkout root in `deniedPaths`. `projectSettings(cwd)` returns the owning project's `testsGate` settings (below) |
 | `createFetchText()` | `gates/node/capabilities/fetch-text` | No options in the app. `addressPolicy` is for tests only |
 
 Not here: `captureScreenshot` (it needs lane browser ids) and `readWorktreeFile` (SEC-23).
+
+### Attended launches: `assertSafeArgv(argv, { trusted, provider })`
+
+The attended launch-config builder must call it right before every PTY spawn, on the **full** argv:
+its own flags, upstream's `providerConfig.extraArgs` and the `autoApproveFlag` if upstream adds one.
+
+- `provider: 'claude' | 'codex'` decides what short flags mean (`-c` is Claude's `--continue` but
+  Codex's `--config`). Always pass it: without it the guard reads `-c` and `-p` the strict (Codex)
+  way, so a Claude `-p` argv is refused.
+- `trusted`: every value Ninebrains generated for a config-bearing flag. That means the absolute
+  paths of the `--settings` and `--mcp-config` files it wrote, and each Codex `-c` override it built
+  (`buildCodexExecLaunch` returns them). `--settings`, `-c`/`--config`, `--profile`, `--mcp-config`
+  and `--add-dir` with any other value are refused, which includes a user's `extraArgs`.
+- Write `--mcp-config=<f>` and `--add-dir=<d>` with `=`. In the space form every following non-flag
+  token is taken as a value and must be trusted.
+- It throws `UnsafeArgvError`. Before matching, it splits `--flag=value`, expands attached and
+  combined short flags, parses inline `--settings` JSON and decodes `-c` TOML strings. It matches
+  case-insensitively.
+
+### Per-project settings for the tests gate (wired by the settings UI owner)
+
+| Key | Default | Effect |
+|---|---|---|
+| `testsGate.allowNetwork` | `false` | Opens all network to the tests gate. Off: macOS denies everything but loopback, and Linux runs with `--unshare-net` (loopback only) |
+| `testsGate.allowUnsandboxed` | `false` | Linux without `bwrap`, and Windows: run the tests gate without an OS sandbox. Off: the gate fails with "tests gate needs a sandbox (install bubblewrap) or an explicit per-project opt-in". Accepted risk R11 |
 
 ## SEC requirements and their tests
 
 | SEC | Test (`describe`) |
 |---|---|
 | SEC-11 | `SEC-11 lane sandbox settings` (settings generation). The live deny can't be proven with the fake agent: **manual e2e with the real CLI before release** |
-| SEC-12 | `SEC-12 launch argv guard`: builder snapshots plus the runtime guard inside `spawnInGroup` |
+| SEC-12 | `SEC-12 launch argv guard`: builder snapshots plus the runtime guard inside `spawnInGroup`; `M2 argv guard normalises before matching`: every bypass from the review's repro |
 | SEC-13 | `SEC-13 unattended env is minimal` |
 | SEC-14 | `SEC-14 ids cannot traverse` (runId → transcript path) |
 | SEC-16 | `SEC-16 refuses a relative binary`, `SEC-16 never executes a binary planted in the worktree` |
 | SEC-17 | `SEC-17 prompt is not argv`: the prompt goes on stdin for both providers |
 | SEC-18 | `SEC-18 reviewer cannot write the worktree`: real git repo, hostile fake reviewer, byte-for-byte snapshot, plus a control run showing the same script does write when allowed |
-| SEC-20 | `SEC-20 tests gate env is scrubbed`, `SEC-20 tests gate is sandboxed`, `SEC-20 macOS seatbelt profile` |
+| SEC-20 | `SEC-20 tests gate env is scrubbed`, `SEC-20 tests gate is sandboxed`, `SEC-20 macOS seatbelt profile`, `H1 tests gate needs a sandbox on Linux and Windows`, `M1 macOS seatbelt profile`, `M1 seatbelt under real sandbox-exec` |
 | SEC-21 | `SEC-21 address policy`, `SEC-21 rebinding and redirects blocked`, `SEC-21 pinning, redirects and caps` |
-| SEC-29 | `SEC-29 enforces the wall-clock budget` / `token budget` / `caps concurrent runs` |
-| SEC-30 | `SEC-30 kill switch`: 8 runs whose leader and grandchild ignore SIGTERM are all gone in under 5 s, and the switch stays latched |
+| SEC-29 | `SEC-29 enforces the wall-clock budget` / `token budget` / `caps concurrent runs`, `SEC-29 budgets survive restart`, `SEC-29 Codex budgets come from its event stream` |
+| SEC-30 | `SEC-30 kill switch`: 8 runs whose leader and grandchild ignore SIGTERM are all gone in under 5 s, and the switch stays latched. `SEC-30 kill switch reaches tests-gate commands` and `… reaches review-checkout git` |
+| L4 | `L4 review checkout runs no repo-controlled code`: hooks, fsmonitor, `file://` and repo filter drivers off, scrubbed env |
+| M4 | `M4 denies every listed home secret and all of <userData>` |
 | SEC-31 | `SEC-31 unattended scope` (root and symlink checks), `refuses a cwd outside the allowed roots` |
 | SEC-32 | `SEC-32: carries no outbound credentials` (env). Egress is set only when a plan passes `egressAllowedDomains` |
 | SEC-35 | `SEC-35 transcript redactor`, and a supervisor test checking that the API key never reaches the transcript |
@@ -57,9 +85,8 @@ relative to the settings file.
     "allowUnsandboxedCommands": false,
     "autoAllowBashIfSandboxed": true,
     "filesystem": {
-      "denyRead": ["<userData>/ninebrains", "<sibling worktrees>", "~/.ssh", "~/.aws", "~/.config/gcloud",
-                   "~/.config/gh", "~/.codex", "~/.claude/.credentials.json", "~/.claude.json", "~/.netrc",
-                   "~/.npmrc", "~/.docker/config.json", "~/.kube", "~/.gnupg", "<CLAUDE_CONFIG_DIR>/.credentials.json"],
+      "denyRead": ["<userData>/ninebrains", "<sibling worktrees>", "<userData>", "<SECRET_HOME_PATHS>",
+                   "<CLAUDE_CONFIG_DIR>/.credentials.json"],
       "allowRead": ["<worktree>"],
       "allowWrite": ["<worktree>"],
       "denyWrite": []
@@ -68,6 +95,12 @@ relative to the settings file.
   "permissions": { "deny": ["Read(//<each denied path>/**)", "Edit(//<each denied path>/**)"] }
 }
 ```
+
+`SECRET_HOME_PATHS` (`sandbox-settings.ts`) is the one list the settings file, the macOS seatbelt
+profile and the Linux bubblewrap mounts all read: `~/.ssh`, `~/.aws`, `~/.azure`,
+`~/.config/gcloud`, `~/.config/gh`, `~/.config/git/credentials`, `~/.git-credentials`, `~/.kube`,
+`~/.docker/config.json`, `~/.npmrc`, `~/.pypirc`, `~/.netrc`, `~/.cargo/credentials{,.toml}`,
+`~/.gnupg`, `~/.codex`, `~/.claude/.credentials.json` and `~/.claude.json`.
 
 The reviewer preset differs in three ways: `autoAllowBashIfSandboxed: false`, `allowWrite: []`, and
 `denyWrite` plus `Edit(//<checkout>/**)` on its own checkout. The live lane worktree is on its
@@ -111,12 +144,17 @@ codex exec --json --cd <wt> --sandbox workspace-write|read-only -c approval_poli
 
 - **R2, Codex:** `--sandbox` restricts writes, not reads, so a Codex run can read sibling lanes and
   Ninebrains data.
-- **`runCommand` on Linux and Windows:** there is no OS sandbox. Only env scrubbing, the timeout,
-  the process-group or tree kill and the output cap apply. On macOS it relies on `sandbox-exec`,
-  which Apple deprecates, and it leaves the network open, so tests can reach loopback services
-  (the Brain endpoint still needs a token).
-- **Escaping the process group:** a process that calls `setsid()` leaves the group and survives
-  STOP. On Windows, `taskkill /T` only reaches the tree.
+- **R11, unsandboxed tests gate:** only with `testsGate.allowUnsandboxed` (Linux without `bwrap`,
+  Windows). Then only env scrubbing, the timeout, the process-group or tree kill and the output cap
+  apply. macOS relies on `sandbox-exec`, which Apple deprecates. The Linux bubblewrap path has only
+  been exercised with a stand-in `bwrap`.
+- **R12, loopback:** loopback stays open to the tests gate for dev servers, so tests can reach
+  local services (the Brain endpoint still needs a token and rate-limits failed auth).
+- **R13, Codex budgets:** `maxTurns` does not apply to Codex, and its usage arrives only at
+  `turn.completed`, so the wall clock is the real cap for one `codex exec` turn.
+- **R14, escaping the process group:** a process that calls `setsid()` leaves the group and
+  survives STOP. On Windows, `taskkill /T` only reaches the tree. `recover()` never signals the
+  pids of a dead app's runs.
 - **Deny lists are best-effort:** they cover known credential paths, not every secret on disk.
 - **Regex redaction:** the transcript redactor is pattern plus literal-value based.
 - **Untested platforms:** Windows paths are untested.
