@@ -13,10 +13,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Tip of w7/integrate when it was merged into the branch that introduced DCO. It and its ancestors
- * predate the policy; every commit after it must be signed off.
+ * Tip of w7/integrate when the DCO rule took effect for every agent (2026-09-12). It and its
+ * ancestors predate the policy; every commit after it must be signed off. Agents commit as
+ * committer "Pane", so they sign with `--trailer "Signed-off-by: Lukce <…>"`, never `-s`.
  */
-export const DCO_CUTOFF = '321928d68ef4095ec5c87145ee9ed872a81ce3e9';
+export const DCO_CUTOFF = 'e251d9d68535f24203de046000f59df079340684';
 
 export const COMMIT_TYPES = [
   'build',
