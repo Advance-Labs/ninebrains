@@ -182,7 +182,7 @@ SEC-08 and SEC-32).
 
 New threats: **T37** a subscription token sent to a third-party base URL (SEC-39, SEC-41). **T38** a
 lane's Bash reads the profile key from its env and spends directly: the guide tells users to set a
-vendor-side spend limit per key; accepted risk R18. **T39** a reviewer silently downgraded
+vendor-side spend limit per key; accepted risk R19. **T39** a reviewer silently downgraded
 (SEC-42). **T40** a mispriced or unpriced model makes the budget meaningless (SEC-43).
 
 Compression stays off. Any future "lite" compression needs its own eval and is never applied to
@@ -222,7 +222,7 @@ weeks for R0–R7.
 1. Non-Claude models under Claude Code are unsupported: labels, per-vendor R0 tests, reviewers stay
    on strong Claude/GPT-class profiles.
 2. Stale prices: visible and editable, `priced_at_version` stored, unpriced refused.
-3. A lane spends a key directly (T38): accepted risk R18, bounded by vendor-side limits.
+3. A lane spends a key directly (T38): accepted risk R19, bounded by vendor-side limits.
 4. Scope creep toward OmniRoute's feature set: anything beyond this plan needs a new decision.
 
 ## 9. Decisions for Lucas

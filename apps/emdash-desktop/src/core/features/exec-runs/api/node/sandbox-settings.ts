@@ -12,6 +12,7 @@
  */
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
+import type { LaneGitPaths } from './lane-git-paths';
 import type { ExecPreset } from './types';
 
 export interface SandboxSettingsInput {
@@ -27,6 +28,8 @@ export interface SandboxSettingsInput {
   codexHome?: string;
   egressAllowedDomains?: readonly string[];
   homeDir?: string;
+  /** The worktree's git dirs (`resolveLaneGitPaths`): their control files are write-denied (T36). */
+  git?: LaneGitPaths;
 }
 
 export interface ClaudeSandboxSettings {
@@ -85,6 +88,26 @@ export function secretDenyPaths(input: { homeDir?: string; userDataDir?: string 
   ];
 }
 
+/**
+ * T36: the repo files that make git run programs or pick filters: config (fsmonitor, filter
+ * drivers, sshCommand, hooksPath), per-worktree config, `info/attributes`, hooks, and a linked
+ * worktree's `.git` gitfile (which names the git dir, config included). The app runs git against
+ * the repo outside any sandbox, so a lane may not write them. Objects, refs and the index stay
+ * writable, so a lane can still commit.
+ */
+export function gitControlPaths(git: LaneGitPaths): string[] {
+  return [
+    ...new Set([
+      ...(git.gitFile ? [git.gitFile] : []),
+      join(git.commonDir, 'config'),
+      join(git.commonDir, 'config.worktree'),
+      join(git.gitDir, 'config.worktree'),
+      join(git.commonDir, 'info', 'attributes'),
+      join(git.commonDir, 'hooks'),
+    ]),
+  ];
+}
+
 const isInside = (child: string, parent: string): boolean => {
   const rel = relative(parent, child);
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
@@ -106,6 +129,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
   if (clash) throw new Error(`Run directory ${worktree} lies inside a denied path ${clash}`);
 
   const unique = [...new Set(denyRead)];
+  const gitDeny = input.git ? gitControlPaths(input.git) : [];
   const settings: ClaudeSandboxSettings = {
     sandbox: {
       enabled: true,
@@ -117,7 +141,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
         denyRead: unique,
         allowRead: [worktree],
         allowWrite: input.preset === 'worker' ? [worktree] : [],
-        denyWrite: input.preset === 'reviewer' ? [worktree] : [],
+        denyWrite: [...(input.preset === 'reviewer' ? [worktree] : []), ...gitDeny],
       },
     },
     permissions: {
@@ -125,6 +149,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
         ...unique.flatMap((p) => [`Read(/${p}/**)`, `Edit(/${p}/**)`]),
         // A reviewer may not modify even its own disposable checkout.
         ...(input.preset === 'reviewer' ? [`Edit(/${worktree}/**)`] : []),
+        ...gitDeny.flatMap((p) => [`Edit(/${p})`, `Edit(/${p}/**)`]),
       ],
     },
   };

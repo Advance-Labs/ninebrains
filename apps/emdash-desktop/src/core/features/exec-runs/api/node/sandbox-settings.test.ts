@@ -96,6 +96,58 @@ describe('SEC-11 lane sandbox settings', () => {
     expect(s.permissions.deny).toContain('Edit(//wt/proj/lane-a/**)');
   });
 
+  it("T36 denies writes to the lane repo's config, attributes and hooks, not objects or refs", () => {
+    const s = buildClaudeSandboxSettings({
+      ...base,
+      preset: 'worker',
+      git: { gitDir: '/repo/.git/worktrees/lane-a', commonDir: '/repo/.git' },
+    });
+    expect(s.sandbox.filesystem.denyWrite).toEqual([
+      '/repo/.git/config',
+      '/repo/.git/config.worktree',
+      '/repo/.git/worktrees/lane-a/config.worktree',
+      '/repo/.git/info/attributes',
+      '/repo/.git/hooks',
+    ]);
+    expect(s.sandbox.filesystem.allowWrite).toEqual(['/wt/proj/lane-a']);
+    expect(s.permissions.deny).toEqual(
+      expect.arrayContaining([
+        'Edit(//repo/.git/config)',
+        'Edit(//repo/.git/info/attributes)',
+        'Edit(//repo/.git/hooks/**)',
+      ])
+    );
+    const denied = JSON.stringify([s.sandbox.filesystem.denyWrite, s.permissions.deny]);
+    expect(denied).not.toMatch(/objects|refs|\/index|\/HEAD/);
+    // A reviewer keeps its own checkout write-denied as well.
+    const reviewer = buildClaudeSandboxSettings({
+      ...base,
+      preset: 'reviewer',
+      git: { gitDir: '/wt/proj/lane-a/.git', commonDir: '/wt/proj/lane-a/.git' },
+    });
+    expect(reviewer.sandbox.filesystem.denyWrite).toEqual([
+      '/wt/proj/lane-a',
+      '/wt/proj/lane-a/.git/config',
+      '/wt/proj/lane-a/.git/config.worktree',
+      '/wt/proj/lane-a/.git/info/attributes',
+      '/wt/proj/lane-a/.git/hooks',
+    ]);
+  });
+
+  it("T36 denies rewriting a linked worktree's .git gitfile", () => {
+    const s = buildClaudeSandboxSettings({
+      ...base,
+      preset: 'worker',
+      git: {
+        gitDir: '/repo/.git/worktrees/lane-a',
+        commonDir: '/repo/.git',
+        gitFile: '/wt/proj/lane-a/.git',
+      },
+    });
+    expect(s.sandbox.filesystem.denyWrite[0]).toBe('/wt/proj/lane-a/.git');
+    expect(s.permissions.deny).toContain('Edit(//wt/proj/lane-a/.git)');
+  });
+
   it('refuses a run directory inside a denied path', () => {
     expect(() =>
       buildClaudeSandboxSettings({ ...base, preset: 'worker', worktree: '/ud/ninebrains/lanes/x' })

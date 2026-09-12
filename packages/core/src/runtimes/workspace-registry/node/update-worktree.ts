@@ -70,6 +70,9 @@ export async function executeUpdateWorktree(
         // Same hygiene flags as the creation-path fetches.
         await exec.exec([
           'fetch',
+          // Ninebrains: `--refmap=` stops git also updating `refs/remotes/<remote>/*`, which
+          // raced the create path's background fetch ("incorrect old value provided").
+          '--refmap=',
           execution.remote,
           `+${execution.sourceRef}:${tempRef}`,
           '--no-tags',

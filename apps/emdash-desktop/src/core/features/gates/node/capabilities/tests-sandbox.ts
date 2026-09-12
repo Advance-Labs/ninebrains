@@ -41,6 +41,13 @@ export interface SandboxPaths {
   deniedPaths: readonly string[];
   /** `testsGate.allowNetwork`. */
   allowNetwork?: boolean;
+  /**
+   * Readable but never writable, even inside the worktree: the repo's git control files
+   * (`gitControlPaths`, T36). They matter when the repo's `.git` sits inside the cwd.
+   */
+  readOnlyPaths?: readonly string[];
+  /** Never renamed or removed, while what is inside stays writable (seatbelt only): git dirs. */
+  pinnedPaths?: readonly string[];
 }
 
 const real = (p: string) => (existsSync(p) ? realpathSync(p) : resolvePath(p));
@@ -61,16 +68,24 @@ export function effectiveDenied(worktree: string, denied: readonly string[]): st
 const sbplString = (value: string) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 const subpaths = (paths: readonly string[]) =>
   paths.map((p) => `(subpath ${sbplString(p)})`).join(' ');
+const literals = (paths: readonly string[]) =>
+  paths.map((p) => `(literal ${sbplString(p)})`).join(' ');
 
 /** macOS seatbelt profile. Later rules win, so each deny follows the broad allow. */
 export function buildSeatbeltProfile(input: SandboxPaths): string {
   const writable = [input.worktree, input.tempDir, '/dev'];
   const denied = effectiveDenied(input.worktree, input.deniedPaths);
+  // Path rules: they also stop a lane creating a control file that does not exist yet.
+  const readOnly = [...new Set((input.readOnlyPaths ?? []).map(real))];
+  const pinned = [...new Set((input.pinnedPaths ?? []).map(real))];
   return [
     '(version 1)',
     '(allow default)',
     ...(denied.length ? [`(deny file-read* file-write* ${subpaths(denied)})`] : []),
     `(deny file-write* (require-not (require-any ${subpaths(writable)})))`,
+    ...(readOnly.length || pinned.length
+      ? [`(deny file-write* ${[subpaths(readOnly), literals(pinned)].filter(Boolean).join(' ')})`]
+      : []),
     ...(input.allowNetwork
       ? []
       : [
@@ -101,6 +116,11 @@ export function buildBwrapArgs(input: SandboxPaths): string[] {
   args.push('--bind', input.worktree, input.worktree);
   // bwrap resolves bind sources on the host, so this survives the tmpfs over /tmp.
   args.push('--bind', input.tempDir, input.tempDir);
+  // T36, after the worktree bind so they cover it. A missing path can't be bound without creating
+  // it in the user's repo, so it is skipped: only seatbelt stops a lane creating one.
+  for (const path of new Set((input.readOnlyPaths ?? []).map(real))) {
+    if (statSafe(path)) args.push('--ro-bind', path, path);
+  }
   if (!input.allowNetwork) args.push('--unshare-net');
   args.push('--chdir', input.worktree);
   return args;

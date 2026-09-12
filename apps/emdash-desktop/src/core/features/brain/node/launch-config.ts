@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { BrainGrant } from '@ninebrains/brain-core';
 import { assertSafeArgv } from '@core/features/exec-runs/api/node/argv-guard';
+import { resolveLaneGitPaths } from '@core/features/exec-runs/api/node/lane-git-paths';
 import {
   assertSafeSettings,
   buildClaudeSandboxSettings,
@@ -135,6 +136,7 @@ export function buildLaneLaunch(
       ninebrainsDataDir: ninebrainsDataDir(deps.userDataDir),
       siblingWorktrees: target.siblingWorktrees,
       claudeConfigDir: deps.claudeConfigDir,
+      git: resolveLaneGitPaths(target.worktree),
     });
     assertSafeSettings(sandbox);
     settingsPath = join(dir, 'settings.json');

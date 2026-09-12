@@ -7,6 +7,7 @@ import {
   type ExecResult,
   type ExecSpawnOptions,
 } from '#services/exec/api';
+import { hardenGitExec } from '#services/exec/api/hardened-git';
 import { gitRuntimeEnv } from '../non-interactive-env';
 
 export type CreateGitExecOptions = {
@@ -38,11 +39,12 @@ export function gitEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 export function createGitExec(options: CreateGitExecOptions): BoundExec {
   const source = options.env;
   const env = typeof source === 'function' ? async () => gitEnv(await source()) : gitEnv(source);
-  return createBoundExec({
-    file: options.executable ?? 'git',
-    cwd: options.cwd,
-    env,
-  });
+  // Ninebrains: T36 hardening against repo config a lane can write. The git worker's writes
+  // are user-initiated, so they keep the user's hooks.
+  return hardenGitExec(
+    createBoundExec({ file: options.executable ?? 'git', cwd: options.cwd, env }),
+    'user-write'
+  );
 }
 
 /** Targets every command at one Git directory, independently of the executor's cwd. */

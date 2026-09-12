@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { EnvSource } from '#primitives/exec/api';
 import { createBoundExec, ExecError } from '#services/exec/api';
+import { hardenGitExec } from '#services/exec/api/hardened-git';
 
 /** What the host found at a canonical directory path (kind is host-detected, ADR 0005). */
 export type PathInspection =
@@ -37,13 +38,21 @@ export async function inspectWorkspacePath(
 ): Promise<PathInspection> {
   let stdout: string;
   try {
-    ({ stdout } = await createBoundExec({
-      file: 'git',
-      cwd: canonicalPath,
-      env: async () => nonInteractiveEnv(await env()),
-    }).exec(['rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir'], {
-      timeoutMs: 10_000,
-    }));
+    // Ninebrains: T36 hardening against repo config a lane can write.
+    const git = hardenGitExec(
+      createBoundExec({
+        file: 'git',
+        cwd: canonicalPath,
+        env: async () => nonInteractiveEnv(await env()),
+      }),
+      'app-write'
+    );
+    ({ stdout } = await git.exec(
+      ['rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir'],
+      {
+        timeoutMs: 10_000,
+      }
+    ));
   } catch (error) {
     // Exit 128 = not inside a git work tree: a plain directory, not a failure.
     if (error instanceof ExecError && error.exitCode !== null) return { kind: 'directory' };

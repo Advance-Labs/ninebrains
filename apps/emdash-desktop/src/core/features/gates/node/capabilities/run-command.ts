@@ -22,6 +22,7 @@ import { accessSync, constants, existsSync, realpathSync, statSync } from 'node:
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join } from 'node:path';
+import { resolveLaneGitPaths } from '@core/features/exec-runs/api/node/lane-git-paths';
 import {
   processGroups,
   signalGroup,
@@ -31,7 +32,10 @@ import {
 } from '@core/features/exec-runs/api/node/process-group';
 import { buildScrubbedCommandEnv } from '@core/features/exec-runs/api/node/run-env';
 import { resolveRunCwd } from '@core/features/exec-runs/api/node/run-paths';
-import { secretDenyPaths } from '@core/features/exec-runs/api/node/sandbox-settings';
+import {
+  gitControlPaths,
+  secretDenyPaths,
+} from '@core/features/exec-runs/api/node/sandbox-settings';
 import {
   buildBwrapArgs,
   buildSeatbeltProfile,
@@ -174,10 +178,17 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
       // T32: a gate-built git call never lazy-fetches a missing object through a promisor remote.
       ...(exec ? { GIT_NO_LAZY_FETCH: '1' } : {}),
     };
+    // T36: the repo's git control files stay read-only, even when its .git is inside the cwd.
+    const git =
+      mode === 'none' || platform === 'win32'
+        ? undefined
+        : resolveLaneGitPaths(cwd, { parentEnv: options.parentEnv });
     const sandboxed = {
       worktree: cwd,
       tempDir,
       allowNetwork: settings.allowNetwork === true,
+      readOnlyPaths: git ? gitControlPaths(git) : [],
+      pinnedPaths: git ? [git.commonDir, git.gitDir, join(git.commonDir, 'info')] : [],
       deniedPaths: [
         options.ninebrainsDataDir,
         ...(options.siblingWorktrees?.(cwd) ?? []),
