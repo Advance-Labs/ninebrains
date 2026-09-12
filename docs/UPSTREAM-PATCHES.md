@@ -89,6 +89,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `.github/workflows/workspace-server-package-check.yml` | `workflow_dispatch` only | Save Actions minutes on the private repo |
 | `.github/ISSUE_TEMPLATE/config.yml` | Links → our repo | |
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
+| `tooling/scripts/check.mjs`, `package.json` (root) | `check` runs `format:check` (was `format`, which rewrote files) and the new `test:tooling` step; `--write` / `check:write` restores the writing mode; `test:tooling` script runs the node tests in `tooling/scripts`, `tooling/fake-agent/test` and `scripts/release` (W7 CI) | `pnpm run check` now matches what CI runs and never edits the tree, so a green local check means a green `static` job |
 | `README.md` | Replaced with a short Ninebrains placeholder | |
 
 ## 5. Unattended exec path (W2 `exec-runs`)

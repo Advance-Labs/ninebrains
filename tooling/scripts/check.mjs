@@ -1,12 +1,16 @@
 /**
- * Root merge gate: runs format, lint, typecheck, licenses, and test in order via
- * the existing Nx-powered root scripts. Equivalent to running the commands by
- * hand; stops at the first failure. `licenses` is the Ninebrains licence gate
- * (tooling/scripts/check-licenses.mjs).
+ * Root merge gate: runs format:check, lint, typecheck, licenses, the tooling
+ * node tests, and test in order via the existing Nx-powered root scripts.
+ * Equivalent to running the commands by hand; stops at the first failure.
+ * `licenses` is the Ninebrains licence gate (tooling/scripts/check-licenses.mjs).
+ *
+ * Ninebrains: non-mutating by default, the same checks CI runs. Pass --write
+ * (or `pnpm run check:write`) to run `format` instead of `format:check`.
  */
 import { spawnSync } from 'node:child_process';
 
-const steps = ['format', 'lint', 'typecheck', 'licenses', 'test'];
+const write = process.argv.includes('--write');
+const steps = [write ? 'format' : 'format:check', 'lint', 'typecheck', 'licenses', 'test:tooling', 'test'];
 
 for (const step of steps) {
   console.log(`\ncheck: running pnpm run ${step}\n`);
@@ -15,12 +19,14 @@ for (const step of steps) {
     shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
+    const hint =
+      step === 'format:check' ? '\nRun `pnpm run format` (or `pnpm run check:write`) to fix it.' : '';
     console.error(
-      `\ncheck: failed at "pnpm run ${step}".` +
+      `\ncheck: failed at "pnpm run ${step}".${hint}` +
         '\nIf the failure looks environmental, run `pnpm run doctor` to rule out your setup.'
     );
     process.exit(typeof result.status === 'number' ? result.status : 1);
   }
 }
 
-console.log('\ncheck: format, lint, typecheck, licenses, and test all passed.');
+console.log(`\ncheck: ${steps.join(', ')} all passed.`);
