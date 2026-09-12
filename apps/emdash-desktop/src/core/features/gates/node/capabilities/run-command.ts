@@ -7,13 +7,12 @@
  *   at a private per-command temp dir that is deleted afterwards.
  * - With `argv`, no shell: `command` is resolved to an absolute executable from the scrubbed PATH,
  *   skipping any PATH entry inside the cwd, so a binary planted in the worktree never runs (SEC-16).
- * - New process group; SIGTERM then SIGKILL on abort or timeout, and leftovers are reaped when
- *   the command exits. Output capped at 1 MiB per stream (the tail is kept: failures are there).
- * - macOS: wrapped in `sandbox-exec` with a profile that denies reading Ninebrains data, sibling
- *   worktrees and credential files, and allows writes only to the cwd, the private temp dir and
- *   `/dev`. The shared system temp dir is NOT writable, because review checkouts live there.
- *   Claude's sandbox can't wrap an arbitrary command we spawn ourselves, so this is the
- *   equivalent. Linux and Windows run without an OS sandbox: accepted risk, see the README.
+ * - New process group, registered with the SEC-30 registry so the global STOP reaches it. SIGTERM
+ *   then SIGKILL on abort or timeout, and leftovers are reaped when the command exits. Output is
+ *   capped at 1 MiB per stream (the tail is kept: failures are there).
+ * - OS sandbox (`tests-sandbox.ts`): seatbelt on macOS, bubblewrap on Linux. Where neither exists
+ *   (Linux without `bwrap`, Windows), a shell-line command (the tests gate) is refused unless the
+ *   project sets `testsGate.allowUnsandboxed`. `argv` commands (gate-built git calls) still run.
  *
  * The shell line must come from app config the user set, never from a job record or a worktree
  * file (SEC-20 provenance rule). This capability can't check that; its caller must.
@@ -21,65 +20,61 @@
 import { accessSync, constants, existsSync, realpathSync, statSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { delimiter, isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path';
+import { delimiter, dirname, isAbsolute, join } from 'node:path';
 import {
+  processGroups,
   signalGroup,
   spawnInGroup,
   terminateGroup,
+  type ProcessGroupRegistry,
 } from '@core/features/exec-runs/api/node/process-group';
 import { buildScrubbedCommandEnv } from '@core/features/exec-runs/api/node/run-env';
 import { resolveRunCwd } from '@core/features/exec-runs/api/node/run-paths';
-import { credentialDenyPaths } from '@core/features/exec-runs/api/node/sandbox-settings';
+import { secretDenyPaths } from '@core/features/exec-runs/api/node/sandbox-settings';
+import {
+  buildBwrapArgs,
+  buildSeatbeltProfile,
+  isInside,
+  TestsSandboxUnavailableError,
+  type TestsGateSettings,
+} from './tests-sandbox';
 import type { CommandResult, RunCommand } from './types';
 
 const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
+
+export type TestsSandboxMode = 'seatbelt' | 'bwrap' | 'none';
 
 export interface RunCommandOptions {
   /** Lane worktree roots and the review-checkout root. The cwd must be inside one. */
   allowedRoots: () => readonly string[];
   /** `<userData>/ninebrains`. */
   ninebrainsDataDir: string;
+  /** All of `<userData>`, denied whole (M4). Default: the parent of `ninebrainsDataDir`. */
+  userDataDir?: string;
   /** Other lanes' worktrees for this run's lane. */
   siblingWorktrees?: (cwd: string) => readonly string[];
   /** More paths to deny entirely, e.g. the review-checkout root. Ancestors of the cwd are skipped. */
   deniedPaths?: () => readonly string[];
+  /**
+   * Per-project settings (`testsGate.allowNetwork`, `testsGate.allowUnsandboxed`) for the
+   * project that owns `cwd`. Both default to false.
+   */
+  projectSettings?: (cwd: string) => TestsGateSettings | Promise<TestsGateSettings>;
   parentEnv?: Readonly<Record<string, string | undefined>>;
   platform?: NodeJS.Platform;
-  /** `auto` uses sandbox-exec on macOS when present. */
-  sandbox?: 'auto' | 'off';
+  /** `auto` (default): seatbelt on macOS, bubblewrap on Linux when installed. Others force a mode. */
+  sandbox?: 'auto' | TestsSandboxMode;
+  /** Absolute `bwrap`. Default: found on the app's PATH at creation. */
+  bwrapPath?: string;
+  /** The SEC-30 registry the global STOP kills. Default: the app-wide one. */
+  groups?: ProcessGroupRegistry;
   defaultTimeoutMs?: number;
   maxOutputBytes?: number;
   killGraceMs?: number;
   homeDir?: string;
 }
 
-const sbplString = (value: string) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
-const real = (p: string) => (existsSync(p) ? realpathSync(p) : resolvePath(p));
-const isInside = (child: string, parent: string) => {
-  const rel = relative(parent, child);
-  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
-};
-
-/** Seatbelt profile: allow by default, deny reads of secrets, deny writes outside the cwd. */
-export function buildSeatbeltProfile(input: {
-  worktree: string;
-  tempDir: string;
-  deniedPaths: readonly string[];
-}): string {
-  const writable = [input.worktree, input.tempDir, '/dev'];
-  // A denied ancestor of the cwd (e.g. the review-checkout root) would deny the cwd itself.
-  const denied = [...new Set(input.deniedPaths.map(real))].filter(
-    (p) => !isInside(input.worktree, p)
-  );
-  const subpaths = (paths: readonly string[]) =>
-    paths.map((p) => `(subpath ${sbplString(p)})`).join(' ');
-  return [
-    '(version 1)',
-    '(allow default)',
-    ...(denied.length ? [`(deny file-read* file-write* ${subpaths(denied)})`] : []),
-    `(deny file-write* (require-not (require-any ${subpaths(writable)})))`,
-  ].join('\n');
-}
+const real = (p: string) => (existsSync(p) ? realpathSync(p) : p);
 
 /** SEC-16: absolute, or found on PATH outside the cwd. Never a relative or worktree binary. */
 export function resolveExecutable(
@@ -126,16 +121,42 @@ class TailBuffer {
   }
 }
 
+function findBwrap(options: RunCommandOptions): string | undefined {
+  if (options.bwrapPath) return options.bwrapPath;
+  try {
+    const path = (options.parentEnv ?? process.env).PATH ?? '';
+    return resolveExecutable('bwrap', path, '/nonexistent-cwd', 'linux');
+  } catch {
+    return undefined;
+  }
+}
+
 export function createRunCommand(options: RunCommandOptions): RunCommand {
   const platform = options.platform ?? process.platform;
   const graceMs = options.killGraceMs ?? 2000;
   const maxOutput = options.maxOutputBytes ?? 1024 * 1024;
-  const useSeatbelt =
-    platform === 'darwin' && options.sandbox !== 'off' && existsSync(SANDBOX_EXEC);
+  const groups = options.groups ?? processGroups;
+  const userDataDir = options.userDataDir ?? dirname(options.ninebrainsDataDir);
+  const bwrap = platform === 'linux' ? findBwrap(options) : undefined;
+  const requested = options.sandbox ?? 'auto';
+  const mode: TestsSandboxMode =
+    requested !== 'auto'
+      ? requested
+      : platform === 'darwin' && existsSync(SANDBOX_EXEC)
+        ? 'seatbelt'
+        : bwrap
+          ? 'bwrap'
+          : 'none';
+  if (mode === 'bwrap' && !bwrap) throw new Error('sandbox "bwrap" needs bwrapPath or bwrap on PATH');
 
   return async (command, opts) => {
     const cwd = await resolveRunCwd(opts.cwd, options.allowedRoots());
     opts.signal.throwIfAborted();
+    const settings = (await options.projectSettings?.(cwd)) ?? {};
+    if (mode === 'none' && !opts.argv && settings.allowUnsandboxed !== true) {
+      throw new TestsSandboxUnavailableError(`No OS sandbox is available on ${platform}.`);
+    }
+    groups.assertOpen('a tests-gate command');
     const base = buildScrubbedCommandEnv(
       options.parentEnv ?? process.env,
       platform === 'win32' ? 'windows' : 'posix'
@@ -149,37 +170,42 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
       TMPDIR: tempDir,
       ...(platform === 'win32' ? { TEMP: tempDir, TMP: tempDir } : {}),
     };
+    const sandboxed = {
+      worktree: cwd,
+      tempDir,
+      allowNetwork: settings.allowNetwork === true,
+      deniedPaths: [
+        options.ninebrainsDataDir,
+        ...(options.siblingWorktrees?.(cwd) ?? []),
+        ...(options.deniedPaths?.() ?? []),
+        ...secretDenyPaths({ homeDir: options.homeDir, userDataDir }),
+      ],
+    };
+    const target = exec ? [exec.file, ...exec.args] : ['/bin/sh', '-c', command];
 
     let binary: string;
     let argv: string[];
     if (platform === 'win32') {
       binary = exec?.file ?? `${env.SystemRoot ?? 'C:\\Windows'}\\System32\\cmd.exe`;
       argv = exec?.args ?? ['/d', '/s', '/c', command];
-    } else if (useSeatbelt) {
-      const profile = buildSeatbeltProfile({
-        worktree: cwd,
-        tempDir,
-        deniedPaths: [
-          options.ninebrainsDataDir,
-          ...(options.siblingWorktrees?.(cwd) ?? []),
-          ...(options.deniedPaths?.() ?? []),
-          ...credentialDenyPaths(options.homeDir),
-        ],
-      });
+    } else if (mode === 'seatbelt') {
       binary = SANDBOX_EXEC;
-      argv = ['-p', profile, ...(exec ? [exec.file, ...exec.args] : ['/bin/sh', '-c', command])];
+      argv = ['-p', buildSeatbeltProfile(sandboxed), ...target];
+    } else if (mode === 'bwrap') {
+      binary = bwrap!;
+      argv = [...buildBwrapArgs(sandboxed), '--', ...target];
     } else {
-      binary = exec?.file ?? '/bin/sh';
-      argv = exec?.args ?? ['-c', command];
+      [binary, ...argv] = target;
     }
 
     let child;
     try {
-      child = spawnInGroup(binary, argv, { cwd, env, platform });
+      child = spawnInGroup(binary, argv, { cwd, env, platform, kind: 'command' });
     } catch (err) {
       await rm(tempDir, { recursive: true, force: true });
       throw err;
     }
+    groups.track(child, platform);
     const stdout = new TailBuffer(maxOutput);
     const stderr = new TailBuffer(maxOutput);
     child.stdout?.setEncoding('utf8').on('data', (c: string) => stdout.push(c));

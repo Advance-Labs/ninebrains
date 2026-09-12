@@ -130,6 +130,11 @@ export interface Message {
   attachments: Attachment[];
   createdAt: number;
   readAt: number | null;
+  /**
+   * SEC-09 / gate-feedback provenance: set by main when the body carries content nobody trusted
+   * wrote (gate feedback, test output, web text). Lane-written messages are untrusted regardless.
+   */
+  untrusted?: boolean;
 }
 
 export interface Run {

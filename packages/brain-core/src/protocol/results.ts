@@ -125,7 +125,10 @@ export function jobDetail(job: Job): JobDetail {
 
 export type MessageView = z.output<typeof messageSchema>;
 
-/** SEC-09: every message carries `from`, and anything a lane wrote is flagged untrusted. */
+/**
+ * SEC-09: every message carries `from`. Anything a lane wrote is untrusted, and so is anything
+ * main relayed with `untrusted: true` (gate feedback, test output, web text).
+ */
 export function messageView(message: Message): MessageView {
-  return { ...message, untrusted: message.from.kind === 'lane' };
+  return { ...message, untrusted: message.from.kind === 'lane' || message.untrusted === true };
 }

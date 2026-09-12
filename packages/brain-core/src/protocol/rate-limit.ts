@@ -2,6 +2,8 @@
 export interface RateLimiter {
   /** Spends one request for `key`. False means reject with 429. */
   take(key: object): boolean;
+  /** True when `key` has a request left. Spends nothing. */
+  peek?(key: object): boolean;
 }
 
 export interface TokenBucketOptions {
@@ -22,17 +24,24 @@ export function createTokenBucketLimiter(options: TokenBucketOptions = {}): Rate
   const burst = options.burst ?? 60;
   const now = options.now ?? Date.now;
   const buckets = new WeakMap<object, { tokens: number; at: number }>();
+  const refill = (key: object) => {
+    const at = now();
+    const bucket = buckets.get(key) ?? { tokens: burst, at };
+    bucket.tokens = Math.min(burst, bucket.tokens + ((at - bucket.at) * rate) / 1000);
+    bucket.at = at;
+    buckets.set(key, bucket);
+    return bucket;
+  };
 
   return {
     take(key) {
-      const at = now();
-      const bucket = buckets.get(key) ?? { tokens: burst, at };
-      bucket.tokens = Math.min(burst, bucket.tokens + ((at - bucket.at) * rate) / 1000);
-      bucket.at = at;
-      buckets.set(key, bucket);
+      const bucket = refill(key);
       if (bucket.tokens < 1) return false;
       bucket.tokens -= 1;
       return true;
+    },
+    peek(key) {
+      return refill(key).tokens >= 1;
     },
   };
 }

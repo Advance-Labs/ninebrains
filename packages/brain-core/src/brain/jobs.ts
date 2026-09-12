@@ -346,6 +346,8 @@ export function recordGateResult(
       attachments: [],
       createdAt: ctx.now(),
       readAt: null,
+      // Gate feedback quotes test output, diffs and web text: data for the lane, not orders.
+      untrusted: true,
     };
     ctx.store.insertMessage(message);
     tx.raise({ type: 'messageSent', payload: { message } });

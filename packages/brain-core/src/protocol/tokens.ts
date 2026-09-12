@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { assertId } from '../ids';
+import type { ProjectId } from '../types';
 import type { BrainGrant } from './execute';
 
 /** 32 random bytes, base64url without padding: 43 characters, 256 bits. */
@@ -75,6 +76,19 @@ export class TokenRegistry {
       }
     }
     return removed;
+  }
+
+  /**
+   * The project of a live Brain grant with this brainId (null when that grant has no project),
+   * or undefined when no such Brain holds a token. Feeds `ExecuteOptions.resolveBrainProject`.
+   */
+  brainProject(brainId: string): ProjectId | null | undefined {
+    for (const { grant } of this.entries) {
+      if (grant.identity.role === 'brain' && grant.identity.brainId === brainId) {
+        return grant.projectId;
+      }
+    }
+    return undefined;
   }
 
   get size(): number {

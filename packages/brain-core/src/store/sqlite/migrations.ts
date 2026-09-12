@@ -127,6 +127,14 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 2,
+    name: 'message_untrusted',
+    when: 1_789_142_400_000,
+    sql: `
+      ALTER TABLE messages ADD COLUMN untrusted INTEGER NOT NULL DEFAULT 0 CHECK (untrusted IN (0, 1));
+    `,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

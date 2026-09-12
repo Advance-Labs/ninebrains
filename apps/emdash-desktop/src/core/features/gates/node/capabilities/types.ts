@@ -16,14 +16,26 @@ export type {
 } from '@emdash/gates-core';
 export type { FetchText } from '@emdash/citations';
 
-export interface ReviewerMcpServer {
-  command: string;
-  args?: readonly string[];
-  env?: Readonly<Record<string, string>>;
-}
+/** One reviewer MCP server, keyed by name in the record form. */
+export type ReviewerMcpServer =
+  | {
+      type?: 'stdio';
+      command: string;
+      args?: readonly string[];
+      env?: Readonly<Record<string, string>>;
+    }
+  | { type: 'http'; url: string; headers?: Readonly<Record<string, string>> };
+
+/** The packs' `McpServerEntry` shape: the same server with its name inside. */
+export type ReviewerMcpServerEntry = ReviewerMcpServer & { name: string };
+
+/** Either the record form or the packs' `McpServerEntry[]` (what the SEO gate passes). */
+export type ReviewerMcpServers =
+  | Readonly<Record<string, ReviewerMcpServer>>
+  | readonly ReviewerMcpServerEntry[];
 
 export interface SpawnReviewerOptions extends CoreSpawnReviewerOptions {
-  mcpServers?: Readonly<Record<string, ReviewerMcpServer>>;
+  mcpServers?: ReviewerMcpServers;
 }
 
 export type SpawnReviewer = (

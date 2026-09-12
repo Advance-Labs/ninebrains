@@ -8,8 +8,13 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import {
+  ProcessGroupRegistry,
+  StopLatchedError,
+} from '@core/features/exec-runs/api/node/process-group';
 import {
   createPrepareReviewCheckout,
   isReviewCheckout,
@@ -111,3 +116,106 @@ describe('prepareReviewCheckout', () => {
     rmSync(hook);
   });
 });
+
+const script = (name: string, body: string) => {
+  const path = join(root, name);
+  writeFileSync(path, `#!/bin/sh\n${body}\n`);
+  chmodSync(path, 0o755);
+  return path;
+};
+const realGit = execFileSync('/usr/bin/which', ['git'], { encoding: 'utf8' }).trim();
+
+describe('L4 review checkout runs no repo-controlled code', () => {
+  // A separate repo whose committed .gitattributes routes files through a filter the lane
+  // configured, plus an fsmonitor and hooks: every one of them would run in main.
+  const hostileRoot = join(root, 'hostile');
+  mkdirSync(hostileRoot, { recursive: true });
+  const { repo: hostileRepo, lanePaths: hostileLanes } = makeRepoWithLanes(hostileRoot, ['lane-h']);
+  const [hostileLane] = hostileLanes;
+  writeFileSync(join(hostileLane, '.gitattributes'), '*.txt filter=evil\n');
+  writeFileSync(join(hostileLane, 'filtered.txt'), 'raw blob\n');
+  git(hostileLane, 'add', '.');
+  git(hostileLane, 'commit', '-q', '-m', 'attributes');
+  const markers = join(hostileRoot, 'markers');
+  mkdirSync(markers, { recursive: true });
+  const evil = script('evil.sh', `touch '${markers}'/"$(basename "$0")-$$"; cat`);
+  git(hostileRepo, 'config', 'filter.evil.smudge', evil);
+  git(hostileRepo, 'config', 'filter.evil.clean', evil);
+  git(hostileRepo, 'config', 'filter.evil.required', 'true');
+  git(hostileRepo, 'config', 'core.fsmonitor', evil);
+  writeFileSync(join(hostileLane, 'filtered.txt'), 'uncommitted\n'); // forces a clean on diff
+
+  it('empties filter drivers and disables fsmonitor, hooks and file://', async () => {
+    const log = join(hostileRoot, 'git-calls.log');
+    const wrapper = script(
+      'git-wrapper.sh',
+      `printf '%s\\n' "ARGS $*" >> '${log}'; env | sed 's/^/ENV /' >> '${log}'; exec '${realGit}' "$@"`
+    );
+    const checkout = await prepareReviewCheckout({
+      worktreePath: hostileLane,
+      root: checkouts,
+      gitBinary: wrapper,
+      parentEnv: { ...process.env, NINEBRAINS_TOKEN: 'nb-live-token-123', GITHUB_TOKEN: 'ghp_x' },
+    });
+    try {
+      expect(readdirSync(markers)).toEqual([]);
+      expect(readFileSync(join(checkout.path, 'filtered.txt'), 'utf8')).toBe('uncommitted\n');
+    } finally {
+      await checkout.dispose();
+    }
+    expect(readdirSync(markers)).toEqual([]);
+    const calls = readFileSync(log, 'utf8');
+    expect(calls).not.toMatch(/NINEBRAINS_TOKEN|nb-live-token|GITHUB_TOKEN/);
+    for (const flag of [
+      'core.fsmonitor= ',
+      'core.hooksPath=/dev/null',
+      'protocol.file.allow=never',
+      'filter.evil.smudge= ',
+      'filter.evil.clean= ',
+      'filter.evil.required=false',
+    ]) {
+      expect(calls).toContain(flag);
+    }
+  });
+});
+
+describe('SEC-30 kill switch reaches review-checkout git', () => {
+  it('killAll stops a hung git and its grandchild, then refuses new checkouts', async () => {
+    const pidFile = join(root, 'git-grandchild.pid');
+    const hung = script(
+      'git-hung.sh',
+      `trap '' TERM; sh -c 'echo $$ > "${pidFile}"; exec sleep 999' & wait`
+    );
+    const groups = new ProcessGroupRegistry();
+    const pending = prepareReviewCheckout({
+      worktreePath: lane,
+      root: checkouts,
+      gitBinary: hung,
+      groups,
+    });
+    pending.catch(() => undefined);
+    for (let i = 0; i < 100 && !(existsSync(pidFile) && readFileSync(pidFile, 'utf8')); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    const t0 = Date.now();
+    await groups.killAll(2000);
+    await expect(pending).rejects.toThrow();
+    while (alive(pid) && Date.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 50));
+    expect(alive(pid)).toBe(false);
+    expect(Date.now() - t0).toBeLessThan(5000);
+    await expect(
+      prepareReviewCheckout({ worktreePath: lane, root: checkouts, groups })
+    ).rejects.toBeInstanceOf(StopLatchedError);
+    expect(readdirSync(checkouts)).toEqual([]);
+  }, 20_000);
+});
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

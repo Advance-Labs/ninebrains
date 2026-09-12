@@ -4,8 +4,13 @@
  * `killAll()` is the global STOP (SEC-30): it latches, SIGTERMs every run's process group and
  * SIGKILLs it at 2 s, so everything is gone well inside 5 s.
  *
- * Persisting budget counters across an app restart (the rest of SEC-29) belongs to the Brain DB
- * owner; this class emits every counter change as an event for that store to record.
+ * Budget counters persist in each run's transcript (`ninebrains.budget` records), and `recover()`
+ * closes runs a dead app instance left open as `killed` (SEC-29 restart half, `run-recovery.ts`).
+ * Every counter change is also emitted as an event for the Brain DB.
+ *
+ * Codex has no max-turns flag: `maxTurns` does not apply to it. The wall clock bounds a Codex run,
+ * and its token budget is checked on each `turn.completed` usage event, which Codex only sends at
+ * the end of a turn, so for a single `codex exec` turn the wall clock is the real cap.
  */
 import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -13,9 +18,17 @@ import { open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
-import { buildCodexExecArgv, CodexEventParser } from './codex-exec';
-import { signalGroup, spawnInGroup, terminateGroup } from './process-group';
+import type { ArgvGuardOptions } from './argv-guard';
+import { buildCodexExecLaunch, CodexEventParser } from './codex-exec';
+import {
+  processGroups,
+  signalGroup,
+  spawnInGroup,
+  terminateGroup,
+  type ProcessGroupRegistry,
+} from './process-group';
 import { createRedactor, describeEnvForTranscript } from './redact';
+import { recoverInterruptedRuns } from './run-recovery';
 import { buildUnattendedEnv } from './run-env';
 import { ensurePrivateDir, ninebrainsDir, resolveRunCwd, runPaths } from './run-paths';
 import { buildClaudeSandboxSettings } from './sandbox-settings';
@@ -41,6 +54,11 @@ export interface ExecRunSupervisorOptions {
   platform?: NodeJS.Platform;
   /** SIGTERM → SIGKILL delay. SEC-30 fixes it at 2 s. */
   killGraceMs?: number;
+  /**
+   * SEC-30: process groups started outside this supervisor (tests gate, review-checkout git).
+   * `killAll()` latches and kills them too. Default: the app-wide registry.
+   */
+  groups?: ProcessGroupRegistry;
 }
 
 export type ExecRunRejection = 'stop-latched' | 'concurrency' | 'duplicate-run';
@@ -129,13 +147,44 @@ export class ExecRunSupervisor {
       void this.terminate(id, 'killed');
       return run.done.catch(() => undefined);
     });
+    const others = this.groups.killAll(this.graceMs);
     const deadline = new Promise((r) => setTimeout(r, this.graceMs + KILL_ALL_SLACK_MS));
-    await Promise.race([Promise.all(runs), deadline]);
+    await Promise.race([Promise.all([...runs, others]), deadline]);
   }
 
   clearStop(): void {
     this.latched = false;
+    this.groups.clearStop();
     this.emit({ type: 'stop-cleared' });
+  }
+
+  /**
+   * SEC-29: call once at app start, before any run. Runs a previous app instance left mid-flight
+   * are closed as `killed` with their last persisted counters, and reported as `finished` events
+   * so the Brain DB listener records them.
+   */
+  async recover(): Promise<ExecRunResult[]> {
+    const results = (await recoverInterruptedRuns(this.options.userDataDir)).map(
+      (run): ExecRunResult => ({
+        runId: run.runId,
+        ok: false,
+        reason: 'killed',
+        exitCode: null,
+        signal: null,
+        isError: true,
+        errors: ['the app stopped while this run was active'],
+        usage: run.usage,
+        totalTokens: run.totalTokens,
+        transcriptPath: run.transcriptPath,
+        durationMs: run.elapsedMs,
+      })
+    );
+    for (const result of results) this.emit({ type: 'finished', runId: result.runId, result });
+    return results;
+  }
+
+  private get groups(): ProcessGroupRegistry {
+    return this.options.groups ?? processGroups;
   }
 
   private terminate(runId: string, reason: ExecRunEndReason): Promise<void> {
@@ -175,10 +224,13 @@ export class ExecRunSupervisor {
     });
     const secrets = [
       ...(spec.auth?.ANTHROPIC_API_KEY ? [spec.auth.ANTHROPIC_API_KEY] : []),
-      ...Object.values(spec.mcpServers ?? {}).flatMap((s) => Object.values(s.env ?? {})),
+      ...Object.values(spec.mcpServers ?? {}).flatMap((s) =>
+        Object.values((s.type === 'http' ? s.headers : s.env) ?? {})
+      ),
     ];
 
     let argv: string[];
+    let guard: ArgvGuardOptions;
     let parser: AgentStreamParser;
     let sandbox: unknown;
     if (spec.provider === 'claude') {
@@ -186,6 +238,7 @@ export class ExecRunSupervisor {
         preset: spec.preset,
         worktree: cwd,
         ninebrainsDataDir: ninebrainsDir(userDataDir),
+        userDataDir,
         siblingWorktrees: spec.siblingWorktrees,
         claudeConfigDir: spec.auth?.CLAUDE_CONFIG_DIR,
         egressAllowedDomains: spec.egressAllowedDomains,
@@ -195,10 +248,13 @@ export class ExecRunSupervisor {
       await writePrivateFile(settingsPath, JSON.stringify(settings, null, 2));
       await writePrivateFile(mcpConfigPath, buildClaudeMcpConfig(spec));
       argv = buildClaudePrintArgv(spec, { settingsPath, mcpConfigPath, sessionId: randomUUID() });
+      guard = { provider: 'claude', trusted: [settingsPath, mcpConfigPath] };
       parser = new ClaudeStreamParser();
       sandbox = settings;
     } else {
-      argv = buildCodexExecArgv(spec, cwd);
+      const launch = buildCodexExecLaunch(spec, cwd);
+      argv = launch.argv;
+      guard = { provider: 'codex', trusted: launch.trusted };
       parser = new CodexEventParser();
       sandbox = { codexSandbox: spec.preset === 'reviewer' ? 'read-only' : 'workspace-write' };
     }
@@ -229,6 +285,7 @@ export class ExecRunSupervisor {
       env,
       stdin: spec.prompt,
       platform: this.platform,
+      argvGuard: guard,
     });
     const run: ActiveRun = { child, done: undefined as unknown as Promise<ExecRunResult> };
     this.active.set(spec.runId, run);
@@ -263,10 +320,16 @@ export class ExecRunSupervisor {
           transcript.raw(line);
           for (const event of parser.push(line)) {
             this.emit({ type: 'agent', runId: spec.runId, event });
+            if (event.kind !== 'usage') continue;
+            // SEC-29: persisted, so a restart can close this run with its real counters.
+            const used = totalTokens(event.usage);
+            transcript.record('budget', {
+              usage: event.usage,
+              totalTokens: used,
+              elapsedMs: Date.now() - startedAt,
+            });
             const max = spec.budgets.maxTokens;
-            if (event.kind === 'usage' && max !== undefined && totalTokens(event.usage) > max) {
-              void this.terminate(spec.runId, 'tokens');
-            }
+            if (max !== undefined && used > max) void this.terminate(spec.runId, 'tokens');
           }
         });
       }

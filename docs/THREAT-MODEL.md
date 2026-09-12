@@ -4,6 +4,10 @@ Status: design review, 2026-09-10. Written before Phase 2 code lands so the buil
 controls instead of retrofitting them. Every requirement below is a test, not a guideline. A phase is
 not done until its `SEC-*` tests exist and pass.
 
+Updated 2026-09-11 after the first independent security review (findings H1, M1–M4, L1–L4 and the
+SEO reviewer bug, branch `w6/sec-fixes`). The per-requirement status is in §5a, new accepted risks
+are R10–R15 in §7, and one new finding is T31.
+
 Inputs: plan `2026-09-10-oss-agent-workbench.md` (D5, D6, Phase 6), `docs/SEAMS.md` (§3.6–3.8,
 §3.12–3.14, §3.16–3.17), `brain-remediation-spec.md` (a real RCE in our earlier voice orchestrator),
 the `gates-core` and `citations` READMEs, the brain-core/brain-mcp checkpoint (`06f5d8284`), and the
@@ -108,6 +112,7 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T28 | Unsigned build auto-updates from a feed we don't control (upstream Emdash feed, hijacked release) | M | H | updater compiled out until signing; checksums + provenance | SEC-36, SEC-37 |
 | T29 | Telemetry or a crash report leaves the machine | L | M | default off; no key or host compiled in; egress test | SEC-38 |
 | T30 | An incident can't be reconstructed because the logs were in memory (remediation lesson 4) | M | M | append-only `security_events` in the Brain DB | SEC-33 |
+| T31 | The reviewer gate's `git diff` runs in the review checkout, which shares the lane-writable repo config, so a `filter.<x>.clean` driver in `.git/config` runs during the diff. Review checkouts themselves empty every filter driver (L4); gates-core's `SAFE_GIT` flags do not yet. It runs under the tests-gate sandbox on macOS and on Linux with bubblewrap, but unsandboxed on Linux without it and on Windows | M | H | give `reviewer-gate.ts` the same filter-driver overrides as `review-checkout.ts` (open, gates-core owner) | SEC-18, SEC-20 |
 
 ## 5. Requirements
 
@@ -369,7 +374,58 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   Test `SEC-38 no egress on first run`: a network interceptor during first run and a 4-lane session
   sees only user-initiated traffic.
 
+## 5a. Status (2026-09-11)
+
+"Done" means the code enforces it and a test named after the ID proves it. "Open" means no
+SEC-titled test exists on `main`, which is not proof the control is absent. Owners in brackets are
+the agents or slices expected to close the gap.
+
+| ID | Status | Proof and notes |
+|---|---|---|
+| SEC-01 | Done | brain-mcp `sec-01.test.ts`, `stdio.test.ts` |
+| SEC-02 | Done, tightened | `http.test.ts`; `project-scope.test.ts`: L2, a lane token calling a brain-only op gets FORBIDDEN; M3, a brain token acts only inside its grant's project for every op. v0.1 has no global grant (`BrainGrant.global?: false` exists only as a type) |
+| SEC-03 | Done | `tokens.test.ts` |
+| SEC-04 | Done | `http.test.ts` |
+| SEC-05 | Done at the handler | `http.test.ts`. The offscreen-`BrowserWindow` e2e is not written [w5-brain-wiring] |
+| SEC-06 | Done, extended | `http.test.ts`; `pre-auth.test.ts` (L3): a failed-auth budget (5/s, burst 20) is checked before any token is resolved |
+| SEC-07 | Done | `boundary.test.ts` |
+| SEC-08 | Done | `gate-floor.test.ts` |
+| SEC-09 | Done, extended | `boundary.test.ts`; L1: recipients must exist and share the sender's project (`project-scope.test.ts`); gate feedback is persisted `untrusted` (`gate-feedback.test.ts`) and brain-mcp fences every untrusted body it hands a lane (`fence.test.ts`, `stdio.test.ts`) |
+| SEC-10 | Open | Lane config writer [w5-brain-wiring] |
+| SEC-11 | Partial | Settings are generated and tested (`sandbox-settings.test.ts`). M4 widened the deny list to one shared list plus all of `<userData>`. The live deny still needs the manual e2e with the real CLI |
+| SEC-12 | Done for unattended and reviewer runs | `argv-guard.test.ts` (SEC-12 and M2 normalisation). Attended launches must call `assertSafeArgv` on their full argv [w5-brain-wiring] |
+| SEC-13 | Done | `run-env.test.ts` |
+| SEC-14 | Done | `ids.test.ts`, `run-paths.test.ts`; the evidence store now uses the same rule (`evidence-hygiene.test.ts`) |
+| SEC-15 | Open | Dispatcher paste [w5-brain-wiring] |
+| SEC-16 | Done | `argv-guard.test.ts`, `run-command.test.ts` |
+| SEC-17 | Done | `run-supervisor.test.ts` |
+| SEC-18 | Done | `spawn-reviewer.test.ts`, `reviewer-gate.test.ts`. See T31 |
+| SEC-19 | Done | gates-core `untrusted.test.ts`, `reviewer-gate.test.ts` |
+| SEC-20 | Done on macOS, partial elsewhere | `run-command.test.ts`, `tests-sandbox.test.ts`. macOS seatbelt denies secrets, `<userData>` and non-loopback network, checked with real `sandbox-exec`. Linux bubblewrap argv is tested with a stand-in `bwrap`, not yet on a Linux host. Linux without `bwrap` and Windows refuse the tests gate unless the project opts in (R11) |
+| SEC-21 | Done | `fetch-text.test.ts`, `ip-policy.test.ts` |
+| SEC-22 | Open | [w5-gates-wiring] |
+| SEC-23 | Open | `readWorktreeFile` lives outside exec-runs [w5-gates-wiring] |
+| SEC-24 | Partial | `evidence-hygiene.test.ts`: dirs 0700, files 0600, SEC-14 ids, redaction of all text evidence. Retention, deletion on project delete, per-job delete and the screenshot origin rule are open [w5-gates-wiring] |
+| SEC-25 | Open | Lane browser/CDP |
+| SEC-26 | Open | Exact npx versions without integrity (R10) |
+| SEC-27 | Not re-verified | No SEC-27 test on `main` |
+| SEC-28 | Open | No SEC-28 test on `main` |
+| SEC-29 | Done in the supervisor | `run-supervisor.test.ts`, `run-budgets.test.ts`: wall clock, tokens, concurrency, counters persisted to the transcript, and restart recovery closing open runs as `killed` (`ExecRunSupervisor.recover()`). Codex per R13. Writing counters into the Brain DB depends on wiring the `finished` events [w5-brain-wiring] |
+| SEC-30 | Done for unattended runs, the tests gate and review checkouts | `run-supervisor.test.ts`, `run-command.test.ts`, `review-checkout.test.ts` (one `ProcessGroupRegistry` that `killAll()` latches and kills). The tray, menu and shortcut entry points and PTY lanes are [w5-brain-wiring] |
+| SEC-31 | Done | `run-supervisor.test.ts`, `run-paths.test.ts` |
+| SEC-32 | Partial | `run-env.test.ts`: no outbound credentials in the env. The per-plan allowlist UI is open |
+| SEC-33 | Open | `security_events` table |
+| SEC-34 | Open | No fs-spy test |
+| SEC-35 | Partial | Transcript (`redact.test.ts`) and evidence (`evidence-hygiene.test.ts`) redactors. Gate feedback and crash output are not redacted yet |
+| SEC-36 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `update-service.test.ts`. The packaged-build smoke test is open |
+| SEC-37 | Open | Release workflow [w4-release] |
+| SEC-38 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `telemetry.test.ts`. The first-run egress test is open |
+
 ## 6. Where the current design already breaks a requirement
+
+Status 2026-09-11: items 1, 4, 5, 6 and 7 are fixed in code (brain-core and gates READMEs). Item 8
+has its `argv` option. Item 9: the app's `fetchText` pins at connect time with `node:http(s)`'s
+`lookup` (exec-runs README, decision 2) and never uses net-guard's resolver.
 
 1. **brain-mcp opens the DB directly and takes identity from env** (`brain-mcp/src/bin.ts`
    `SqliteBrainStore.open`, `config.ts` `NINEBRAINS_ROLE`). Any lane can run the bin with
@@ -406,7 +462,7 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
 | ID | Risk | Why accepted | Revisit |
 |---|---|---|---|
 | R1 | With the sandbox off (user choice), a lane can read sibling tokens and the user's files. | That lane is the user's own shell. The badge makes it visible. | v0.2 default-deny toggle |
-| R2 | Codex's sandbox restricts writes, not reads, so a Codex lane can read other lanes' `mcp.json`. Damage is limited to lane impersonation, since gates still run. | No read-deny in Codex. | when Codex adds read policy |
+| R2 | Codex's sandbox restricts writes, not reads, so a Codex lane, and a Codex worker or reviewer run, can read other lanes' `mcp.json`, `<userData>` and the home secrets on the M4 list. Damage is limited to lane impersonation and secret reads, since gates still run. | No read-deny in Codex. | when Codex adds read policy |
 | R3 | Attended lanes use upstream's broad env allowlist. | Matches the user's own terminal. | — |
 | R4 | Pack skills install globally to `~/.agentskills` (SEAMS §3.16) and are visible to non-Ninebrains agents. | Bundled skills only, `nb-` prefix. | per-lane config dir |
 | R5 | Prompt injection against an attended lane can't be fully prevented. We rely on the provider's permission prompts and the user. | That's the state of the art; we don't claim otherwise. | — |
@@ -414,6 +470,12 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
 | R7 | Screenshots of the lane's own preview may show seeded or test personal data. | Local only, 30-day retention. | — |
 | R8 | Unsigned builds, verified by checksums and attestations only. | No signing spend yet (plan §9 Q4). | 7.1 |
 | R9 | Lanes share one OS user, so there is no kernel-level isolation between lanes. | Containers or VMs per lane are out of v0.1 scope. | v0.3 |
+| R10 | Pack MCP servers launch with `npx` at an exact version but no integrity check, so a compromised registry or package mirror could serve different code for the same version (SEC-26 not met). | Bundled packs only, pinned exact versions, no `@latest`. App-owned installs with `--ignore-scripts` and an integrity hash are not built yet. | Phase 5 follow-up |
+| R11 | A project that sets `testsGate.allowUnsandboxed` runs its tests gate with no OS sandbox on Linux without bubblewrap and on Windows. Lane-controlled scripts then run as the user with only the scrubbed env, the timeout, the group or tree kill and the output cap. They can read the user's files and reach the network. | Explicit per-project opt-in (default off). Without it, the gate refuses: "tests gate needs a sandbox (install bubblewrap) or an explicit per-project opt-in". | when a Windows sandbox is available |
+| R12 | With `testsGate.allowNetwork`, the tests gate reaches the network. Without it, loopback stays open for dev servers, so tests can reach local services, including the Brain endpoint. | The endpoint still needs a token, and failed auth is rate-limited before any token is resolved (L3). | — |
+| R13 | Codex has no max-turns flag and reports usage only at `turn.completed`. So `maxTurns` does not apply to Codex, and a single `codex exec` turn can overrun `maxTokens` before the supervisor sees it. The wall clock is the real cap. | Codex is experimental in v0.1; the wall-clock budget always applies. | when Codex streams usage mid-turn |
+| R14 | A process that calls `setsid()` leaves its process group and survives STOP. After an app crash, the process groups of old runs are not killed on restart: `recover()` closes their transcripts as `killed` but never signals old pids, which may have been reused. | Killing a reused pid is worse. bubblewrap's `--die-with-parent` covers the Linux tests gate. | job objects / cgroups |
+| R15 | The L3 pre-auth budget is shared, so a local process that floods the endpoint with bad tokens also gets valid lanes 429s until it refills (5/s). | A local attacker can already exhaust the 64 connections. Refusing before token resolution keeps the flood cheap. | per-peer budgets |
 
 ## 8. Release gate
 

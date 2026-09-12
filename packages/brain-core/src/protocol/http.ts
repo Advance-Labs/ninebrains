@@ -35,7 +35,16 @@ export interface BrainHttpOptions extends ExecuteOptions {
   /** Exactly `127.0.0.1:<port>` of the listening socket. */
   expectedHost: string;
   limiter?: RateLimiter;
+  /**
+   * L3: one budget shared by all failed authentications, checked BEFORE the token is resolved.
+   * Each 401 spends one; while it is spent, every request gets 429 without reaching the token
+   * registry. Valid requests never spend it. Needs a limiter with `peek`.
+   */
+  preAuthLimiter?: RateLimiter;
 }
+
+/** The single bucket every unauthenticated caller shares. */
+const PRE_AUTH_KEY = Object.freeze({ scope: 'pre-auth' });
 
 /**
  * The endpoint contract in `endpoint.ts`, transport-agnostic so main can
@@ -62,14 +71,24 @@ export function handleBrainHttpRequest(
     return reject(415, 'BAD_REQUEST', `Content-Type must be exactly ${BRAIN_ENDPOINT.contentType}`);
   }
 
+  // L3: refuse before resolving any token once failed authentications have spent the budget.
+  const preAuth = options.preAuthLimiter;
+  if (preAuth?.peek?.(PRE_AUTH_KEY) === false) {
+    return reject(429, 'RATE_LIMITED', 'too many failed authentications; slow down');
+  }
+  const unauthorized = (message: string) => {
+    preAuth?.take(PRE_AUTH_KEY);
+    return reject(401, 'UNAUTHORIZED', message);
+  };
+
   const token = BEARER_PATTERN.exec(headers.authorization ?? '')?.[1];
   const grant = options.tokens.resolve(token);
-  if (!grant) return reject(401, 'UNAUTHORIZED', 'missing or unknown brain token');
+  if (!grant) return unauthorized('missing or unknown brain token');
 
   // The shim may say which lane it thinks it is; a mismatch means a mixed-up or tampered config.
   const hint = headers[LANE_HINT_HEADER];
   if (hint !== undefined && (grant.identity.role !== 'lane' || grant.identity.laneId !== hint)) {
-    return reject(401, 'UNAUTHORIZED', 'lane hint does not match the token');
+    return unauthorized('lane hint does not match the token');
   }
   if (options.limiter && !options.limiter.take(grant)) {
     return reject(429, 'RATE_LIMITED', 'too many requests; slow down');
