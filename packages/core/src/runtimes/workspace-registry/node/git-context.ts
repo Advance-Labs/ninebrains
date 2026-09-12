@@ -1,5 +1,6 @@
 import type { EnvSource } from '#primitives/exec/api';
 import { createBoundExec, type BoundExec, type ExecOptions } from '#services/exec/api';
+import { hardenGitExec } from '#services/exec/api/hardened-git';
 import {
   GitSchedule,
   WorktreeWriteLocks,
@@ -58,11 +59,15 @@ function createRegistryGitExec(
 ): BoundExec {
   const tier = options.tier ?? 'probe';
   const work = { tier, repository: options.repository };
-  const inner = createBoundExec({
-    file: 'git',
-    cwd,
-    env: async () => registryGitEnv(await env(), tier === 'probe'),
-  });
+  // Ninebrains: T36 hardening. Registry git is app-driven: no hooks, no repo core.sshCommand.
+  const inner = hardenGitExec(
+    createBoundExec({
+      file: 'git',
+      cwd,
+      env: async () => registryGitEnv(await env(), tier === 'probe'),
+    }),
+    'app-write'
+  );
   return {
     get file() {
       return inner.file;

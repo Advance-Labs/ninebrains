@@ -1,4 +1,5 @@
 import { createBoundExec, type BoundExec } from '#services/exec/api';
+import { hardenGitExec } from '#services/exec/api/hardened-git';
 
 export type GitExecFactory = (cwd: string) => BoundExec;
 
@@ -9,7 +10,8 @@ export type GitExecFactory = (cwd: string) => BoundExec;
  * fast instead of blocking on credential or host-key input.
  */
 export function createNonInteractiveGitExec(cwd: string): BoundExec {
-  return createBoundExec({
+  // Ninebrains: T36 hardening against repo config a lane can write; these calls are app-driven.
+  const exec = createBoundExec({
     file: 'git',
     cwd,
     env: {
@@ -24,6 +26,7 @@ export function createNonInteractiveGitExec(cwd: string): BoundExec {
       ...(process.env.GIT_SSH_COMMAND ? {} : { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' }),
     },
   });
+  return hardenGitExec(exec, 'app-write');
 }
 
 export const defaultGitExecFactory: GitExecFactory = (cwd) => createNonInteractiveGitExec(cwd);
