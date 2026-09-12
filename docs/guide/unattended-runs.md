@@ -19,6 +19,22 @@ Lanes are attended by default. A lane's mode is kept in memory, so a restart mak
 attended again. There is no control in the app to switch a lane to unattended yet.
 <!-- VERIFY: a lane mode picker (attended or unattended) is being added -->
 
+## Making a lane unattended
+
+Every lane starts **attended**: the Brain pastes each job into the lane's terminal, where you can
+watch it and answer its prompts. To hand a lane's Brain jobs to headless runs instead, click the
+hand icon in the lane's header and confirm. The dialog says which command runs and with which
+budgets before anything changes.
+
+An unattended lane shows a warning badge in its header, **Unattended · claude -p** (or
+`codex exec`), so you never mistake it for a lane you are watching. Hover it to see the budgets;
+click it to switch back to attended straight away. Only jobs the Brain dispatches run headless.
+Anything you type into the lane's terminal yourself is unaffected.
+
+The mode is saved with the lane, so an unattended lane stays unattended after a restart.
+
+![A lane header showing the Unattended badge](../screenshots/lanes-run-mode-1440.png)
+
 Unattended runs use whatever login or API key your CLI uses. Ninebrains makes no claim about which
 plan, quota or billing they draw from. Check your provider's terms.
 
@@ -52,20 +68,21 @@ It also stops the terminal session of every attended lane that holds a Brain job
 A test runs eight runs whose processes and child processes ignore SIGTERM, and checks that all are
 gone in under 5 seconds.
 
-To use STOP, do one of these:
+STOP is in four places:
 
-- press **⌘⇧⌫** (Ctrl+Shift+Backspace on Windows and Linux). It works even while a terminal has
-  focus;
-- click **STOP** in the Lanes view's title bar;
-- run **Stop All Agent Work** from the command palette.
+- the **Agents** menu in the app menu bar (**Stop All Agent Work**),
+- the tray icon's menu, when the tray icon is on,
+- the keyboard shortcut **⌘⇧⌫** (Ctrl+Shift+Backspace on Windows and Linux), which is also the Agents
+  menu item's shortcut and works even while a terminal has focus,
+- the **STOP** button in the Lanes view.
 
-All three are in the app window. The work itself runs in the main process, but if the window has
-frozen, you cannot reach STOP today.
-<!-- VERIFY: a tray and app-menu STOP that works with a frozen window is being added -->
+The Agents menu and the tray menu call the Brain in the app's main process, not through the window,
+so they work even if the window has frozen. STOP also stops the terminal sessions of lanes that are
+working on a Brain-dispatched job. Lanes you drive by hand keep running.
 
-STOP stays **latched**: nothing new is dispatched and no run starts until you clear it. To clear
-it, open the Brain drawer and click **Clear STOP**. The latch is held in memory, so quitting and
-reopening the app also clears it.
+STOP stays **latched**: nothing new is dispatched and no run starts until you clear it. Use
+**Clear STOP** in the Agents menu, the tray menu or the Brain drawer; it is only offered while STOP
+is latched. The latch is held in memory, so quitting and reopening the app also clears it.
 
 Known limits:
 

@@ -22,7 +22,7 @@ export interface UnattendedDeps {
   supervisor: { run(spec: ExecRunSpec): Promise<ExecRunResult> };
   endpoint: Pick<BrainEndpoint, 'url' | 'mint' | 'revoke'>;
   brainMcp: BrainMcpRuntime;
-  pack(projectId: string): Promise<PackLaunch | undefined>;
+  pack(projectId: string, roleId?: string): Promise<PackLaunch | undefined>;
   siblingWorktrees(laneId: string): string[];
   budgets?: RunBudgets;
 }
@@ -59,7 +59,7 @@ export async function runJobUnattended(
       attachmentRoots: [lane.worktreePath],
       runId: run.id,
     });
-    const pack = await deps.pack(lane.projectId);
+    const pack = await deps.pack(lane.projectId, lane.roleId);
     const mcpServers: Record<string, McpServerSpec> = {
       brain: brainServerEntry(deps.brainMcp, deps.endpoint.url, token, lane.laneId),
     };
@@ -73,6 +73,7 @@ export async function runJobUnattended(
       cwd: lane.worktreePath,
       prompt: buildJobPrompt(job),
       budgets: deps.budgets ?? DEFAULT_UNATTENDED_BUDGETS,
+      ...(lane.model ? { model: lane.model } : {}),
       mcpServers,
       appendSystemPrompt: pack?.appendSystemPrompt,
       siblingWorktrees: deps.siblingWorktrees(lane.laneId),

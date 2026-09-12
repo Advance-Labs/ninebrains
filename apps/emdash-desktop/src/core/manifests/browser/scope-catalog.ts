@@ -4,6 +4,7 @@ import { fileTreeScope } from '@core/features/editor/contributions/scopes';
 import { GATES_WINDOW_COMMAND_DEFS } from '@core/features/gates/contributions/commands';
 import { LANES_WINDOW_COMMAND_DEFS } from '@core/features/lanes/contributions/commands';
 import { lanesViewScope } from '@core/features/lanes/contributions/scopes';
+import { PLANNER_WINDOW_COMMAND_DEFS } from '@core/features/planner/contributions/commands';
 import { settingsScope } from '@core/features/settings/contributions/scopes';
 import { taskListScope, taskViewScope } from '@core/features/tasks/contributions/scopes';
 import {
@@ -21,6 +22,7 @@ export const windowScope = defineWindowScope([
   ...LANES_WINDOW_COMMAND_DEFS,
   ...GATES_WINDOW_COMMAND_DEFS,
   ...BRAIN_WINDOW_COMMAND_DEFS,
+  ...PLANNER_WINDOW_COMMAND_DEFS,
 ]);
 
 export const SCOPE_CATALOG = [

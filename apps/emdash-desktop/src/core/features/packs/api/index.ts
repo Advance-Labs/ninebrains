@@ -1,5 +1,6 @@
 export {
   packLoadErrorSchema,
+  packSecretNameSchema,
   packSecretStatusSchema,
   packSummarySchema,
   packsContract,

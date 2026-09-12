@@ -1,5 +1,5 @@
 import type { Brain, Identity, Job, LaneStatus as BrainLaneStatus } from '@ninebrains/brain-core';
-import type { LaneRunMode } from '../api';
+import type { LaneRunMode } from '@core/features/lanes/api';
 import { canPaste, type LaneAgentState, type PasteOutcome } from './attended';
 import { buildJobPrompt } from './job-prompt';
 
@@ -17,6 +17,12 @@ export interface DispatchLane {
   asleep: boolean;
   agent?: LaneAgentState;
   worktreePath: string | null;
+  /** The lane's persisted run mode. When present it is authoritative over `setMode`. */
+  mode?: LaneRunMode;
+  /** The pack role the lane launches with (prompt and servers). */
+  roleId?: string;
+  /** The lane's model, for unattended runs. */
+  model?: string;
 }
 
 export interface DispatcherPorts {
@@ -120,6 +126,18 @@ export class Dispatcher {
     this.schedule();
   }
 
+  /** Adopts each lane's persisted mode, so a restart keeps unattended lanes unattended. */
+  private mirrorModes(lanes: Iterable<DispatchLane>): void {
+    let changed = false;
+    for (const lane of lanes) {
+      if (lane.mode === undefined || lane.mode === this.modeOf(lane.laneId)) continue;
+      if (lane.mode === 'attended') this.modes.delete(lane.laneId);
+      else this.modes.set(lane.laneId, lane.mode);
+      changed = true;
+    }
+    if (changed) this.ports.onChange?.();
+  }
+
   /** Coalesces triggers (brain events, lane status changes, the interval) into one tick. */
   schedule(): void {
     if (this.scheduled) return;
@@ -142,6 +160,7 @@ export class Dispatcher {
     if (this.paused || this.latched) return [];
     const { brain } = this.ports;
     const lanes = new Map(this.ports.lanes().map((lane) => [lane.laneId, lane]));
+    this.mirrorModes(lanes.values());
     for (const lane of lanes.values()) this.syncLane(lane);
 
     const records: DispatchRecord[] = [];

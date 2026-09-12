@@ -30,3 +30,7 @@ grid of lanes. The Brain's unit of work is a Job; lanes only carry `activeJobId`
   its tests fake those rather than the TUI/PTY runtime fakes.
 - **Agent feed is local only** and does not re-subscribe if the TUI worker restarts; a restart
   leaves lights stale until the app reloads. Fine for v0.1 local lanes.
+- **Run mode and role live in the lane config.** `runMode` (absent = attended) and `roleId`
+  (`pack:role`) are optional fields, so older grids load unchanged. `setLaneMode` persists the mode;
+  the Brain's dispatcher reads it back through the composition root. The header's mode control
+  and the add-lane form's role picker come from the brain and packs slices' `api`/`contributions`.

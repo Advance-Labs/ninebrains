@@ -12,11 +12,13 @@ import {
   BrainDrawer,
   BrainTitlebarControls,
 } from '@core/features/brain/contributions/lanes-drawer';
+import { plannerViewDef } from '@core/features/planner/contributions/views';
+import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
 import { Titlebar } from '@core/features/workbench/contributions/browser/Titlebar';
 import { workbenchPanelLayoutsMemento } from '@core/features/workbench/contributions/mementos';
 import { createLayoutStorage } from '@core/primitives/mementos/browser/layout-storage';
 import { useSubjectSpace } from '@core/primitives/mementos/react';
-import { useViewParams } from '@core/primitives/navigation/browser/navigation-hooks';
+import { useNavigate, useViewParams } from '@core/primitives/navigation/browser/navigation-hooks';
 import { appSubject } from '@core/primitives/subjects/api';
 import { defineViewRuntime } from '@core/primitives/views/react';
 import type { Lane, LaneTab } from '../../api';
@@ -35,14 +37,34 @@ function LanesViewWrapper({ children }: { children: ReactNode; tabId?: string })
 }
 
 const LanesTitlebar = observer(function LanesTitlebar() {
+  const params = useViewParams(lanesViewDef);
+  const { board } = useLaneBoard();
+  const { navigate } = useNavigate();
+  const tab = board.tabs.find((candidate) => candidate.tabId === params?.tabId) ?? board.tabs[0];
+  // The planner opens on the tab's first lane's project, else the first project.
+  const projectId =
+    tab?.slots.find((lane) => lane !== null)?.projectId ??
+    getProjectManagerStore().projects.keys().next().value;
   return (
     <Titlebar
       leftSlot={<LanesTabStrip />}
       rightSlot={
-        <BrainTitlebarControls
-          drawerOpen={brainDrawer.open}
-          onToggleDrawer={() => setDrawerOpen(!brainDrawer.open)}
-        />
+        <div className="flex items-center">
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="lanes-open-planner"
+            disabled={!projectId}
+            title={projectId ? "Plan this project's jobs on a canvas" : 'Add a project first'}
+            onClick={() => projectId && navigate(plannerViewDef({ projectId }))}
+          >
+            Planner
+          </Button>
+          <BrainTitlebarControls
+            drawerOpen={brainDrawer.open}
+            onToggleDrawer={() => setDrawerOpen(!brainDrawer.open)}
+          />
+        </div>
       }
     />
   );
