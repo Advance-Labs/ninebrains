@@ -231,6 +231,24 @@ the lanes api, `unattendedBudgets`), `brain/node/{brain-service,dispatcher,unatt
 `packs/node/{packs-service,secrets,wire-controller}.ts`, `packs/browser/packs-view.tsx`,
 `main/bootstrap/boot/ninebrains/{create-ninebrains-services,keychain-secret-resolver}.ts`.
 
+## 13. Git hardening against lane-written repo config (T36, `w7/sec-review-fixes`)
+
+A lane can write its repo's config and `info/attributes`, and upstream runs git against lane
+worktrees unsandboxed (THREAT-MODEL T36). Each helper gains one import and one
+`hardenGitExec(…)` wrap. The logic lives in the new `hardened-git.ts`.
+
+| File | What | Why |
+|---|---|---|
+| `packages/core/src/runtimes/git/node/exec/git-exec.ts` | `createGitExec` returns `hardenGitExec(createBoundExec(…), 'user-write')` | The git worker: automatic `status` on every watch event, the diff/blame/log views, and user-initiated commit, push and pull (these keep the user's hooks) |
+| `packages/core/src/runtimes/workspace-registry/node/git-context.ts` | The registry exec's inner `createBoundExec` wrapped with `'app-write'` | The automatic scan's `status` and `diff`, and app-driven create/update/delete/fetch/push: no hooks, no repo `core.sshCommand` |
+| `packages/core/src/services/exec/node/git-exec.ts` | `createNonInteractiveGitExec` wrapped with `'app-write'` | `measure-usage` and `worktree-path-safety` |
+| `packages/core/src/runtimes/workspace-registry/node/inspect-path.ts` | The inline `rev-parse` exec wrapped with `'app-write'` | Runs on every path the registry inspects |
+| `packages/core/src/runtimes/workspace-registry/node/update-worktree.ts` | `fetch` gains `--refmap=` | The fetch also updated `refs/remotes/<remote>/*` and raced the create path's background `fetch --prune` ("incorrect old value provided"). The hardening's extra filter-listing process made the race deterministic in `update-worktree.contract.test.ts`. The fetch only needs its private `refs/emdash/update/<uuid>` ref |
+| `packages/core/src/runtimes/git/node/exec/git-exec.test.ts`, `.../workspace-registry/node/git-context-env.test.ts` | `T36` real-git describes appended | Proof per helper kind, with controls |
+
+Ninebrains files also touched: `exec-runs/api/node/{sandbox-settings,run-supervisor}.ts` and
+`brain/node/launch-config.ts` (the T36 write deny).
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,
@@ -253,4 +271,6 @@ the lanes api, `unattendedBudgets`), `brain/node/{brain-service,dispatcher,unatt
 `docs/screenshots/brain-*.png`, `src/core/features/planner/contributions/{commands,palette}.ts`,
 `src/main/bootstrap/boot/ninebrains/keychain-secret-resolver.test.ts`,
 `src/renderer/tests/browser/daily-use-screenshots.test.tsx`,
-`docs/screenshots/{lanes-run-mode,lanes-add-lane-role,packs-secrets}-*.png`.
+`docs/screenshots/{lanes-run-mode,lanes-add-lane-role,packs-secrets}-*.png`,
+`packages/core/src/services/exec/api/hardened-git{,.test}.ts`,
+`packages/core/src/services/exec/node/hardened-git.test-fixtures.ts`.
