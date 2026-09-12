@@ -9,7 +9,7 @@ description: >-
 A **discipline pack** is a per-project bundle of four things:
 
 - **Roles.** A role is a lane preset: a system prompt, an optional provider and model, and default
-  gates.
+  gates. There is no way to start a lane from a role in this build (see below).
 - **Skills**, installed through the skills manager Ninebrains inherits from Emdash.
 - **MCP servers** for the lanes to use.
 - **Gates** that the pack's work must pass.
@@ -32,12 +32,14 @@ an MIT, Apache-2.0, ISC, BSD-2/3-Clause or 0BSD licence; the loader rejects anyt
 
 ## How a pack reaches a lane
 
-<!-- VERIFY-AFTER-P2 -->
 When a lane launches in a project, Ninebrains writes that launch's MCP config. It contains the
 Brain's server plus the servers of every pack the project has enabled, and nothing from other
-projects. If the lane was started from a role, the role's prompt is appended to the agent's system
-prompt, and the role's gates become the default gates for the lane's jobs.
-<!-- /VERIFY -->
+projects.
+
+A lane started from a role would get the role's prompt appended to the agent's system prompt, and
+the role's gates as the default gates for its jobs. In this build, the add-lane form offers only a
+project and an agent, so no lane starts from a role and role prompts are not used.
+<!-- VERIFY: a role picker for lanes is being added -->
 
 A server that needs a secret you have not provided is **left out with a warning**. It is never
 launched half-configured, and warnings never contain secret values.
@@ -57,14 +59,18 @@ consequences:
 A pack file names its secrets; it never contains them. Nothing is stored in the pack file or in
 your preferences.
 
-<!-- VERIFY-AFTER-P2 -->
-Secrets are read through a secret resolver. The resolver that ships reads environment variables
-named `NINEBRAINS_SECRET_<NAME>`, for example `NINEBRAINS_SECRET_GOOGLE_ACCESS_TOKEN`. Until the
-app's secret store is wired up, the settings page shows every secret as missing.
-<!-- /VERIFY -->
+Ninebrains looks for each secret in two places, in this order:
 
-A keychain-backed store (Electron `safeStorage`) is planned. It will refuse to store a secret when
-the OS offers no encryption, rather than fall back to plaintext.
+1. The app's encrypted secret store in your OS keychain, under the key `ninebrains.pack.<NAME>`.
+2. An environment variable named `NINEBRAINS_SECRET_<NAME>`, for example
+   `NINEBRAINS_SECRET_GOOGLE_ACCESS_TOKEN`.
+
+The app reads the environment it was started with. On macOS, an app opened from the Dock or Finder
+does not see variables you set in your shell, so start it from a terminal where they are set.
+
+This build has no screen for saving a secret into the keychain store, so use the environment
+variable. **Settings → Packs** lists each missing secret and where to set it.
+<!-- VERIFY: a screen for saving pack secrets is being added -->
 
 ## SEO pack
 
@@ -144,14 +150,10 @@ The research pack has no MCP servers. Researchers write `claims.json` with a sou
 exact quote for every claim, and the `fact-check` gate checks each one. See
 [Verification gates](gates.md#fact-check).
 
-## Writing your own pack
+## Your own packs
 
-The loader reads bundled packs first, then `<userData>/ninebrains/packs/<id>/pack.json`. The
-directory name must equal the pack's `id`, and it may not reuse a bundled id. Files are read with a
-realpath check, so a symlink cannot reach outside the pack directory.
+Your own packs are not available in v0.1. The app loads only the bundled packs, and there is no
+setting or environment variable that changes this.
 
-A pack's MCP servers run with your user's permissions, like any other program you install. Treat a
-pack from someone else the way you would treat their code.
-
-The full `pack.json` schema, with every field, is in the
-[packs feature README](../../apps/emdash-desktop/src/core/features/packs/README.md).
+When they are turned on, a pack's MCP servers will run with your user's permissions, like any other
+program you install. Treat a pack from someone else the way you would treat their code.
