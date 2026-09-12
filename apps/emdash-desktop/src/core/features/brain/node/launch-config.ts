@@ -127,6 +127,7 @@ export function buildLaneLaunch(
 
   let extraArgs: string[];
   let settingsPath: string | null = null;
+  let trusted: string[];
   if (target.provider === 'claude') {
     const sandbox = buildClaudeSandboxSettings({
       preset: 'worker',
@@ -145,24 +146,18 @@ export function buildLaneLaunch(
     if (target.pack?.appendSystemPrompt) {
       extraArgs.push(`--append-system-prompt=${target.pack.appendSystemPrompt}`);
     }
+    trusted = [mcpConfigPath, settingsPath];
   } else {
-    extraArgs = ['--sandbox=workspace-write', ...codexMcpOverrides(brain, target.pack)];
+    const overrides = codexMcpOverrides(brain, target.pack);
+    extraArgs = ['--sandbox=workspace-write', ...overrides];
+    // The guard checks each `--config` value: the text after the flag's first `=`.
+    trusted = overrides.map((flag) => flag.slice(flag.indexOf('=') + 1));
   }
-  // The full variable argv: upstream's user flags plus ours. The config files we
-  // generated are registered as trusted, so the hardened guard (w6) accepts our
-  // own --mcp-config/--settings and still rejects any a user flag brings in.
-  guardArgv([...upstream.extraArgs, ...extraArgs], {
-    trusted: settingsPath ? [mcpConfigPath, settingsPath] : [mcpConfigPath],
-  });
+  // The full variable argv: upstream's user flags plus ours. Only values we generated are
+  // trusted, so the guard (SEC-12, M2) accepts our config flags and refuses any a user brings.
+  assertSafeArgv([...upstream.extraArgs, ...extraArgs], { trusted, provider: target.provider });
   return { extraArgs, providerVars: {}, mcpConfigPath, settingsPath };
 }
-
-/**
- * `assertSafeArgv` with the `{ trusted }` option the hardened guard takes.
- * Today's single-parameter guard ignores the option.
- */
-const guardArgv: (argv: readonly unknown[], options: { trusted: readonly string[] }) => void =
-  assertSafeArgv;
 
 const toml = (value: string) => JSON.stringify(value);
 const tomlArray = (values: readonly string[]) => `[${values.map(toml).join(',')}]`;
