@@ -20,6 +20,7 @@ import { createInterface } from 'node:readline';
 import type { ArgvGuardOptions } from './argv-guard';
 import { buildClaudeMcpConfig, buildClaudePrintArgv, ClaudeStreamParser } from './claude-print';
 import { buildCodexExecLaunch, CodexEventParser } from './codex-exec';
+import { resolveLaneGitPaths } from './lane-git-paths';
 import {
   processGroups,
   signalGroup,
@@ -242,6 +243,7 @@ export class ExecRunSupervisor {
         siblingWorktrees: spec.siblingWorktrees,
         claudeConfigDir: spec.auth?.CLAUDE_CONFIG_DIR,
         egressAllowedDomains: spec.egressAllowedDomains,
+        git: resolveLaneGitPaths(cwd),
       });
       const settingsPath = join(paths.configDir, 'settings.json');
       const mcpConfigPath = join(paths.configDir, 'mcp.json');
