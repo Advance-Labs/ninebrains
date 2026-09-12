@@ -55,6 +55,9 @@ describe('T36 createGitExec hardening (real git)', () => {
 
       const plain = createBoundExec({ file: 'git', cwd: h.repo, env: h.env });
       await plain.exec(['status', '--porcelain']);
+      // status alone may skip the clean filter: a.txt changed size, so git marks it modified from
+      // stat data without reading it (seen on CI's git 2.55). diff always reads it through the filter.
+      await plain.exec(['diff', '--numstat', 'HEAD', '--']);
       await plain.exec(['cat-file', '-p', 'HEAD:b.txt']).catch(() => undefined);
       expect(h.ran()).toEqual(expect.arrayContaining(['filter', 'fsmonitor', 'ssh']));
     } finally {
