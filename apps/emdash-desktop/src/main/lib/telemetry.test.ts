@@ -38,6 +38,14 @@ async function productionTelemetry() {
   return telemetryService;
 }
 
+async function devTelemetry() {
+  vi.resetModules();
+  vi.stubEnv('DEV', true);
+  const { telemetryService } = await import('./telemetry');
+  await telemetryService.initialize({ appVersion: '0.0.0-test', isPackaged: false });
+  return telemetryService;
+}
+
 // Ninebrains telemetry policy (docs/UPSTREAM-PATCHES.md): off by default, pointed at nothing.
 describe('Ninebrains telemetry defaults', () => {
   const fetchSpy = vi.fn();
@@ -81,5 +89,36 @@ describe('Ninebrains telemetry defaults', () => {
     await telemetry.checkAndReportDailyActiveUser();
     await telemetry.dispose();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// getFeatureFlags(): the fork-flags override read by useFeatureFlag (docs/guide/configuration.md).
+describe('FLAG_* dev overrides', () => {
+  beforeEach(() => {
+    store.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('turns FLAG_<NAME> env vars into hyphenated, lowercased flags in dev builds', async () => {
+    vi.stubEnv('FLAG_my_feature', 'true');
+    vi.stubEnv('FLAG_OTHER_THING', '1');
+    vi.stubEnv('FLAG_disabled', 'false');
+    const telemetry = await devTelemetry();
+
+    expect(telemetry.getFeatureFlags()).toEqual({
+      'my-feature': true,
+      'other-thing': true,
+      disabled: false,
+    });
+  });
+
+  it('ignores FLAG_* env vars outside dev builds', async () => {
+    vi.stubEnv('FLAG_my_feature', 'true');
+    const telemetry = await productionTelemetry();
+
+    expect(telemetry.getFeatureFlags()).toEqual({});
   });
 });
