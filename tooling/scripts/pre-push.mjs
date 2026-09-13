@@ -46,6 +46,39 @@ export function protectedRefProblems(updates, env = process.env) {
   return problems;
 }
 
+/**
+ * Git exports these to every hook (`git rev-parse --local-env-vars`). A child that inherits them
+ * points every `git` it runs at the repo being pushed, whatever its cwd: test fixtures that
+ * `git init` and `git commit` in a temp dir then rewrite this repo instead. On 2026-09-13 that set
+ * `core.bare=true` and a Test identity on the shared .git and stacked commits on the pushed branch.
+ */
+export const GIT_REPO_ENV = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_CONFIG',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_DIR',
+  'GIT_GRAFT_FILE',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_INTERNAL_SUPER_PREFIX',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_PREFIX',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+  'GIT_WORK_TREE',
+];
+
+/** The environment the checks run in: the hook's own, minus the variables that locate a repo. */
+export function checkEnv(env = process.env) {
+  const clean = { ...env };
+  for (const name of GIT_REPO_ENV) delete clean[name];
+  for (const name of Object.keys(clean)) if (/^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(name)) delete clean[name];
+  return clean;
+}
+
 /** The commands to run for a push, or [] when it only deletes refs. */
 export function checkCommands(updates, base) {
   if (!updates.some((update) => update.localSha !== ZERO_SHA)) return [];
@@ -59,7 +92,8 @@ export function checkCommands(updates, base) {
 export function runPrePush({
   stdin,
   env = process.env,
-  run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' }).status,
+  run = (cmd, args, childEnv) =>
+    spawnSync(cmd, args, { stdio: 'inherit', env: childEnv, shell: process.platform === 'win32' }).status,
   git = (args) => execFileSync('git', args, { encoding: 'utf8' }),
   log = console.error,
 }) {
@@ -81,7 +115,7 @@ export function runPrePush({
   }
   for (const [cmd, args] of commands) {
     log(`\npre-push: ${cmd} ${args.join(' ')}`);
-    const status = run(cmd, args);
+    const status = run(cmd, args, checkEnv(env));
     if (status !== 0) {
       log(`\npre-push: failed at "${cmd} ${args.join(' ')}". Fix it, or push with --no-verify (CI will still run it).`);
       return typeof status === 'number' ? status : 1;
