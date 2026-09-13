@@ -358,3 +358,14 @@ Releases: `tooling/scripts/changelog.mjs` and its test; `CHANGELOG.md` (written 
 `ci-ok` gates, the `channel` input, `--prerelease`, changelog notes, the e2e job and SHA pins (W7 CI).
 
 Retired: `.github/workflows/licenses.yml` (W7 CI). The licence gate runs in `ci.yml`'s `static` job.
+
+Dogfood matrix: `docs/testing/DOGFOOD-MATRIX.md`,
+`e2e/{stop-halts-lanes.e2e,lane-run-mode.e2e,lane-from-pack-role.e2e}.mjs` (W7
+`w7/dogfood-matrix`).
+
+## 17. Dogfood matrix and e2e (W7 `w7/dogfood-matrix`)
+
+No upstream (Emdash) file was patched for this work. `.github/workflows/e2e.yml` and
+`CONTRIBUTING.md` are Ninebrains-only already (see above); adding the three new suites to the
+`for suite in ...` list and the suite lists in `CONTRIBUTING.md` needed no patch-log entry beyond
+naming the new files, done above under "New Ninebrains-only files".

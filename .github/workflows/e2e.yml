@@ -55,7 +55,7 @@ jobs:
         working-directory: apps/emdash-desktop
         run: |
           status=0
-          for suite in lanes-smoke brain-fanout self-heal; do
+          for suite in lanes-smoke brain-fanout self-heal stop-halts-lanes lane-run-mode lane-from-pack-role; do
             echo "::group::$suite"
             if timeout --kill-after=30s 10m xvfb-run -a --server-args="-screen 0 1920x1080x24" node "e2e/$suite.e2e.mjs"; then
               echo "$suite: pass"
