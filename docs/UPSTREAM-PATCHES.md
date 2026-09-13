@@ -308,7 +308,10 @@ below), so this feature landed entirely inside files this fork owns:
 - `gates/node/wire-controller.ts`: wires `setProjectSettings` into the existing `gates` domain
   controller (no new domain registration, so `manifests/*` needed no change this time).
 - `gates/node/rigor/project-prefs.ts`, `gates/contributions/mementos.ts`: `ProjectGatePrefs` and
-  its memento schema gain `allowNetwork`/`allowUnsandboxed`, both defaulting to false.
+  its memento schema gain `allowNetwork`/`allowUnsandboxed`, both defaulting to false. The memento
+  bumps to schema version '2' with a real `up()` migration (not a same-version `.default(false)`)
+  so a v1 row stored before this change still reads both flags as strictly `false` in production
+  (2026-09-13 security-review fix; SEC-08, `gates/node/rigor/project-prefs-schema.test.ts`).
 - `gates/node/rigor/rigor.ts`: `RigorResolver.testsGateSettingsFor(projectId)`.
 - `gates/browser/{test-command-section,gates-settings-view}.tsx`: the rigor-override select and
   the two warning-labelled toggles in Settings → Gates.

@@ -9,22 +9,38 @@ import { rigorLevelSchema } from './settings';
 // the default 60-day memento sweep.
 const KEEP = { tier: 'persisted' as const, maxAge: days(3650), maxEntries: 10_000 };
 
+const gatesProjectPrefsV1Schema = z.object({
+  version: z.literal('1'),
+  /** Null means "use the app setting". */
+  testingRigor: rigorLevelSchema.nullable(),
+  securityRigor: rigorLevelSchema.nullable(),
+  /** SEC-20: the tests gate's command. Only the user sets it, never a job or a worktree file. */
+  testCommand: z.string().max(500).nullable(),
+});
+
+const gatesProjectPrefsV2Schema = gatesProjectPrefsV1Schema.extend({
+  version: z.literal('2'),
+  /** `testsGate.allowNetwork` (SEC-20/R12). Set only from Settings → Gates. Default false. */
+  allowNetwork: z.boolean(),
+  /** `testsGate.allowUnsandboxed` (SEC-20/R11). Set only from Settings → Gates. Default false. */
+  allowUnsandboxed: z.boolean(),
+});
+
+/**
+ * v1: testingRigor, securityRigor, testCommand.
+ * v2 (SEC-08, W7 testsgate-prefs): adds allowNetwork/allowUnsandboxed, both false for every row
+ * stored before this change — `VersionedSchema.safeParse` only validates the stored version's
+ * schema in dev, so a plain `.default(false)` on the v1 schema would leave both fields `undefined`
+ * on a v1 row's fast path in production. The `up()` migration sets them explicitly instead.
+ */
 export const gatesProjectPrefsSchema = defineVersionedSchema()
-  .initial(
-    '1',
-    z.object({
-      version: z.literal('1'),
-      /** Null means "use the app setting". */
-      testingRigor: rigorLevelSchema.nullable(),
-      securityRigor: rigorLevelSchema.nullable(),
-      /** SEC-20: the tests gate's command. Only the user sets it, never a job or a worktree file. */
-      testCommand: z.string().max(500).nullable(),
-      /** `testsGate.allowNetwork` (SEC-20/R12). Set only from Settings → Gates. Default false. */
-      allowNetwork: z.boolean().default(false),
-      /** `testsGate.allowUnsandboxed` (SEC-20/R11). Set only from Settings → Gates. Default false. */
-      allowUnsandboxed: z.boolean().default(false),
-    })
-  )
+  .initial('1', gatesProjectPrefsV1Schema)
+  .version('2', gatesProjectPrefsV2Schema, (prev) => ({
+    ...prev,
+    version: '2' as const,
+    allowNetwork: false,
+    allowUnsandboxed: false,
+  }))
   .build();
 export type GatesProjectPrefs = typeof gatesProjectPrefsSchema.Type;
 
@@ -34,7 +50,7 @@ export const gatesProjectPrefsMemento = defineMemento({
   subject: projectSubject,
   schema: gatesProjectPrefsSchema,
   default: {
-    version: '1' as const,
+    version: '2' as const,
     testingRigor: null,
     securityRigor: null,
     testCommand: null,

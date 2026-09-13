@@ -22,7 +22,11 @@ resumed a dispatcher the user had paused). SEC-27 now has its at-rest scan.
 Updated 2026-09-13 (branch `w7/testsgate-prefs`): R11 and R12's `testsGate.allowNetwork` /
 `allowUnsandboxed` opt-ins are wired to real per-project storage and a Settings → Gates UI for the
 first time (SEC-08). Not a new finding: the gap those risks accepted was previously unreachable
-(always false), so this only makes the documented, accepted risk real and user-controllable.
+(always false), so this only makes the documented, accepted risk real and user-controllable. A
+same-day independent security review of that change found one finding, fixed the same day: the
+project-prefs memento stayed at schema version '1', so a row stored before this change could read
+the two new flags as `undefined` rather than `false` in a production build (never exploited; see
+SEC-08).
 
 Inputs: plan `2026-09-10-oss-agent-workbench.md` (D5, D6, Phase 6), `docs/SEAMS.md` (§3.6–3.8,
 §3.12–3.14, §3.16–3.17), `brain-remediation-spec.md` (a real RCE in our earlier voice orchestrator),
@@ -212,6 +216,17 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   worktree, not from a job record.
   Test `SEC-08: agent identities cannot reach this service` (`project-prefs-service.test.ts`) pins
   that the three project-prefs ops have no `BrainOp` counterpart.
+  **Fixed 2026-09-13 (independent security review):** `gatesProjectPrefsSchema` stayed at version
+  '1' when the two flags were added, only as `.default(false)` on the schema. `VersionedSchema`
+  only validates a resolved version's own schema in dev (`versioned-schema.ts`); a v1 row already
+  at the latest version takes a fast path with no schema validation at all in production, so a
+  memento stored before this change would read back with both flags `undefined`, not `false`
+  (never exploited — every consumer checks `=== true`/`!== true` strictly). Fixed by bumping the
+  memento to version '2' with a real `up()` migration that sets both fields explicitly
+  (`gates/contributions/mementos.ts`); a v1 row is then never "already at the latest version", so
+  the migration runs in dev and production alike, independent of `isDevMode()`.
+  Test `SEC-08: a legacy v1 row reads with both flags strictly false in production`
+  (`gates/node/rigor/project-prefs-schema.test.ts`), run with `NODE_ENV=production`.
 - **SEC-09 Messages are data.** `read_inbox` returns JSON with `from` on every message; the dispatcher
   never concatenates inbox bodies into a lane's instructions. Messages from lanes to a Brain are
   marked `untrusted: true`.

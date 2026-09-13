@@ -117,7 +117,10 @@ export function createMementoProjectPrefsStore(
     },
     set(projectId, prefs) {
       return serial(async () => {
-        await write(gatesProjectPrefsMemento, project(projectId), { version: '1', ...prefs });
+        await write(gatesProjectPrefsMemento, project(projectId), {
+          version: '2' as const,
+          ...prefs,
+        });
         const index = await read(gatesPrefsIndexMemento, app);
         if (!index.projectIds.includes(projectId)) {
           await write(gatesPrefsIndexMemento, app, {
