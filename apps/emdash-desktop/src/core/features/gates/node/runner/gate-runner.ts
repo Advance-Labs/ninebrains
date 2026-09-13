@@ -20,6 +20,7 @@ import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import {
   decideSelfHeal,
   runGates,
+  SCREENSHOT_PRECONDITION_METRIC,
   type EvidenceStore,
   type Gate,
   type GateCapabilities,
@@ -278,9 +279,13 @@ export class GateRunnerService {
       );
     }
 
-    // Setup problems (no test command, sandbox refused, lane gone) aren't the worker's to fix.
+    // Setup problems (no test command, sandbox refused, lane gone, DevTools open on the lane
+    // browser) aren't the worker's to fix.
     const setupResult = report.results.find(
-      (r) => !r.pass && r.metrics?.[CONFIGURATION_ERROR_METRIC] === 1
+      (r) =>
+        !r.pass &&
+        (r.metrics?.[CONFIGURATION_ERROR_METRIC] === 1 ||
+          r.metrics?.[SCREENSHOT_PRECONDITION_METRIC] === 1)
     );
     const nonRetryable = report.status === 'failed' && (setupFailed || setupResult !== undefined);
     // The reason's first line is the blocked notification's body: lead with the gate's own fix.

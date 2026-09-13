@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { makeContext, solidPng } from '../test-utils';
-import type { ScreenshotCapture, Viewport } from '../types';
-import { screenshotGate } from './screenshot-gate';
+import { GatePreconditionError, type ScreenshotCapture, type Viewport } from '../types';
+import { screenshotGate, SCREENSHOT_PRECONDITION_METRIC } from './screenshot-gate';
 
 const PREVIEW = 'http://localhost:5173/pricing';
 const APPROVE = JSON.stringify({ pass: true, issues: [] });
@@ -130,5 +130,30 @@ describe('screenshotGate', () => {
     const result = await screenshotGate({ reviewer: false }).run(ctx);
     expect(result.pass).toBe(false);
     expect(result.feedback).toContain('capture failed: webview not attached');
+  });
+
+  it('marks a precondition failure (DevTools open) instead of an ordinary verdict', async () => {
+    const { ctx } = setup();
+    ctx.capabilities.captureScreenshot = async () => {
+      throw new GatePreconditionError('gate skipped: devtools open');
+    };
+    const result = await screenshotGate({ reviewer: false }).run(ctx);
+    expect(result.pass).toBe(false);
+    expect(result.metrics?.[SCREENSHOT_PRECONDITION_METRIC]).toBe(1);
+    expect(result.feedback).toContain('setup problem, not your change');
+    expect(result.feedback).toContain('capture failed: gate skipped: devtools open');
+  });
+
+  it('does not mark a precondition failure when only some viewports were skipped', async () => {
+    const { ctx } = setup();
+    let calls = 0;
+    ctx.capabilities.captureScreenshot = async () => {
+      calls += 1;
+      if (calls === 1) throw new GatePreconditionError('gate skipped: devtools open');
+      return { png: solidPng(4, 4), consoleErrors: [], failedRequests: [] };
+    };
+    const result = await screenshotGate({ reviewer: false }).run(ctx);
+    expect(result.pass).toBe(false);
+    expect(result.metrics?.[SCREENSHOT_PRECONDITION_METRIC]).toBeUndefined();
   });
 });
