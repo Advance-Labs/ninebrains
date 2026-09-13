@@ -266,7 +266,10 @@ Run a real CLI only by hand, and say in the PR that you did.
 ## End-to-end tests
 
 The Electron tests in `apps/emdash-desktop/e2e/` drive the built app with Playwright and the fake
-agent. They are kept out of CI.
+agent. They are too slow for every push, so CI runs them (`.github/workflows/e2e.yml`, under xvfb)
+only when a PR carries the `run-e2e` label, weekly, on pushes to `release/**`, and before every
+release. Add the label to any PR that touches lanes, the Brain, gates or the e2e harness. The
+daily-use coverage they give is mapped in [`docs/testing/DOGFOOD-MATRIX.md`](docs/testing/DOGFOOD-MATRIX.md).
 
 1. Build from the repo root: `pnpm run build`. It builds the workspace packages the app bundles.
    On a fresh worktree, `pnpm --dir apps/emdash-desktop build` alone fails with

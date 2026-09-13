@@ -46,6 +46,9 @@ No job is dispatched and no run starts until you clear it.
 
 Open the Brain drawer and click **Clear STOP**. Quitting and reopening the app also clears it.
 
+If jobs still don't move after that, the lane STOP stopped is still off: click **Start agent** on
+that lane. Clearing STOP does not restart it.
+
 ### The screenshot gate fails with "gate skipped: devtools open"
 
 The screenshot gate attaches to the lane's browser through the Chrome DevTools Protocol. If

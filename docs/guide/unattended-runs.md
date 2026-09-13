@@ -82,6 +82,9 @@ STOP stays **latched**: nothing new is dispatched and no run starts until you cl
 **Clear STOP** in the Agents menu, the tray menu or the Brain drawer; it is only offered while STOP
 is latched. The latch is held in memory, so quitting and reopening the app also clears it.
 
+Clearing STOP does not restart a lane that STOP stopped. The job it held goes back to **ready** and
+waits until you click **Start agent** on that lane (or another lane picks it up).
+
 Known limits:
 
 - A process that calls `setsid()` leaves its process group and survives STOP.

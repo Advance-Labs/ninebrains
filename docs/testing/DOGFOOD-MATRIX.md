@@ -181,17 +181,14 @@ Bugs and coverage holes found while building this matrix, not fixed here per the
    never-dispatched lane is left running. What is easy to miss until you dogfood it: **Clear STOP
    does not restart a stopped lane.** The job stays `ready` — not dispatched anywhere — until you
    click that lane's own "Start agent" button. A user who clears STOP and expects work to resume on
-   its own will see nothing happen. Worth a callout in the STOP section of the guide.
-4. **`docs/guide/planner.md` and `docs/guide/unattended-runs.md`/`docs/guide/brain-and-jobs.md`
-   carry stale `<!-- VERIFY -->` markers.** They say "This build has no menu item or command that
-   opens [the planner] yet" and "this build has no control to change a lane's mode yet" — both are
-   false against this worktree: `planner.open` is a real command
-   (`planner/contributions/commands.ts`) and `LaneRunModeControl`
-   (`brain/browser/lane-run-mode.tsx`) is a real, wired control, both exercised by e2e suites in
-   this PR. The docs need their VERIFY markers resolved, not the features.
-5. **`docs/guide/contributing.md` and root `CONTRIBUTING.md` both say the e2e suites are "kept out
-   of CI"**, but `.github/workflows/e2e.yml` runs `lanes-smoke`, `brain-fanout` and `self-heal` (and,
-   after this PR, the three new suites) in CI already. Doc/reality mismatch, not fixed here.
+   its own will see nothing happen. **Documented in this PR** in `docs/guide/unattended-runs.md`
+   (the STOP switch) and `docs/guide/troubleshooting.md`.
+4. **Resolved (PR #5):** the stale `<!-- VERIFY -->` markers in `planner.md`,
+   `unattended-runs.md` and `brain-and-jobs.md` that denied the Planner entry point and the lane
+   mode control. This branch was first cut before PR #5 merged.
+5. **Fixed in this PR:** `docs/guide/contributing.md` and root `CONTRIBUTING.md` said the e2e suites
+   are "kept out of CI". `.github/workflows/e2e.yml` runs them on the `run-e2e` label, weekly, on
+   `release/**` pushes and before every release; both docs now say so.
 
 ## This matrix's own coverage
 
