@@ -8,7 +8,12 @@ import {
   createMemoryMementoRowPort,
   PLANNER_MEMENTO_IDS,
 } from './canvas-store';
-import { createPlannerService, planIdFor, sanitizeProposal } from './planner-service';
+import {
+  createPlannerService,
+  planIdFor,
+  sanitizeProposal,
+  weakerGateKind,
+} from './planner-service';
 
 const BRAIN: Identity = { role: 'brain', brainId: 'test' };
 const KEY = { projectId: 'p1', canvasId: 'c1' };
@@ -244,5 +249,38 @@ describe('draft from brief', () => {
       ['new-2', true],
     ]);
     expect(proposal.edges).toEqual([{ ...edge('design', 'new-1'), proposed: true }]);
+  });
+
+  it('SEC-08 refuses a draft that declares a weaker gate kind, and allows code or ui', () => {
+    expect(weakerGateKind({ nodes: [job('a', { gateKind: 'ui' }), job('b')], edges: [] })).toBe(
+      undefined
+    );
+    for (const kind of ['research', 'seo', 'docs'] as const) {
+      expect(weakerGateKind({ nodes: [job('a', { gateKind: kind })], edges: [] })).toBe(kind);
+    }
+  });
+});
+
+describe('planner gate kind', () => {
+  it("compiles a node's gate kind into gateSpec.kind, apart from the routing kind", async () => {
+    const { brain, service } = setup();
+    await service.saveCanvas(
+      doc([
+        job('hero', { gateKind: 'ui', kind: 'work' }),
+        job('notes', { gateKind: 'docs' }),
+        job('plain'),
+      ])
+    );
+    await service.compile(KEY);
+    const byNode = new Map(
+      brain.listJobs(BRAIN, { planId: PLAN_ID }).map((j) => [j.planNodeId, j] as const)
+    );
+    expect(byNode.get('hero')).toMatchObject({
+      gateSpec: { gates: [], kind: 'ui' },
+      hints: { kind: 'work' },
+    });
+    // The canvas is the user's surface, so a weaker kind the user chose is kept.
+    expect(byNode.get('notes')?.gateSpec).toEqual({ gates: [], kind: 'docs' });
+    expect(byNode.get('plain')?.gateSpec).toBeNull();
   });
 });

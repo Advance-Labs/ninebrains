@@ -32,10 +32,10 @@ import type { EditorBufferService } from '@core/features/editor/node/editor-buff
 import { createEditorWireController } from '@core/features/editor/node/wire-controller';
 import { createFilesWireController } from '@core/features/files/node/wire-controller';
 import {
-  unavailableVerificationService,
-  type GatesVerificationService,
-} from '@core/features/gates/node/verification-service';
-import { createGatesWireController } from '@core/features/gates/node/wire-controller';
+  createGatesWireController,
+  unavailableGatesWireService,
+  type GatesWireService,
+} from '@core/features/gates/node/wire-controller';
 import type { GitCredentialsService } from '@core/features/github/api/node/services/git-credentials-service';
 import { createGithubWireController } from '@core/features/github/node/wire-controller';
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
@@ -187,8 +187,8 @@ export type DesktopControllerContext = {
   readonly workspaces: Omit<CreateWorkspacesWireControllerOptions, 'db' | 'mutations'>;
   /** Ninebrains packs. Optional until boot wiring passes one (features/packs/README.md). */
   readonly packs?: PacksService;
-  /** Ninebrains gate verification views. Optional until boot wiring passes one (features/gates/README.md). */
-  readonly gates?: GatesVerificationService;
+  /** Ninebrains gate verification views and Settings → Gates. Optional until boot wiring passes one (features/gates/README.md). */
+  readonly gates?: GatesWireService;
   /** Ninebrains planner. Optional until wired; absent means an in-memory, Brain-less fallback. */
   readonly planner?: PlannerService;
   /** Ninebrains model routing (features/routing/README.md). Absent: profiles off. */
@@ -496,7 +496,7 @@ export const desktopNodeControllers = {
       controllerFromImpl(desktopDomainContracts.lanes, createLanesWireController(lanes), scope),
   },
   gates: {
-    create: ({ gates }) => createGatesWireController(gates ?? unavailableVerificationService),
+    create: ({ gates }) => createGatesWireController(gates ?? unavailableGatesWireService),
   },
   brain: {
     create: ({ brain, scope }) =>

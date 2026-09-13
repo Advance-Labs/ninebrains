@@ -1,5 +1,5 @@
 import { Badge, Button, type BadgeTone } from '@emdash/ui/react/primitives';
-import { useState, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { cn } from '@core/primitives/styling/browser/cn';
 import {
   emptyLaneSidePanelSource,
@@ -33,10 +33,13 @@ export function LaneSidePanel({
   source?: LaneSidePanelSource;
 }) {
   const [tab, setTab] = useState<LaneSidePanelTab>('jobs');
-  const items = useSyncExternalStore(
-    (onChange) => source.subscribe(laneId, onChange),
-    () => source.list(laneId, tab)
+  // A stable subscribe: an inline one re-subscribes on every render, and each new subscription
+  // replays the lane's current data, which renders again, so the renderer never went idle.
+  const subscribe = useCallback(
+    (onChange: () => void) => source.subscribe(laneId, onChange),
+    [source, laneId]
   );
+  const items = useSyncExternalStore(subscribe, () => source.list(laneId, tab));
   const active = TABS.find((candidate) => candidate.id === tab) ?? TABS[0]!;
 
   return (

@@ -6,6 +6,7 @@ import {
   InvalidInputError,
   NotFoundError,
   type Brain,
+  type GateKind,
   type Identity,
 } from '@ninebrains/brain-core';
 import type {
@@ -326,14 +327,20 @@ export class BrainService {
     body?: string;
     dependsOn?: string[];
     gates?: string[];
+    gateKind?: GateKind;
   }) {
     return attempt(this.deps.onError, () => {
+      const { gates, gateKind } = input;
       const job = this.brain.createJob(USER_IDENTITY, {
         projectId: input.projectId,
         title: input.title,
         body: input.body,
         dependsOn: input.dependsOn,
-        gateSpec: input.gates ? { gates: input.gates } : undefined,
+        // The user's own surface: any kind, including the weaker ones agents may not declare.
+        gateSpec:
+          gates || gateKind
+            ? { gates: gates ?? [], ...(gateKind ? { kind: gateKind } : {}) }
+            : undefined,
       });
       return { jobId: job.id };
     });

@@ -54,8 +54,7 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 <!-- VERIFY: each item below is being wired into the app -->
 - **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
   into Brain jobs, idempotently, and refuses cycles. Nothing opens it yet.
-- **Per-project gate settings.** The test command the tests gate runs, and a rigor override. Until
-  a project has a test command, jobs are blocked at the default rigor.
+- **Per-project rigor override.** A project's own testing and security rigor.
 - **Lane roles and modes.** Starting a lane from a pack role, and switching a lane to unattended.
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
@@ -98,9 +97,9 @@ them; it never logs in for you.
 2. **Open Lanes.** Press ⌘K (Ctrl+K on Windows and Linux) and run **Open Lanes**.
 3. **Add lanes.** Click an empty slot, choose the project and an agent. Each lane gets its own
    worktree on a `lanes/<id>` branch. Add up to four per tab; use **+** for another tab.
-4. **Set up gates.** At the default rigor, jobs need a test command that cannot be set yet, so
-   set **Testing rigor** below 3 in Settings → Gates. Jobs then finish as unverified.
-   <!-- VERIFY: a per-project test command setting is being added -->
+4. **Set up gates.** At the default rigor, jobs need a test command. In Settings → Gates → Tests,
+   pick the project, type its test command (for example `pnpm test`) and click **Save test
+   command**.
 5. **Give the Brain a brief.** Click **Brain** in the Lanes title bar, then **Start Brain**, and
    type the brief into the Brain's terminal. The Brain breaks it into jobs, and the app hands them
    to idle lanes.

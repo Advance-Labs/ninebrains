@@ -47,10 +47,11 @@ function missingTestCommandGate(): Gate {
       pass: false,
       evidence: [],
       metrics: configurationError,
+      // The first line becomes the blocked notification, so it says where the fix is.
       feedback:
-        'No test command is set for this project, so the tests gate cannot run. This is a ' +
-        'configuration problem for the user (Settings → Gates), not something to change in ' +
-        'the worktree.',
+        'No test command is set for this project: set one in Settings → Gates → Test command.\n' +
+        'The tests gate cannot run until then. This is a configuration problem for the user, ' +
+        'not something to change in the worktree.',
     }),
   };
 }

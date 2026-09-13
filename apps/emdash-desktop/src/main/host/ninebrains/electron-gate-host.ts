@@ -61,6 +61,9 @@ async function createOffscreenWindow(partition: string) {
   });
   hardenGateSession(win.webContents.session);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // A window that has loaded nothing has no renderer yet, and CDP commands sent to it (the first
+  // is `Page.enable`) never answer. A blank page gives it one before the gate attaches.
+  await win.loadURL('about:blank');
   return {
     contents: asCdpTarget(win.webContents),
     destroy: () => {

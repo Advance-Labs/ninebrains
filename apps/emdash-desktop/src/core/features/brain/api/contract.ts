@@ -46,6 +46,8 @@ export const brainContract = defineContract({
       body: z.string().max(32_000).optional(),
       dependsOn: z.array(brainIdSchema).max(100).optional(),
       gates: z.array(z.string().min(1).max(64)).max(10).optional(),
+      /** gates-core kind for the floor (`gateSpec.kind`). The user may pick any; agents cannot. */
+      gateKind: z.enum(['code', 'ui', 'research', 'seo', 'docs']).optional(),
     }),
     data: z.object({ jobId: z.string() }),
     error: brainErrorSchema,

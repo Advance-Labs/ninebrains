@@ -21,9 +21,10 @@ import { createPrepareReviewCheckout } from '@core/features/gates/node/capabilit
 import { createRunCommand } from '@core/features/gates/node/capabilities/run-command';
 import { createSpawnReviewer } from '@core/features/gates/node/capabilities/spawn-reviewer';
 import { createGateRigor, createGatesServices } from '@core/features/gates/node/gates-services';
+import { createProjectPrefsService } from '@core/features/gates/node/project-prefs-service';
 import { createMementoProjectPrefsStore } from '@core/features/gates/node/rigor/project-prefs';
 import type { GateLaneTarget, NotificationPublisher } from '@core/features/gates/node/runner/ports';
-import type { GatesVerificationService } from '@core/features/gates/node/verification-service';
+import type { GatesWireService } from '@core/features/gates/node/wire-controller';
 import type { LaneService } from '@core/features/lanes/node/lane-service';
 import {
   createConversationsPort,
@@ -96,7 +97,8 @@ export type NinebrainsServices = {
   readonly brain: BrainService;
   readonly packs: PacksService;
   readonly planner: PlannerService;
-  readonly gates: GatesVerificationService;
+  /** The Job verification modal plus Settings → Gates (the per-project test command). */
+  readonly gates: GatesWireService;
   readonly routing: RoutingService;
   resolveLaneLaunch(
     conversationId: string,
@@ -395,7 +397,7 @@ export async function createNinebrainsServices(
     brain: brainService,
     packs,
     planner,
-    gates: gates.verification,
+    gates: { ...gates.verification, ...createProjectPrefsService(gates.rigor) },
     routing,
     resolveLaneLaunch: (conversationId, upstream) =>
       brainService.resolveSessionLaunch(conversationId, upstream) ??

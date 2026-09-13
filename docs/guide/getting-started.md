@@ -80,12 +80,10 @@ Useful from here:
 ## 4. Set up gates
 
 At the default settings, every job the Brain creates must pass the tests gate, and the tests gate
-needs a test command for the project. This build has no field to set one, so every job is blocked
-until you change the rigor.
-<!-- VERIFY: a per-project test command setting is being added -->
+needs a test command for the project. Without one, every job is blocked.
 
-For now, open **Settings → Gates** and set **Testing rigor** below 3. Jobs then finish as
-**unverified** rather than blocked. See [Verification gates](gates.md#test-command).
+Open **Settings → Gates**. Under **Tests**, pick the project, type its test command (for example
+`pnpm test`) and click **Save test command**. See [Verification gates](gates.md#test-command).
 
 ## 5. Give the Brain a brief
 

@@ -170,6 +170,22 @@ real captures, fires hooks from `--settings`, and makes real MCP stdio calls.
 
 Run a real CLI only by hand, and say in the PR that you did.
 
+## End-to-end tests
+
+The Electron tests in `apps/emdash-desktop/e2e/` drive the built app with Playwright and the fake
+agent. They are kept out of CI.
+
+1. Build from the repo root: `pnpm run build`. It builds the workspace packages the app bundles.
+   On a fresh worktree, `pnpm --dir apps/emdash-desktop build` alone fails with
+   `@emdash/wire/worker` unresolved.
+2. Run one test, for example `node apps/emdash-desktop/e2e/self-heal.e2e.mjs`
+   (`brain-fanout.e2e.mjs` and `lanes-smoke.e2e.mjs` work the same way).
+
+Each run gets a temp profile and HOME, `--use-mock-keychain` and a fake `claude` on PATH. Lanes and
+reviewer runs get an allowlisted environment, so the harness bakes the test's lane script and an
+approving reviewer script into that `claude` wrapper instead of passing `FAKE_AGENT_*` variables.
+The app's main-process output for a run is in `<profile>/main.log`.
+
 ## Security-sensitive code
 
 Lanes run agents that execute shell commands as the user. Treat these areas as high risk: the Brain

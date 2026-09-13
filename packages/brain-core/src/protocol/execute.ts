@@ -149,14 +149,18 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
       return { id: note.id, projectId: note.projectId, jobId: note.jobId };
     }
     case 'create_job': {
-      const { title, body, projectId, dependsOn, gates, kind, paths } = request.args;
+      const { title, body, projectId, dependsOn, gates, gateKind, kind, paths } = request.args;
       return jobSummary(
         brain.createJob(me, {
           projectId: project(projectId),
           title,
           body,
           dependsOn,
-          gateSpec: gates ? { gates } : null,
+          // scope.ts has already refused a kind that would weaken the floor (SEC-08).
+          gateSpec:
+            gates || gateKind
+              ? { gates: gates ?? [], ...(gateKind ? { kind: gateKind } : {}) }
+              : null,
           hints: { ...(kind ? { kind } : {}), ...(paths ? { paths } : {}) },
         })
       );

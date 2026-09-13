@@ -11,6 +11,14 @@ export const gatesErrorSchema = z.object({
 export type GatesError = z.infer<typeof gatesErrorSchema>;
 
 const jobId = z.string().min(1).max(64);
+const projectId = z.string().min(1).max(200);
+
+/** Settings → Gates, per project. `testCommand` null means none is set: code and UI jobs block. */
+export const gatesProjectPrefsViewSchema = z.object({
+  projectId: z.string(),
+  testCommand: z.string().nullable(),
+});
+export type GatesProjectPrefsView = z.infer<typeof gatesProjectPrefsViewSchema>;
 
 export const gatesContract = defineContract({
   /** Everything the "Job verification" modal shows for one job. */
@@ -33,6 +41,17 @@ export const gatesContract = defineContract({
   deleteEvidence: fallible({
     input: z.object({ jobId }),
     data: z.object({ jobId: z.string() }),
+    error: gatesErrorSchema,
+  }),
+  getProjectPrefs: fallible({
+    input: z.object({ projectId }),
+    data: gatesProjectPrefsViewSchema,
+    error: gatesErrorSchema,
+  }),
+  /** SEC-20: the tests gate's command. Only this user action sets it, never a job or a worktree. */
+  setTestCommand: fallible({
+    input: z.object({ projectId, testCommand: z.string().max(500).nullable() }),
+    data: gatesProjectPrefsViewSchema,
     error: gatesErrorSchema,
   }),
 });

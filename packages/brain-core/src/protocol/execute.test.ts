@@ -197,6 +197,26 @@ describe('executeBrainRequest', () => {
     });
   });
 
+  describe('SEC-08 agents cannot declare a weaker kind', () => {
+    it.each(['research', 'seo', 'docs'] as const)(
+      '%s is FORBIDDEN to brain and lane tokens',
+      (kind) => {
+        for (const who of ['hub', 'A'] as const) {
+          expect(call(who, 'create_job', { title: 'T', gateKind: kind })).toMatchObject({
+            ok: false,
+            error: { code: 'FORBIDDEN' },
+          });
+        }
+        expect(brain.listJobs(BRAIN, { projectId: 'p1' })).toEqual([]);
+      }
+    );
+
+    it.each(['code', 'ui'] as const)('a Brain session may declare %s', (kind) => {
+      const job = result('hub', 'create_job', { title: 'T', gateKind: kind });
+      expect(brain.getJob(BRAIN, job.id).gateSpec).toEqual({ gates: [], kind });
+    });
+  });
+
   it('M3 refuses a Brain grant with no project: v0.1 has no global grant', () => {
     for (const args of [{ title: 'T' }, { title: 'T', projectId: 'p1' }]) {
       const response = executeBrainRequest(

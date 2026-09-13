@@ -21,8 +21,9 @@ each rigor level attaches.
 
 ## Per-project gate preferences
 
-Each project can hold these values. None of them can be set in this build.
-<!-- VERIFY: per-project gate settings (test command and rigor override) are being added -->
+Each project can hold these values. Set `testCommand` in **Settings → Gates → Tests**. The rigor
+overrides cannot be set in this build.
+<!-- VERIFY: a per-project rigor override is being added -->
 
 | Field | Meaning |
 |---|---|

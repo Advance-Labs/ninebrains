@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { ID_PATTERN } from '../ids';
 import { LIMITS, utf8Bytes } from '../limits';
-import { ADDRESS_KINDS, JOB_STATES } from '../types';
+import { ADDRESS_KINDS, GATE_KINDS, JOB_STATES } from '../types';
 
 export const BRAIN_PROTOCOL_VERSION = 1 as const;
 
@@ -111,6 +111,12 @@ export const opArgs = {
       .optional()
       .describe(
         'Verification gates to run on completion, e.g. ["tests", "screenshot", "reviewer"].'
+      ),
+    gateKind: z
+      .enum(GATE_KINDS)
+      .optional()
+      .describe(
+        'What the work is, so the right verification applies: "ui" adds screenshots of the preview to the code gates. Agents may declare "code" or "ui" only. Defaults to "code".'
       ),
     kind: z.enum(['work', 'review']).optional(),
     paths: z

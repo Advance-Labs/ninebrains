@@ -99,7 +99,7 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T04 | Web page or local process calls the Brain endpoint (`fetch('http://127.0.0.1:<port>')`, DNS rebinding, port scan) | M | H | loopback bind, Host check, Origin/Sec-Fetch reject, header token, no CORS, JSON-only | SEC-04, SEC-05 |
 | T05 | Token guessed or timed | L | H | 256-bit random, constant-time compare, per-launch rotation | SEC-03 |
 | T06 | Endpoint flooded or fed huge bodies (renderer or lane DoS) | M | M | body cap, header timeout, per-token rate limit | SEC-06 |
-| T07 | Injected Brain (or lane) creates jobs with `gates: []`, so work ships as `unverified` | M | H | gate floor from rigor settings; callers can only add gates | SEC-08 |
+| T07 | Injected Brain (or lane) creates jobs with `gates: []`, so work ships as `unverified` | M | H | gate floor from rigor settings; callers can only add gates; agents may declare only the code or ui kind | SEC-08 |
 | T08 | Job body breaks out of the bracketed paste and types keystrokes, or a paste lands on a permission prompt and approves it | M | H | paste only when idle; strip ESC/C0; reject `ESC[201~` | SEC-15 |
 | T09 | Job body starting with `--` is parsed as a CLI flag (`--dangerously-skip-permissions`) | M | H | prompt via stdin, never argv | SEC-17 |
 | T10 | Worktree plants `claude.cmd` / `node_modules/.bin/claude` and the dispatcher runs it | M | H | absolute binary path from the dependency resolver; no `shell: true` | SEC-16 |
@@ -184,6 +184,13 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   UI, lowers rigor.
   Test `SEC-08 caller cannot drop gates`: `create_job({ gates: [] })` at testing rigor 7 still gets
   `reviewer`; no job created by an agent is `unverified` above rigor 0.
+  The job's kind (`gateKind`, stored as `gateSpec.kind`) feeds the floor, so it is part of the
+  rule: an agent (a Brain session or lane token) may declare only `code` or `ui`, whose floors hold
+  everything `code` requires. `research`, `seo` and `docs` have weaker floors and are refused with
+  FORBIDDEN, never coerced. The app's own identities (the UI's `createJob`, the planner canvas) may
+  set any kind; a Brain-written planner draft that declares a weaker kind is refused.
+  Tests `SEC-08 agents cannot declare a weaker kind` (brain and lane tokens, each weaker kind →
+  FORBIDDEN) and `SEC-08 ui kind adds the screenshot floor`.
 - **SEC-09 Messages are data.** `read_inbox` returns JSON with `from` on every message; the dispatcher
   never concatenates inbox bodies into a lane's instructions. Messages from lanes to a Brain are
   marked `untrusted: true`.
@@ -461,7 +468,7 @@ the agents or slices expected to close the gap.
 | SEC-05 | Done at the handler | `http.test.ts`. The offscreen-`BrowserWindow` e2e is not written [w5-brain-wiring] |
 | SEC-06 | Done, extended | `http.test.ts`; `pre-auth.test.ts` (L3): a failed-auth budget (5/s, burst 20) is checked before any token is resolved |
 | SEC-07 | Done | `boundary.test.ts` |
-| SEC-08 | Done | `gate-floor.test.ts` |
+| SEC-08 | Done, extended | `gate-floor.test.ts`; the kind rule: `SEC-08 agents cannot declare a weaker kind` (brain-core `execute.test.ts`), `SEC-08 ui kind adds the screenshot floor` (gates `rigor.test.ts`), and drafts in `planner-service.test.ts` [w7/self-heal-e2e] |
 | SEC-09 | Done, extended | `boundary.test.ts`; L1: recipients must exist and share the sender's project (`project-scope.test.ts`); gate feedback is persisted `untrusted` (`gate-feedback.test.ts`) and brain-mcp fences every untrusted body it hands a lane (`fence.test.ts`, `stdio.test.ts`) |
 | SEC-10 | Open | Lane config writer [w5-brain-wiring] |
 | SEC-11 | Partial | Settings are generated and tested (`sandbox-settings.test.ts`). M4 widened the deny list to one shared list plus all of `<userData>`. T36 adds a write deny on the lane repo's `config`, `config.worktree`, `info/attributes` and `hooks` (`T36` snapshot, `lane-git-paths.test.ts`). **Manual pre-release e2e with the real CLI:** the live read deny, and the T36 write deny. The e2e must check that `git config`, `echo > .git/info/attributes` and a new hook fail from a lane while `git commit` still works, including on Linux for paths that do not exist yet (`info/attributes`, `config.worktree`) |

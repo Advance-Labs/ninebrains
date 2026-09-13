@@ -249,7 +249,7 @@ worktrees unsandboxed (THREAT-MODEL T36). Each helper gains one import and one
 Ninebrains files also touched: `exec-runs/api/node/{sandbox-settings,run-supervisor}.ts` and
 `brain/node/launch-config.ts` (the T36 write deny).
 
-## 12. Model routing (W7 `routing`, wave 1)
+## 14. Model routing (W7 `routing`, wave 1)
 
 Append-only registrations. Lever B is behind the fork flag `MODEL_PROFILES_ENABLED`
 (`app-identity/api/fork-flags.ts`, a Ninebrains file: `import.meta.env.DEV`, so on in dev builds
@@ -272,6 +272,22 @@ and `tooling/fake-agent/src/events.mjs` (`apiKeySource` follows `ANTHROPIC_API_K
 New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/routing-launch.e2e.test.ts`,
 `src/renderer/tests/browser/routing-screenshots.test.tsx`, `docs/screenshots/routing-*.png`,
 `docs/research/VENDORS.md`, `docs/guide/models.md`.
+
+## 15. UI jobs and the test command (W7 `w7/self-heal-e2e`)
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/node/controllers.ts` | `gates?: GatesWireService` (verification plus project prefs) and the `unavailableGatesWireService` fallback | Settings → Gates reads and saves the per-project test command over the existing `gates` domain; `wiring.ts` is unchanged |
+| `src/core/features/settings/browser/components/SettingsPage.tsx` | `navItemFor('packs')`, `navItemFor('gates')` in the sidebar | Both pages were registered contributions, but the fixed sidebar list left them out, so neither could be opened |
+
+Ninebrains files also touched: brain-core `types.ts` and `protocol/{ops,execute,scope}.ts`
+(`gateKind`, SEC-08 agent kinds), brain-mcp `tools.ts`, `gates/api/contract.ts`,
+`gates/node/{project-prefs-service,wire-controller}.ts`, `gates/node/runner/{gate-registry,gate-runner}.ts`,
+`gates/node/capabilities/run-command.ts` (a gate command may run in a lane worktree root itself),
+`gates/browser/{gates-settings-view,test-command-section}.tsx`, `planner/api/{schema,index}.ts`,
+`planner/node/{ports,brain-plan-target,planner-service}.ts`, `brain/api/contract.ts`,
+`brain/node/brain-service.ts`, `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`,
+`e2e/{harness,brain-fanout.e2e,self-heal.e2e}.mjs`.
 
 ## New Ninebrains-only files
 
@@ -297,4 +313,6 @@ New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/r
 `src/renderer/tests/browser/daily-use-screenshots.test.tsx`,
 `docs/screenshots/{lanes-run-mode,lanes-add-lane-role,packs-secrets}-*.png`,
 `packages/core/src/services/exec/api/hardened-git{,.test}.ts`,
-`packages/core/src/services/exec/node/hardened-git.test-fixtures.ts`.
+`packages/core/src/services/exec/node/hardened-git.test-fixtures.ts`,
+`e2e/brain-e2e.mjs`, `src/core/features/gates/node/project-prefs-service{,.test}.ts`,
+`src/core/features/gates/browser/test-command-section.tsx`.

@@ -11,12 +11,12 @@ description: >-
 ### Every job is blocked with "No test command is set for this project"
 
 At the default rigor, every code and ui job gets the tests gate, and a job with no kind counts as
-code. The tests gate needs a test command for the project, and this build has no field to set
-one. The job is blocked at once and no attempt is used.
-<!-- VERIFY: a per-project test command setting is being added -->
+code. The tests gate needs a test command for the project; without one, the job is blocked at once
+and no attempt is used.
 
-To let jobs finish, open **Settings → Gates** and set **Testing rigor** below 3. Jobs then finish as
-**unverified**, not passed. See [Verification gates](gates.md#test-command).
+Open **Settings → Gates**, pick the project under **Tests**, type its test command (for example
+`pnpm test`) and click **Save test command**. Then requeue the blocked job. See
+[Verification gates](gates.md#test-command).
 
 ### The tests gate says it needs a sandbox
 

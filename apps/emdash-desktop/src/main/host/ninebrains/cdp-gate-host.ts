@@ -15,6 +15,8 @@
  *   webview (or another debugger holds it), the gate is skipped, not faked.
  * - No mounted webview (unattended runs): an offscreen window on the lane's
  *   partition, or an ephemeral per-lane one, destroyed afterwards.
+ * - Every command has its own deadline, so a target that never answers fails
+ *   this capture instead of holding the whole gate until its time limit.
  */
 import type { FailedRequest, ScreenshotCapture, Viewport } from '@emdash/gates-core';
 import type { LaneBrowserTarget, ScreenshotHost } from '@core/features/gates/node/runner/ports';
@@ -54,6 +56,8 @@ export interface CdpGateHostDeps {
   loadTimeoutMs?: number;
   /** Time after `load` to catch late console errors. Default 300 ms. */
   settleMs?: number;
+  /** How long each CDP command may take to answer. Default 15 s. */
+  commandTimeoutMs?: number;
 }
 
 export class GateSkippedError extends Error {
@@ -135,12 +139,24 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** Rejects when `work` has not settled within `ms`, naming the CDP method that went quiet. */
+function answerWithin<T>(work: Promise<T>, ms: number, method: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`the browser did not answer ${method} within ${ms} ms`)),
+      ms
+    );
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function captureWith(
   contents: CdpTargetLike,
   viewport: Viewport,
   preview: URL,
   signal: AbortSignal,
-  options: { loadTimeoutMs: number; settleMs: number }
+  options: { loadTimeoutMs: number; settleMs: number; commandTimeoutMs: number }
 ): Promise<ScreenshotCapture> {
   const dbg = contents.debugger;
   const consoleErrors: string[] = [];
@@ -226,21 +242,20 @@ async function captureWith(
   });
   aborted.catch(() => undefined);
   const guard = <T>(work: Promise<T>) => Promise.race([work, detached, aborted]);
+  const send = (method: string, params?: Record<string, unknown>) =>
+    guard(answerWithin(dbg.sendCommand(method, params), options.commandTimeoutMs, method));
 
   dbg.attach('1.3');
   try {
-    for (const domain of ['Page', 'Runtime', 'Log', 'Network'])
-      await guard(dbg.sendCommand(`${domain}.enable`));
-    await guard(
-      dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
-        width: viewport.width,
-        height: viewport.height,
-        deviceScaleFactor: 1,
-        mobile: viewport.width < 768,
-      })
-    );
+    for (const domain of ['Page', 'Runtime', 'Log', 'Network']) await send(`${domain}.enable`);
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: 1,
+      mobile: viewport.width < 768,
+    });
     navigating = true;
-    const navigation = (await guard(dbg.sendCommand('Page.navigate', { url: preview.href }))) as {
+    const navigation = (await send('Page.navigate', { url: preview.href })) as {
       errorText?: string;
     } | null;
     if (navigation?.errorText) {
@@ -264,9 +279,10 @@ async function captureWith(
       clearTimeout(timer);
     }
     await guard(delay(options.settleMs, signal));
-    const shot = (await guard(
-      dbg.sendCommand('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
-    )) as { data?: string } | null;
+    const shot = (await send('Page.captureScreenshot', {
+      format: 'png',
+      captureBeyondViewport: false,
+    })) as { data?: string } | null;
     if (typeof shot?.data !== 'string') throw new Error('the browser returned no screenshot');
     return {
       png: Uint8Array.from(Buffer.from(shot.data, 'base64')),
@@ -277,7 +293,11 @@ async function captureWith(
     stopMessages();
     stopDetach();
     if (dbg.isAttached()) {
-      await dbg.sendCommand('Emulation.clearDeviceMetricsOverride').catch(() => undefined);
+      await answerWithin(
+        dbg.sendCommand('Emulation.clearDeviceMetricsOverride'),
+        options.commandTimeoutMs,
+        'Emulation.clearDeviceMetricsOverride'
+      ).catch(() => undefined);
       try {
         dbg.detach();
       } catch {
@@ -288,7 +308,11 @@ async function captureWith(
 }
 
 export function createCdpGateHost(deps: CdpGateHostDeps): ScreenshotHost {
-  const options = { loadTimeoutMs: deps.loadTimeoutMs ?? 30_000, settleMs: deps.settleMs ?? 300 };
+  const options = {
+    loadTimeoutMs: deps.loadTimeoutMs ?? 30_000,
+    settleMs: deps.settleMs ?? 300,
+    commandTimeoutMs: deps.commandTimeoutMs ?? 15_000,
+  };
 
   function laneWebview(target: LaneBrowserTarget): CdpTargetLike | undefined {
     if (deps.mode === 'offscreen' || !target.browserId) return undefined;

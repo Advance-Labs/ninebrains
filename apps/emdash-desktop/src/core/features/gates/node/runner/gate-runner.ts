@@ -279,14 +279,16 @@ export class GateRunnerService {
     }
 
     // Setup problems (no test command, sandbox refused, lane gone) aren't the worker's to fix.
-    const nonRetryable =
-      report.status === 'failed' &&
-      (setupFailed ||
-        report.results.some((r) => !r.pass && r.metrics?.[CONFIGURATION_ERROR_METRIC] === 1));
+    const setupResult = report.results.find(
+      (r) => !r.pass && r.metrics?.[CONFIGURATION_ERROR_METRIC] === 1
+    );
+    const nonRetryable = report.status === 'failed' && (setupFailed || setupResult !== undefined);
+    // The reason's first line is the blocked notification's body: lead with the gate's own fix.
+    const setupLine = setupResult?.feedback.split('\n')[0]?.trim();
     const decision: SelfHealDecision = nonRetryable
       ? {
           action: 'block',
-          reason: `Verification can't run until the user fixes the setup, so no attempt was used.\n\n${report.feedback}`,
+          reason: `${setupLine || "Verification can't run until the user fixes the setup."} This is setup, so no attempt was used.\n\n${report.feedback}`,
         }
       : decideSelfHeal(report, attempt, MAX_ATTEMPTS);
     const feedback =
