@@ -52,12 +52,14 @@ function mcpOverrides(spec: ExecRunSpec): string[] {
  * The argv plus the `-c` overrides this builder generated. The SEC-12 guard refuses any `-c`
  * value not in `trusted`, so an override injected from elsewhere never reaches Codex.
  * The trailing `-` reads the prompt from stdin (SEC-17), per `codex exec --help`.
+ * `routeConfig` is the model route's `-c` values (`routeLaunch`), trusted like the rest.
  */
 export function buildCodexExecLaunch(
   spec: ExecRunSpec,
-  cwd: string
+  cwd: string,
+  routeConfig: readonly string[] = []
 ): { argv: string[]; trusted: string[] } {
-  const config = ['approval_policy="never"', ...mcpOverrides(spec)];
+  const config = ['approval_policy="never"', ...mcpOverrides(spec), ...routeConfig];
   return {
     argv: [
       'exec',

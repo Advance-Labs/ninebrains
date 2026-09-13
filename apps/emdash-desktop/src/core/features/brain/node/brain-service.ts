@@ -15,6 +15,7 @@ import type {
 } from '@core/features/exec-runs/api/node/types';
 import type { LaneConfig, LaneRunMode } from '@core/features/lanes/api';
 import type { PackLaunch } from '@core/features/packs/api/launch';
+import type { LaunchRouting } from '@core/features/routing/api/node/launch-env';
 import type { BrainAddress, BrainDispatcherView, BrainError } from '../api';
 import { pastePrompt, type LaneAgentState } from './attended';
 import { BrainSessions, type BrainSessionPorts } from './brain-sessions';
@@ -51,6 +52,20 @@ export interface BrainLanesPort {
   refresh(): void;
 }
 
+/** What routing needs to know about a lane. */
+export interface RoutingLane {
+  laneId: string;
+  provider: 'claude' | 'codex';
+  subagentModel?: string;
+  authProfileId?: string;
+}
+
+/** The routing side, bound by the composition root (routing's `node/` may not be imported). */
+export interface BrainRoutingPort {
+  /** The lane's route. For a profile it decrypts the key, for one launch (SEC-40). */
+  prepare(lane: RoutingLane): Promise<LaunchRouting>;
+}
+
 export interface BrainSupervisorPort {
   run(spec: ExecRunSpec): Promise<ExecRunResult>;
   killAll(): Promise<void>;
@@ -76,6 +91,8 @@ export interface BrainServiceDeps {
    */
   verification?: 'internal' | 'external';
   claudeConfigDir?: string;
+  /** Model routing. Without it a lane on a model profile refuses to launch. */
+  routing?: BrainRoutingPort;
   onError(context: string, error: unknown): void;
   sleep?(ms: number): Promise<void>;
   dispatch?: { intervalMs?: number; debounceMs?: number; submitDelayMs?: number };
@@ -121,6 +138,8 @@ export class BrainService {
   readonly dispatcher: Dispatcher;
   private readonly verification: VerificationHandler;
   private readonly packCache = new Map<string, PackLaunch>();
+  /** Profile routes prepared for the next launch of a lane, taken once (or why they failed). */
+  private readonly preparedRoutes = new Map<string, LaunchRouting | Error>();
   private readonly offs: Array<() => void> = [];
 
   constructor(private readonly deps: BrainServiceDeps) {
@@ -157,6 +176,7 @@ export class BrainService {
               pack: (projectId, roleId) => this.pack(projectId, roleId),
               siblingWorktrees: (laneId) => this.siblingWorktrees(laneId),
               budgets: deps.unattendedBudgets,
+              routing: (lane) => this.routeFor(lane),
             },
             lane,
             job
@@ -259,6 +279,7 @@ export class BrainService {
     return {
       prepareLaunch: async (lane: LaneConfig) => {
         await this.pack(lane.projectId, lane.roleId);
+        await this.prepareRoute(lane);
       },
       resolveLaunch: (lane: LaneConfig, upstream: UpstreamLaunchArgs & { cwd: string }) =>
         buildLaneLaunch(
@@ -276,10 +297,14 @@ export class BrainService {
             laneHint: lane.laneId,
             siblingWorktrees: this.siblingWorktrees(lane.laneId),
             pack: this.packCache.get(packCacheKey(lane.projectId, lane.roleId)),
+            routing: this.takeRoute(lane),
           },
           upstream
         ),
-      releaseLaunch: (laneId: string) => this.release(laneLaunchKey(laneId), laneId),
+      releaseLaunch: (laneId: string) => {
+        this.preparedRoutes.delete(laneId);
+        this.release(laneLaunchKey(laneId), laneId);
+      },
       override: (laneId: string) => {
         const held = this.brain.listJobs(APP_IDENTITY, {
           laneId,
@@ -477,6 +502,47 @@ export class BrainService {
       this.deps.onError('brain: pack launch failed', error);
       return this.packCache.get(key);
     }
+  }
+
+  // --- model routing (docs/plans/2026-09-12-model-routing.md) -----------------
+
+  /** A lane's route. A profile needs the routing port, which decrypts its key. */
+  private async routeFor(lane: RoutingLane): Promise<LaunchRouting> {
+    if (!lane.authProfileId) {
+      return { auth: { mode: 'subscription' }, subagentModel: lane.subagentModel };
+    }
+    if (!this.deps.routing) throw new Error('Model routing is not available in this build.');
+    return this.deps.routing.prepare(lane);
+  }
+
+  /** Before a lane launch: resolve its route (async), so the sync launch hook can take it. */
+  private async prepareRoute(lane: LaneConfig): Promise<void> {
+    this.preparedRoutes.delete(lane.laneId);
+    if (!lane.authProfileId) return;
+    try {
+      this.preparedRoutes.set(lane.laneId, await this.routeFor(lane));
+    } catch (error) {
+      this.preparedRoutes.set(
+        lane.laneId,
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /**
+   * The launch hook's route, taken once so a decrypted key lives only until its launch. A
+   * profile lane with no prepared route fails its launch; it never falls back to the
+   * subscription.
+   */
+  private takeRoute(lane: LaneConfig): LaunchRouting {
+    if (!lane.authProfileId) {
+      return { auth: { mode: 'subscription' }, subagentModel: lane.subagentModel };
+    }
+    const prepared = this.preparedRoutes.get(lane.laneId);
+    this.preparedRoutes.delete(lane.laneId);
+    if (prepared instanceof Error) throw prepared;
+    if (!prepared) throw new Error('The lane’s model profile was not prepared. Relaunch the lane.');
+    return prepared;
   }
 
   private agentOf(laneId: string): LaneAgentState | undefined {

@@ -20,6 +20,8 @@ const brainStoreDefinition = defineDurableSqliteStore({
 
 export interface OpenedBrainStore {
   store: SqliteBrainStore;
+  /** The same connection, for Ninebrains tables outside brain-core's store (`model_profiles`). */
+  connection: SqliteConnectionLike;
   close(): void;
 }
 
@@ -32,11 +34,9 @@ export interface OpenedBrainStore {
 export function openBrainStore(path: string): OpenedBrainStore {
   ensurePrivateDbFile(path);
   const handle = brainStoreDefinition.open(path);
-  const store = SqliteBrainStore.fromConnection(
-    handle.connection as unknown as SqliteConnectionLike,
-    { path }
-  );
-  return { store, close: () => handle.close() };
+  const connection = handle.connection as unknown as SqliteConnectionLike;
+  const store = SqliteBrainStore.fromConnection(connection, { path });
+  return { store, connection, close: () => handle.close() };
 }
 
 export function ensurePrivateDbFile(path: string): void {

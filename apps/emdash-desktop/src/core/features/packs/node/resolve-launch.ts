@@ -189,6 +189,7 @@ export async function resolvePackLaunch(input: ResolvePackLaunchInput): Promise<
     };
     if (found.role.provider) role.provider = found.role.provider;
     if (found.role.model) role.model = found.role.model;
+    if (found.role.subagentModel) role.subagentModel = found.role.subagentModel;
     launch.role = role;
   }
   return launch;

@@ -16,6 +16,7 @@ import { createMementoBrainSessionsPersistence } from '@core/features/brain/node
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
 import type { ExecProvider } from '@core/features/exec-runs/api/node/types';
 import { createFetchText } from '@core/features/gates/node/capabilities/fetch-text';
+import { isBlockedAddress } from '@core/features/gates/node/capabilities/ip-policy';
 import { createPrepareReviewCheckout } from '@core/features/gates/node/capabilities/review-checkout';
 import { createRunCommand } from '@core/features/gates/node/capabilities/run-command';
 import { createSpawnReviewer } from '@core/features/gates/node/capabilities/spawn-reviewer';
@@ -42,6 +43,14 @@ import {
   type PlannerService,
 } from '@core/features/planner/node/planner-service';
 import type { PreviewServerAccessOperations } from '@core/features/preview-servers/node/preview-server-access-service';
+import { createProfileKeyStore } from '@core/features/routing/node/keys';
+import { createProfilesRepo } from '@core/features/routing/node/profiles-repo';
+import {
+  createRoutingService,
+  type RoutingService,
+} from '@core/features/routing/node/routing-service';
+import { createConnectionTester } from '@core/features/routing/node/test-connection';
+import { MODEL_PROFILES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import { previewServerUrl } from '@core/primitives/preview-servers/api';
 import { tasks } from '@core/services/app-db/node/schema';
 import type { AppSettingsService } from '@core/services/settings/node/app-settings-service';
@@ -88,6 +97,7 @@ export type NinebrainsServices = {
   readonly packs: PacksService;
   readonly planner: PlannerService;
   readonly gates: GatesVerificationService;
+  readonly routing: RoutingService;
   resolveLaneLaunch(
     conversationId: string,
     upstream: NinebrainsLaunchInput
@@ -167,6 +177,8 @@ export async function createNinebrainsServices(
                 mode: lane.runMode ?? 'attended',
                 ...(lane.roleId ? { roleId: lane.roleId } : {}),
                 ...(lane.model ? { model: lane.model } : {}),
+                ...(lane.subagentModel ? { subagentModel: lane.subagentModel } : {}),
+                ...(lane.authProfileId ? { authProfileId: lane.authProfileId } : {}),
               },
             ]
           : []
@@ -190,6 +202,28 @@ export async function createNinebrainsServices(
     },
     allowedRoots: () => [...laneWorktrees(), checkoutRoot],
     maxConcurrentRuns: 4,
+  });
+  // SEC-41 refusals. SEC-33's security_events table is still open, so they go to the log.
+  deps.scope.add(
+    supervisor.onEvent((event) => {
+      if (event.type === 'security') {
+        deps.logger.warn('ninebrains: security event', {
+          runId: event.runId,
+          kind: event.kind,
+          detail: event.detail,
+        });
+      }
+    })
+  );
+
+  // Model routing (docs/plans/2026-09-12-model-routing.md): profiles in the Brain DB, keys in
+  // the keychain (SEC-40), Test connection under the SEC-21 address policy.
+  const routing = createRoutingService({
+    enabled: MODEL_PROFILES_ENABLED,
+    profiles: createProfilesRepo(opened.connection),
+    keys: createProfileKeyStore(encryptedAppSecretsStore),
+    testConnection: createConnectionTester({ isBlockedAddress }),
+    onError,
   });
 
   const brainLanes: BrainLanesPort = {
@@ -233,6 +267,7 @@ export async function createNinebrainsServices(
     packs,
     // The gates below own `verifying` jobs.
     verification: 'external',
+    routing: { prepare: (lane) => routing.prepareLaunch(lane) },
     onError,
   });
   lanes = createLaneService(deps, brainService.laneBrainPort());
@@ -361,6 +396,7 @@ export async function createNinebrainsServices(
     packs,
     planner,
     gates: gates.verification,
+    routing,
     resolveLaneLaunch: (conversationId, upstream) =>
       brainService.resolveSessionLaunch(conversationId, upstream) ??
       laneService.resolveLaneLaunch(conversationId, upstream),

@@ -113,6 +113,7 @@ export function createDesktopWireOptions(
     packs: services.ninebrains.packs,
     planner: services.ninebrains.planner,
     gates: services.ninebrains.gates,
+    routing: services.ninebrains.routing,
     legacyPortOperations,
     logger: log,
     loggingOperations: {

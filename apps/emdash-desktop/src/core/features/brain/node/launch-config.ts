@@ -7,6 +7,14 @@ import {
   buildClaudeSandboxSettings,
 } from '@core/features/exec-runs/api/node/sandbox-settings';
 import type { McpServerEntry, PackLaunch } from '@core/features/packs/api/launch';
+import {
+  assertLaunchPolicy,
+  LaunchPolicyError,
+  routeLaunch,
+  SUBSCRIPTION,
+  type LaunchRouting,
+} from '@core/features/routing/api/node/launch-env';
+import { managedGatewaySettings } from '@core/features/routing/api/node/managed-settings';
 import type { BrainEndpoint } from './endpoint';
 import { buildLaneStatusHooks } from './hook-settings';
 import { launchDir, ninebrainsDataDir, writePrivateFileSync } from './lane-files';
@@ -82,6 +90,8 @@ export interface LaunchTarget {
   laneHint?: string;
   siblingWorktrees: readonly string[];
   pack?: PackLaunch;
+  /** The model route. Absent: the subscription, with the gateway variables neutralized. */
+  routing?: LaunchRouting;
 }
 
 export interface LaunchConfigDeps {
@@ -89,6 +99,8 @@ export interface LaunchConfigDeps {
   endpoint: Pick<BrainEndpoint, 'url' | 'mint'>;
   brainMcp: BrainMcpRuntime;
   claudeConfigDir?: string;
+  /** Claude Code's managed-settings files to check (SEC-41). Default: the platform's. */
+  managedSettingsPaths?: readonly string[];
 }
 
 export interface UpstreamLaunchArgs {
@@ -111,6 +123,11 @@ export interface LaneLaunch {
  * live only in the server entries' env, never in `providerVars` (SEC-10).
  * Every flag is `--flag=value` (spike §3.1), and the argv guard runs over the
  * user's flags plus ours (SEC-12).
+ *
+ * `providerVars` carries only the model route (`routeLaunch`): a subscription
+ * launch blanks the gateway variables over the user's shell env, and SEC-39 is
+ * checked on the result. A profile launch carries its key here, into this one
+ * PTY's env and nowhere else (SEC-40).
  */
 export function buildLaneLaunch(
   deps: LaunchConfigDeps,
@@ -125,6 +142,11 @@ export function buildLaneLaunch(
   const brain = brainServerEntry(deps.brainMcp, deps.endpoint.url, token, target.laneHint);
   const mcpConfigPath = join(dir, 'mcp.json');
   writePrivateFileSync(mcpConfigPath, buildMcpConfigJson(brain, target.pack));
+  const routing = target.routing ?? SUBSCRIPTION;
+  const route = routeLaunch(target.provider, {
+    ...routing,
+    roleSubagentModel: routing.roleSubagentModel ?? target.pack?.role?.subagentModel,
+  });
 
   let extraArgs: string[];
   let settingsPath: string | null = null;
@@ -139,10 +161,18 @@ export function buildLaneLaunch(
       git: resolveLaneGitPaths(target.worktree),
     });
     assertSafeSettings(sandbox);
+    // SEC-41: managed settings outrank our `--settings`, so a gateway there is refused.
+    const managed = managedGatewaySettings(deps.managedSettingsPaths);
+    if (managed.length > 0) {
+      throw new LaunchPolicyError(
+        `managed Claude Code settings set ${managed.flatMap((m) => m.names).join(', ')} (${managed[0]!.path})`
+      );
+    }
     settingsPath = join(dir, 'settings.json');
+    // The route's `env` block outranks the user's own settings files (spike §13 Q2). No key.
     writePrivateFileSync(
       settingsPath,
-      JSON.stringify({ ...sandbox, hooks: buildLaneStatusHooks() }, null, 2)
+      JSON.stringify({ ...sandbox, hooks: buildLaneStatusHooks(), env: route.settingsEnv }, null, 2)
     );
     extraArgs = [
       `--mcp-config=${mcpConfigPath}`,
@@ -154,15 +184,27 @@ export function buildLaneLaunch(
     }
     trusted = [mcpConfigPath, settingsPath];
   } else {
-    const overrides = codexMcpOverrides(brain, target.pack);
+    const overrides = [
+      ...codexMcpOverrides(brain, target.pack),
+      ...route.codexConfig.map((value) => `--config=${value}`),
+    ];
     extraArgs = ['--sandbox=workspace-write', ...overrides];
     // The guard checks each `--config` value: the text after the flag's first `=`.
     trusted = overrides.map((flag) => flag.slice(flag.indexOf('=') + 1));
   }
   // The full variable argv: upstream's user flags plus ours. Only values we generated are
   // trusted, so the guard (SEC-12, M2) accepts our config flags and refuses any a user brings.
-  assertSafeArgv([...upstream.extraArgs, ...extraArgs], { trusted, provider: target.provider });
-  return { extraArgs, providerVars: {}, mcpConfigPath, settingsPath };
+  const argv = [...upstream.extraArgs, ...extraArgs];
+  assertSafeArgv(argv, { trusted, provider: target.provider });
+  assertLaunchPolicy({
+    provider: target.provider,
+    mode: route.mode,
+    env: route.env,
+    ...(target.provider === 'claude' ? { settingsEnv: route.settingsEnv } : {}),
+    argv,
+    envKind: 'layered',
+  });
+  return { extraArgs, providerVars: route.env, mcpConfigPath, settingsPath };
 }
 
 const toml = (value: string) => JSON.stringify(value);

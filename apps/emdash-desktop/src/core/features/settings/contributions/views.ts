@@ -17,6 +17,7 @@ export const settingsPageTabSchema = z.enum([
   'skills',
   'packs',
   'gates',
+  'models',
   'connections',
   'docs',
 ]);

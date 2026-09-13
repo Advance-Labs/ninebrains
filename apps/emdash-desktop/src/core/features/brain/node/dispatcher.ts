@@ -23,6 +23,10 @@ export interface DispatchLane {
   roleId?: string;
   /** The lane's model, for unattended runs. */
   model?: string;
+  /** Lever A: the lane's subagent tier. Absent: the role's default, else inherit. */
+  subagentModel?: string;
+  /** Lever B: the model profile the lane runs on. Absent: the user's subscription. */
+  authProfileId?: string;
 }
 
 export interface DispatcherPorts {

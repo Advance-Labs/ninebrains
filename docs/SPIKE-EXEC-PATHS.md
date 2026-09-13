@@ -398,3 +398,188 @@ passing** (`node --test "test/*.test.mjs"`). One test talks to the SDK-based stu
 `spikes/exec-paths/` (own `package.json`; `npm install`, then gotcha 1): stub, attended, unattended,
 variadic and Codex app-server probes, hook and statusline loggers, fixture sanitiser.
 `tooling/fake-agent/`: `bin/`, `src/`, `test/`, `fixtures/` (sanitised real captures).
+
+## 13. Routing (R0, 2026-09-12)
+
+R0 questions from `docs/plans/2026-09-12-model-routing.md` (§2, SEC-39, SEC-41, SEC-43). Claude Code
+**2.1.269**. Codex **0.154.0**, run from the npx cache (not installed). No real model call, no login,
+no credential read, no user config touched.
+
+**Harness.** Every run used `env -i PATH HOME`, an empty `CLAUDE_CONFIG_DIR` / `CODEX_HOME` from
+`mktemp -d`, and dummy keys (`sk-dummy-0000000000000000`). Model traffic went to Node mock servers on
+127.0.0.1 (Anthropic Messages SSE + JSON, `GET /v1/models`, OpenAI Responses SSE). `HTTPS_PROXY`
+pointed at a local proxy that answers 403 to every CONNECT. The mocks logged method, path, the first
+6 characters of each credential, and the body `model`. The scratch scripts (`mock.mjs`, `proxy.mjs`,
+`run.sh`) are outside the repo. Base command, called `P` below:
+
+```bash
+env -i PATH="$PATH" HOME="$HOME" CLAUDE_CONFIG_DIR="$(mktemp -d)" DISABLE_AUTOUPDATER=1 \
+  HTTPS_PROXY=http://127.0.0.1:47199 NO_PROXY=127.0.0.1,localhost  <VARS> \
+  claude -p "reply ok" --output-format=stream-json --verbose < /dev/null
+```
+
+### 13.1 `apiKeySource` per credential [verified]
+
+| Case | `<VARS>` / extra flags | `init.apiKeySource` | Mock saw |
+|---|---|---|---|
+| a | `ANTHROPIC_BASE_URL=<mock> ANTHROPIC_AUTH_TOKEN=<dummy>` | `"none"` | `Authorization: Bearer sk-dum…` |
+| b | `ANTHROPIC_BASE_URL=<mock> ANTHROPIC_API_KEY=<dummy>` | `"ANTHROPIC_API_KEY"` | `x-api-key: sk-dum…` |
+| c | both a and b | `"ANTHROPIC_API_KEY"` | **both** headers: `Bearer <token>` and `x-api-key <key>` |
+| d | neither | `"none"` | nothing. It starts, then `result.is_error: true`, "Not logged in · Please run /login", exit 1 |
+| e | a + `--model=deepseek-flash` | `"none"`, `init.model: "deepseek-flash"` | `model: "deepseek-flash"`. Stderr: `[claude-code:unrecognized_model]` |
+| f | a + `ANTHROPIC_API_KEY=` (empty) | `"none"` | Bearer only. An empty key counts as unset |
+| g | `ANTHROPIC_BASE_URL=<mock>` + `--settings='{"apiKeyHelper":"echo sk-helper-…"}'` | `"apiKeyHelper"` | helper value in both `Bearer` and `x-api-key` |
+
+Conclusion: **`ANTHROPIC_AUTH_TOKEN` does not show in `apiKeySource`.** It reports `"none"`, the same
+value as a subscription login (§3) and as a logged-out run.
+
+Other notes:
+- With no `--model`, the empty config dir defaults to `claude-opus-5[1m]`.
+- Requests go to `POST /v1/messages?beta=true`, so a vendor must accept the query string.
+- **Egress:** each `-p` run also opened **2** CONNECTs to `api.anthropic.com:443` while
+  `ANTHROPIC_BASE_URL` was set. They are not inference calls; TLS hides the path. With
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` there were **0**.
+
+### 13.2 Settings `env` precedence [verified]
+
+Sources: mock A in user settings (`$CLAUDE_CONFIG_DIR/settings.json`), mock B in `--settings=<file>`,
+mock C in the process env, mock H in project settings (`<cwd>/.claude/settings.json`). The token
+was in the process env each time.
+
+| `ANTHROPIC_BASE_URL` set in | Request went to |
+|---|---|
+| process C + user A + `--settings` B | B |
+| process C + user A | **A** (user settings beat the launch env) |
+| process C + `--settings` B | B |
+| process C + project H | H |
+| user A + project H | H |
+| project H + `--settings` B | B |
+| user A + `--settings` `{"env":{"ANTHROPIC_BASE_URL":""}}` | **not A**: the default `api.anthropic.com`. My proxy refused it, and the result was "Failed to authenticate. API Error: 403" |
+
+Conclusion: the order is `--settings` > project > user > process env. An empty string in our
+`--settings` env cancels a user value, and the CLI falls back to the default host.
+
+Not tested: `.claude/settings.local.json`, managed (policy) settings, and an empty
+`ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` set through `--settings` (only the empty process-env
+`ANTHROPIC_API_KEY` was tested, 13.1 f).
+
+### 13.3 `--max-budget-usd` with a non-Claude model [verified]
+
+`P` with `ANTHROPIC_BASE_URL=<mock D> ANTHROPIC_AUTH_TOKEN=<dummy>` and
+`--model=<M> --max-budget-usd=0.01`. Mock D reports 2,000,000 input and 500,000 output tokens per
+response.
+
+| `--model` | `total_cost_usd` | `modelUsage[M].costBasis` | Result |
+|---|---|---|---|
+| `deepseek-flash` | 22.5 | `"unknown"` | `subtype: "error_max_budget_usd"`, `is_error: true`, `terminal_reason: "budget_exhausted"`, `errors: ["Reached maximum budget ($0.01)"]`, exit 1 |
+| `glm-4.6` | 22.5 | `"unknown"` | same |
+| `haiku` | 4.5 | `"list"` | same |
+
+22.5 = 2M × $5 + 0.5M × $25 per MTok, which is the **Claude Opus 5 list price**. Haiku (4.5 = $1/$5)
+is priced correctly. `modelUsage[M].provider` is `"firstParty"` even for the mock.
+
+Multi-turn check: mock G answers the first request with a `tool_use`. With the budget set, the mock
+got **exactly 1 request**. The CLI ran the tool locally and stopped before the second request.
+Without the budget, the same run made 7 requests (reported $157.50) and ended on an "Autocompact is
+thrashing" error.
+
+Conclusion: the CLI prices unknown models at the Opus 5 list price (`costBasis: "unknown"`). It
+checks the budget after each response, so a single response can overshoot the cap by any amount.
+
+### 13.4 `CLAUDE_CODE_SUBAGENT_MODEL` under `-p` [verified]
+
+The subagent tool is **`Agent`** on the wire, but `init.tools` lists it as `Task`. My first attempt
+(a mock that waited for `Task`) never fired. Mock E3 answers the first request with a `tool_use` of
+`Agent` (`{description, prompt: "subagent says ok", subagent_type: "general-purpose"}`). Command:
+`P` + `ANTHROPIC_BASE_URL=<E3> ANTHROPIC_AUTH_TOKEN=<dummy> CLAUDE_CODE_SUBAGENT_MODEL=<V>`.
+
+| `<V>` | `model` of the subagent request (the one with 13 tools) |
+|---|---|
+| unset | `claude-opus-5` (inherits the main model) |
+| `haiku` | `claude-haiku-4-5-20251001` |
+| `claude-sonnet-4-5-20250929` | `claude-sonnet-4-5-20250929` |
+| `deepseek-flash` | `deepseek-flash`. **Accepted with no warning** |
+
+Main requests stayed on `claude-opus-5` each time. How to observe it in stream-json:
+- `assistant` events whose `parent_tool_use_id` is the `Agent` tool_use id carry `message.model`.
+- `result.modelUsage` has one key per model.
+
+The agent ran as a background task: `system/task_started`, then `system/task_notification`, then a
+**second `system/init` and a second `result` in the same process**. The second result's
+`total_cost_usd` is cumulative (0.00022 → 0.00032). The mock got 4 requests: main, subagent, main, main.
+
+Attended: **[not verified].** It needs a PTY, a pre-seeded trust entry and the mock; that is not
+cheap. The variable is process env, so the same behaviour is likely but unproven.
+
+### 13.5 Codex custom provider [verified]
+
+```bash
+echo "reply ok" | env -i PATH="$PATH" HOME="$HOME" CODEX_HOME="$(mktemp -d)" \
+  NB_MODEL_KEY=sk-dummy-0000000000000000 HTTPS_PROXY=http://127.0.0.1:47199 NO_PROXY=127.0.0.1 \
+  codex exec --json --skip-git-repo-check \
+  -c 'model_providers.nb={name="nb",base_url="http://127.0.0.1:47106/v1",wire_api="responses",env_key="NB_MODEL_KEY"}' \
+  -c model_provider="nb" --model x -
+```
+
+- The mock got 1 `POST /v1/responses` with **`Authorization: Bearer sk-dum…`**, `model: "x"`,
+  `stream: true`, 9 tools, and `User-Agent: codex_exec/0.154.0`. Exit 0.
+- The `--config=model_providers.nb={…}` and `--config=model_provider="nb"` spelling behaves the same.
+- If the `env_key` variable is missing, no request is sent. Codex emits `error {message: "Missing
+  environment variable: \`NB_MISSING_KEY\`."}` and `turn.failed`, and exits 1.
+- Events: `thread.started`, `item.completed {type: "error", message: "Model metadata for \`x\` not
+  found. Defaulting to fallback metadata…"}`, `turn.started`, `item.completed {agent_message "ok"}`,
+  `turn.completed {usage}`. **No JSON event names the provider.** The model shows up only in that
+  warning text, and only for an unknown model.
+- The rollout file `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread_id>.jsonl` records
+  `session_meta.payload.model_provider: "nb"` and `turn_context.payload.model: "x"`. The key is not
+  in the file.
+
+Conclusion: the provider override works per launch and sends our key as Bearer. The provider can be
+read only from the rollout file, not from the `--json` stream.
+
+### 13.6 What this means for Ninebrains
+
+1. **SEC-39 neutralizers.** Our per-launch `--settings` env beats user settings, project settings
+   and the process env. So a subscription run should get `"ANTHROPIC_BASE_URL": ""` in its
+   `--settings` env. This is verified: it reverts to `api.anthropic.com` even when user settings
+   point elsewhere. Blanking `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_API_KEY` the same way is the
+   obvious next step, but it is **not verified**; make it an R1 test. Managed settings and attended
+   lanes are untested.
+2. **SEC-41 expected `apiKeySource`:**
+
+   | Auth mode | Value |
+   |---|---|
+   | subscription | `"none"` |
+   | `anthropic-api` (`ANTHROPIC_API_KEY`) | `"ANTHROPIC_API_KEY"` |
+   | `anthropic-compatible` via `ANTHROPIC_AUTH_TOKEN` | `"none"`, the same as a subscription |
+   | `apiKeyHelper` | `"apiKeyHelper"` |
+
+   The plan's rule "a profiled run must report the variable we set" cannot hold for
+   `AUTH_TOKEN`. Options:
+   - send compatible-vendor keys as `ANTHROPIC_API_KEY` (`x-api-key`), which needs a per-vendor
+     check that the vendor accepts it;
+   - or check a token run by `init.model` plus the neutralizers.
+
+   Also:
+   - A user `env` block with `AUTH_TOKEN` + `BASE_URL` does not show in `apiKeySource`. For
+     subscription runs, SEC-41 rests on the neutralizers, not on the init check alone.
+   - Never set both variables: both headers go to the base URL (13.1 c).
+   - Check **every** `system/init`: one process can emit several (13.4).
+3. **SEC-43 `--max-budget-usd` trust: low.** Unknown models are priced at the Opus 5 list price
+   (`costBasis: "unknown"`), and the cap is checked after each response. It is fine as a coarse
+   backstop, but never as the gate. The gate is our `usage` × profile price. Treat
+   `costBasis !== "list"` as unpriced by the CLI. Several `result` events can arrive in one process;
+   use the last one, since its cost is cumulative.
+4. **Lever A observability: works in `-p`.** The subagent request follows the variable, and the
+   stream shows it through `parent_tool_use_id` + `message.model` and the `modelUsage` keys. The CLI
+   accepts a non-Claude ID without complaint, so `launch-env.ts` must itself allow only Claude
+   aliases and IDs (SEC-39). Attended lanes are not verified. The fake agent should model the
+   `Agent` / `Task` naming split and the second init/result.
+5. **Codex provider check.** `--json` carries no provider field. The SEC-41 equivalent is to read
+   `session_meta.model_provider` and `turn_context.model` from the rollout file for the thread id
+   in `thread.started` (or use app-server). A missing `env_key` fails closed before any request. An
+   unknown model yields `item.completed {type: "error"}` as a warning only, so decide failure by
+   `turn.failed` and the exit code.
+6. **SEC-45 egress.** Even a routed claude run opens 2 connections to `api.anthropic.com`. Profiled
+   runs should set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (verified to remove them) or allow
+   that host explicitly.

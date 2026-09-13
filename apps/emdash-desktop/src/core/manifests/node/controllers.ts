@@ -67,6 +67,11 @@ import type { ProjectDeletionDependencies } from '@core/features/projects/node/o
 import { getProjectById } from '@core/features/projects/node/operations/getProjects';
 import { createProjectsWireController } from '@core/features/projects/node/wire-controller';
 import { createRepositoryWireController } from '@core/features/repository/node/wire-controller';
+import {
+  createDisabledRoutingService,
+  type RoutingService,
+} from '@core/features/routing/node/routing-service';
+import { createRoutingWireController } from '@core/features/routing/node/wire-controller';
 import type { SearchService } from '@core/features/search/node/search-service';
 import { createSearchWireController } from '@core/features/search/node/wire-controller';
 import { createSkillsWireController } from '@core/features/skills/node/wire-controller';
@@ -186,6 +191,8 @@ export type DesktopControllerContext = {
   readonly gates?: GatesVerificationService;
   /** Ninebrains planner. Optional until wired; absent means an in-memory, Brain-less fallback. */
   readonly planner?: PlannerService;
+  /** Ninebrains model routing (features/routing/README.md). Absent: profiles off. */
+  readonly routing?: RoutingService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -497,6 +504,9 @@ export const desktopNodeControllers = {
   },
   planner: {
     create: ({ planner }) => createPlannerWireController(planner ?? createUnwiredPlannerService()),
+  },
+  routing: {
+    create: ({ routing }) => createRoutingWireController(routing ?? createDisabledRoutingService()),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

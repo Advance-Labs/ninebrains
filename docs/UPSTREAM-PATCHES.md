@@ -249,6 +249,30 @@ worktrees unsandboxed (THREAT-MODEL T36). Each helper gains one import and one
 Ninebrains files also touched: `exec-runs/api/node/{sandbox-settings,run-supervisor}.ts` and
 `brain/node/launch-config.ts` (the T36 write deny).
 
+## 12. Model routing (W7 `routing`, wave 1)
+
+Append-only registrations. Lever B is behind the fork flag `MODEL_PROFILES_ENABLED`
+(`app-identity/api/fork-flags.ts`, a Ninebrains file: `import.meta.env.DEV`, so on in dev builds
+and off in release builds).
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/domain-contracts.ts` | `+[routingDomain]: routingContract` | The `routing` wire contract (Settings → Models) |
+| `src/core/manifests/node/controllers.ts` | Optional `routing?: RoutingService` on the context + `routing` controller entry (disabled service when absent) | Key parity without requiring the service |
+| `src/main/bootstrap/boot/wiring.ts` | `routing: services.ninebrains.routing` | The real service from the composition root |
+| `src/core/features/settings/contributions/views.ts` | `'models'` in `settingsPageTabSchema` | Settings tab id |
+| `src/core/manifests/browser/settings-page-contributions.ts` | `+modelsSettingsPage` | Settings → Models |
+| `src/core/features/settings/browser/search/settings-search.ts` | `+models` search entry | Every settings tab needs a search entry |
+
+Ninebrains files also touched: `exec-runs/api/node/{types,run-env,run-supervisor,claude-print,codex-exec,redact}.ts`,
+`brain/node/{launch-config,unattended,dispatcher,brain-service,brain-db}.ts`, `lanes/{api/lane-model,api/contract,node/lane-service,node/lane-ports,node/wire-controller}.ts`,
+`lanes/browser/grid/{lane-header,add-lane-form}.tsx`, `packs/{api/pack-schema,api/launch,api/contract,node/resolve-launch,node/packs-service}.ts`,
+`main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`, `packages/brain-core` migration 3 (`model_profiles`),
+and `tooling/fake-agent/src/events.mjs` (`apiKeySource` follows `ANTHROPIC_API_KEY`, as the real CLI).
+New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/routing-launch.e2e.test.ts`,
+`src/renderer/tests/browser/routing-screenshots.test.tsx`, `docs/screenshots/routing-*.png`,
+`docs/research/VENDORS.md`, `docs/guide/models.md`.
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,

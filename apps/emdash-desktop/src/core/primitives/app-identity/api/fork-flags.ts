@@ -20,3 +20,11 @@ export const TELEMETRY_SETTINGS_ENABLED: boolean = false;
  * checks exist (docs/THREAT-MODEL.md, T20).
  */
 export const USER_PACKS_ENABLED: boolean = false;
+
+/**
+ * Lever B of model routing (docs/plans/2026-09-12-model-routing.md): model profiles with the
+ * user's own API keys, Settings → Models' profile list, and the API-key lane mode. On in dev
+ * builds, off in release builds until Lucas decides (plan §8 Q1). Lever A (the subagent tier)
+ * is always on.
+ */
+export const MODEL_PROFILES_ENABLED: boolean = import.meta.env.DEV;

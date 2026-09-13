@@ -37,6 +37,8 @@ export const packSummarySchema = z.object({
       /** The role's preferred agent and model, used to prefill the add-lane form. */
       provider: z.enum(['claude', 'codex']).optional(),
       model: z.string().optional(),
+      /** The role's subagent tier (Lever A), used to prefill the add-lane form. */
+      subagentModel: z.string().optional(),
     })
   ),
   mcpServers: z.array(

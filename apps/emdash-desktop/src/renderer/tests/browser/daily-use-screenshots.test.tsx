@@ -27,6 +27,7 @@ import {
   type PacksListing,
 } from '@core/features/packs/api';
 import { PacksPanel } from '@core/features/packs/browser/packs-view';
+import { routingContract, routingDomain } from '@core/features/routing/api';
 import { ThemeProvider } from '@core/primitives/theme/browser/theme-provider';
 import { resetWireConnection, seedWireConnection } from '@core/primitives/wire/browser/connection';
 
@@ -44,6 +45,7 @@ const contract = defineContract({
   [agentsDomain]: defineContract({ hooksStatus: agentsContract.hooksStatus }),
   [brainDomain]: brainContract,
   [packsDomain]: packsContract,
+  [routingDomain]: routingContract,
 });
 
 const DISPATCHER: BrainDispatcherView = {
@@ -245,6 +247,9 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
           setEnabled: async () => ok({ enabledPackIds: [] }),
           setSecret: async () => ok(undefined),
           clearSecret: async () => ok(undefined),
+        },
+        [routingDomain]: {
+          listProfiles: async () => ({ enabled: true, profiles: [], vendors: [] }),
         },
         // Partial impls: only the paths these renders call.
       } as never,
