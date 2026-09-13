@@ -469,8 +469,16 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   `ANTHROPIC_AUTH_TOKEN` reports `none` like a login (spike §13 Q1), so a token profile is told
   apart by the model it must report. Codex has no such event: not enforceable at run time.
   Tests `SEC-41 the active credential is checked at run start`, `SEC-41 managed settings`.
-- **SEC-42 Reviewers are never downgraded.** Wave 2 (R4). Reviewers take no route in wave 1.
-- **SEC-43 Budgets are in USD and computed by us.** Wave 2 (R5). Prices are stored, nullable.
+- **SEC-42 Reviewers are never downgraded.** Wave 2 (R4), partial. `routing/node/policy.ts`'s
+  `resolveRoute('reviewer', …)` pins a `strong`-tier profile and blocks — never a pass, never a
+  lower tier, never the subscription — once it is missing, disabled or has an open circuit
+  breaker (R6's states, read as healthy until R6 starts writing them). Reviewers still take no
+  route in wave 2: nothing calls `resolveRoute` from a live reviewer launch yet, since
+  `ExecRunSpec.routing`'s contract says reviewers never set one; lifting that is Lucas's call.
+- **SEC-43 Budgets are in USD and computed by us.** Wave 2 (R5), partial. `routing/api/node/price.ts`
+  has `usd()` (usage × the profile's own price), `checkBudget()` (a projected spend over its cap
+  refuses, never downgrades) and `refusesUnpriced()`. Prices are stored, nullable. Not wired into
+  a real run: no `run_costs`/`spend_caps` tables, no `maxUsd` check in the supervisor.
 - **SEC-44 Allowed credential kinds and vendors only.** Kinds are `anthropic-api`, `openai-api`,
   `anthropic-compatible`, `openai-responses-compatible`, `local` (and `bedrock`/`vertex`/`foundry`,
   refused until wave 2). No OAuth, cookie, session or token-file kind exists. A remote profile's
@@ -541,8 +549,8 @@ the agents or slices expected to close the gap.
 | SEC-39 | Done [w7-routing] | `launch-env.test.ts`, `routing-launch.e2e.test.ts` (attended, Brain session, unattended claude and codex, reviewer). Empty-means-unset checked on claude 2.1.269; the real attended CLI is not e2e-tested |
 | SEC-40 | Done [w7-routing] | `routing-service.test.ts`, `profiles-repo.db.test.ts`, `routing-launch.e2e.test.ts` (transcript and settings carry no key). The key is readable by the lane's own tools (R19) |
 | SEC-41 | Partial [w7-routing] | `run-supervisor-routing.test.ts`: unattended claude checked at init; managed settings refuse. Attended lanes rely on the `--settings` precedence (spike §13 Q2), with no runtime signal. Codex has none. Security events are logged until SEC-33 |
-| SEC-42 | Open | Wave 2 (R4) |
-| SEC-43 | Open | Wave 2 (R5) |
+| SEC-42 | Partial [w7/routing-wave2] | `policy.ts` `resolveRoute` and its `SEC-42 reviewers are never downgraded` suite: a reviewer pinned to a `strong` profile blocks (never falls back to a lower tier, a different profile or the subscription) once it is missing, disabled or unhealthy. Not wired into a live reviewer launch: `reviewer-route.ts`'s `routeReviewer` is unchanged, and `ExecRunSpec.routing`'s own contract says reviewers never set a route, so using this for a real reviewer run needs that decided first |
+| SEC-43 | Partial [w7/routing-wave2] | `api/node/price.ts`: `usd()`, `checkBudget()`, `refusesUnpriced()` and the `SEC-43` suites. Not wired into the supervisor: no `run_costs`/`spend_caps` tables, no `maxUsd` check on a real run, no cost view |
 | SEC-44 | Done [w7-routing] | `profile.test.ts`, `vendors.test.ts`, `routing-service.test.ts`, `profiles-repo.db.test.ts` |
 | SEC-45 | Done for unattended claude [w7-routing] | `routing-launch.e2e.test.ts`. Attended lanes have no egress list (as today) |
 | SEC-46 | N/A in wave 1 | No gateway exists |
