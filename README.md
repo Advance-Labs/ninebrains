@@ -47,15 +47,13 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 - **Gates in the loop.** A failed gate sends feedback to the lane and retries, up to three
   attempts, then blocks and tells you. The screenshot gate captures the lane's own browser at
   three widths.
-- **Rigor settings.** Two 0–10 sliders in Settings → Gates decide which gates every job gets.
-
-**In the code, not yet reachable from the app:**
-
-<!-- VERIFY: each item below is being wired into the app -->
-- **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
-  into Brain jobs, idempotently, and refuses cycles. Nothing opens it yet.
-- **Per-project rigor override.** A project's own testing and security rigor.
-- **Lane roles and modes.** Starting a lane from a pack role, and switching a lane to unattended.
+- **Rigor settings.** Two 0–10 sliders in Settings → Gates decide which gates every job gets, and
+  a project can override them in Settings → Gates → Tests.
+- **Planner.** A canvas where jobs are nodes and dependencies are edges, opened from the Planner
+  button in the Lanes title bar. **Run plan** compiles it into Brain jobs, idempotently, and
+  refuses cycles.
+- **Lane roles and modes.** Start a lane from a pack role, and switch a lane between attended and
+  unattended from its header.
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
 with a morning digest, a video pack, signed builds and auto-update.

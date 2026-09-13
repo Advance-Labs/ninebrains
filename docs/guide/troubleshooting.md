@@ -31,9 +31,10 @@ opt-in". The tests gate runs the lane's code, so it only runs inside an OS sandb
   sudo dnf install bubblewrap    # Fedora
   ```
 
-- **Windows:** there is no sandbox for the tests gate. The per-project opt-in
-  (`testsGate.allowUnsandboxed`) exists in the code but cannot be set in this build. Lower
-  **Testing rigor** below 3 so code jobs skip the tests gate.
+- **Windows:** there is no sandbox for the tests gate. Either lower **Testing rigor** below 3 so
+  code jobs skip the tests gate, or turn on **Allow unsandboxed** for the project in
+  **Settings → Gates → Tests**. With that on, the test command (code the lane can rewrite) runs as
+  you, with only a scrubbed environment and a timeout.
 
 Like a missing test command, this is a setup problem: the job is blocked at once and no attempt is
 used.

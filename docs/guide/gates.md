@@ -71,8 +71,9 @@ weaker floor, so an agent asking for one is refused, not quietly downgraded.
 This is the floor. A job's creator can add gates on top; neither a lane nor the Brain can take
 them away. Packs add their own defaults, such as the SEO pack's `seo-evidence` gate.
 
-Set rigor in **Settings → Gates**. The app can also hold a per-project override, but there is no
-control for it in this build.
+Set rigor in **Settings → Gates**. To override it for one project, pick the project under
+**Settings → Gates → Tests** and choose a **Rigor override** level; it sets testing and security
+rigor together.
 
 ## Test command
 
@@ -109,8 +110,11 @@ and allows network to localhost only:
 - **Windows, and Linux without bubblewrap:** there is no sandbox, and the gate refuses to run. See
   [Troubleshooting](troubleshooting.md#the-tests-gate-says-it-needs-a-sandbox).
 
-The per-project options `testsGate.allowNetwork` and `testsGate.allowUnsandboxed` exist in the code
-but cannot be set in this build. See [Configuration](configuration.md#tests-gate-options).
+Two per-project switches in **Settings → Gates → Tests** loosen this, and both are off by default.
+**Allow network** lets the test command reach any address, not only localhost. **Allow
+unsandboxed** lets the gate run where there is no sandbox; the command then runs as you, with only
+the scrubbed environment and the timeout. Remember that the test command runs code the lane wrote.
+See [Configuration](configuration.md#tests-gate-options).
 
 ### screenshot
 

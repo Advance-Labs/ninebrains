@@ -21,8 +21,9 @@ each rigor level attaches.
 
 ## Per-project gate preferences
 
-Each project can hold these values. Set `testCommand` in **Settings → Gates → Tests**. The rigor
-overrides cannot be set in this build.
+Each project can hold these values, all set in **Settings → Gates → Tests** after picking the
+project. **Rigor override** sets `testingRigor` and `securityRigor` together to one level from 0 to
+10; **Use app default** clears both.
 
 | Field | Meaning |
 |---|---|
@@ -35,8 +36,10 @@ With no `testCommand`, the tests gate reports a setup problem and the job is blo
 
 ## Tests gate options
 
-The tests gate reads two per-project options. Both default to off, and neither can be set in this
-build.
+The tests gate reads two per-project options. Both default to off, including for projects set up
+before they existed. Turn them on with the **Allow network** and **Allow unsandboxed** switches in
+**Settings → Gates → Tests**. Only you can change them: no job, lane or Brain session can. They
+apply only when the gate runs in one of that project's lane worktrees.
 
 | Option | When on |
 |---|---|
