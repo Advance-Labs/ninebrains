@@ -295,7 +295,7 @@ Ninebrains files also touched: brain-core `types.ts` and `protocol/{ops,execute,
 `brain/node/brain-service.ts`, `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`,
 `e2e/{harness,brain-fanout.e2e,self-heal.e2e}.mjs`.
 
-## 17. Tests-gate project settings (W7 `w7/testsgate-prefs`)
+## 16. Tests-gate project settings (W7 `w7/testsgate-prefs`)
 
 No upstream (forked-from-Emdash) file changed. `gates/**` (beyond `capabilities/`) and
 `main/bootstrap/boot/ninebrains/**` are already Ninebrains-only (§ New Ninebrains-only files
