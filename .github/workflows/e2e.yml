@@ -40,6 +40,15 @@ jobs:
         working-directory: apps/emdash-desktop
         run: pnpm run rebuild
 
+      # The tests gate refuses to run without an OS sandbox on Linux (SEC-20), and brain-fanout and
+      # self-heal both reach it. Same install and smoke test as ci.yml's desktop-spawn shard.
+      - name: Install bubblewrap for the tests-gate sandbox
+        run: |
+          sudo apt-get install -y -q bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          bwrap --ro-bind / / --unshare-net --die-with-parent true
+          echo "bubblewrap $(bwrap --version) works"
+
       # Each suite gets a hard timeout. The built app stays in the tray after its window closes, so
       # Playwright's app.close() can hang (docs/FORK.md); exit 124 means that, not a failed check.
       - name: Run e2e suites
