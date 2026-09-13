@@ -185,6 +185,7 @@ export class ClaudeStreamParser implements AgentStreamParser {
       sessionId,
       model: typeof msg.model === 'string' ? msg.model : undefined,
       version: typeof msg.claude_code_version === 'string' ? msg.claude_code_version : undefined,
+      apiKeySource: typeof msg.apiKeySource === 'string' ? msg.apiKeySource : undefined,
       tools: Array.isArray(msg.tools) ? msg.tools.filter((t) => typeof t === 'string') : undefined,
     };
   }

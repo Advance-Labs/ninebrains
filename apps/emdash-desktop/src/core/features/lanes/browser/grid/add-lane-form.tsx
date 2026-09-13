@@ -6,6 +6,10 @@ import { useAgentInstallationStatuses } from '@core/features/agents/api/browser/
 import type { PacksListing } from '@core/features/packs/api';
 import { getPacksClient } from '@core/features/packs/api/browser/client';
 import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
+import {
+  LaneRoutingFields,
+  type LaneRoutingValue,
+} from '@core/features/routing/contributions/lanes';
 import { SSH_UNSUPPORTED_MESSAGE, type LaneProvider, type LaneSlot } from '../../api';
 import { runLaneAction } from '../use-lanes';
 
@@ -25,6 +29,8 @@ export type AddLaneRole = {
   label: string;
   provider?: LaneProvider;
   model?: string;
+  /** The role's subagent tier (Lever A). */
+  subagentModel?: string;
 };
 
 export function rolesOfEnabledPacks(listing: PacksListing | null): AddLaneRole[] {
@@ -36,6 +42,7 @@ export function rolesOfEnabledPacks(listing: PacksListing | null): AddLaneRole[]
         label: `${role.title} (${pack.title})`,
         ...(role.provider ? { provider: role.provider } : {}),
         ...(role.model ? { model: role.model } : {}),
+        ...(role.subagentModel ? { subagentModel: role.subagentModel } : {}),
       }))
     );
 }
@@ -84,6 +91,7 @@ export function AddLaneFields({
   const [provider, setProvider] = useState<LaneProvider | undefined>();
   const [roleValue, setRoleValue] = useState(NO_ROLE);
   const [model, setModel] = useState('');
+  const [routing, setRouting] = useState<LaneRoutingValue>({});
   const [roles, setRoles] = useState<AddLaneRole[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -125,6 +133,10 @@ export function AddLaneFields({
 
   const add = async () => {
     if (!selectedProject || !selectedProvider) return;
+    // Unchosen means the role's tier. Codex has no subagent model setting.
+    const subagentModel =
+      selectedProvider.id === 'claude' ? (routing.subagentModel ?? role?.subagentModel) : undefined;
+    const authProfileId = routing.authProfileId;
     setBusy(true);
     await runLaneAction('Could not add the lane', (client) =>
       client.createLane({
@@ -134,6 +146,8 @@ export function AddLaneFields({
         provider: selectedProvider.id,
         ...(model.trim() ? { model: model.trim() } : {}),
         ...(role ? { roleId: role.value } : {}),
+        ...(subagentModel ? { subagentModel } : {}),
+        ...(authProfileId ? { authProfileId } : {}),
       })
     );
     setBusy(false);
@@ -213,6 +227,14 @@ export function AddLaneFields({
           maxLength={128}
           onChange={(event) => setModel(event.target.value)}
         />
+        {selectedProvider && (
+          <LaneRoutingFields
+            provider={selectedProvider.id}
+            value={routing}
+            onChange={setRouting}
+            roleSubagentModel={role?.subagentModel}
+          />
+        )}
         {role && (
           <p className="text-xs text-foreground-muted">
             The lane launches with this role's prompt and its pack's servers.

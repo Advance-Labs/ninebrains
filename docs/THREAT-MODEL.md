@@ -99,7 +99,7 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T04 | Web page or local process calls the Brain endpoint (`fetch('http://127.0.0.1:<port>')`, DNS rebinding, port scan) | M | H | loopback bind, Host check, Origin/Sec-Fetch reject, header token, no CORS, JSON-only | SEC-04, SEC-05 |
 | T05 | Token guessed or timed | L | H | 256-bit random, constant-time compare, per-launch rotation | SEC-03 |
 | T06 | Endpoint flooded or fed huge bodies (renderer or lane DoS) | M | M | body cap, header timeout, per-token rate limit | SEC-06 |
-| T07 | Injected Brain (or lane) creates jobs with `gates: []`, so work ships as `unverified` | M | H | gate floor from rigor settings; callers can only add gates | SEC-08 |
+| T07 | Injected Brain (or lane) creates jobs with `gates: []`, so work ships as `unverified` | M | H | gate floor from rigor settings; callers can only add gates; agents may declare only the code or ui kind | SEC-08 |
 | T08 | Job body breaks out of the bracketed paste and types keystrokes, or a paste lands on a permission prompt and approves it | M | H | paste only when idle; strip ESC/C0; reject `ESC[201~` | SEC-15 |
 | T09 | Job body starting with `--` is parsed as a CLI flag (`--dangerously-skip-permissions`) | M | H | prompt via stdin, never argv | SEC-17 |
 | T10 | Worktree plants `claude.cmd` / `node_modules/.bin/claude` and the dispatcher runs it | M | H | absolute binary path from the dependency resolver; no `shell: true` | SEC-16 |
@@ -130,6 +130,10 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T35 | The review-checkout mirror, which runs in main unsandboxed, followed links. The lane commits a symlink `x -> ~/.zshrc`, then replaces `x` with a regular file in the working tree. The mirror copied that file through the checkout's symlink, so a lane could overwrite any file the user can write. The mirror now also lists index paths, so a lane that turned `keys/` into a link to `~/.ssh`, or hard-linked a secret into its worktree, could have had the secret copied into the checkout the reviewer reads | M | H | **Fixed 2026-09-12:** the checkout has `core.symlinks=false`, so HEAD's links are plain files. Both trees are walked through real directories only (`lstat` on every parent). The lane file is opened with `O_NOFOLLOW` and its inode re-checked after reading. A lane symlink is mirrored as a file holding its target, which is how git stores one. Files with several hard links keep HEAD's version. Any path with a `.git` component is refused (case, trailing dots and spaces, HFS-ignorable code points, `git~1`), and writes use `wx`. Tests: `T35 mirroring never follows a symlink or a hard link`, `isSafeReviewPath` | SEC-18, SEC-23 |
 | T36 | Upstream `packages/core` runs git against lane worktrees outside any sandbox, with no config hardening, in two forked Node children (the git worker and the workspace-registry worker). **Automatic, with no user action:** the git worker runs `status --porcelain=v2 -uall` on every worktree watch event and on a periodic revalidate (`runtimes/git/node/checkout/ops/status.ts:31`). The registry scan runs `status --porcelain=v1` and `diff --numstat HEAD` over every registered lane on watch events and a periodic poll (`runtimes/workspace-registry/node/scan/observe-git.ts:292`, `:309`), plus `rev-list`. So a lane's `core.fsmonitor=<cmd>`, or `filter.<x>.clean` with `info/attributes`, runs as the user within seconds. Lazy fetch (T32) applies to the diff, `rev-list` and `cat-file` calls, and `textconv` to the changes panel's diff, `log` and `blame`. **App-driven writes** (`create-worktree`, `update-worktree`, `background-steps` push/fetch, `delete-worktree`) add hooks and transport vectors. Lanes share the common config, so a poisoned config also fires when the app creates the next lane. The registry's `registryGitEnv` (`runtimes/workspace-registry/node/git-context.ts`) sets no `GIT_SSH_COMMAND`, so a lane's `core.sshCommand` runs on its fetch and push. git is spawned through four helpers over `createBoundExec`, not one: `runtimes/git/node/exec/git-exec.ts` (`gitEnv`), `workspace-registry/node/git-context.ts`, `services/exec/node/git-exec.ts` and an inline call in `workspace-registry/node/inspect-path.ts` | H | H | **Fixed 2026-09-12, two layers.** (1) The root cause, for Claude lanes and runs: `buildClaudeSandboxSettings` write-denies `$GIT_COMMON_DIR/config`, `config.worktree` (common and per-worktree), `info/attributes` and `hooks`, with matching `Edit` deny rules. The paths come from the worktree via read-only hardened git (`resolveLaneGitPaths`), plus a linked worktree's `.git` gitfile, which names the git dir. A lane that rewrote it could point the app's git at a config and hooks it made. The tests-gate sandbox makes the same paths read-only, for a lane whose repo `.git` sits inside its worktree, and seatbelt also stops `.git` being renamed. Objects, refs and the index stay writable. The live deny needs the manual real-CLI e2e (§5a SEC-11). (2) Every upstream git call goes through the Ninebrains `hardenGitExec` (`packages/core/src/services/exec/api/hardened-git.ts`), wired into all four helpers, which classifies each call. Every call gets `core.fsmonitor=false` via `GIT_CONFIG_COUNT` (which ranks above repo config) and a default `GIT_SSH_COMMAND` (which git prefers over a repo `core.sshCommand`). App-driven calls also get `core.hooksPath=/dev/null`, while user-initiated writes in the git worker keep the user's hooks. Reads also get `GIT_NO_LAZY_FETCH=1`, `--no-ext-diff --no-textconv` on diff, log and show (`--no-textconv` on blame), and the repo's own (local and worktree scope) filter drivers blanked on `status`, `diff`, `blame`, `ls-files` and `cat-file --filters`. Global drivers such as git-lfs keep working. Not scoped to lane-worktree paths: lanes share the common config with the user's main checkout, so a path scope would miss the main checkout's own status. `diff.external` is not set, because an empty value makes git run an empty command, so `git diff` fails. Tests: `T36 createGitExec hardening`, `T36 registry git hardening` and `T36 createNonInteractiveGitExec` (real git; fsmonitor, clean filter, `core.sshCommand`, promisor and hooks planted; none run through the hardened path, and plain git runs them), `T36 hardenGitExec argv`, `T36 repoFilterDriverFlags` (global lfs kept), `T36 resolveLaneGitPaths`, the `T36` settings snapshots, and `T36 tests-gate commands cannot rewrite the repo git control files` (real `sandbox-exec`: config, attributes, a hook, renaming `.git` and a linked worktree's gitfile all refused, while `git commit` still works). Residuals: R18 | SEC-11, SEC-16 |
 | T37 | The dispatcher's `latch()` set `paused` as well as `latched`, and `BrainService.clearStop()` then called `setPaused(false)`. So a user who paused dispatch and then pressed STOP had dispatch resumed by Clear STOP, from the renderer, the app menu or the tray. The main-process guard only checked that STOP was latched | M | M | **Fixed 2026-09-12:** the latch is separate state. `latch()` no longer touches `paused`, and `clearStop()` no longer resets it, so a pause set before STOP survives Clear STOP. Tests: `T37 keeps a user pause across STOP and Clear STOP` (dispatcher) and `T37 Clear STOP keeps a pause the user set before STOP` (BrainService) | SEC-30 |
+| T38 | A subscription lane or run gets `ANTHROPIC_BASE_URL` (from the user's shell, their Claude settings files, or a routing bug) and sends the claude.ai login through a third-party gateway. Setting only the base URL keeps the saved login and forwards it (Claude Code gateway docs) | M | H | **Mitigated 2026-09-12 (routing wave 1):** `routeLaunch` blanks every gateway and alias variable in the launch env and in our `--settings` env block, which outranks user, project and local settings (spike §13 Q2). `assertLaunchPolicy` checks both on every builder. Managed settings outrank `--settings`, so a gateway there refuses the launch. Unattended claude runs also check `apiKeySource` at init | SEC-39, SEC-41 |
+| T39 | A lane's Bash reads the model-profile key from its own env and spends it directly, or sends it elsewhere | M | M | The key reaches only that one spawn's env (SEC-40); the guide tells users to set a vendor-side spend limit per key. Accepted risk R19 | SEC-40 |
+| T40 | A reviewer is silently moved to a cheaper or weaker model, so gates pass on weaker review | L | H | **Open (wave 2):** reviewers take no route in wave 1 (always the user's login); the pin arrives with R4 | SEC-42 |
+| T41 | A mispriced or unpriced model makes USD budgets meaningless; `--max-budget-usd` prices unknown models at Opus rates and stops only after a response (spike §13 Q3) | M | M | **Open (wave 2):** profiles store nullable prices now; R5 refuses unpriced unattended runs and computes USD from stream usage | SEC-43 |
 
 ## 5. Requirements
 
@@ -180,6 +184,13 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   UI, lowers rigor.
   Test `SEC-08 caller cannot drop gates`: `create_job({ gates: [] })` at testing rigor 7 still gets
   `reviewer`; no job created by an agent is `unverified` above rigor 0.
+  The job's kind (`gateKind`, stored as `gateSpec.kind`) feeds the floor, so it is part of the
+  rule: an agent (a Brain session or lane token) may declare only `code` or `ui`, whose floors hold
+  everything `code` requires. `research`, `seo` and `docs` have weaker floors and are refused with
+  FORBIDDEN, never coerced. The app's own identities (the UI's `createJob`, the planner canvas) may
+  set any kind; a Brain-written planner draft that declares a weaker kind is refused.
+  Tests `SEC-08 agents cannot declare a weaker kind` (brain and lane tokens, each weaker kind →
+  FORBIDDEN) and `SEC-08 ui kind adds the screenshot floor`.
 - **SEC-09 Messages are data.** `read_inbox` returns JSON with `from` on every message; the dispatcher
   never concatenates inbox bodies into a lane's instructions. Messages from lanes to a Brain are
   marked `untrusted: true`.
@@ -391,6 +402,57 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   Test `SEC-38 no egress on first run`: a network interceptor during first run and a 4-lane session
   sees only user-initiated traffic.
 
+### Model routing (RT, `features/routing`, plan 2026-09-12)
+
+- **SEC-39 Subscription runs are never routed to another host.** A launch on the user's own login
+  carries no `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, alias variable
+  (`ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`) or Codex
+  `model_provider(s)` override or `--profile`. `CLAUDE_CODE_SUBAGENT_MODEL` may carry a Claude
+  alias or `claude-*` id (Lever A), nothing else. `routing/api/node/launch-env.ts` (`routeLaunch`,
+  `assertLaunchPolicy`) is the one policy; `buildLaneLaunch` (attended lanes, Brain sessions) and
+  `ExecRunSupervisor.launch` (unattended claude and codex, reviewers) both call it. Attended env is
+  layered over the shell, so each variable is set to `''` (the CLI treats empty as unset); the
+  same blanks go in our `--settings` `env` block.
+  Tests `SEC-39 subscription runs carry no routing` (`launch-env.test.ts`, and
+  `routing-launch.e2e.test.ts` for every builder), `SEC-39 profile routes`.
+- **SEC-40 Keys stay in the keychain.** `ninebrains.model.<id>` in the safeStorage store (SEC-27 rules),
+  decrypted by `keys.ts` `reveal` for one launch or one Test connection, taken once from the
+  Brain's prepared-route map, and put only in that spawn's env (never in `--settings`, argv,
+  a file, the Brain DB, logs or the renderer). Every revealed value is registered with the
+  redactor, including redactors built earlier. The contract has no procedure that returns a key.
+  Tests `SEC-40 keys are write-only` (`routing-service.test.ts`), `SEC-40 no key bytes in the Brain DB`
+  (`profiles-repo.db.test.ts`), `R3 a profile run reaches only its host, with only its key (SEC-40)`.
+- **SEC-41 The active credential is checked at run start.** The CLI applies settings-file `env`
+  over the process env. Our `--settings` outranks user/project/local settings; managed settings
+  outrank it, so a gateway variable there refuses the launch (attended and unattended). For
+  unattended claude, the supervisor reads `apiKeySource` and `model` from `system/init` and kills
+  the run (`credential-mismatch`, a `security` event, logged until SEC-33) on a mismatch.
+  `ANTHROPIC_AUTH_TOKEN` reports `none` like a login (spike §13 Q1), so a token profile is told
+  apart by the model it must report. Codex has no such event: not enforceable at run time.
+  Tests `SEC-41 the active credential is checked at run start`, `SEC-41 managed settings`.
+- **SEC-42 Reviewers are never downgraded.** Wave 2 (R4). Reviewers take no route in wave 1.
+- **SEC-43 Budgets are in USD and computed by us.** Wave 2 (R5). Prices are stored, nullable.
+- **SEC-44 Allowed credential kinds and vendors only.** Kinds are `anthropic-api`, `openai-api`,
+  `anthropic-compatible`, `openai-responses-compatible`, `local` (and `bedrock`/`vertex`/`foundry`,
+  refused until wave 2). No OAuth, cookie, session or token-file kind exists. A remote profile's
+  host must be on its vendor's `node/vendors.json` entry (R0 SAFE list plus first-party APIs);
+  `local` must be loopback; claude.ai and chatgpt.com hosts are always refused. Checked on save,
+  on every DB read (a hand-edited row is skipped) and at launch.
+  Tests `SEC-44 allowed credential kinds and vendors`, `SEC-44 vendor allowlist`.
+- **SEC-45 Egress follows the profile.** A profile run's sandbox egress is the plan allowlist plus
+  the profile's API host, and profile runs set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, which
+  stops the CLI's own calls to api.anthropic.com (spike §13). Loopback can't be narrowed to one
+  port in the sandbox's domain list. Test `SEC-45` assertions in `routing-launch.e2e.test.ts`.
+- **SEC-46 No gateway without hardening.** Wave 1 starts no gateway; R8 is a separate decision.
+- **SEC-12 update (deliberate).** Codex route values (`model_providers.nb={…}`, `model_provider="nb"`,
+  `model=…`) are generated by `routeLaunch` and passed to the argv guard as `trusted`, like the MCP
+  overrides. A user's own `-c`/`--config` stays refused.
+- **SEC-13 update (deliberate).** The unattended allowlist gains the routing variables, and only
+  from the route, never from the parent env: `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`,
+  `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL`, `NB_MODEL_KEY`, and the two exempt `CLAUDE_CODE_*`
+  names (`CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). A route's `''`
+  removes the variable. Test `SEC-13 routing env comes only from the route`.
+
 ## 5a. Status (2026-09-11)
 
 "Done" means the code enforces it and a test named after the ID proves it. "Open" means no
@@ -406,7 +468,7 @@ the agents or slices expected to close the gap.
 | SEC-05 | Done at the handler | `http.test.ts`. The offscreen-`BrowserWindow` e2e is not written [w5-brain-wiring] |
 | SEC-06 | Done, extended | `http.test.ts`; `pre-auth.test.ts` (L3): a failed-auth budget (5/s, burst 20) is checked before any token is resolved |
 | SEC-07 | Done | `boundary.test.ts` |
-| SEC-08 | Done | `gate-floor.test.ts` |
+| SEC-08 | Done, extended | `gate-floor.test.ts`; the kind rule: `SEC-08 agents cannot declare a weaker kind` (brain-core `execute.test.ts`), `SEC-08 ui kind adds the screenshot floor` (gates `rigor.test.ts`), and drafts in `planner-service.test.ts` [w7/self-heal-e2e] |
 | SEC-09 | Done, extended | `boundary.test.ts`; L1: recipients must exist and share the sender's project (`project-scope.test.ts`); gate feedback is persisted `untrusted` (`gate-feedback.test.ts`) and brain-mcp fences every untrusted body it hands a lane (`fence.test.ts`, `stdio.test.ts`) |
 | SEC-10 | Open | Lane config writer [w5-brain-wiring] |
 | SEC-11 | Partial | Settings are generated and tested (`sandbox-settings.test.ts`). M4 widened the deny list to one shared list plus all of `<userData>`. T36 adds a write deny on the lane repo's `config`, `config.worktree`, `info/attributes` and `hooks` (`T36` snapshot, `lane-git-paths.test.ts`). **Manual pre-release e2e with the real CLI:** the live read deny, and the T36 write deny. The e2e must check that `git config`, `echo > .git/info/attributes` and a new hook fail from a lane while `git commit` still works, including on Linux for paths that do not exist yet (`info/attributes`, `config.worktree`) |
@@ -437,6 +499,14 @@ the agents or slices expected to close the gap.
 | SEC-36 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `update-service.test.ts`. The packaged-build smoke test is open |
 | SEC-37 | Open | Release workflow [w4-release] |
 | SEC-38 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `telemetry.test.ts`. The first-run egress test is open |
+| SEC-39 | Done [w7-routing] | `launch-env.test.ts`, `routing-launch.e2e.test.ts` (attended, Brain session, unattended claude and codex, reviewer). Empty-means-unset checked on claude 2.1.269; the real attended CLI is not e2e-tested |
+| SEC-40 | Done [w7-routing] | `routing-service.test.ts`, `profiles-repo.db.test.ts`, `routing-launch.e2e.test.ts` (transcript and settings carry no key). The key is readable by the lane's own tools (R19) |
+| SEC-41 | Partial [w7-routing] | `run-supervisor-routing.test.ts`: unattended claude checked at init; managed settings refuse. Attended lanes rely on the `--settings` precedence (spike §13 Q2), with no runtime signal. Codex has none. Security events are logged until SEC-33 |
+| SEC-42 | Open | Wave 2 (R4) |
+| SEC-43 | Open | Wave 2 (R5) |
+| SEC-44 | Done [w7-routing] | `profile.test.ts`, `vendors.test.ts`, `routing-service.test.ts`, `profiles-repo.db.test.ts` |
+| SEC-45 | Done for unattended claude [w7-routing] | `routing-launch.e2e.test.ts`. Attended lanes have no egress list (as today) |
+| SEC-46 | N/A in wave 1 | No gateway exists |
 
 ## 6. Where the current design already breaks a requirement
 
@@ -496,6 +566,7 @@ has its `argv` option. Item 9: the app's `fetchText` pins at connect time with `
 | R16 | The review-checkout mirror keeps HEAD's version of any file that is over 5 MB, has more than one hard link, or is neither a regular file nor a symlink (a nested repo, a socket). An edit hidden that way is missing from the reviewer's diff. The tests gate still runs against the lane worktree. | Copying those files would put unbounded data, or a hard-linked secret (T35), into a checkout the reviewer reads. | list skipped paths in the reviewer prompt |
 | R18 | T36 residuals. (a) Codex lanes get no settings file, so there is no write deny on the repo config (as R2). Only `hardenGitExec` protects the app's calls there. (b) The filter-driver listing and the call are separate processes, so without the SEC-11 deny a live lane can race in a new driver. (c) Writes keep filters, and the transport vectors on app fetch and push (`credential.helper`, `remote.<x>.uploadpack` on a local-path remote) are closed only by the config deny. (d) User-visible costs: in a user's own partial clone, a diff or blame of a never-fetched blob fails. Textconv drivers don't render in the app's diff views. A repo-local LFS install shows smudged files as modified. The registry now ignores a repo-level `core.sshCommand` on app fetch and push, as the git worker already did (use `~/.ssh/config`). (e) On Linux, bubblewrap cannot re-bind a control file that does not exist yet without creating it in the user's repo, so a tests-gate script there could create `info/attributes` or `config.worktree`. Seatbelt denies them by path. A Claude lane on the main checkout could still rename `.git` itself, because the settings file cannot express a rename-only deny. | Each costs a security layer the other layer still covers, or is a narrow UX cost. Blanking filters on writes would commit raw content where LFS expects pointers. | per-call scoping once lanes get their own repos (R9) |
 | R17 | The review checkout reads objects from the lane's object store through `objects/info/alternates`, and the lane can write that store. A lane process that survives into `verifying` (R14) can delete objects, which fails its own review (there is no fetch, T32), or swap object files. So the base the reviewer diffs against is only as trustworthy as that store. The linked worktree it replaced shared the same store. | Copying objects with `clone --no-local` or `fetch` runs `upload-pack` in the lane repo under its config (T33). | copy and verify the base and HEAD trees |
+| R19 | A lane (or unattended run) on a model profile holds the profile's key in its own env, so its Bash tool can read it and spend it directly or send it elsewhere (T39). | Claude Code and Codex read the key from the process env; there is no way to hand it to the CLI and hide it from its tools. The key is the user's own, scoped to one spawn, redacted from transcripts, and never in a file. The guide tells users to set a spend limit per key at the vendor. | R8 router (the lane would hold only a per-launch loopback token) |
 
 ## 8. Release gate
 

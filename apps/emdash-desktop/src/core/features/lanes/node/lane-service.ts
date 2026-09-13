@@ -1,5 +1,6 @@
 import { err, ok, type Result } from '@emdash/shared';
 import { cell, peek, type Cell } from '@emdash/wire/state';
+import { MODEL_PROFILES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import {
   LANE_SLOT_COUNT,
   SSH_UNSUPPORTED_MESSAGE,
@@ -34,6 +35,11 @@ const EMPTY_SNAPSHOT: LaneAgentSnapshot = { agents: new Map(), sessions: new Map
 function laneError(type: LaneError['type'], message: string): LaneError {
   return { type, message };
 }
+
+const PROFILES_DISABLED = laneError(
+  'routing-disabled',
+  'Model profiles are off in this build, so the lane stays on your subscription.'
+);
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -196,8 +202,11 @@ export class LaneService {
     provider: LaneProvider;
     model?: string;
     roleId?: string;
+    subagentModel?: string;
+    authProfileId?: string;
   }): Promise<Result<{ laneId: string }, LaneError>> {
     await this.initialize();
+    if (input.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
     const tab = this.grid.tabs.find((candidate) => candidate.tabId === input.tabId);
     if (!tab) return err(laneError('tab-not-found', 'That tab no longer exists.'));
     if (tab.slots[input.slot]) {
@@ -224,6 +233,8 @@ export class LaneService {
       asleep: false,
       conversationReady: false,
       ...(input.roleId ? { roleId: input.roleId } : {}),
+      ...(input.subagentModel ? { subagentModel: input.subagentModel } : {}),
+      ...(input.authProfileId ? { authProfileId: input.authProfileId } : {}),
     };
     tab.slots[input.slot] = config;
     this.projectNames.set(project.projectId, project.name);
@@ -337,6 +348,32 @@ export class LaneService {
       });
     }
     return ok(undefined);
+  }
+
+  /**
+   * Lever A tier and Lever B auth mode (docs/plans/2026-09-12-model-routing.md). Stored with
+   * the lane and used from its next launch; `null` clears a field. An explicit `inherit` is
+   * kept, so it overrides a role's default.
+   */
+  async setLaneRouting(
+    laneId: string,
+    routing: { subagentModel: string | null; authProfileId: string | null }
+  ): Promise<Result<void, LaneError>> {
+    await this.initialize();
+    if (routing.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
+    const location = this.locate(laneId);
+    if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    const { config } = location;
+    if (routing.subagentModel === null) delete config.subagentModel;
+    else config.subagentModel = routing.subagentModel;
+    if (routing.authProfileId === null) delete config.authProfileId;
+    else config.authProfileId = routing.authProfileId;
+    this.commit();
+    return ok(undefined);
+  }
+
+  private get profilesEnabled(): boolean {
+    return this.ports.modelProfilesEnabled ?? MODEL_PROFILES_ENABLED;
   }
 
   private async load(): Promise<void> {

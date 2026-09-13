@@ -10,8 +10,8 @@ you. The promise is simple: **no agent grades its own work.** Gates run tests, l
 check citations, or hand the diff to a separate reviewer that cannot change anything.
 
 > **Before your first job:** at the default settings, every job the Brain creates gets the tests
-> gate, and the tests gate needs a test command for the project. Without one, the job is blocked
-> straight away. See [Test command](#test-command).
+> gate, and the tests gate needs a test command for the project. Set one in **Settings → Gates →
+> Tests**. Without one, the job is blocked straight away. See [Test command](#test-command).
 
 ## What happens when a lane finishes
 
@@ -63,7 +63,10 @@ Two settings, each 0 to 10, decide which gates attach to a job by default. Both 
 | `security-review` | security ≥ 6 | code, ui |
 | `reviewer` | testing ≥ 7 | all |
 
-A job that does not name its kind is treated as **code**.
+A job names its kind with `gateKind` when it is created. A job that does not name one is treated
+as **code**. The Brain declares a page or other visible UI as `"ui"`, which adds the screenshot
+gate. An agent (a Brain session or a lane) may declare only `code` or `ui`: every other kind has a
+weaker floor, so an agent asking for one is refused, not quietly downgraded.
 
 This is the floor. A job's creator can add gates on top; neither a lane nor the Brain can take
 them away. Packs add their own defaults, such as the SEO pack's `seo-evidence` gate.
@@ -77,13 +80,14 @@ control for it in this build.
 The tests gate runs one command, which you set per project. It never takes a command from a job or
 from a file in the worktree.
 
-In this build there is no field in the app to set it, so the tests gate always reports a missing
-command. At the default rigor (testing 5), every code and ui job gets the tests gate, so every
-such job is blocked with the message "No test command is set for this project".
-<!-- VERIFY: a per-project test command setting is being added -->
+Set it in **Settings → Gates → Tests**: pick the project, type the command (for example
+`pnpm test`) and click **Save test command**. It runs in the lane's worktree. Saving an empty
+command clears it.
 
-Until you can set one, lower **Testing rigor** below 3 in **Settings → Gates** to let jobs finish.
-They finish **unverified**.
+At the default rigor (testing 5), every code and ui job gets the tests gate. A project with no test
+command has every such job blocked with "No test command is set for this project: set one in
+Settings → Gates → Test command", and no attempt is used. Lowering **Testing rigor** below 3 also
+lets jobs finish, but they finish **unverified**.
 
 ## The built-in gates
 

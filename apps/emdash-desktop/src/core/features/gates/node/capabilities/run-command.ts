@@ -1,8 +1,8 @@
 /**
  * `runCommand` for the tests gate and the reviewer's git calls (SEC-20).
  *
- * - Runs in a directory inside the allowed roots (lane worktrees, review checkouts), checked by
- *   realpath (SEC-31 rule).
+ * - Runs in an allowed lane worktree itself, or in a directory inside an allowed root (lane
+ *   worktrees, review checkouts), checked by realpath (SEC-31 rule). Never at a denied root itself.
  * - Scrubbed env: no tokens, no `NINEBRAINS_*`, no provider secrets or accounts. `TMPDIR` points
  *   at a private per-command temp dir that is deleted afterwards.
  * - With `argv`, no shell: `command` is resolved to an absolute executable from the scrubbed PATH,
@@ -19,7 +19,7 @@
  * file (SEC-20 provenance rule). This capability can't check that; its caller must.
  */
 import { accessSync, constants, existsSync, realpathSync, statSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join } from 'node:path';
 import { resolveLaneGitPaths } from '@core/features/exec-runs/api/node/lane-git-paths';
@@ -126,6 +126,34 @@ class TailBuffer {
   }
 }
 
+/**
+ * The tests gate runs in the lane worktree itself, and each lane worktree is one of the allowed
+ * roots. `resolveRunCwd` was built for the exec supervisor, whose roots are parent directories, so
+ * it accepts only a path strictly inside a root. Here a cwd that is exactly an allowed root is
+ * accepted too, unless that root is denied: the review-checkout root is, so nothing runs at that
+ * shared root itself.
+ */
+async function resolveGateCwd(
+  cwd: string,
+  roots: readonly string[],
+  denied: readonly string[]
+): Promise<string> {
+  const realCwd = isAbsolute(cwd) ? await realpath(cwd).catch(() => undefined) : undefined;
+  if (realCwd) {
+    const deniedReal = new Set(
+      await Promise.all(denied.map((path) => realpath(path).catch(() => path)))
+    );
+    for (const root of roots) {
+      if (!isAbsolute(root)) continue;
+      const info = await lstat(root).catch(() => undefined);
+      if (!info || info.isSymbolicLink() || !info.isDirectory()) continue;
+      const realRoot = await realpath(root);
+      if (realRoot === realCwd && !deniedReal.has(realRoot)) return realCwd;
+    }
+  }
+  return resolveRunCwd(cwd, roots);
+}
+
 function findBwrap(options: RunCommandOptions): string | undefined {
   if (options.bwrapPath) return options.bwrapPath;
   try {
@@ -156,7 +184,11 @@ export function createRunCommand(options: RunCommandOptions): RunCommand {
     throw new Error('sandbox "bwrap" needs bwrapPath or bwrap on PATH');
 
   return async (command, opts) => {
-    const cwd = await resolveRunCwd(opts.cwd, options.allowedRoots());
+    const cwd = await resolveGateCwd(
+      opts.cwd,
+      options.allowedRoots(),
+      options.deniedPaths?.() ?? []
+    );
     opts.signal.throwIfAborted();
     const settings = (await options.projectSettings?.(cwd)) ?? {};
     if (mode === 'none' && !opts.argv && settings.allowUnsandboxed !== true) {

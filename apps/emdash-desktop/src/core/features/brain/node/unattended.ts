@@ -6,6 +6,7 @@ import type {
   RunBudgets,
 } from '@core/features/exec-runs/api/node/types';
 import type { PackLaunch } from '@core/features/packs/api/launch';
+import type { LaunchRouting } from '@core/features/routing/api/node/launch-env';
 import type { DispatchLane } from './dispatcher';
 import { APP_IDENTITY } from './dispatcher';
 import { runLaunchKey, type BrainEndpoint } from './endpoint';
@@ -25,6 +26,8 @@ export interface UnattendedDeps {
   pack(projectId: string, roleId?: string): Promise<PackLaunch | undefined>;
   siblingWorktrees(laneId: string): string[];
   budgets?: RunBudgets;
+  /** The lane's model route; a profile's key is decrypted for this one run. */
+  routing?(lane: DispatchLane): Promise<LaunchRouting>;
 }
 
 /**
@@ -66,6 +69,10 @@ export async function runJobUnattended(
     for (const server of usablePackServers(pack)) {
       if (server.type === 'stdio') mcpServers[server.name] = server;
     }
+    if (lane.authProfileId && !deps.routing) {
+      throw new Error('this lane runs on a model profile, but model routing is not wired');
+    }
+    const routing = deps.routing ? await deps.routing(lane) : undefined;
     result = await deps.supervisor.run({
       runId: run.id,
       provider: lane.provider,
@@ -77,6 +84,14 @@ export async function runJobUnattended(
       mcpServers,
       appendSystemPrompt: pack?.appendSystemPrompt,
       siblingWorktrees: deps.siblingWorktrees(lane.laneId),
+      ...(routing
+        ? {
+            routing: {
+              ...routing,
+              roleSubagentModel: routing.roleSubagentModel ?? pack?.role?.subagentModel,
+            },
+          }
+        : {}),
     });
     if (!result.ok) failure = `unattended run ended: ${result.reason}`;
   } catch (error) {

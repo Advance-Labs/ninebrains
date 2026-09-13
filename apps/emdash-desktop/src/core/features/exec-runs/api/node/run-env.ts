@@ -45,6 +45,15 @@ const WINDOWS_KEYS = [
 /** Never allowed into a child, whatever an allowlist upstream says. */
 const FORBIDDEN_PREFIXES = ['NINEBRAINS_', 'EMDASH_', 'CLAUDECODE', 'CLAUDE_CODE_'];
 
+/**
+ * SEC-13 (updated for model routing): the one `CLAUDE_CODE_*` name a child may carry, and only
+ * when the route set it. The prefix ban stays for parent-session markers (spike gotcha 9).
+ */
+const ROUTE_EXEMPT = new Set([
+  'CLAUDE_CODE_SUBAGENT_MODEL',
+  'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',
+]);
+
 function pick(env: EnvRecord, keys: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const key of keys) {
@@ -54,8 +63,12 @@ function pick(env: EnvRecord, keys: readonly string[]): Record<string, string> {
   return out;
 }
 
-function assertNoForbidden(env: Record<string, string>): Record<string, string> {
+function assertNoForbidden(
+  env: Record<string, string>,
+  exempt: ReadonlySet<string> = new Set()
+): Record<string, string> {
   for (const key of Object.keys(env)) {
+    if (exempt.has(key)) continue;
     if (FORBIDDEN_PREFIXES.some((p) => key.toUpperCase().startsWith(p))) {
       throw new Error(`Child env must not carry ${key}`);
     }
@@ -73,11 +86,18 @@ export interface UnattendedEnvOptions {
   provider: ExecProvider;
   auth?: ProviderAuthEnv;
   platform?: AgentEnvPlatform;
+  /**
+   * The model route's env (`routeLaunch`): gateway, key and subagent tier. Layered last. Empty
+   * values (a subscription route's neutralizers) are dropped, because this env has no parent
+   * layer to override: the variable is simply absent.
+   */
+  routing?: Readonly<Record<string, string>>;
 }
 
 /**
  * SEC-13. Account selection comes only from `auth`, never from the parent env, so a run can't
- * silently inherit the user's default account or an API key they did not choose for it.
+ * silently inherit the user's default account or an API key they did not choose for it. Model
+ * routing variables come only from `routing`, never from the parent env either.
  */
 export function buildUnattendedEnv(
   parentEnv: EnvRecord,
@@ -94,9 +114,21 @@ export function buildUnattendedEnv(
           ENABLE_TOOL_SEARCH: 'false',
         }
       : { CODEX_HOME: auth.CODEX_HOME };
-  return assertNoForbidden(
-    mergeAgentEnvLayers(platform, baseEnv(parentEnv, platform), providerLayer)
+  const routingLayer: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(options.routing ?? {})) {
+    routingLayer[key] = value === '' ? undefined : value;
+  }
+  const merged = mergeAgentEnvLayers(
+    platform,
+    baseEnv(parentEnv, platform),
+    providerLayer,
+    routingLayer
   );
+  // A neutralizer drops the account key too: a route's '' means "absent in this child".
+  for (const [key, value] of Object.entries(options.routing ?? {})) {
+    if (value === '') delete merged[key];
+  }
+  return assertNoForbidden(merged, ROUTE_EXEMPT);
 }
 
 /** SEC-20: the tests gate's env. No provider auth, no tokens, no app variables. */

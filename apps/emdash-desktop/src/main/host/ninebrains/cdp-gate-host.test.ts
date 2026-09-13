@@ -203,6 +203,17 @@ describe('CDP gate host', () => {
     expect(dbg.attached).toBe(false);
   });
 
+  it('fails a command that never answers instead of hanging, and detaches', async () => {
+    const dbg = new FakeDebugger();
+    dbg.hangOn = 'Page.enable';
+    const h = host({ getWebContents: () => webview(dbg), commandTimeoutMs: 20 });
+    await expect(h.capture(lane, DESKTOP, { url: PREVIEW, signal: signal() })).rejects.toThrow(
+      'did not answer Page.enable'
+    );
+    expect(dbg.attached).toBe(false);
+    expect(dbg.listenerCount).toBe(0);
+  });
+
   it('fails when the preview does not load in time', async () => {
     const dbg = new FakeDebugger();
     dbg.sendCommand = async (method, params) => {

@@ -1,6 +1,6 @@
 import type { Brain } from '../brain/brain';
 import { ForbiddenError, NotFoundError } from '../errors';
-import type { Address, ProjectId } from '../types';
+import { AGENT_GATE_KINDS, type Address, type GateKind, type ProjectId } from '../types';
 import type { BrainGrant, ExecuteOptions } from './execute';
 import { BRAIN_OPS, LANE_OPS, type ParsedBrainRequest, SESSION_OPS } from './ops';
 
@@ -13,6 +13,9 @@ import { BRAIN_OPS, LANE_OPS, type ParsedBrainRequest, SESSION_OPS } from './ops
  *   global Brain grant, so a brain grant without a project may touch no project at all.
  * - L1: `send_message` recipients must exist and belong to the sender's project. A lane may message
  *   only its own project's lanes and Brains.
+ * - SEC-08: a token may declare `gateKind` "code" or "ui" only. Every other kind has a weaker gate
+ *   floor, so it is refused, never coerced. The app's own identities call `Brain` directly and may
+ *   set any kind.
  *
  * The domain layer (`Brain`) stays unscoped for the brain role on purpose: main's own identity uses
  * it directly. Scoping is a property of tokens, so it lives here.
@@ -54,6 +57,8 @@ export function authorizeRequest(
 
   switch (request.op) {
     case 'create_job':
+      checkGateKind(request.args.gateKind);
+      return inHome(request.args.projectId);
     case 'broadcast':
     case 'list_jobs':
     case 'list_lanes':
@@ -77,6 +82,13 @@ export function authorizeRequest(
     default:
       return;
   }
+}
+
+function checkGateKind(kind: GateKind | undefined): void {
+  if (kind === undefined || (AGENT_GATE_KINDS as readonly string[]).includes(kind)) return;
+  throw new ForbiddenError(
+    `gateKind "${kind}" has a weaker gate floor than code work; agents may declare "code" or "ui" only`
+  );
 }
 
 function checkRecipient(

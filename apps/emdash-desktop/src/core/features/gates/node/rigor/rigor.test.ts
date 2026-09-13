@@ -1,4 +1,9 @@
-import { Brain, InMemoryBrainStore, type Identity } from '@ninebrains/brain-core';
+import {
+  Brain,
+  InMemoryBrainStore,
+  executeBrainRequest,
+  type Identity,
+} from '@ninebrains/brain-core';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_GATES_SETTINGS, type GatesSettings } from '../../contributions/settings';
 import {
@@ -95,6 +100,31 @@ describe('SEC-08 caller cannot drop gates (app floor)', () => {
       gateSpec: { gates: [], kind: 'ui' },
     });
     expect(ui.gateSpec?.gates).toEqual(['tests', 'screenshot', 'reviewer']);
+  });
+});
+
+describe('SEC-08 ui kind adds the screenshot floor', () => {
+  it('an agent declaring gateKind ui gets tests and screenshot at the default rigor', async () => {
+    const { rigor } = await resolver();
+    const brain = new Brain({
+      store: new InMemoryBrainStore(),
+      resolveGateFloor: rigor.resolveGateFloor,
+    });
+    const create = (args: Record<string, unknown>) => {
+      const response = executeBrainRequest(
+        brain,
+        { identity: BRAIN, projectId: 'p1', attachmentRoots: [] },
+        { v: 1, op: 'create_job', args: { title: 't', ...args } }
+      );
+      if (!response.ok) throw new Error(response.error.message);
+      return brain.getJob(BRAIN, (response.result as { id: string }).id).gateSpec;
+    };
+    expect(create({ gateKind: 'ui' })).toEqual({ gates: ['tests', 'screenshot'], kind: 'ui' });
+    expect(create({})?.gates).toEqual(['tests']);
+    expect(create({ gateKind: 'code', gates: ['screenshot'] })).toEqual({
+      gates: ['tests', 'screenshot'],
+      kind: 'code',
+    });
   });
 });
 

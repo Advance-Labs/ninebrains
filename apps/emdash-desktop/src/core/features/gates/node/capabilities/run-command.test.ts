@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
@@ -149,6 +149,27 @@ describe('SEC-20 tests gate is sandboxed', () => {
     await expect(runCommand('true', { cwd: outside, signal: signal() })).rejects.toThrow(
       /not inside/
     );
+  });
+
+  it('runs in a lane worktree that is itself an allowed root, as the tests gate does', async () => {
+    const perLane = createRunCommand({
+      allowedRoots: () => [laneA],
+      ninebrainsDataDir: ninebrains,
+      killGraceMs: 2000,
+    });
+    const r = await perLane('pwd', { cwd: laneA, signal: signal() });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout.trim()).toBe(realpathSync(laneA));
+  });
+
+  it('never runs at a denied root itself, such as the review-checkout root', async () => {
+    const guarded = createRunCommand({
+      allowedRoots: () => [laneA],
+      deniedPaths: () => [laneA],
+      ninebrainsDataDir: ninebrains,
+      killGraceMs: 2000,
+    });
+    await expect(guarded('true', { cwd: laneA, signal: signal() })).rejects.toThrow(/not inside/);
   });
 
   it('escapes profile paths', () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { profileIdSchema, subagentModelSchema } from '@core/features/routing/api';
 
 /** A tab holds a 2×2 grid: slots 0-3, left-to-right then top-to-bottom. */
 export const LANE_SLOT_COUNT = 4;
@@ -65,6 +66,10 @@ export const laneConfigSchema = z.object({
   runMode: laneRunModeSchema.optional(),
   /** The pack role whose prompt and servers the lane launches with. */
   roleId: laneRoleIdSchema.optional(),
+  /** Lever A: the model the lane's subagents use (`CLAUDE_CODE_SUBAGENT_MODEL`). Absent: inherit. */
+  subagentModel: subagentModelSchema.optional(),
+  /** Lever B: the model profile the lane runs on. Absent: the user's own subscription login. */
+  authProfileId: profileIdSchema.optional(),
 });
 export type LaneConfig = z.infer<typeof laneConfigSchema>;
 
@@ -118,6 +123,7 @@ export const laneErrorSchema = z.object({
     'ssh-unsupported',
     'start-failed',
     'stop-failed',
+    'routing-disabled',
   ]),
   message: z.string(),
 });

@@ -93,6 +93,9 @@ describe.skipIf(!import.meta.env.VITE_GATES_SCREENSHOTS)('gates screenshots', ()
         return ok(fixtureEvidence(file, width ? mockCapture(width, attempt === 1) : undefined));
       },
       deleteEvidence: async ({ jobId }: { jobId: string }) => ok({ jobId }),
+      getProjectPrefs: async ({ projectId }: { projectId: string }) =>
+        ok({ projectId, testCommand: 'pnpm test' }),
+      setTestCommand: async (input: { projectId: string; testCommand: string | null }) => ok(input),
     });
     document.body.style.margin = '0';
     host = document.createElement('div');
@@ -144,6 +147,16 @@ describe.skipIf(!import.meta.env.VITE_GATES_SCREENSHOTS)('gates screenshots', ()
   }
 
   const settings = { testingRigor: 7, securityRigor: 6, evidenceRetentionDays: 30 };
+  const testCommand = {
+    projects: [
+      { id: 'acme', name: 'acme-build' },
+      { id: 'docs', name: 'docs-site' },
+    ],
+    projectId: 'acme',
+    onProjectChange: vi.fn(),
+    savedCommand: 'pnpm test',
+    onSave: async () => null,
+  };
 
   it('verification modal, light, 1440', async () => {
     await showModal('emlight', 1440, 900);
@@ -173,14 +186,19 @@ describe.skipIf(!import.meta.env.VITE_GATES_SCREENSHOTS)('gates screenshots', ()
       'emlight',
       1440,
       900,
-      <GatesSettingsPanel settings={settings} onChange={vi.fn()} />
+      <GatesSettingsPanel settings={settings} onChange={vi.fn()} testCommand={testCommand} />
     );
     await new Promise((resolve) => setTimeout(resolve, 200));
     await page.screenshot({ path: `${SHOTS}/gates-settings-1440.png` });
   });
 
   it('settings, dark, 390', async () => {
-    await render('emdark', 390, 844, <GatesSettingsPanel settings={settings} onChange={vi.fn()} />);
+    await render(
+      'emdark',
+      390,
+      844,
+      <GatesSettingsPanel settings={settings} onChange={vi.fn()} testCommand={testCommand} />
+    );
     await new Promise((resolve) => setTimeout(resolve, 200));
     await page.screenshot({ path: `${SHOTS}/gates-settings-390.png` });
   });

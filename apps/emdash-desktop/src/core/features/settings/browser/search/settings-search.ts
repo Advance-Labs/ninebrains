@@ -185,6 +185,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
     description: 'Testing and security rigor: which verification gates attach to jobs.',
     keywords: ['rigor', 'verification', 'screenshots', 'reviewer', 'security review'],
   },
+  // Ninebrains: models settings tab (features/routing).
+  {
+    id: 'models',
+    label: 'Models',
+    tab: 'models',
+    description: 'Subagent models, and model profiles with your own API keys or local models.',
+    keywords: ['api key', 'subagent', 'ollama', 'openrouter', 'profiles', 'routing'],
+  },
 
   // Integrations
   {

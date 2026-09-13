@@ -108,6 +108,8 @@ export type LaneServicePorts = {
   persistence: LanePersistencePort;
   agentFeed: LaneAgentFeedPort;
   brain?: LaneBrainPort;
+  /** `MODEL_PROFILES_ENABLED` unless a test says otherwise. */
+  modelProfilesEnabled?: boolean;
   newId(): string;
   onError(context: string, error: unknown): void;
 };

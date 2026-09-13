@@ -88,7 +88,10 @@ describe('SEC-10 lane config files', () => {
     });
     expect(config.mcpServers.supabase.env).toEqual({ SUPABASE_ACCESS_TOKEN: 's3' });
 
-    expect(launch.providerVars).toEqual({});
+    // providerVars carries only the model route: SEC-39's neutralizers on a subscription lane.
+    expect(Object.keys(launch.providerVars).filter((k) => k.startsWith('NINEBRAINS'))).toEqual([]);
+    expect(Object.values(launch.providerVars)).not.toContain(TOKEN);
+    expect(Object.values(launch.providerVars).every((v) => v === '')).toBe(true);
     expect(JSON.stringify(launch.extraArgs)).not.toContain(TOKEN);
     if (posix) {
       expect(statSync(launch.mcpConfigPath).mode & 0o777).toBe(0o600);

@@ -1,8 +1,20 @@
 import { PageLayout, SettingsRow, SettingsSection } from '@emdash/ui/react/patterns';
 import { Badge, Text } from '@emdash/ui/react/primitives';
+import { observer } from 'mobx-react-lite';
+import { useEffect, useState } from 'react';
+import {
+  asAvailableProject,
+  getProjectManagerStore,
+} from '@core/features/projects/api/browser/stores/project-selectors';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
+import { getGatesClient } from '../api/browser/client';
 import { RIGOR_TABLE, gatesAttachedAt } from '../api/rigor-table';
 import { DEFAULT_GATES_SETTINGS, type GatesSettings } from '../contributions/settings';
+import {
+  TestCommandSection,
+  type GatesProjectOption,
+  type TestCommandSectionProps,
+} from './test-command-section';
 
 function RigorSlider(props: {
   label: string;
@@ -70,6 +82,8 @@ export function GatesSettingsPanel(props: {
   settings: GatesSettings;
   disabled?: boolean;
   onChange: (partial: Partial<GatesSettings>) => void;
+  /** The per-project test command. Omitted, the section is not shown. */
+  testCommand?: TestCommandSectionProps;
 }) {
   const { testingRigor, securityRigor } = props.settings;
   return (
@@ -106,6 +120,7 @@ export function GatesSettingsPanel(props: {
               }
             />
           </SettingsSection>
+          {props.testCommand ? <TestCommandSection {...props.testCommand} /> : null}
           <SettingsSection title="Which gates attach" bare>
             <div className="flex flex-col gap-2">
               <RigorTable testing={testingRigor} security={securityRigor} />
@@ -121,13 +136,58 @@ export function GatesSettingsPanel(props: {
   );
 }
 
-export function GatesSettingsView() {
+/** The selected project's test command, loaded from and saved to the gates project prefs. */
+function useProjectTestCommand(projects: GatesProjectOption[]): TestCommandSectionProps {
+  const [picked, setPicked] = useState<string>();
+  const projectId = projects.some((p) => p.id === picked) ? picked : projects[0]?.id;
+  const [saved, setSaved] = useState<{ projectId: string; command: string | null }>();
+
+  useEffect(() => {
+    if (!projectId) return;
+    let live = true;
+    void getGatesClient()
+      .then((client) => client.getProjectPrefs({ projectId }))
+      .then((result) => {
+        // An unreadable pref reads as "not set": the runner treats it the same way.
+        if (live) setSaved({ projectId, command: result.success ? result.data.testCommand : null });
+      });
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+
+  return {
+    projects,
+    projectId,
+    onProjectChange: setPicked,
+    savedCommand: saved && saved.projectId === projectId ? saved.command : undefined,
+    onSave: async (command) => {
+      if (!projectId) return 'Pick a project first.';
+      const result = await (
+        await getGatesClient()
+      ).setTestCommand({ projectId, testCommand: command });
+      if (!result.success) return result.error.message;
+      setSaved({ projectId, command: result.data.testCommand });
+      return null;
+    },
+  };
+}
+
+export const GatesSettingsView = observer(function GatesSettingsView() {
   const { value, update, isLoading } = useAppSettingsKey('ninebrains.gates');
+  const projects = Array.from(getProjectManagerStore().projects.entries()).flatMap(
+    ([id, store]) => {
+      const context = asAvailableProject(store);
+      return context ? [{ id, name: context.project.name }] : [];
+    }
+  );
+  const testCommand = useProjectTestCommand(projects);
   return (
     <GatesSettingsPanel
       settings={value ?? DEFAULT_GATES_SETTINGS}
       disabled={isLoading}
       onChange={(partial) => update(partial)}
+      testCommand={testCommand}
     />
   );
-}
+});

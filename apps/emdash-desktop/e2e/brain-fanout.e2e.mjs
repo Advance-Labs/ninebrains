@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 // Phase 2 exit demo: the Brain fans a 5-job brief with 2 dependencies out to
 // 3 lanes, waits on the dependencies, lanes report back, and the done log is
 // complete. Every lane runs tooling/fake-agent over the REAL brain-mcp shim and
@@ -6,21 +6,34 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 // with the Brain session's own minted token. Also: SEC-05 from an in-app
 // offscreen BrowserWindow, and the brain-drawer screenshots.
 // Run with `pnpm e2e:brain` (builds first). Kept out of CI like lanes-smoke.
-import http from 'node:http';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  LONG,
+  addLane,
+  addProject,
+  approveLanePrompts,
+  brainCall,
+  launchConfigs,
+  openLanes,
+  setTestCommand,
+  startBrain,
+  step,
+  until,
+} from './brain-e2e.mjs';
+import {
+  closeApp,
+  hangWatchdog,
   launchApp,
   repoRoot,
   setContentSize,
   setMinimumSize,
-  stubDirectoryPicker,
 } from './harness.mjs';
 
 const SCREENSHOTS = join(repoRoot, 'docs/screenshots');
-const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
-const LONG = 90_000;
 const LANES = [0, 1, 2];
+// Code jobs get the tests gate at the default rigor, so the project needs a real test command.
+const TEST_COMMAND = 'test -f README.md';
 
 // Each pasted job: say something, report it with the id taken from the prompt, end the turn.
 const ROUND = [
@@ -39,106 +52,6 @@ const ROUND = [
   { waitForInput: true },
 ];
 const LANE_SCRIPT = Array.from({ length: 6 }, () => ROUND).flat();
-
-const step = (message) => process.stdout.write(`• ${message}\n`);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function until(label, check, ms = LONG) {
-  const end = Date.now() + ms;
-  for (;;) {
-    const value = await check();
-    if (value) return value;
-    if (Date.now() > end) throw new Error(`timed out: ${label}`);
-    await sleep(250);
-  }
-}
-
-/** A brain-mcp-shaped call: Node client, no Origin/Sec-Fetch, exact Host. */
-function brainCall(url, token, op, args = {}) {
-  const { port } = new URL(url);
-  const body = JSON.stringify({ v: 1, op, args });
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        host: '127.0.0.1',
-        port,
-        path: '/brain/v1/call',
-        method: 'POST',
-        headers: {
-          host: `127.0.0.1:${port}`,
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`,
-          'content-length': Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        let text = '';
-        res.setEncoding('utf8');
-        res.on('data', (c) => (text += c));
-        res.on('end', () => {
-          const json = JSON.parse(text);
-          if (!json.ok) reject(new Error(`${op}: ${json.error.code} ${json.error.message}`));
-          else resolve(json.result);
-        });
-      }
-    );
-    req.on('error', reject);
-    req.end(body);
-  });
-}
-
-function launchConfigs(userData) {
-  const root = join(userData, 'ninebrains', 'lanes');
-  if (!existsSync(root)) return [];
-  return readdirSync(root).flatMap((dir) => {
-    const file = join(root, dir, 'mcp.json');
-    if (!existsSync(file)) return [];
-    const env = JSON.parse(readFileSync(file, 'utf8')).mcpServers.brain.env;
-    return [
-      {
-        dir,
-        url: env.NINEBRAINS_BRAIN_URL,
-        token: env.NINEBRAINS_TOKEN,
-        laneId: env.NINEBRAINS_LANE_ID,
-      },
-    ];
-  });
-}
-
-async function addProject(app, page, repo) {
-  await stubDirectoryPicker(app, repo);
-  await page.getByText('Open project', { exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Add Project' });
-  await dialog.waitFor({ timeout: LONG });
-  const picker = dialog.getByText('Select a directory');
-  if (await picker.isVisible()) await picker.click();
-  await dialog.locator('button[data-variant="primary"]', { hasText: 'Create' }).click();
-  await dialog.waitFor({ state: 'hidden', timeout: LONG });
-}
-
-async function openLanes(page) {
-  await page.keyboard.press(`${MOD}+K`);
-  await page.keyboard.type('Open Lanes');
-  await page
-    .getByRole('option', { name: /Open Lanes/ })
-    .first()
-    .click();
-  await page.getByTestId('lanes-grid').waitFor({ timeout: LONG });
-}
-
-async function addLane(page, slot) {
-  const selector = `[data-testid="lane-cell"][data-slot="${slot}"] button`;
-  await page.waitForFunction(
-    (sel) =>
-      [...document.querySelectorAll(sel)].some((b) => b.textContent === 'Add lane' && !b.disabled),
-    selector,
-    { timeout: LONG }
-  );
-  await page
-    .locator(`[data-testid="lane-cell"][data-slot="${slot}"]`)
-    .getByRole('button', { name: 'Add lane' })
-    .click();
-}
 
 /** SEC-05: a page inside the app (offscreen, own partition) tries the endpoint with a real token. */
 async function browserAttack(app, url, token, laneId) {
@@ -178,12 +91,15 @@ async function main() {
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
   step(`profile ${root}`);
   let jobs = {};
+  let stopApproving = () => {};
   try {
     await page.evaluate(() => localStorage.setItem('emdash:has-seen-onboarding:v1', 'true'));
     await page.reload();
     await setContentSize(app, 1440, 900);
     step('adding the fixture project and opening Lanes');
     await addProject(app, page, repo);
+    step(`Settings → Gates: test command \`${TEST_COMMAND}\``);
+    await setTestCommand(page, TEST_COMMAND);
     await openLanes(page);
     for (const slot of LANES) await addLane(page, slot);
     await page.waitForFunction(
@@ -197,16 +113,10 @@ async function main() {
         launchConfigs(userData).filter((c) => !c.dir.startsWith('brain-')).length === LANES.length
     );
     step('3 lanes up, each with its own 0600 mcp.json and token');
+    stopApproving = approveLanePrompts(page);
 
     step('opening the Brain drawer and starting a Brain session');
-    await page.getByTestId('brain-drawer-toggle').click();
-    await page.getByTestId('brain-drawer').waitFor({ timeout: LONG });
-    await page.getByTestId('brain-drawer').getByRole('button', { name: 'Start Brain' }).click();
-    const brain = await until('brain launch config', () =>
-      launchConfigs(userData).find((c) => c.dir.startsWith('brain-'))
-    );
-    const whoami = await brainCall(brain.url, brain.token, 'whoami');
-    if (whoami.role !== 'brain') throw new Error(`brain token has role ${whoami.role}`);
+    const brain = await startBrain(page, userData);
 
     step('posting the brief: 5 jobs, C needs A, E needs C');
     const create = (title, dependsOn = []) =>
@@ -247,6 +157,8 @@ async function main() {
     if (firstTaken[E.id] < firstDone[C.id]) throw new Error('E was dispatched before C was done');
     if (lanesUsed.size < 2) throw new Error(`fan-out used ${lanesUsed.size} lane(s)`);
     step(`all 5 done in dependency order across ${lanesUsed.size} lanes`);
+    // No prompts are left to answer, and the screenshots below need a quiet page.
+    stopApproving();
 
     step('SEC-05: an in-app web page calls the endpoint with a real lane token');
     const lane = launchConfigs(userData).find((c) => !c.dir.startsWith('brain-'));
@@ -260,8 +172,14 @@ async function main() {
 
     step('screenshots: drawer open, lane 1 side panel on the done log');
     const cell = page.locator('[data-testid="lane-cell"][data-slot="0"]');
-    await cell.getByRole('button', { name: 'Jobs, done and notes' }).click();
-    await cell.getByRole('tab', { name: 'Done' }).click();
+    // A narrow lane hides the header button, so go through the lane menu, which always has it.
+    await cell.locator('button[aria-label="Lane menu"]').click();
+    await page.getByRole('menuitem', { name: 'Show jobs, done and notes' }).click();
+    await page.keyboard.press('Escape');
+    const doneTab = cell.getByRole('tab', { name: 'Done' });
+    await doneTab.waitFor({ timeout: LONG });
+    // Only a screenshot follows; don't wait on the closing menu's animation.
+    await doneTab.click({ force: true });
     await page.waitForTimeout(1_500);
     mkdirSync(SCREENSHOTS, { recursive: true });
     await page.screenshot({ path: join(SCREENSHOTS, 'brain-drawer-1440.png') });
@@ -282,14 +200,20 @@ async function main() {
       process.stderr.write(`console errors:\n  ${consoleErrors.join('\n  ')}\n`);
     process.exitCode = 1;
   } finally {
-    await app.close();
+    stopApproving();
+    await closeApp(app);
   }
   if (process.exitCode) return;
 
-  step('done log from the Brain DB after shutdown');
+  step('done log and gate verdicts from the Brain DB after shutdown');
   const db = new DatabaseSync(join(userData, 'ninebrains-brain.db'), { readOnly: true });
   const done = db.prepare('SELECT * FROM done_log').all();
-  const unverified = db.prepare("SELECT * FROM notes WHERE body LIKE '[gates] unverified:%'").all();
+  const results = new Map(
+    db
+      .prepare('SELECT id, result FROM jobs')
+      .all()
+      .map((row) => [row.id, JSON.parse(row.result ?? 'null')])
+  );
   db.close();
   const doneIds = new Set(done.map((row) => row.job_id));
   const missing = Object.entries(jobs).filter(([, job]) => !doneIds.has(job.id));
@@ -300,8 +224,23 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  step(`done log complete: 5 rows, ${unverified.length} marked unverified (no gate runner wired)`);
-  step('PASS');
+  // The gates are wired: every job must pass its tests gate, never finish unverified.
+  const verdicts = Object.entries(jobs).map(([key, job]) => [
+    key,
+    results.get(job.id)?.verification,
+  ]);
+  const notVerified = verdicts.filter(([, v]) => !v?.verified || v.status !== 'passed');
+  if (notVerified.length > 0) {
+    process.stderr.write(`FAIL: jobs not verified: ${JSON.stringify(notVerified)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  step(
+    `done log complete: 5 rows, every job verified (${verdicts.map(([k, v]) => `${k} ${v.status} on attempt ${v.attempt}`).join(', ')})`
+  );
+  process.stdout.write('PASS brain fan-out e2e: 5 jobs done in dependency order, all verified\n');
 }
 
+hangWatchdog(20 * 60_000);
 await main();
+process.exit(process.exitCode ?? 0);

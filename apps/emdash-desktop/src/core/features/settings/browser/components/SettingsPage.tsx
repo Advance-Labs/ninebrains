@@ -41,6 +41,10 @@ const SIDEBAR_ITEMS: PageSidebarMenuItem[] = [
   navItemFor('clis-models'),
   navItemFor('mcp'),
   navItemFor('skills'),
+  // Ninebrains: the packs and gates pages are registered contributions; without these entries
+  // nothing in the sidebar opened them.
+  navItemFor('packs'),
+  navItemFor('gates'),
   REMOTE_SECTION,
   navItemFor('connections'),
 ];

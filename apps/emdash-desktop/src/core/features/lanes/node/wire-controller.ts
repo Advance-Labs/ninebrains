@@ -28,6 +28,8 @@ export function createLanesWireController(lanes: LaneService): {
       removeLane: ({ laneId, deleteWorktree }) => lanes.removeLane(laneId, deleteWorktree),
       moveLane: ({ laneId, tabId, slot }) => lanes.moveLane(laneId, tabId, slot),
       setLaneMode: ({ laneId, mode }) => lanes.setLaneMode(laneId, mode),
+      setLaneRouting: ({ laneId, subagentModel, authProfileId }) =>
+        lanes.setLaneRouting(laneId, { subagentModel, authProfileId }),
     },
     async dispose() {
       await board.dispose();

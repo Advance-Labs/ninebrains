@@ -1,8 +1,24 @@
-import { BrainError, CycleError, type Brain, type Identity } from '@ninebrains/brain-core';
+import {
+  BrainError,
+  CycleError,
+  type Brain,
+  type GateSpec,
+  type Identity,
+} from '@ninebrains/brain-core';
 import type { PlannerJobState } from '../api';
-import type { PlanCompileRequest, PlanCompileResult, PlanTarget } from './ports';
+import type { PlanCompileRequest, PlanCompileResult, PlanJob, PlanTarget } from './ports';
 
 const PLANNER_IDENTITY: Identity = { role: 'brain', brainId: 'planner' };
+
+/**
+ * The canvas is the user's own surface: compiling it runs as the app's planner identity, never an
+ * agent token, so any gate kind the user set on a node is kept (SEC-08 restricts agents only).
+ */
+function gateSpecOf(job: PlanJob): GateSpec | null {
+  const gates = job.gates ?? [];
+  if (gates.length === 0 && !job.gateKind) return null;
+  return { gates, ...(job.gateKind ? { kind: job.gateKind } : {}) };
+}
 
 /**
  * The PlanTarget over brain-core. Compile logic (idempotent upsert, archiving,
@@ -29,7 +45,8 @@ export function createBrainPlanTarget(
             id: job.id,
             title: job.title,
             body: job.body,
-            gateSpec: job.gates && job.gates.length > 0 ? { gates: job.gates } : null,
+            gateSpec: gateSpecOf(job),
+            // Routing hint (work | review), separate from the gate kind above.
             hints: job.kind ? { kind: job.kind } : undefined,
           })),
           edges: request.edges,

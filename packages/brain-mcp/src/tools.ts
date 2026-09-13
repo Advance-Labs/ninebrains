@@ -43,7 +43,7 @@ const DESCRIPTIONS: Record<Exclude<BrainOp, 'whoami'>, (role: Role) => string> =
   add_note: () =>
     'Leave a durable note for your project or one job: a discovery, a gotcha, a decision. Other lanes and the Brain can read notes. Use send_message instead when someone has to act.',
   create_job: () =>
-    'Create a job. With dependsOn it stays "proposed" until every dependency is done, then becomes "ready" and the dispatcher hands it to a free lane. gates picks the verification that runs on completion. kind "review" plus paths help routing (reviews prefer a different model than the author).',
+    'Create a job. With dependsOn it stays "proposed" until every dependency is done, then becomes "ready" and the dispatcher hands it to a free lane. gates picks the verification that runs on completion, on top of the project\'s minimum. gateKind says what the work is: "ui" for anything with a visible page (adds screenshots of the preview), "code" otherwise (the default). Agents may declare only "code" or "ui"; weaker kinds are refused. kind "review" plus paths help routing (reviews prefer a different model than the author).',
   link_jobs: () =>
     'Make job `to` wait until job `from` is done. Idempotent. Rejected, with the cycle path, if it would create a dependency cycle.',
   assign_job: () =>

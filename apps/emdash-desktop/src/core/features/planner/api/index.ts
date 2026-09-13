@@ -21,6 +21,7 @@ export {
   PLANNER_ID_PATTERN,
   PLANNER_JOB_STATES,
   PLANNER_LIMITS,
+  plannerGateKindSchema,
   plannerIdSchema,
   plannerJobKindSchema,
   plannerJobStateSchema,
@@ -32,6 +33,7 @@ export {
   type JobNode,
   type ModuleNode,
   type NoteNode,
+  type PlannerGateKind,
   type PlannerJobKind,
   type PlannerJobState,
 } from './schema';

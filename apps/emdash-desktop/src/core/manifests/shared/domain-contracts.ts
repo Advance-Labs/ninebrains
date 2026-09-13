@@ -22,6 +22,7 @@ import { plannerContract, plannerDomain } from '@core/features/planner/api';
 import { previewServersContract, previewServersDomain } from '@core/features/preview-servers/api';
 import { projectsDomain, projectsWireContract } from '@core/features/projects/api';
 import { repositoryContract, repositoryDomain } from '@core/features/repository/api';
+import { routingContract, routingDomain } from '@core/features/routing/api';
 import { searchContract, searchDomain } from '@core/features/search/api';
 import { skillsContract, skillsDomain } from '@core/features/skills/api';
 import { sourceControlContract, sourceControlDomain } from '@core/features/source-control/api';
@@ -98,4 +99,5 @@ export const desktopDomainContracts = {
   [gatesDomain]: gatesContract,
   [brainDomain]: brainContract,
   [plannerDomain]: plannerContract,
+  [routingDomain]: routingContract,
 } as const;

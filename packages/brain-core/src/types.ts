@@ -53,6 +53,20 @@ export interface GateSpec {
   [option: string]: unknown;
 }
 
+/**
+ * What the work is, for the app's gate floor: `gateSpec.kind`. The app maps it to default gates
+ * (tests and security review for code and UI, screenshots for UI, fact checks for research and SEO,
+ * none for docs). brain-core's own `JobKind` is for routing and cannot tell UI work apart.
+ */
+export const GATE_KINDS = ['code', 'ui', 'research', 'seo', 'docs'] as const;
+export type GateKind = (typeof GATE_KINDS)[number];
+
+/**
+ * SEC-08: the kinds an agent may declare. Both floors hold everything `code` requires, so an
+ * agent can add verification by calling work UI, never drop it by calling code work docs.
+ */
+export const AGENT_GATE_KINDS = ['code', 'ui'] as const satisfies readonly GateKind[];
+
 export type JobKind = 'work' | 'review';
 
 /** Optional routing hints consumed by `pickLane`. */
