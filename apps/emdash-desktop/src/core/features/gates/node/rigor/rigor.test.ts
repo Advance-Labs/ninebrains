@@ -90,7 +90,7 @@ describe('rigor resolver', () => {
     expect(gateJobKindOf(null)).toBe('code');
   });
 
-  describe('testsGateSettingsFor (SEC-08: feeds createRunCommand\'s projectSettings hook)', () => {
+  describe("testsGateSettingsFor (SEC-08: feeds createRunCommand's projectSettings hook)", () => {
     it('defaults both to false', async () => {
       const { rigor } = await resolver();
       expect(rigor.testsGateSettingsFor('p1')).toEqual({
@@ -100,10 +100,7 @@ describe('rigor resolver', () => {
     });
 
     it('reflects the stored per-project opt-ins, independently of rigor', async () => {
-      const { rigor } = await resolver(
-        {},
-        { p1: { allowNetwork: true, allowUnsandboxed: true } }
-      );
+      const { rigor } = await resolver({}, { p1: { allowNetwork: true, allowUnsandboxed: true } });
       expect(rigor.testsGateSettingsFor('p1')).toEqual({
         allowNetwork: true,
         allowUnsandboxed: true,
@@ -219,6 +216,9 @@ describe('memento project prefs store', () => {
 
   it('defaults allowNetwork and allowUnsandboxed to false (SEC-08)', async () => {
     const store = createMementoProjectPrefsStore(async () => fakeClient());
-    expect(await store.get('unset')).toMatchObject({ allowNetwork: false, allowUnsandboxed: false });
+    expect(await store.get('unset')).toMatchObject({
+      allowNetwork: false,
+      allowUnsandboxed: false,
+    });
   });
 });

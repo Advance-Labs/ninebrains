@@ -79,7 +79,10 @@ export function createProjectPrefsService(
     },
 
     async setProjectSettings({ projectId, rigorLevel, allowNetwork, allowUnsandboxed }) {
-      if (rigorLevel !== null && (!Number.isInteger(rigorLevel) || rigorLevel < 0 || rigorLevel > 10)) {
+      if (
+        rigorLevel !== null &&
+        (!Number.isInteger(rigorLevel) || rigorLevel < 0 || rigorLevel > 10)
+      ) {
         return err({ type: 'refused', message: 'Rigor must be an integer from 0 to 10.' });
       }
       try {
