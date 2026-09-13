@@ -295,6 +295,27 @@ Ninebrains files also touched: brain-core `types.ts` and `protocol/{ops,execute,
 `brain/node/brain-service.ts`, `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`,
 `e2e/{harness,brain-fanout.e2e,self-heal.e2e}.mjs`.
 
+## 17. Tests-gate project settings (W7 `w7/testsgate-prefs`)
+
+No upstream (forked-from-Emdash) file changed. `gates/**` (beyond `capabilities/`) and
+`main/bootstrap/boot/ninebrains/**` are already Ninebrains-only (§ New Ninebrains-only files
+below), so this feature landed entirely inside files this fork owns:
+
+- `gates/api/contract.ts`: `gatesProjectPrefsViewSchema` gains `rigorLevel`, `allowNetwork`,
+  `allowUnsandboxed`; new `setProjectSettings` op.
+- `gates/node/project-prefs-service.ts`: `setProjectSettings`, and `getProjectPrefs`/
+  `setTestCommand` now also return the new fields.
+- `gates/node/wire-controller.ts`: wires `setProjectSettings` into the existing `gates` domain
+  controller (no new domain registration, so `manifests/*` needed no change this time).
+- `gates/node/rigor/project-prefs.ts`, `gates/contributions/mementos.ts`: `ProjectGatePrefs` and
+  its memento schema gain `allowNetwork`/`allowUnsandboxed`, both defaulting to false.
+- `gates/node/rigor/rigor.ts`: `RigorResolver.testsGateSettingsFor(projectId)`.
+- `gates/browser/{test-command-section,gates-settings-view}.tsx`: the rigor-override select and
+  the two warning-labelled toggles in Settings → Gates.
+- `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`: `createRunCommand`'s
+  `projectSettings` hook now resolves the running job's lane worktree to a project id and reads
+  `rigor.testsGateSettingsFor` (was previously unwired, so the opt-ins were unreachable).
+
 ## New Ninebrains-only files
 
 `NOTICE`, `docs/FORK.md`, `docs/UPSTREAM-PATCHES.md`, `docs/screenshots/w0-rebrand.png`,

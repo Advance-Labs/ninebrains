@@ -342,6 +342,15 @@ export async function createNinebrainsServices(
         userDataDir,
         siblingWorktrees: (cwd) => laneWorktrees().filter((root) => !isInside(cwd, root)),
         deniedPaths: () => [checkoutRoot],
+        // SEC-08: allowNetwork/allowUnsandboxed come only from Settings → Gates (project prefs),
+        // never from a job or worktree file. A cwd outside every lane worktree (e.g. a review
+        // checkout) gets neither.
+        projectSettings: (cwd) => {
+          const lane = laneInfos().find(
+            (info) => info.worktreePath && isInside(cwd, info.worktreePath)
+          );
+          return lane ? rigor.testsGateSettingsFor(lane.projectId) : {};
+        },
       }),
       spawnReviewer: createSpawnReviewer({
         supervisor,

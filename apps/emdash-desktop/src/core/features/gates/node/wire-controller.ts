@@ -25,5 +25,6 @@ export function createGatesWireController(service: GatesWireService): Controller
     deleteEvidence: ({ jobId }) => service.deleteEvidence(jobId),
     getProjectPrefs: ({ projectId }) => service.getProjectPrefs(projectId),
     setTestCommand: (input) => service.setTestCommand(input),
+    setProjectSettings: (input) => service.setProjectSettings(input),
   });
 }

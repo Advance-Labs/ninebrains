@@ -19,6 +19,10 @@ export const gatesProjectPrefsSchema = defineVersionedSchema()
       securityRigor: rigorLevelSchema.nullable(),
       /** SEC-20: the tests gate's command. Only the user sets it, never a job or a worktree file. */
       testCommand: z.string().max(500).nullable(),
+      /** `testsGate.allowNetwork` (SEC-20/R12). Set only from Settings → Gates. Default false. */
+      allowNetwork: z.boolean().default(false),
+      /** `testsGate.allowUnsandboxed` (SEC-20/R11). Set only from Settings → Gates. Default false. */
+      allowUnsandboxed: z.boolean().default(false),
     })
   )
   .build();
@@ -29,7 +33,14 @@ export const gatesProjectPrefsMemento = defineMemento({
   id: 'gates.project-prefs',
   subject: projectSubject,
   schema: gatesProjectPrefsSchema,
-  default: { version: '1' as const, testingRigor: null, securityRigor: null, testCommand: null },
+  default: {
+    version: '1' as const,
+    testingRigor: null,
+    securityRigor: null,
+    testCommand: null,
+    allowNetwork: false,
+    allowUnsandboxed: false,
+  },
   retention: KEEP,
 });
 

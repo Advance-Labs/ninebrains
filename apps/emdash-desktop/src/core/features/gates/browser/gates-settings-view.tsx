@@ -13,6 +13,7 @@ import { DEFAULT_GATES_SETTINGS, type GatesSettings } from '../contributions/set
 import {
   TestCommandSection,
   type GatesProjectOption,
+  type ProjectGateSettings,
   type TestCommandSectionProps,
 } from './test-command-section';
 
@@ -136,11 +137,21 @@ export function GatesSettingsPanel(props: {
   );
 }
 
-/** The selected project's test command, loaded from and saved to the gates project prefs. */
+const EMPTY_PROJECT_SETTINGS: ProjectGateSettings = {
+  rigorLevel: null,
+  allowNetwork: false,
+  allowUnsandboxed: false,
+};
+
+/** The selected project's test command and gate settings, loaded from and saved to project prefs. */
 function useProjectTestCommand(projects: GatesProjectOption[]): TestCommandSectionProps {
   const [picked, setPicked] = useState<string>();
   const projectId = projects.some((p) => p.id === picked) ? picked : projects[0]?.id;
-  const [saved, setSaved] = useState<{ projectId: string; command: string | null }>();
+  const [saved, setSaved] = useState<{
+    projectId: string;
+    command: string | null;
+    settings: ProjectGateSettings;
+  }>();
 
   useEffect(() => {
     if (!projectId) return;
@@ -149,7 +160,18 @@ function useProjectTestCommand(projects: GatesProjectOption[]): TestCommandSecti
       .then((client) => client.getProjectPrefs({ projectId }))
       .then((result) => {
         // An unreadable pref reads as "not set": the runner treats it the same way.
-        if (live) setSaved({ projectId, command: result.success ? result.data.testCommand : null });
+        if (!live) return;
+        setSaved({
+          projectId,
+          command: result.success ? result.data.testCommand : null,
+          settings: result.success
+            ? {
+                rigorLevel: result.data.rigorLevel,
+                allowNetwork: result.data.allowNetwork,
+                allowUnsandboxed: result.data.allowUnsandboxed,
+              }
+            : EMPTY_PROJECT_SETTINGS,
+        });
       });
     return () => {
       live = false;
@@ -167,7 +189,27 @@ function useProjectTestCommand(projects: GatesProjectOption[]): TestCommandSecti
         await getGatesClient()
       ).setTestCommand({ projectId, testCommand: command });
       if (!result.success) return result.error.message;
-      setSaved({ projectId, command: result.data.testCommand });
+      setSaved((prev) => ({
+        projectId,
+        command: result.data.testCommand,
+        settings: prev && prev.projectId === projectId ? prev.settings : EMPTY_PROJECT_SETTINGS,
+      }));
+      return null;
+    },
+    savedSettings: saved && saved.projectId === projectId ? saved.settings : undefined,
+    onSaveSettings: async (settings) => {
+      if (!projectId) return 'Pick a project first.';
+      const result = await (await getGatesClient()).setProjectSettings({ projectId, ...settings });
+      if (!result.success) return result.error.message;
+      setSaved((prev) => ({
+        projectId,
+        command: prev && prev.projectId === projectId ? prev.command : result.data.testCommand,
+        settings: {
+          rigorLevel: result.data.rigorLevel,
+          allowNetwork: result.data.allowNetwork,
+          allowUnsandboxed: result.data.allowUnsandboxed,
+        },
+      }));
       return null;
     },
   };
