@@ -261,6 +261,50 @@ describe('LaneService removal and persistence', () => {
     expect(second.calls).toEqual(['provision', 'launch']);
   });
 
+  it('persists the run mode with the lane, attended by default', async () => {
+    const first = createHarness();
+    const { laneId } = await addLane(first);
+    expect(first.service.getLane(laneId)?.runMode).toBeUndefined();
+    expect((await first.service.setLaneMode(laneId, 'unattended')).success).toBe(true);
+    expect(first.service.getLane(laneId)?.runMode).toBe('unattended');
+    await first.service.settled();
+
+    // A restart keeps the lane unattended.
+    const second = createHarness({ persisted: first.stored()! });
+    await second.service.initialize();
+    expect(second.service.getLane(laneId)?.runMode).toBe('unattended');
+
+    // Back to attended stores no field, so older builds read the grid unchanged.
+    await second.service.setLaneMode(laneId, 'attended');
+    await second.service.settled();
+    expect(second.stored()!.tabs[0]!.slots[0]).not.toHaveProperty('runMode');
+    expect((await second.service.setLaneMode('missing', 'unattended')).success).toBe(false);
+  });
+
+  it('keeps the pack role and model a lane was created with', async () => {
+    const harness = createHarness();
+    await harness.service.initialize();
+    const tabId = harness.service.boardSnapshot().tabs[0]!.tabId;
+    const created = await harness.service.createLane({
+      tabId,
+      slot: 2,
+      projectId: 'p1',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+      roleId: 'coding:builder',
+    });
+    if (!created.success) throw new Error(created.error.message);
+    await harness.service.settled();
+    expect(harness.service.getLane(created.data.laneId)).toMatchObject({
+      roleId: 'coding:builder',
+      model: 'claude-sonnet-5',
+    });
+    expect(harness.stored()!.tabs[0]!.slots[2]).toMatchObject({ roleId: 'coding:builder' });
+    expect(harness.ports.conversations.create.mock.calls[0]![0]).toMatchObject({
+      model: 'claude-sonnet-5',
+    });
+  });
+
   it('leaves launches untouched in Phase 1', async () => {
     const harness = createHarness();
     const { laneId } = await addLane(harness);

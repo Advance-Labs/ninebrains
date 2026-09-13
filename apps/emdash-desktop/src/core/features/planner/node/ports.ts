@@ -5,6 +5,7 @@ import type {
   CanvasSummary,
   DraftProposal,
   PlannerError,
+  PlannerGateKind,
   PlannerJobKind,
   PlannerJobState,
 } from '../api';
@@ -15,6 +16,7 @@ export interface PlanJob {
   title: string;
   body?: string;
   kind?: PlannerJobKind;
+  gateKind?: PlannerGateKind;
   gates?: string[];
 }
 

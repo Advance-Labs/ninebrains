@@ -197,16 +197,38 @@ describe('executeBrainRequest', () => {
     });
   });
 
-  it('requires a project when the grant has no default', () => {
-    const response = executeBrainRequest(
-      brain,
-      { ...grants.hub, projectId: null },
-      { v: 1, op: 'create_job', args: { title: 'T' } }
+  describe('SEC-08 agents cannot declare a weaker kind', () => {
+    it.each(['research', 'seo', 'docs'] as const)(
+      '%s is FORBIDDEN to brain and lane tokens',
+      (kind) => {
+        for (const who of ['hub', 'A'] as const) {
+          expect(call(who, 'create_job', { title: 'T', gateKind: kind })).toMatchObject({
+            ok: false,
+            error: { code: 'FORBIDDEN' },
+          });
+        }
+        expect(brain.listJobs(BRAIN, { projectId: 'p1' })).toEqual([]);
+      }
     );
-    expect(response).toMatchObject({
-      ok: false,
-      error: { code: 'INVALID', message: expect.stringContaining('projectId') },
+
+    it.each(['code', 'ui'] as const)('a Brain session may declare %s', (kind) => {
+      const job = result('hub', 'create_job', { title: 'T', gateKind: kind });
+      expect(brain.getJob(BRAIN, job.id).gateSpec).toEqual({ gates: [], kind });
     });
+  });
+
+  it('M3 refuses a Brain grant with no project: v0.1 has no global grant', () => {
+    for (const args of [{ title: 'T' }, { title: 'T', projectId: 'p1' }]) {
+      const response = executeBrainRequest(
+        brain,
+        { ...grants.hub, projectId: null },
+        { v: 1, op: 'create_job', args }
+      );
+      expect(response).toMatchObject({
+        ok: false,
+        error: { code: 'FORBIDDEN', message: expect.stringContaining('no project') },
+      });
+    }
   });
 
   it('SEC-07 errors do not leak internals: unexpected exceptions become a bare INTERNAL', () => {

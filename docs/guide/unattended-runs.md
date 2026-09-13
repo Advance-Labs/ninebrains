@@ -12,7 +12,28 @@ Ninebrains starts the CLI in print mode and reads its event stream:
 - Claude Code: `claude -p --output-format=stream-json`.
 - Codex: `codex exec --json`. Codex support for unattended runs is **experimental**.
 
-Unattended runs carry out Brain-dispatched work and the reviewer side of verification gates.
+Unattended runs carry out the reviewer side of verification gates. They can also carry out
+Brain-dispatched work, for a lane set to unattended mode. In this build, both use Claude Code.
+
+Lanes are attended by default. A lane's mode is kept in memory, so a restart makes every lane
+attended again. There is no control in the app to switch a lane to unattended yet.
+<!-- VERIFY: a lane mode picker (attended or unattended) is being added -->
+
+## Making a lane unattended
+
+Every lane starts **attended**: the Brain pastes each job into the lane's terminal, where you can
+watch it and answer its prompts. To hand a lane's Brain jobs to headless runs instead, click the
+hand icon in the lane's header and confirm. The dialog says which command runs and with which
+budgets before anything changes.
+
+An unattended lane shows a warning badge in its header, **Unattended · claude -p** (or
+`codex exec`), so you never mistake it for a lane you are watching. Hover it to see the budgets;
+click it to switch back to attended straight away. Only jobs the Brain dispatches run headless.
+Anything you type into the lane's terminal yourself is unaffected.
+
+The mode is saved with the lane, so an unattended lane stays unattended after a restart.
+
+![A lane header showing the Unattended badge](../screenshots/lanes-run-mode-1440.png)
 
 Unattended runs use whatever login or API key your CLI uses. Ninebrains makes no claim about which
 plan, quota or billing they draw from. Check your provider's terms.
@@ -28,11 +49,11 @@ carry:
 | Turns | `--max-turns` |
 | Spend | `--max-budget-usd` (Claude) |
 | Tokens | Counted from the stream's `usage` events: input, output, cache-creation and cache-read tokens |
-| Concurrent runs | A global cap. A run over the cap is refused, not queued; queueing is the dispatcher's job |
+| Concurrent runs | A global cap of 4. A run over the cap is refused, not queued; queueing is the dispatcher's job |
 
-<!-- VERIFY-AFTER-P2 -->
-Budget counters are stored in the Brain database, so restarting the app does not reset them.
-<!-- /VERIFY -->
+While a run is live, the supervisor writes its budget counters into the run's own transcript. If
+the app restarts, it reads them back from there, so a restart does not reset them. A run that was
+still open when the app stopped is marked as killed.
 
 ## The STOP switch
 
@@ -42,14 +63,26 @@ STOP ends every run the Brain owns:
 2. Every run's process group gets SIGTERM.
 3. After 2 seconds, anything still alive gets SIGKILL.
 
-A test runs eight runs whose processes and child processes ignore SIGTERM, and checks that all are
-gone in under 5 seconds. STOP stays **latched**: nothing new starts until you clear it.
+It also stops the terminal session of every attended lane that holds a Brain job.
 
-<!-- VERIFY-AFTER-P2 -->
-STOP is in the tray menu, the app menu and a keyboard shortcut. All three are handled in the main
-process, so they work even if the window has frozen. STOP also stops the terminal sessions of lanes
-the Brain started.
-<!-- /VERIFY -->
+A test runs eight runs whose processes and child processes ignore SIGTERM, and checks that all are
+gone in under 5 seconds.
+
+STOP is in four places:
+
+- the **Agents** menu in the app menu bar (**Stop All Agent Work**),
+- the tray icon's menu, when the tray icon is on,
+- the keyboard shortcut **⌘⇧⌫** (Ctrl+Shift+Backspace on Windows and Linux), which is also the Agents
+  menu item's shortcut and works even while a terminal has focus,
+- the **STOP** button in the Lanes view.
+
+The Agents menu and the tray menu call the Brain in the app's main process, not through the window,
+so they work even if the window has frozen. STOP also stops the terminal sessions of lanes that are
+working on a Brain-dispatched job. Lanes you drive by hand keep running.
+
+STOP stays **latched**: nothing new is dispatched and no run starts until you clear it. Use
+**Clear STOP** in the Agents menu, the tray menu or the Brain drawer; it is only offered while STOP
+is latched. The latch is held in memory, so quitting and reopening the app also clears it.
 
 Known limits:
 
@@ -74,7 +107,8 @@ Known limits:
   proxy variables. `GITHUB_TOKEN`, `GH_TOKEN`, `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS` and
   third-party model keys are dropped.
 - **Transcripts** pass through a redactor that removes common key and token formats before they are
-  written.
+  written. They are stored under `ninebrains/runs/` in the app data folder. See
+  [Configuration](configuration.md#file-locations).
 
 ## What never runs automatically
 
@@ -82,8 +116,7 @@ Known limits:
   `--permission-mode bypassPermissions`, or Codex's `--dangerously-bypass-approvals-and-sandbox` or
   `--sandbox danger-full-access`. A guard inside the spawn wrapper throws if one appears.
 - **Outbound actions.** Deploys, DNS changes, payments, email, `git push`, package publishing and
-  cloud CLIs are denied by absence: an unattended run has no credentials for them, and its network
-  access is limited unless a plan lists allowed domains.
+  cloud CLIs are denied by absence: an unattended run has no credentials for them.
 - **Prompt text as flags.** The job text reaches the CLI on stdin, never as a command-line
   argument, so a job that starts with `--` cannot turn into a flag.
 - **Programs planted in the worktree.** The CLI is started from an absolute path found by the app,
@@ -93,21 +126,19 @@ Known limits:
 - **A reviewer that can change things.** Reviewers get Read, Grep and Glob only: no shell, no
   writes, no network.
 
-<!-- VERIFY-AFTER-P2 -->
-A plan can name outbound capabilities it needs. You approve them in the app when the plan starts,
-the approval is recorded, and a Brain session cannot grant or widen them.
-<!-- /VERIFY -->
-
 ## Not built yet
 
-An overnight queue runner with a morning digest is planned. So is an append-only security event
-log in the Brain database. Neither ships in this build.
+- A way for a plan to request outbound capabilities, with your approval recorded. In this build,
+  nothing can grant an unattended run those capabilities.
+- An overnight queue runner with a morning digest.
+- An append-only security event log in the Brain database.
 
 ## Known gaps
 
-- The tests gate's OS sandbox exists on macOS only (`sandbox-exec`, which Apple has deprecated, and
-  which leaves the network open). On Linux and Windows the gate relies on the scrubbed environment,
-  the timeout, the process kill and the output cap.
+- The tests gate runs in an OS sandbox on macOS (`sandbox-exec`, which Apple has deprecated) and
+  on Linux when bubblewrap (`bwrap`) is installed. Both allow network to localhost only. On Windows,
+  and on Linux without bubblewrap, the tests gate refuses to run. See
+  [Troubleshooting](troubleshooting.md#the-tests-gate-says-it-needs-a-sandbox).
 - Windows paths are untested.
 - The unattended path has been tested against `tooling/fake-agent`, a stand-in CLI. It has not yet
   been exercised against the real `claude` or `codex` CLIs in this form.

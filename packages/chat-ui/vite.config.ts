@@ -4,7 +4,10 @@ import { playwright } from '@vitest/browser-playwright';
 import solid from 'vite-plugin-solid';
 import { defineConfig } from 'vitest/config';
 
-const skipBrowserProjects = Boolean(process.env.CI || process.env.EMDASH_TEST_SKIP_BROWSER);
+// Ninebrains: EMDASH_TEST_BROWSER=1 forces the browser project on, even under CI.
+const skipBrowserProjects =
+  process.env.EMDASH_TEST_BROWSER !== '1' &&
+  Boolean(process.env.CI || process.env.EMDASH_TEST_SKIP_BROWSER);
 
 export default defineConfig({
   plugins: [vanillaExtractPlugin(), solid()],

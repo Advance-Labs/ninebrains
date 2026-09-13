@@ -88,7 +88,7 @@ export function toEdge(r: Row): JobEdge {
 }
 
 export const MESSAGE_COLUMNS =
-  'id, from_kind, from_id, to_kind, to_id, body, attachments, created_at, read_at';
+  'id, from_kind, from_id, to_kind, to_id, body, attachments, created_at, read_at, untrusted';
 
 export function toMessage(r: Row): Message {
   return {
@@ -99,6 +99,8 @@ export function toMessage(r: Row): Message {
     attachments: json(r.attachments, []),
     createdAt: num(r.created_at),
     readAt: numOrNull(r.read_at),
+    // Only set when true, so both stores return the same object for ordinary messages.
+    ...(num(r.untrusted) === 1 ? { untrusted: true } : {}),
   };
 }
 
@@ -113,6 +115,7 @@ export function messageParams(m: Message): Param[] {
     JSON.stringify(m.attachments),
     m.createdAt,
     m.readAt,
+    m.untrusted === true ? 1 : 0,
   ];
 }
 

@@ -39,6 +39,10 @@ export type PlannerJobState = z.infer<typeof plannerJobStateSchema>;
 export const plannerJobKindSchema = z.enum(['work', 'review']);
 export type PlannerJobKind = z.infer<typeof plannerJobKindSchema>;
 
+/** What the work is, for the gate floor (`gateSpec.kind`): "ui" adds the screenshot gate. */
+export const plannerGateKindSchema = z.enum(['code', 'ui', 'research', 'seo', 'docs']);
+export type PlannerGateKind = z.infer<typeof plannerGateKindSchema>;
+
 const finite = z.number().finite();
 const positionSchema = z.object({ x: finite, y: finite });
 
@@ -57,6 +61,7 @@ export const jobNodeSchema = z.object({
   title: z.string().trim().min(1).max(PLANNER_LIMITS.titleChars),
   body: z.string().max(PLANNER_LIMITS.bodyChars).optional(),
   kind: plannerJobKindSchema.optional(),
+  gateKind: plannerGateKindSchema.optional(),
   gates: z.array(z.string().min(1).max(40)).max(PLANNER_LIMITS.gatesPerJob).optional(),
 });
 

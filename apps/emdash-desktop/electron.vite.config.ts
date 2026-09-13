@@ -31,6 +31,28 @@ function copyAdapterAssetsPlugin() {
   };
 }
 
+// Ninebrains: the brain-mcp stdio shim, run by the app's own Electron as Node
+// (SEAMS §3.6). Its dist is self-contained (bin + shared chunk); maps are skipped.
+function copyBrainMcpPlugin() {
+  return {
+    name: 'copy-ninebrains-brain-mcp',
+    async closeBundle(): Promise<void> {
+      const source = resolve('../../packages/brain-mcp/dist');
+      const target = resolve('out/main/brain-mcp');
+      try {
+        await rm(target, { recursive: true, force: true });
+        await cp(source, target, {
+          recursive: true,
+          filter: (path) => !path.endsWith('.map') && !path.endsWith('.d.mts'),
+        });
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') return;
+        throw error;
+      }
+    },
+  };
+}
+
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
@@ -60,7 +82,7 @@ export default defineConfig({
   main: {
     root: 'src/main',
     envDir: resolve('.'),
-    plugins: [copyAdapterAssetsPlugin()],
+    plugins: [copyAdapterAssetsPlugin(), copyBrainMcpPlugin()],
     // formidable (bundled via @emdash/plugins -> asana) reassigns `require`
     // behind a `global.GENTLY` guard, which Rollup rejects. Defining it false
     // makes the branch dead code so the bundle builds.

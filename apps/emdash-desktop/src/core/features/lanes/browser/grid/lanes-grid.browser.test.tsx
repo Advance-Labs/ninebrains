@@ -110,6 +110,8 @@ describe('lanes grid through the wire seam', () => {
       wakeLane: ok0,
       removeLane: ok0,
       moveLane: ok0,
+      setLaneMode: ok0,
+      setLaneRouting: ok0,
     });
     container = document.createElement('div');
     document.body.append(container);

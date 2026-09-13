@@ -9,11 +9,12 @@ A **gate** is a check that runs after a lane says its job is finished, and befor
 you. The promise is simple: **no agent grades its own work.** Gates run tests, look at the page,
 check citations, or hand the diff to a separate reviewer that cannot change anything.
 
-The gate logic ships in [`@emdash/gates-core`](../../packages/gates-core/README.md).
+> **Before your first job:** at the default settings, every job the Brain creates gets the tests
+> gate, and the tests gate needs a test command for the project. Set one in **Settings → Gates →
+> Tests**. Without one, the job is blocked straight away. See [Test command](#test-command).
 
 ## What happens when a lane finishes
 
-<!-- VERIFY-AFTER-P2 -->
 1. The lane calls `complete_job`. The job moves to **verifying**.
 2. The gate runner runs every gate that applies to the job, each with its own timeout.
 3. If all pass, the job is **done**.
@@ -21,9 +22,13 @@ The gate logic ships in [`@emdash/gates-core`](../../packages/gates-core/README.
    lane fixes the problem and completes again.
 5. On the third failure, the job is **blocked** and you are notified.
 
+If a gate cannot run because of your setup (no test command, or no sandbox for the tests gate),
+the job is blocked at once and **no attempt is used**. The lane cannot fix a setup problem, so
+Ninebrains does not ask it to try.
+
 Evidence (logs, screenshots, reviewer replies) is stored under
-`<userData>/ninebrains/evidence/<jobId>/<attempt>/`, never inside the worktree.
-<!-- /VERIFY -->
+`ninebrains/evidence/<jobId>/<attempt>/` in the app data folder, never inside the worktree. It is
+kept for 30 days.
 
 The retry rule:
 
@@ -33,6 +38,7 @@ The retry rule:
 | unverified | any | done, **not** verified |
 | failed | 1 or 2 | retry, with the feedback |
 | failed | 3 | blocked, with the last feedback |
+| setup problem | any | blocked, attempt not counted |
 
 Feedback is written for the agent. It covers only the failures, in gate order, up to 1,500
 characters per gate.
@@ -47,7 +53,7 @@ characters per gate.
 
 ## Rigor
 
-Two settings, each 0 to 10, decide which gates attach to a job by default:
+Two settings, each 0 to 10, decide which gates attach to a job by default. Both start at 5.
 
 | Gate | Attached when | Job kinds |
 |---|---|---|
@@ -57,12 +63,31 @@ Two settings, each 0 to 10, decide which gates attach to a job by default:
 | `security-review` | security ≥ 6 | code, ui |
 | `reviewer` | testing ≥ 7 | all |
 
+A job names its kind with `gateKind` when it is created. A job that does not name one is treated
+as **code**. The Brain declares a page or other visible UI as `"ui"`, which adds the screenshot
+gate. An agent (a Brain session or a lane) may declare only `code` or `ui`: every other kind has a
+weaker floor, so an agent asking for one is refused, not quietly downgraded.
+
 This is the floor. A job's creator can add gates on top; neither a lane nor the Brain can take
 them away. Packs add their own defaults, such as the SEO pack's `seo-evidence` gate.
 
-<!-- VERIFY-AFTER-P2 -->
-Set rigor globally in Settings, and override it per project.
-<!-- /VERIFY -->
+Set rigor in **Settings → Gates**. The app can also hold a per-project override, but there is no
+control for it in this build.
+<!-- VERIFY: a per-project rigor override in the app is being added -->
+
+## Test command
+
+The tests gate runs one command, which you set per project. It never takes a command from a job or
+from a file in the worktree.
+
+Set it in **Settings → Gates → Tests**: pick the project, type the command (for example
+`pnpm test`) and click **Save test command**. It runs in the lane's worktree. Saving an empty
+command clears it.
+
+At the default rigor (testing 5), every code and ui job gets the tests gate. A project with no test
+command has every such job blocked with "No test command is set for this project: set one in
+Settings → Gates → Test command", and no attempt is used. Lowering **Testing rigor** below 3 also
+lets jobs finish, but they finish **unverified**.
 
 ## The built-in gates
 
@@ -72,10 +97,21 @@ Runs the project's test command in the worktree. It passes on exit code 0 and fa
 The last 200 lines are kept as evidence, and the last 40 go into the feedback.
 
 This is the only gate that runs the lane's own code, and a lane can rewrite its test script. So
-the command comes only from the project setting you chose, never from the job or a worktree file.
-It runs with a scrubbed environment (no Ninebrains tokens, pack secrets or provider keys), its
-whole process group is killed on timeout, and output is capped at 1 MiB. On macOS it also runs in
-a sandbox.
+the command comes only from the project setting you chose. It runs with a scrubbed environment (no
+Ninebrains tokens, pack secrets or provider keys), its whole process group is killed on timeout,
+and output is capped at 1 MiB.
+
+It also runs in an OS sandbox. The sandbox denies reads of the app data folder, other lanes'
+worktrees and credential folders, allows writes only to the worktree and a private temp folder,
+and allows network to localhost only:
+
+- **macOS:** `sandbox-exec`.
+- **Linux:** bubblewrap (`bwrap`), if it is installed.
+- **Windows, and Linux without bubblewrap:** there is no sandbox, and the gate refuses to run. See
+  [Troubleshooting](troubleshooting.md#the-tests-gate-says-it-needs-a-sandbox).
+
+The per-project options `testsGate.allowNetwork` and `testsGate.allowUnsandboxed` exist in the code
+but cannot be set in this build. See [Configuration](configuration.md#tests-gate-options).
 
 ### screenshot
 
@@ -83,11 +119,14 @@ Captures the lane's preview at 1440, 768 and 390 px wide. Console errors, failed
 requests, or a difference from the baseline above 1% fail the gate before any reviewer is asked.
 If the page is clean, a separate reviewer looks at the screenshots and gives a JSON verdict.
 
-<!-- VERIFY-AFTER-P2 -->
 The app captures the lane's own browser through the Chrome DevTools Protocol, attached only to that
-lane's registered browser. If DevTools is open on the same browser, the capture fails and the gate
-reports it. Unattended runs use an offscreen window on the same browser partition.
-<!-- /VERIFY -->
+lane's registered browser. If DevTools is open on that browser, the capture fails with "gate
+skipped: devtools open", and the gate fails. Unattended runs use an offscreen window on the same
+browser partition.
+
+The gate needs the lane's preview URL. If no dev server is running for the lane, the gate fails
+with "No preview URL for this lane". See
+[Troubleshooting](troubleshooting.md#the-screenshot-gate-says-no-preview-url).
 
 ### reviewer and security-review
 
@@ -100,10 +139,8 @@ afterwards, whatever the result.
 The reply must be a single JSON object of the form `{ pass, issues[] }`. A reply of `pass: false`
 with no issues counts as malformed, because it gives the worker nothing to fix.
 
-<!-- VERIFY-AFTER-P2 -->
-When both CLIs are installed, the reviewer can use a different provider from the author, for
-example Codex reviewing Claude's work.
-<!-- /VERIFY -->
+In this build the reviewer is always Claude Code, whichever agent did the work. A reviewer from a
+different provider is not available yet.
 
 ### fact-check
 

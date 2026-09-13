@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { parseReviewerVerdict } from '../reviewer-verdict';
 import { makeContext, makeJob } from '../test-utils';
@@ -12,6 +16,9 @@ interface Setup {
   diff?: string;
   diffResult?: Partial<CommandResult>;
   untracked?: string;
+  /** `git config --null --name-only --get-regexp ^filter\.` stdout. Unset: no keys (exit 1). */
+  filterKeys?: string;
+  configResult?: Partial<CommandResult>;
   job?: Partial<GateJob>;
   prepareError?: Error;
   reviewerError?: Error;
@@ -21,6 +28,10 @@ function setup(reply: string, opts: Setup = {}) {
   const runCommand = vi.fn(
     async (_command: string, o: { cwd: string; argv?: readonly string[] }) => {
       const argv = o.argv ?? [];
+      if (argv.includes('config')) {
+        const exitCode = opts.filterKeys === undefined ? 1 : 0;
+        return { exitCode, stdout: opts.filterKeys ?? '', stderr: '', ...opts.configResult };
+      }
       if (argv.includes('diff')) {
         return { exitCode: 0, stdout: opts.diff ?? DIFF, stderr: '', ...opts.diffResult };
       }
@@ -45,16 +56,21 @@ function setup(reply: string, opts: Setup = {}) {
   return { ctx, runCommand, spawnReviewer, prepareReviewCheckout, dispose };
 }
 
+/** The argv of the first git call that runs `sub`, or `[]` when none did. */
+function argvOf(runCommand: ReturnType<typeof setup>['runCommand'], sub: string) {
+  return runCommand.mock.calls.find(([, o]) => o.argv?.includes(sub))?.[1].argv ?? [];
+}
+
 describe('reviewerGate', () => {
   it('reviews the diff from a disposable checkout and passes on approval', async () => {
     const { ctx, runCommand, spawnReviewer } = setup(APPROVE);
     const result = await reviewerGate().run(ctx);
 
     expect(result.pass).toBe(true);
-    const [command, o] = runCommand.mock.calls[0];
-    expect(command).toBe('git');
-    expect(o.argv).toEqual(expect.arrayContaining(['diff', '--no-ext-diff', 'HEAD', '--']));
-    expect(o.argv).toEqual(expect.arrayContaining(['core.fsmonitor=false', 'diff.external=']));
+    for (const [command] of runCommand.mock.calls) expect(command).toBe('git');
+    const argv = argvOf(runCommand, 'diff');
+    expect(argv).toEqual(expect.arrayContaining(['diff', '--no-ext-diff', 'HEAD', '--']));
+    expect(argv).toEqual(expect.arrayContaining(['core.fsmonitor=false', 'diff.external=']));
     const [prompt, opts] = spawnReviewer.mock.calls[0];
     expect(prompt).toContain('Add a pricing table');
     expect(prompt).toContain('+export const plans = 3;');
@@ -126,10 +142,56 @@ describe('reviewerGate', () => {
       job: { baseRef: 'abc1234' },
     });
     await reviewerGate().run(ctx);
-    expect(runCommand.mock.calls[0][1].argv).toContain('abc1234');
+    expect(argvOf(runCommand, 'diff')).toContain('abc1234');
     expect(spawnReviewer.mock.calls[0][0]).toMatch(
       /<<<UNTRACKED-[0-9a-f]{16}>>>\nsrc\/new-file\.ts/
     );
+  });
+
+  it('T31 blanks every repo filter driver for the diff and the untracked listing', async () => {
+    const { ctx, runCommand } = setup(APPROVE, {
+      untracked: 'src/new-file.ts\n',
+      filterKeys: 'filter.lfs.clean\0filter.lfs.smudge\0filter.pwn.v2.clean\0',
+    });
+    expect((await reviewerGate().run(ctx)).pass).toBe(true);
+    for (const sub of ['diff', 'ls-files']) {
+      const argv = argvOf(runCommand, sub);
+      for (const name of ['lfs', 'pwn.v2']) {
+        for (const key of ['clean=', 'smudge=', 'process=', 'required=false']) {
+          const at = argv.indexOf(`filter.${name}.${key}`);
+          expect(argv[at - 1]).toBe('-c');
+          expect(at).toBeLessThan(argv.indexOf(sub)); // a global option, before the subcommand
+        }
+      }
+    }
+  });
+
+  it('T31 fails closed when the filter drivers cannot be listed or look hostile', async () => {
+    for (const opts of [
+      { configResult: { exitCode: 128, stderr: 'fatal: bad config line 3' } },
+      { filterKeys: 'filter.a=b;touch x.clean\0' },
+    ]) {
+      const { ctx, runCommand, spawnReviewer, dispose } = setup(APPROVE, opts);
+      const result = await reviewerGate().run(ctx);
+      expect(result.pass).toBe(false);
+      expect(result.feedback).toMatch(/Could not compute the diff/);
+      expect(argvOf(runCommand, 'diff')).toEqual([]);
+      expect(spawnReviewer).not.toHaveBeenCalled();
+      expect(dispose).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('T32 starts every git call with --no-lazy-fetch', async () => {
+    const { ctx, runCommand } = setup(APPROVE, {
+      untracked: 'src/new-file.ts\n',
+      filterKeys: 'filter.lfs.clean\0',
+    });
+    expect((await reviewerGate().run(ctx)).pass).toBe(true);
+    const subs = runCommand.mock.calls.map(([, o]) => o.argv ?? []);
+    expect(
+      subs.map((argv) => argv.find((a) => ['config', 'diff', 'ls-files'].includes(a)))
+    ).toEqual(['config', 'diff', 'ls-files']);
+    for (const argv of subs) expect(argv[0]).toBe('--no-lazy-fetch');
   });
 
   it('fails on a malformed reply', async () => {
@@ -181,6 +243,79 @@ describe('reviewerGate', () => {
     const [prompt, opts] = spawnReviewer.mock.calls[0];
     expect(prompt).toMatch(/security problems only/);
     expect(opts).toMatchObject({ purpose: 'security-review', cwd: CHECKOUT, tools: 'read-only' });
+  });
+});
+
+describe('T32 the reviewer diff never lazy-fetches (real git)', () => {
+  it('fails the diff when a partial clone is missing the base blob, and runs nothing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-reviewer-lazy-'));
+    try {
+      const repo = join(dir, 'repo');
+      const marker = join(dir, 'lazy-fetch-ran');
+      const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+      delete env.GIT_NO_LAZY_FETCH; // prove the argv flag alone is enough
+      const git = (...args: string[]) =>
+        execFileSync('git', args, { cwd: repo, encoding: 'utf8', env }).trim();
+      mkdirSync(repo);
+      git('init', '-q', '-b', 'main');
+      git('config', 'user.email', 'test@example.invalid');
+      git('config', 'user.name', 'Test');
+      git('config', 'commit.gpgsign', 'false');
+      writeFileSync(join(repo, 'a.txt'), 'base\n');
+      git('add', '.');
+      git('commit', '-q', '-m', 'base');
+      writeFileSync(join(repo, 'a.txt'), 'change\n');
+      // The lane makes the repo a partial clone and deletes the blob the diff needs.
+      git('config', 'core.repositoryformatversion', '1');
+      git('config', 'extensions.partialClone', 'evil');
+      git('config', 'remote.evil.url', 'ssh://attacker.invalid/x');
+      git('config', 'core.sshCommand', `touch '${marker}'; false`);
+      const blob = git('rev-parse', 'HEAD:a.txt');
+      rmSync(join(repo, '.git', 'objects', blob.slice(0, 2), blob.slice(2)));
+
+      const runCommand = vi.fn(
+        async (_command: string, o: { cwd: string; argv?: readonly string[] }) => {
+          try {
+            const stdout = execFileSync('git', o.argv ?? [], {
+              cwd: o.cwd,
+              encoding: 'utf8',
+              env,
+              stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            return { exitCode: 0, stdout, stderr: '' };
+          } catch (error) {
+            const e = error as { status?: number; stdout?: string; stderr?: string };
+            return { exitCode: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+          }
+        }
+      );
+      const spawnReviewer = vi.fn(async () => ({ text: APPROVE }));
+      const ctx = makeContext({
+        job: { kind: 'code' },
+        capabilities: {
+          runCommand,
+          spawnReviewer,
+          prepareReviewCheckout: async () => ({ path: repo, dispose: async () => undefined }),
+        },
+      });
+
+      const result = await reviewerGate().run(ctx);
+      expect(result.pass).toBe(false);
+      expect(result.feedback).toMatch(/Could not compute the diff/);
+      expect(spawnReviewer).not.toHaveBeenCalled();
+      expect(existsSync(marker)).toBe(false);
+
+      // Control: the same diff argv without the flag runs the lane's command.
+      const diffArgv = runCommand.mock.calls
+        .map(([, o]) => o.argv ?? [])
+        .find((a) => a.includes('diff'));
+      expect(diffArgv?.[0]).toBe('--no-lazy-fetch');
+      const unhardened = (diffArgv ?? []).slice(1);
+      expect(() => execFileSync('git', unhardened, { cwd: repo, env, stdio: 'ignore' })).toThrow();
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

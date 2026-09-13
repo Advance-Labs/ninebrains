@@ -234,9 +234,11 @@ describe('brain migration runner', () => {
     connection.exec(
       `CREATE TABLE ${CORE_MIGRATIONS_TABLE} (tag TEXT PRIMARY KEY, hash TEXT NOT NULL, applied_at INTEGER NOT NULL)`
     );
-    connection.run(`INSERT INTO ${CORE_MIGRATIONS_TABLE} VALUES (?, 'h', 0)`, [
-      migrationTag(MIGRATIONS[0]!),
-    ]);
+    for (const migration of MIGRATIONS) {
+      connection.run(`INSERT INTO ${CORE_MIGRATIONS_TABLE} VALUES (?, 'h', 0)`, [
+        migrationTag(migration),
+      ]);
+    }
     expect(migrate(connection)).toEqual([]);
     connection.close();
   });

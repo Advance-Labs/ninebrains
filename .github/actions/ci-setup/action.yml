@@ -1,0 +1,63 @@
+name: CI setup
+description: pnpm and Node, a script-free install, optional native test deps, Nx SHAs and the Nx cache
+
+# Ninebrains-only (docs/UPSTREAM-PATCHES.md). Used by .github/workflows/ci.yml. Actions are pinned
+# to commit SHAs; Dependabot (github-actions, weekly) moves the pins.
+inputs:
+  nx-cache-key:
+    description: Cache namespace, one per job or shard, so parallel jobs never race on one key
+    required: true
+  native:
+    description: Provision the native test deps (system-Node better-sqlite3 and node-pty)
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      with:
+        version: 10.28.2
+
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: '24'
+        cache: pnpm
+
+    # --ignore-scripts: the checks only need JS/TS tooling, and skipping lifecycle scripts avoids
+    # flaky node-gyp builds. The retry covers registry hiccups only; it never retries a test.
+    - name: Install dependencies
+      shell: bash
+      run: |
+        for attempt in 1 2 3; do
+          pnpm install --frozen-lockfile --ignore-scripts && break
+          if [ "$attempt" -eq 3 ]; then echo "::error::pnpm install failed after 3 attempts"; exit 1; fi
+          echo "Install failed (attempt $attempt). Retrying in 10s..."
+          sleep 10
+        done
+
+    # The install above skips lifecycle scripts, so two native pieces the Vitest node projects
+    # need are provisioned here: the system-Node better-sqlite3 copy (main-db, migrations) and
+    # node-pty's platform build (PTY specs).
+    - name: Install native test dependencies
+      if: inputs.native == 'true'
+      shell: bash
+      run: |
+        pnpm --dir apps/emdash-desktop/tooling/node-deps install --frozen-lockfile
+        pnpm --filter @emdash/core rebuild node-pty
+        pnpm --filter @emdash/core exec node -e "require('node-pty')"
+
+    # Base/head for `nx affected`. On a push it is the last green run on that branch, which is
+    # why ci.yml grants actions: read.
+    - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1 # v4.4.0
+      with:
+        main-branch-name: ${{ github.base_ref || github.ref_name }}
+
+    # Nx's local cache. PR runs restore from their base branch's entries; main never reads PR caches.
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: .nx/cache
+        key: nx-${{ runner.os }}-${{ inputs.nx-cache-key }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        restore-keys: |
+          nx-${{ runner.os }}-${{ inputs.nx-cache-key }}-${{ hashFiles('pnpm-lock.yaml') }}-
+          nx-${{ runner.os }}-${{ inputs.nx-cache-key }}-

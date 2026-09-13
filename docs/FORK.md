@@ -87,14 +87,18 @@ Note: the built app keeps running in the tray after its window closes, so a Play
 
 | Workflow | Trigger | Notes |
 |---|---|---|
-| `code-consistency-check.yml` | push + PR to `main` | ubuntu-latest; `nx affected` format:check, lint, typecheck, test (browser projects skipped, as upstream) |
-| `licenses.yml` | push + PR to `main` | `pnpm run licenses` |
+| `ci.yml` (Ninebrains) | PR + push to `main` and `release/**`, weekly, dispatch | `static`, sharded `test-node`, `test-browser`, `pr-hygiene`, label-gated `e2e`, and the `ci-ok` aggregate that merges and releases require. See CONTRIBUTING.md, "CI and merging" |
+| `e2e.yml` (Ninebrains) | called by `ci.yml` and `release.yml` | The Electron e2e suites under xvfb with the fake agent |
+| `release.yml` (Ninebrains) | `workflow_dispatch` from `main` or `release/*` | Needs `ci-ok` green on the commit; stable or canary; see RELEASING.md |
+| `code-consistency-check.yml` | `workflow_dispatch` only | Superseded by `ci.yml` (was push + PR to `main`) |
+| `licenses.yml` | **retired** | The licence gate runs in `ci.yml`'s `static` job |
 | `build-matrix.yml` | `workflow_dispatch` only | macOS 14, Windows 2022, Ubuntu 22.04: install, build, test, `electron-builder --dir --publish never`. Unsigned, no secrets |
 | `workspace-server-package-check.yml` | `workflow_dispatch` only | Was push/PR upstream; moved to save minutes |
 | `release-*.yml` (4 files) | **deleted** | They publish to Emdash's R2/GitHub and need Emdash's Apple, Azure, PostHog and R2 secrets |
 
-Actions minutes on the private repo are limited, so only the two ubuntu checks run automatically.
-Run the build matrix by hand before a release (`gh workflow run build-matrix.yml`).
+Actions minutes on the private repo are limited, so only `ci.yml` runs automatically, and it tests
+only what Nx reports as affected on PRs and pushes. Run the build matrix by hand before a release
+(`gh workflow run build-matrix.yml`).
 
 ## Licence gate
 

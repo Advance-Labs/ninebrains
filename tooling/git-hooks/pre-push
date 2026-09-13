@@ -1,0 +1,4 @@
+#!/bin/sh
+# Ninebrains pre-push guard: refuses direct pushes to main and runs the CI checks that fail most
+# often. Install once with `pnpm run hooks:install`. Logic: tooling/scripts/pre-push.mjs.
+exec node "$(git rev-parse --show-toplevel)/tooling/scripts/pre-push.mjs" "$@"

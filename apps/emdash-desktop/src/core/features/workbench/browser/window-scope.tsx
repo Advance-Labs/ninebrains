@@ -1,7 +1,10 @@
 import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
+import { stopAllAgentWork } from '@core/features/brain/contributions/stop-action';
 import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
+import { plannerViewDef } from '@core/features/planner/contributions/views';
+import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { toggleAppTheme } from '@core/features/settings/api/browser/theme-toggle';
 import {
@@ -141,6 +144,29 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
     }),
     'lanes.open': () => ({
       execute: () => getNavigation().navigate(lanesViewDef({})),
+    }),
+    // Ninebrains: other slices open a job's verification by command id.
+    'gates.openJobVerification': () => ({
+      execute: (input) => {
+        if (input?.jobId) void openModal('jobVerificationModal', { jobId: input.jobId });
+      },
+    }),
+    'brain.stopAll': () => ({
+      execute: () => void stopAllAgentWork(),
+    }),
+    // Ninebrains: the planner canvas for the given, current or first project.
+    'planner.open': () => ({
+      availability: () =>
+        currentProjectId || getProjectManagerStore().projects.size > 0
+          ? enabled
+          : disabled('Add a project first'),
+      execute: (input) => {
+        const projectId =
+          input?.projectId ??
+          currentProjectId ??
+          getProjectManagerStore().projects.keys().next().value;
+        if (projectId) getNavigation().navigate(plannerViewDef({ projectId }));
+      },
     }),
   } satisfies ViewScopeImpl<typeof windowScope>;
 

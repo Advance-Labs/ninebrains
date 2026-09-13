@@ -71,8 +71,30 @@ contain secret values.
 ## Secrets
 
 Secrets are resolved through the injected `SecretResolver { resolve(name), describeLocation(name) }`.
-`createEnvSecretResolver(process.env)` reads `NINEBRAINS_SECRET_<NAME>`; a keychain-backed resolver
-should replace it. No secret value is ever stored in a pack file or in prefs.
+`createEnvSecretResolver(process.env)` reads `NINEBRAINS_SECRET_<NAME>`. The app wires
+`createKeychainSecretResolver` (`app/main/bootstrap/boot/ninebrains/`): the OS keychain via
+upstream's safeStorage store under `ninebrains.pack.<NAME>`, then the env resolver. No secret value
+is ever stored in a pack file, in prefs or in plaintext.
+
+**Setting them (write-only).** Settings → Packs lists each pack's `requiredSecrets` with
+`present` and `storedInApp`, and stores or clears values through `setSecret` / `clearSecret`, which
+go to the injected `PackSecretStore` (`createKeychainSecretStore` in the app). The rules:
+
+- Only names a loaded pack declares can be written; anything else is `unknown-secret`.
+- No procedure returns a value. `list` reports only booleans; the form's field empties after
+  saving; errors and warnings name the secret and never echo the value (a thrown non-Error is not
+  echoed either, since it could be the value).
+- With no secret store (the controller fallback), set and clear refuse with `secret-store`. The
+  keychain store throws rather than write plaintext when safeStorage cannot encrypt (SEC-27).
+
+Tests: `node/packs-secrets.test.ts`, `browser/packs-slice.browser.test.tsx`,
+`app/main/bootstrap/boot/ninebrains/keychain-secret-resolver.test.ts`.
+
+## SEC-26: bundled packs only in v0.1
+
+User packs from `<userData>/ninebrains/packs` load only when the `USER_PACKS_ENABLED` fork flag
+(`core/primitives/app-identity/api/fork-flags.ts`) is on, and it is **off**: the directory is not
+even listed. Tests can opt in with `allowUserPacks: true`. Test: `node/user-packs-flag.test.ts`.
 
 ## Skills
 

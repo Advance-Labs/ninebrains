@@ -1,12 +1,14 @@
 import { accountContract, accountDomain } from '@core/features/account/api';
 import { agentsContract, agentsDomain } from '@core/features/agents/api';
 import { automationsContract, automationsDomain } from '@core/features/automations/api';
+import { brainContract, brainDomain } from '@core/features/brain/api';
 import { browserContract, browserDomain } from '@core/features/browser/api';
 import { catalogDomain, catalogWireContract } from '@core/features/catalog/api';
 import { conversationsContract, conversationsDomain } from '@core/features/conversations/api';
 import { devPerfContract, devPerfDomain } from '@core/features/dev-perf/api';
 import { editorContract, editorDomain } from '@core/features/editor/api';
 import { filesDomain, filesWireContract } from '@core/features/files/api';
+import { gatesContract, gatesDomain } from '@core/features/gates/api';
 import { githubContract, githubDomain } from '@core/features/github/api';
 import { integrationsContract, integrationsDomain } from '@core/features/integrations/api';
 import { issuesContract, issuesDomain } from '@core/features/issues/api';
@@ -20,6 +22,7 @@ import { plannerContract, plannerDomain } from '@core/features/planner/api';
 import { previewServersContract, previewServersDomain } from '@core/features/preview-servers/api';
 import { projectsDomain, projectsWireContract } from '@core/features/projects/api';
 import { repositoryContract, repositoryDomain } from '@core/features/repository/api';
+import { routingContract, routingDomain } from '@core/features/routing/api';
 import { searchContract, searchDomain } from '@core/features/search/api';
 import { skillsContract, skillsDomain } from '@core/features/skills/api';
 import { sourceControlContract, sourceControlDomain } from '@core/features/source-control/api';
@@ -93,5 +96,8 @@ export const desktopDomainContracts = {
   [desktopHostDomain]: desktopHostContract,
   [packsDomain]: packsContract,
   [lanesDomain]: lanesContract,
+  [gatesDomain]: gatesContract,
+  [brainDomain]: brainContract,
   [plannerDomain]: plannerContract,
+  [routingDomain]: routingContract,
 } as const;

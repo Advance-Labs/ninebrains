@@ -127,6 +127,45 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 2,
+    name: 'message_untrusted',
+    when: 1_789_142_400_000,
+    sql: `
+      ALTER TABLE messages ADD COLUMN untrusted INTEGER NOT NULL DEFAULT 0 CHECK (untrusted IN (0, 1));
+    `,
+  },
+  {
+    // Model routing (app slice features/routing, plan §4.2). The key lives in the keychain as
+    // ninebrains.model.<id>; has_key only records that one is set (SEC-40). Prices are USD per
+    // million tokens, NULL when unpriced (SEC-43).
+    version: 3,
+    name: 'model_profiles',
+    when: 1_789_228_800_000,
+    sql: `
+      CREATE TABLE model_profiles (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('anthropic-api','openai-api','anthropic-compatible',
+          'openai-responses-compatible','bedrock','vertex','foundry','local')),
+        vendor_id TEXT,
+        protocol TEXT NOT NULL CHECK (protocol IN ('anthropic','openai-responses')),
+        base_url TEXT NOT NULL,
+        model TEXT,
+        tier_models TEXT NOT NULL DEFAULT '{}',
+        tier TEXT NOT NULL DEFAULT 'standard' CHECK (tier IN ('cheap','standard','strong')),
+        price_in_per_mtok REAL,
+        price_out_per_mtok REAL,
+        price_cache_read_per_mtok REAL,
+        price_cache_write_per_mtok REAL,
+        context_window INTEGER,
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        has_key INTEGER NOT NULL DEFAULT 0 CHECK (has_key IN (0, 1)),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) STRICT;
+    `,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

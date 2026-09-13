@@ -1,5 +1,5 @@
-import { Button } from '@emdash/ui/react/primitives';
-import { useState, useSyncExternalStore } from 'react';
+import { Badge, Button, type BadgeTone } from '@emdash/ui/react/primitives';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { cn } from '@core/primitives/styling/browser/cn';
 import {
   emptyLaneSidePanelSource,
@@ -17,7 +17,14 @@ const TABS: { id: LaneSidePanelTab; label: string; empty: string }[] = [
   },
 ];
 
-/** Jobs / Done / Notes for one lane. Phase 1 renders the empty source. */
+function badgeTone(badge: string): BadgeTone {
+  if (badge === 'verified') return 'success';
+  if (badge === 'blocked') return 'error';
+  if (badge === 'unverified' || badge === 'verifying') return 'warning';
+  return 'neutral';
+}
+
+/** Jobs / Done / Notes for one lane, fed by the Brain's side-panel source. */
 export function LaneSidePanel({
   laneId,
   source = emptyLaneSidePanelSource,
@@ -26,10 +33,13 @@ export function LaneSidePanel({
   source?: LaneSidePanelSource;
 }) {
   const [tab, setTab] = useState<LaneSidePanelTab>('jobs');
-  const items = useSyncExternalStore(
-    (onChange) => source.subscribe(laneId, onChange),
-    () => source.list(laneId, tab)
+  // A stable subscribe: an inline one re-subscribes on every render, and each new subscription
+  // replays the lane's current data, which renders again, so the renderer never went idle.
+  const subscribe = useCallback(
+    (onChange: () => void) => source.subscribe(laneId, onChange),
+    [source, laneId]
   );
+  const items = useSyncExternalStore(subscribe, () => source.list(laneId, tab));
   const active = TABS.find((candidate) => candidate.id === tab) ?? TABS[0]!;
 
   return (
@@ -58,7 +68,14 @@ export function LaneSidePanel({
         <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
           {items.map((item) => (
             <li key={item.id} className="rounded-md px-2 py-1 text-xs">
-              <div className="truncate text-foreground">{item.title}</div>
+              <div className="flex min-w-0 items-center gap-1">
+                <span className="truncate text-foreground">{item.title}</span>
+                {item.badge && (
+                  <Badge className="ml-auto shrink-0" tone={badgeTone(item.badge)}>
+                    {item.badge}
+                  </Badge>
+                )}
+              </div>
               {item.detail && <div className="truncate text-foreground-muted">{item.detail}</div>}
             </li>
           ))}

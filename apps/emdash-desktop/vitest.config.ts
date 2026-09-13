@@ -11,7 +11,22 @@ const alias = {
   '@tooling': resolve(__dirname, 'tooling'),
 };
 
-const skipBrowserProjects = Boolean(process.env.CI || process.env.EMDASH_TEST_SKIP_BROWSER);
+// Ninebrains: EMDASH_TEST_BROWSER=1 forces the browser project on, even under CI. The Ninebrains
+// CI workflow sets it in its test-browser job.
+const skipBrowserProjects =
+  process.env.EMDASH_TEST_BROWSER !== '1' &&
+  Boolean(process.env.CI || process.env.EMDASH_TEST_SKIP_BROWSER);
+
+// Ninebrains: suites that spawn real process trees (git, sh, the fake agent). They run in the
+// low-concurrency `node-spawn` project, after the main pool, so spawn deadlines hold on a loaded
+// host without raising any bound.
+const spawnHeavyTests = [
+  'src/core/features/gates/node/capabilities/**/*.test.ts',
+  'src/core/features/exec-runs/**/*.test.ts',
+  'src/core/features/brain/node/stop.test.ts',
+  'src/core/features/brain/node/unattended.test.ts',
+  'src/core/features/agents/node/override-launch.test.ts',
+];
 
 // Node-environment Vitest projects run without Electron. Redirect better-sqlite3 to
 // the isolated system-Node build and make Electron unavailable unless a test injects it.
@@ -47,7 +62,23 @@ export default defineConfig({
             'src/main/db/tests/migrations/**',
             'src/main/db/legacy-port/**/*.test.ts',
             'src/main/core/**/*.db.test.ts',
+            ...spawnHeavyTests,
           ],
+        },
+      },
+      {
+        // Ninebrains: the spawn-heavy suites above, two files at a time, after every other
+        // project in the run has finished.
+        extends: true,
+        resolve: { alias: systemNodeAlias },
+        test: {
+          name: 'node-spawn',
+          environment: 'node',
+          setupFiles: [resolve(__dirname, 'tooling/vitest/setup-app-config.ts')],
+          include: spawnHeavyTests,
+          exclude: ['**/_*/**', '**/*.db.test.ts'],
+          maxWorkers: 2,
+          sequence: { groupOrder: 1 },
         },
       },
       {
@@ -114,8 +145,19 @@ export default defineConfig({
               // slice-isolation tests colocated with core slices as
               // *.browser.test.{ts,tsx}.
               extends: true as const,
+              // Ninebrains: Vite's dep scan misses the automatic JSX runtime, finds it on the
+              // first render and reloads mid-run. On a cold cache that one reload failed 35
+              // tests ("Vite unexpectedly reloaded a test"). Pre-bundling it removes the reload.
+              // To find another late dep: DEBUG=vite:deps, look for "new dependencies found".
+              optimizeDeps: { include: ['react/jsx-dev-runtime', 'react/jsx-runtime'] },
               test: {
                 name: 'browser',
+                // Ninebrains: the browser-mode default, made explicit so the contract is visible
+                // and a root-level change cannot shrink it. Locator actions get the time left in
+                // this budget. Under full-suite load a test can spend most of it before a click;
+                // CI retries browser tests once and annotates every pass-on-retry, and the budget
+                // is not raised to hide that.
+                testTimeout: 15_000,
                 browser: {
                   enabled: true,
                   provider: playwright(),

@@ -15,6 +15,8 @@ import { createAgentOperations } from '@core/features/agents/node/controller';
 import { createAgentsWireController } from '@core/features/agents/node/wire-controller';
 import type { AutomationsService } from '@core/features/automations/api/node/automations-service';
 import { createAutomationsWireController } from '@core/features/automations/node/wire-controller';
+import type { BrainService } from '@core/features/brain/node/brain-service';
+import { createBrainWireController } from '@core/features/brain/node/wire-controller';
 import {
   createBrowserWireController,
   type BrowserOperations,
@@ -29,6 +31,11 @@ import {
 import type { EditorBufferService } from '@core/features/editor/node/editor-buffer-service';
 import { createEditorWireController } from '@core/features/editor/node/wire-controller';
 import { createFilesWireController } from '@core/features/files/node/wire-controller';
+import {
+  createGatesWireController,
+  unavailableGatesWireService,
+  type GatesWireService,
+} from '@core/features/gates/node/wire-controller';
 import type { GitCredentialsService } from '@core/features/github/api/node/services/git-credentials-service';
 import { createGithubWireController } from '@core/features/github/node/wire-controller';
 import { createIntegrationsWireController } from '@core/features/integrations/node/wire-controller';
@@ -60,6 +67,11 @@ import type { ProjectDeletionDependencies } from '@core/features/projects/node/o
 import { getProjectById } from '@core/features/projects/node/operations/getProjects';
 import { createProjectsWireController } from '@core/features/projects/node/wire-controller';
 import { createRepositoryWireController } from '@core/features/repository/node/wire-controller';
+import {
+  createDisabledRoutingService,
+  type RoutingService,
+} from '@core/features/routing/node/routing-service';
+import { createRoutingWireController } from '@core/features/routing/node/wire-controller';
 import type { SearchService } from '@core/features/search/node/search-service';
 import { createSearchWireController } from '@core/features/search/node/wire-controller';
 import { createSkillsWireController } from '@core/features/skills/node/wire-controller';
@@ -141,6 +153,8 @@ export type DesktopControllerContext = {
   readonly hostOperations: DesktopHostControllerOperations;
   readonly issueProviders: IssueProviderRegistry;
   readonly lanes: LaneService;
+  /** Ninebrains Brain (features/brain/README.md). */
+  readonly brain: BrainService;
   readonly legacyPortOperations: LegacyPortControllerOperations;
   readonly logger: Logger;
   readonly loggingOperations: LoggingControllerOperations;
@@ -173,8 +187,12 @@ export type DesktopControllerContext = {
   readonly workspaces: Omit<CreateWorkspacesWireControllerOptions, 'db' | 'mutations'>;
   /** Ninebrains packs. Optional until boot wiring passes one (features/packs/README.md). */
   readonly packs?: PacksService;
+  /** Ninebrains gate verification views and Settings → Gates. Optional until boot wiring passes one (features/gates/README.md). */
+  readonly gates?: GatesWireService;
   /** Ninebrains planner. Optional until wired; absent means an in-memory, Brain-less fallback. */
   readonly planner?: PlannerService;
+  /** Ninebrains model routing (features/routing/README.md). Absent: profiles off. */
+  readonly routing?: RoutingService;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -477,8 +495,18 @@ export const desktopNodeControllers = {
     create: ({ lanes, scope }) =>
       controllerFromImpl(desktopDomainContracts.lanes, createLanesWireController(lanes), scope),
   },
+  gates: {
+    create: ({ gates }) => createGatesWireController(gates ?? unavailableGatesWireService),
+  },
+  brain: {
+    create: ({ brain, scope }) =>
+      controllerFromImpl(desktopDomainContracts.brain, createBrainWireController(brain), scope),
+  },
   planner: {
     create: ({ planner }) => createPlannerWireController(planner ?? createUnwiredPlannerService()),
+  },
+  routing: {
+    create: ({ routing }) => createRoutingWireController(routing ?? createDisabledRoutingService()),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

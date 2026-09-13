@@ -13,11 +13,16 @@ import { projects } from '@core/services/app-db/node/schema';
 import type { MementosRuntimeClient } from '@core/services/runtime-broker/api/clients';
 import { createTuiAgentFeed } from './agent-feed';
 import { lanesEvents } from './event-host';
-import type { LaneConversationsPort, LaneProjectsPort, LaneTasksPort } from './lane-ports';
+import type {
+  LaneBrainPort,
+  LaneConversationsPort,
+  LaneProjectsPort,
+  LaneTasksPort,
+} from './lane-ports';
 import { LaneService } from './lane-service';
 import { createMementoLanePersistence } from './lanes-persistence';
 
-export type NinebrainsServicesDependencies = {
+export type LaneServicesDependencies = {
   db: AppDb;
   runtimes: RuntimeBroker;
   scope: Scope;
@@ -35,12 +40,14 @@ export type NinebrainsServicesDependencies = {
   };
 };
 
-export type NinebrainsServices = {
-  readonly lanes: LaneService;
-};
-
-/** One entry point so the upstream `services.ts` patch stays a single call. */
-export function createNinebrainsServices(deps: NinebrainsServicesDependencies): NinebrainsServices {
+/**
+ * Builds LaneService from upstream services. The Ninebrains composition root
+ * (`app/main/bootstrap/boot/ninebrains/`) calls it with the Brain's port.
+ */
+export function createLaneService(
+  deps: LaneServicesDependencies,
+  brain?: LaneBrainPort
+): LaneService {
   const onError = (context: string, error: unknown) =>
     deps.logger.warn(context, { error: error instanceof Error ? error.message : String(error) });
   const lanes = new LaneService(
@@ -53,6 +60,7 @@ export function createNinebrainsServices(deps: NinebrainsServicesDependencies): 
         scope: deps.scope,
       }),
       agentFeed: createTuiAgentFeed({ runtimes: deps.runtimes, onError }),
+      brain,
       newId: () => randomUUID(),
       onError,
     },
@@ -60,10 +68,12 @@ export function createNinebrainsServices(deps: NinebrainsServicesDependencies): 
   );
   deps.scope.add(() => lanes.dispose());
   void lanes.initialize().catch((error: unknown) => onError('lanes: initialize failed', error));
-  return { lanes };
+  return lanes;
 }
 
-function createProjectsPort(deps: NinebrainsServicesDependencies): LaneProjectsPort {
+export function createProjectsPort(
+  deps: Pick<LaneServicesDependencies, 'db' | 'workspaceIdentity'>
+): LaneProjectsPort {
   return {
     async get(projectId) {
       const [row] = await deps.db
@@ -90,7 +100,9 @@ function createProjectsPort(deps: NinebrainsServicesDependencies): LaneProjectsP
   };
 }
 
-function createTasksPort(deps: NinebrainsServicesDependencies): LaneTasksPort {
+export function createTasksPort(
+  deps: Pick<LaneServicesDependencies, 'taskService'>
+): LaneTasksPort {
   return {
     async createWorktreeTask({ taskId, projectId, name, branchName, baseRef }) {
       const result = await deps.taskService.createTask({
@@ -126,7 +138,9 @@ function createTasksPort(deps: NinebrainsServicesDependencies): LaneTasksPort {
   };
 }
 
-function createConversationsPort(deps: NinebrainsServicesDependencies): LaneConversationsPort {
+export function createConversationsPort(
+  deps: Pick<LaneServicesDependencies, 'conversations' | 'runtimes'>
+): LaneConversationsPort {
   return {
     async create({ conversationId, projectId, taskId, provider, model, title }) {
       await deps.conversations.create({

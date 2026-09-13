@@ -14,7 +14,8 @@
  *
  * Responses are always a JSON `BrainResponse` with no CORS headers. Other
  * statuses: 404 wrong path, 405 any method but POST (including OPTIONS),
- * 400 malformed request, 429 over the per-token rate limit.
+ * 400 malformed request, 429 over the per-token rate limit or after too many failed
+ * authentications (the pre-auth budget, checked before any token is resolved).
  */
 import { z } from 'zod';
 import { idSchema } from './ops';
@@ -30,6 +31,11 @@ export const BRAIN_ENDPOINT = {
   requestTimeoutMs: 5_000,
   maxConnections: 64,
   rateLimit: { perSecond: 20, burst: 60 },
+  /**
+   * L3: one budget shared by every caller that fails authentication, checked before the token
+   * is resolved. While it is spent, every request gets 429.
+   */
+  preAuthRateLimit: { perSecond: 5, burst: 20 },
 } as const;
 
 export const LANE_HINT_HEADER = 'x-ninebrains-lane-hint';

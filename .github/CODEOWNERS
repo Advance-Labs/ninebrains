@@ -1,0 +1,48 @@
+# Ninebrains code owners.
+#
+# Today (private repo, free plan) GitHub neither requests these reviews nor enforces them. The
+# section between the BEGIN and END markers below is still load-bearing: `pnpm run merge <pr>`
+# (tooling/scripts/merge-pr.mjs) reads it and refuses to merge a PR that touches any of these paths
+# without the `security-reviewed` label. Keep the marker lines exactly as they are.
+#
+# When the repo goes public or moves to GitHub Team, GitHub starts requesting reviews from these
+# owners. Do not turn on "Require review from Code Owners" while there is a single owner: GitHub
+# does not let you approve your own PR, so every PR you open would be blocked.
+
+# BEGIN security-sensitive
+# Brain, the MCP shim lanes run, gate logic and claim checking.
+/packages/brain-core/ @zordhalo
+/packages/brain-mcp/ @zordhalo
+/packages/gates-core/ @zordhalo
+/packages/citations/ @zordhalo
+# The allowlisted agent environment every spawn is built from (SEC-13).
+/packages/core/src/primitives/agent-env/ @zordhalo
+
+# Slices that launch agents, run commands, drive the lane browser or load packs.
+/apps/emdash-desktop/src/core/features/exec-runs/ @zordhalo
+/apps/emdash-desktop/src/core/features/gates/ @zordhalo
+/apps/emdash-desktop/src/core/features/packs/ @zordhalo
+/apps/emdash-desktop/src/core/features/lanes/ @zordhalo
+/apps/emdash-desktop/src/core/features/brain/ @zordhalo
+/apps/emdash-desktop/src/core/features/conversations/node/tui-conversation-provider.ts @zordhalo
+
+# Composition root, host wiring, and the switches that keep Emdash's servers cut.
+/apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/ @zordhalo
+/apps/emdash-desktop/src/main/host/ninebrains/ @zordhalo
+/apps/emdash-desktop/src/main/host/chromium-command-line.ts @zordhalo
+/apps/emdash-desktop/src/core/primitives/app-identity/api/fork-flags.ts @zordhalo
+
+# What ships and how it is built, signed and released.
+/apps/emdash-desktop/electron-builder.config.ts @zordhalo
+/apps/emdash-desktop/electron-builder.canary.config.ts @zordhalo
+/apps/emdash-desktop/scripts/release/ @zordhalo
+/.github/ @zordhalo
+
+# The gates themselves: licence tooling, CI and merge scripts, git hooks.
+/tooling/scripts/ @zordhalo
+/tooling/git-hooks/ @zordhalo
+
+# The security contract.
+/docs/THREAT-MODEL.md @zordhalo
+/docs/SECURITY.md @zordhalo
+# END security-sensitive

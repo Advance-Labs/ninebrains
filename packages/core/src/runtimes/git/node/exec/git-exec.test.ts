@@ -1,5 +1,7 @@
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { BoundExec } from '#services/exec/api';
+import { createBoundExec, type BoundExec } from '#services/exec/api';
+import { makeHostileRepo } from '#services/exec/node/hardened-git.test-fixtures';
 import { bindGitDir, createGitExec, gitEnv } from './git-exec';
 
 describe('gitEnv', () => {
@@ -34,6 +36,55 @@ describe('gitEnv', () => {
     expect(before.stdout.trim()).toBe('before-refresh');
     expect(after.stdout.trim()).toBe('after-refresh');
   });
+});
+
+describe('T36 createGitExec hardening (real git)', () => {
+  it('reads run no fsmonitor, filter, lazy fetch or ssh; the same argv unhardened does', async () => {
+    const h = makeHostileRepo();
+    try {
+      const exec = createGitExec({ cwd: h.repo, env: h.env });
+      await exec.exec(['--no-optional-locks', 'status', '--porcelain=v2', '-z', '-uall']);
+      await exec.exec(['diff', '--numstat', 'HEAD', '--']);
+      await exec.exec(['blame', '--porcelain', '--', 'a.txt']);
+      await expect(exec.exec(['cat-file', '-p', 'HEAD:b.txt'])).rejects.toThrow();
+      // The git worker binds a git dir; the driver listing must read that repo's config.
+      await bindGitDir(createGitExec({ cwd: h.root, env: h.env }), join(h.repo, '.git'))
+        .withCwd(h.repo)
+        .exec(['status', '--porcelain']);
+      expect(h.ran()).toEqual([]);
+
+      const plain = createBoundExec({ file: 'git', cwd: h.repo, env: h.env });
+      await plain.exec(['status', '--porcelain']);
+      // status alone may skip the clean filter: a.txt changed size, so git marks it modified from
+      // stat data without reading it (seen on CI's git 2.55). diff always reads it through the filter.
+      await plain.exec(['diff', '--numstat', 'HEAD', '--']);
+      await plain.exec(['cat-file', '-p', 'HEAD:b.txt']).catch(() => undefined);
+      expect(h.ran()).toEqual(expect.arrayContaining(['filter', 'fsmonitor', 'ssh']));
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("user writes keep the user's hooks but run no fsmonitor or repo core.sshCommand", async () => {
+    const h = makeHostileRepo();
+    try {
+      const exec = createGitExec({ cwd: h.repo, env: h.env });
+      await exec.exec(['commit', '-q', '--allow-empty', '-m', 'from the UI']);
+      await expect(
+        exec.exec(['push', 'origin', 'HEAD:main'], { timeoutMs: 30_000 })
+      ).rejects.toThrow();
+      expect(h.ran()).toContain('hook-pre-commit');
+      expect(h.ran()).not.toContain('fsmonitor');
+      expect(h.ran()).not.toContain('ssh');
+
+      h.clear();
+      const plain = createBoundExec({ file: 'git', cwd: h.repo, env: h.env });
+      await plain.exec(['push', 'origin', 'HEAD:main']).catch(() => undefined);
+      expect(h.ran()).toContain('ssh');
+    } finally {
+      h.dispose();
+    }
+  }, 60_000);
 });
 
 describe('bindGitDir', () => {

@@ -34,6 +34,8 @@ export interface PackLaunchRole {
   kind: 'code' | 'ui' | 'research' | 'seo' | 'video';
   provider?: 'claude' | 'codex';
   model?: string;
+  /** The role's Lever A subagent tier (routing). */
+  subagentModel?: string;
 }
 
 export interface PackLaunch {

@@ -1,3 +1,4 @@
+import { gatesSettingsPage } from '@core/features/gates/contributions/settings-page';
 import { promptsSettingsPage } from '@core/features/library/contributions/settings-page';
 import {
   conversationsSettingsPage,
@@ -7,6 +8,7 @@ import {
 } from '@core/features/machines/contributions/settings-page';
 import { mcpSettingsPage } from '@core/features/mcp/contributions/settings-page';
 import { packsSettingsPage } from '@core/features/packs/contributions/settings-page';
+import { modelsSettingsPage } from '@core/features/routing/contributions/settings-page';
 import {
   agentsSettingsPage,
   browserSettingsPage,
@@ -33,5 +35,7 @@ export const settingsPageContributions = [
   mcpSettingsPage,
   skillsSettingsPage,
   packsSettingsPage,
+  gatesSettingsPage,
+  modelsSettingsPage,
   machinesConnectionsPage,
 ] as const satisfies readonly SettingsPageContribution<Exclude<SettingsPageTab, 'docs'>>[];

@@ -61,6 +61,10 @@ afterEach(async () => {
 /** Plays the app's main process: the only DB opener, the endpoint, and the token minter. */
 async function startApp() {
   appBrain = new Brain({ store: SqliteBrainStore.open(path.join(dir, 'app-data')) });
+  // Main registers every lane it launches; L1 refuses messages to lanes that don't exist.
+  for (const id of ['A', 'B']) {
+    appBrain.upsertLane(HUB, { id, projectId: 'p1', provider: 'claude', status: 'idle' });
+  }
   app = await startBrainHttpServer({ brain: appBrain });
   const roots = [path.join(dir, 'project')];
   return {
@@ -158,9 +162,12 @@ describe('built stdio shim', () => {
       attachments: [{ kind: 'file', path: 'report.md' }],
     });
     const inbox = (await laneB.call('read_inbox')).json;
-    expect(inbox).toMatchObject([
-      { from: { kind: 'lane', id: 'A' }, body: 'report is in', untrusted: true },
-    ]);
+    expect(inbox).toMatchObject([{ from: { kind: 'lane', id: 'A' }, untrusted: true }]);
+    // The built bin fences every untrusted body it hands a lane (gate-feedback provenance).
+    expect(inbox[0].body).toMatch(
+      /^<<<MESSAGE-([0-9a-f]{16})>>>\nreport is in\n<<<END-MESSAGE-\1>>>$/
+    );
+    expect(inbox[0].fence).toContain('UNTRUSTED DATA');
     expect(inbox[0].attachments[0].path).toBe(path.join(dir, 'project', 'report.md'));
     expect((await laneA.call('add_note', { body: 'uses port 3001' })).isError).toBe(false);
     const other = (await hub.call('create_job', { title: 'Needs credentials' })).json;

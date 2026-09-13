@@ -25,19 +25,22 @@ const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 /** A TOML basic string. JSON escaping is a valid subset of TOML's for the characters we emit. */
 const tomlString = (value: string): string => JSON.stringify(value);
 
+/** `-c` override values (without the `-c`) for the run's MCP servers. */
 function mcpOverrides(spec: ExecRunSpec): string[] {
   const out: string[] = [];
   for (const [name, server] of Object.entries(spec.mcpServers ?? {})) {
     if (!SERVER_NAME.test(name)) throw new Error(`Unsafe MCP server name: ${JSON.stringify(name)}`);
-    out.push('-c', `mcp_servers.${name}.command=${tomlString(server.command)}`);
-    out.push('-c', `mcp_servers.${name}.args=[${(server.args ?? []).map(tomlString).join(',')}]`);
+    if (server.type === 'http') {
+      throw new Error(`Codex runs take stdio MCP servers only; "${name}" is an http server`);
+    }
+    out.push(`mcp_servers.${name}.command=${tomlString(server.command)}`);
+    out.push(`mcp_servers.${name}.args=[${(server.args ?? []).map(tomlString).join(',')}]`);
     const env = Object.entries(server.env ?? {});
     for (const [key] of env) {
       if (!ENV_KEY.test(key)) throw new Error(`Unsafe MCP env key: ${JSON.stringify(key)}`);
     }
     if (env.length) {
       out.push(
-        '-c',
         `mcp_servers.${name}.env={${env.map(([k, v]) => `${k}=${tomlString(v)}`).join(',')}}`
       );
     }
@@ -45,21 +48,36 @@ function mcpOverrides(spec: ExecRunSpec): string[] {
   return out;
 }
 
-/** The trailing `-` reads the prompt from stdin (SEC-17), per `codex exec --help`. */
+/**
+ * The argv plus the `-c` overrides this builder generated. The SEC-12 guard refuses any `-c`
+ * value not in `trusted`, so an override injected from elsewhere never reaches Codex.
+ * The trailing `-` reads the prompt from stdin (SEC-17), per `codex exec --help`.
+ * `routeConfig` is the model route's `-c` values (`routeLaunch`), trusted like the rest.
+ */
+export function buildCodexExecLaunch(
+  spec: ExecRunSpec,
+  cwd: string,
+  routeConfig: readonly string[] = []
+): { argv: string[]; trusted: string[] } {
+  const config = ['approval_policy="never"', ...mcpOverrides(spec), ...routeConfig];
+  return {
+    argv: [
+      'exec',
+      '--json',
+      '--cd',
+      cwd,
+      '--sandbox',
+      spec.preset === 'reviewer' ? 'read-only' : 'workspace-write',
+      ...config.flatMap((value) => ['-c', value]),
+      ...(spec.model ? ['--model', spec.model] : []),
+      '-',
+    ],
+    trusted: config,
+  };
+}
+
 export function buildCodexExecArgv(spec: ExecRunSpec, cwd: string): string[] {
-  return [
-    'exec',
-    '--json',
-    '--cd',
-    cwd,
-    '--sandbox',
-    spec.preset === 'reviewer' ? 'read-only' : 'workspace-write',
-    '-c',
-    'approval_policy="never"',
-    ...mcpOverrides(spec),
-    ...(spec.model ? ['--model', spec.model] : []),
-    '-',
-  ];
+  return buildCodexExecLaunch(spec, cwd).argv;
 }
 
 type Json = Record<string, unknown>;

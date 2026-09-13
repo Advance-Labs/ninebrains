@@ -80,5 +80,9 @@ installs and accounts, and give us the disclosure window above. We do not run a 
 ## Verifying downloads
 
 Until builds are code-signed, verify every download against the `SHA256SUMS` file attached to its
-GitHub release (`shasum -a 256 -c SHA256SUMS`) and its build provenance
-(`gh attestation verify <file> --repo <org>/ninebrains`). Unsigned builds do not auto-update.
+GitHub release (`shasum -a 256 -c SHA256SUMS`). That proves you have the exact bytes CI uploaded,
+not who built them. Build-provenance attestations are not available while the repository is
+private. Once the repository is public, `gh attestation verify <file> --repo
+Advance-Labs/ninebrains` will also prove which workflow built the file. Until then that command
+fails, and a failure means nothing about the file. Unsigned builds do not auto-update. The release
+guide in the repository (`docs/RELEASING.md`, "Verifying a download") has the commands for each OS.

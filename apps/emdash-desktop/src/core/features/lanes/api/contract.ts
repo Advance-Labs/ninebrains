@@ -1,9 +1,12 @@
 import { defineContract, eventStream, fallible, liveModel, liveState } from '@emdash/wire/rpc';
 import { z } from 'zod';
+import { profileIdSchema, subagentModelSchema } from '@core/features/routing/api';
 import {
   laneBoardSchema,
   laneErrorSchema,
   laneProviderSchema,
+  laneRoleIdSchema,
+  laneRunModeSchema,
   laneSlotSchema,
   laneStatusMapSchema,
   type LaneEvent,
@@ -56,9 +59,19 @@ export const lanesContract = defineContract({
       slot: laneSlotSchema,
       projectId: z.string().min(1),
       provider: laneProviderSchema,
-      model: z.string().min(1).optional(),
+      model: z.string().trim().min(1).max(128).optional(),
+      /** A role of one of the project's enabled packs; its prompt and servers apply at launch. */
+      roleId: laneRoleIdSchema.optional(),
+      subagentModel: subagentModelSchema.optional(),
+      authProfileId: profileIdSchema.optional(),
     }),
     data: z.object({ laneId: z.string() }),
+    error: laneErrorSchema,
+  }),
+  /** Attended (paste into the terminal) or unattended (headless runs). Persisted with the lane. */
+  setLaneMode: fallible({
+    input: laneKey.extend({ mode: laneRunModeSchema }),
+    data: z.void(),
     error: laneErrorSchema,
   }),
   startLane: fallible({ input: laneKey, data: z.void(), error: laneErrorSchema }),
@@ -76,6 +89,15 @@ export const lanesContract = defineContract({
   /** Moves a lane to a slot, swapping with any lane already there. */
   moveLane: fallible({
     input: laneKey.extend({ tabId: z.string().min(1), slot: laneSlotSchema }),
+    data: z.void(),
+    error: laneErrorSchema,
+  }),
+  /** Lever A tier and Lever B auth mode, stored with the lane. `null` clears. Next launch on. */
+  setLaneRouting: fallible({
+    input: laneKey.extend({
+      subagentModel: subagentModelSchema.nullable(),
+      authProfileId: profileIdSchema.nullable(),
+    }),
     data: z.void(),
     error: laneErrorSchema,
   }),

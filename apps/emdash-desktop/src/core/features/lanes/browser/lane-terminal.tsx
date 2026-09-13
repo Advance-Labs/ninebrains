@@ -55,7 +55,8 @@ export const LaneTerminal = observer(function LaneTerminal({
   lane,
   focused,
 }: {
-  lane: Lane;
+  /** A lane, or any PTY conversation in a Task (the Brain drawer renders sessions here). */
+  lane: Pick<Lane, 'conversationId' | 'projectId' | 'taskId'>;
   focused: boolean;
 }) {
   // A lane-specific session id, so this view never collides with the same

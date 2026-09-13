@@ -74,7 +74,10 @@ pnpm run lint           # oxlint, plus the boundary allowlist check
 pnpm run typecheck
 pnpm run licenses       # the licence gate and its tests
 pnpm run test           # every project's tests
-pnpm run check          # format, lint, typecheck, licenses, test, in order
+pnpm run check          # format:check, lint, typecheck, licenses, tooling tests, test (edits nothing)
+pnpm run check:write    # the same, but runs format to fix formatting
+pnpm run hooks:install  # the pre-push guard (once per clone)
+pnpm run merge <pr>     # maintainers: the only way to merge (see "CI and merging")
 pnpm run affected       # lint, typecheck and test only what changed vs main
 ```
 
@@ -94,27 +97,113 @@ pnpm --filter @ninebrains/docs build
 
 ## Before you open a PR
 
-Run `pnpm run check`. It must be green. There are no pre-commit hooks.
+Run `pnpm run check`. It must be green. It runs `format:check`, `lint`, `typecheck`, `licenses`,
+`test:tooling` and `test` in order (the checks CI runs) and never edits a file.
+`pnpm run check:write` runs `format` instead of `format:check`.
 
-CI runs format, lint, typecheck and test on the projects your PR touches, plus the licence gate.
-CI skips the Playwright-backed `browser` test projects, so run them locally. The first run on a
-machine needs:
+Install the pre-push hook once per clone:
+
+```bash
+pnpm run hooks:install   # git config core.hooksPath tooling/git-hooks
+```
+
+It refuses pushes to `main`. Before any other push it runs `format:check`, `nx affected` lint,
+typecheck and test against `origin/main`, and the upstream-patch log check. It checks your working
+tree, so commit first. `git push --no-verify` skips it; CI still runs everything.
+
+CI runs the Playwright-backed `browser` projects too, but run them locally for UI changes. The first
+run on a machine needs:
 
 ```bash
 pnpm --dir apps/emdash-desktop exec playwright install chromium-headless-shell
 ```
 
-If a browser test fails with `Cannot read properties of null (reading 'useRef')` or "Failed to
-fetch dynamically imported module", re-run it. That is Vite re-optimising dependencies mid-run.
+`EMDASH_TEST_BROWSER=1` forces the browser projects on under a `CI` environment;
+`EMDASH_TEST_SKIP_BROWSER=1` skips them locally.
+
+If a browser test fails with "Vite unexpectedly reloaded a test", Vite found a dependency its scan
+missed. Run the test with `DEBUG=vite:deps`, find the name after "new dependencies found", and add it
+to the browser project's `optimizeDeps.include` in `vitest.config.ts`. Do not just re-run it.
 
 Then:
 
 1. Branch: `git checkout -b feat/<short-slug>`.
-2. Commit with Conventional Commits (`feat(lanes): …`, `fix(brain-core): …`, `docs(guide): …`).
-3. In the PR, say what changed, why, and what you ran. Add screenshots at 1440 and 390 px for UI
-   changes.
-4. Update `docs/guide/` in the same PR when behaviour changes. Docs reviewed next to the code that
+2. Commit with Conventional Commits and a sign-off (below): `git commit -s -m "feat(lanes): …"`.
+3. Title the PR as a Conventional Commit as well (`fix(gates): …`). It becomes the squash commit on
+   `main` and the line in the changelog.
+4. Fill in the PR template: what changed, why, what you ran, and the checklist. Add screenshots at
+   1440 and 390 px for UI changes.
+5. Update `docs/guide/` in the same PR when behaviour changes. Docs reviewed next to the code that
    changes them are the ones that stay true.
+
+## Sign your commits (DCO)
+
+A sign-off certifies the [Developer Certificate of Origin](https://developercertificate.org/): you
+wrote the change, or otherwise have the right to submit it under the project's licence. Add it with
+`git commit -s`. The `Signed-off-by` email must match the commit's author email. To sign off a
+branch you already committed, run `git rebase --signoff origin/main` and force-push.
+
+CI's `pr-hygiene` job checks every commit in the PR, except merge commits and commits by GitHub App
+bots such as Dependabot.
+
+If a tool sets `GIT_COMMITTER_NAME` or `GIT_COMMITTER_EMAIL` to its own identity, `-s` signs off as
+that identity instead of you, and the check fails. Add the trailer explicitly instead:
+`git commit --trailer "Signed-off-by: Your Name <you@example.com>"`.
+
+## CI and merging
+
+`.github/workflows/ci.yml` runs on every PR to `main` or `release/**`, on pushes to them, weekly and
+on demand:
+
+| Job | What it runs |
+|---|---|
+| `static` | `format:check`, lint, the boundary allowlist ratchet, typecheck, the licence gate, the node tests of the release scripts, the fake agent and `tooling/scripts`, and, when the docs site is affected, its build plus the link checker (`@ninebrains/docs:build`) |
+| `test-node` | Vitest in four shards: every package except the desktop app; desktop `node`; desktop `main-db`, `migrations` and `scripts`; desktop `node-spawn` (suites that spawn real processes, two files at a time). No retries: SEC-* tests are never retried to green |
+| `test-browser` | The desktop and chat-ui `browser` projects in headless Chromium, with one retry. A test that passes only on the retry is shown as a warning annotation and in the job summary. Open a `flaky-test` issue for it |
+| `pr-hygiene` | DCO sign-offs, a Conventional Commit PR title, and the upstream-patch log: every changed file that existed at `dbf690c` must be named in the lines your PR adds to `docs/UPSTREAM-PATCHES.md` |
+| `e2e` | The Electron e2e suites under xvfb. Runs only with the `run-e2e` label, weekly, on pushes to `release/**` and before a release |
+| `ci-ok` | Green only when every job that should have run passed. This is the one status that matters |
+
+PRs and pushes test only the projects Nx reports as affected. The weekly and manual runs test
+everything.
+
+**Merging.** This private repository is on GitHub's free plan, which has no branch protection, so the
+merge rules live in `pnpm run merge <pr>` (`tooling/scripts/merge-pr.mjs`). Maintainers merge only
+through it. It refuses:
+- a draft, or a PR whose title is not a Conventional Commit;
+- a head commit without a green `ci-ok`;
+- a branch that is behind its base. Update it with `gh pr update-branch <pr> --rebase` and wait for
+  CI;
+- a change to a security-sensitive path (the marked section of `.github/CODEOWNERS`) without the
+  `security-reviewed` label.
+
+Then it prints the file list, squash-merges pinned to the head commit it checked, deletes the branch
+and watches CI on the base. `pnpm run merge <pr> --dry-run` runs the checks without merging.
+
+Once the repository is public or on GitHub Team, add a ruleset for `main` and `release/**`:
+- require the `ci-ok` status check, with GitHub Actions as its source;
+- require branches to be up to date before merging;
+- block force pushes and deletions;
+- allow squash merges only.
+
+`merge-pr.mjs` keeps working alongside the ruleset.
+
+## End-to-end tests
+
+`apps/emdash-desktop/e2e/` drives the built Electron app with Playwright.
+
+- Build first, from the repo root: `pnpm run build`. Then run a suite:
+  `node apps/emdash-desktop/e2e/lanes-smoke.e2e.mjs` (also `brain-fanout` and `self-heal`).
+  `pnpm --dir apps/emdash-desktop run e2e` builds the app and runs the lanes smoke test.
+- The harness (`e2e/harness.mjs`) gives each run a temp HOME, an isolated profile and the fake agent
+  as `claude` on PATH, so no real credits are spent. It sets `NINEBRAINS_E2E=1` and launches with
+  `--use-mock-keychain`, so macOS never prompts for, or touches, your login keychain.
+- The built app stays in the tray after its window closes, so `app.close()` can hang. If a run prints
+  PASS and then sits there, kill the process tree. CI gives each suite 10 minutes and reports exit
+  124 as a hang.
+- On Linux, run under a virtual display with zsh installed (the harness sets `SHELL=/bin/zsh`):
+  `xvfb-run -a node apps/emdash-desktop/e2e/lanes-smoke.e2e.mjs`.
+- To run them in CI, add the `run-e2e` label to your PR.
 
 ## The fork: upstream rebase policy
 
@@ -170,6 +259,22 @@ real captures, fires hooks from `--settings`, and makes real MCP stdio calls.
 
 Run a real CLI only by hand, and say in the PR that you did.
 
+## End-to-end tests
+
+The Electron tests in `apps/emdash-desktop/e2e/` drive the built app with Playwright and the fake
+agent. They are kept out of CI.
+
+1. Build from the repo root: `pnpm run build`. It builds the workspace packages the app bundles.
+   On a fresh worktree, `pnpm --dir apps/emdash-desktop build` alone fails with
+   `@emdash/wire/worker` unresolved.
+2. Run one test, for example `node apps/emdash-desktop/e2e/self-heal.e2e.mjs`
+   (`brain-fanout.e2e.mjs` and `lanes-smoke.e2e.mjs` work the same way).
+
+Each run gets a temp profile and HOME, `--use-mock-keychain` and a fake `claude` on PATH. Lanes and
+reviewer runs get an allowlisted environment, so the harness bakes the test's lane script and an
+approving reviewer script into that `claude` wrapper instead of passing `FAKE_AGENT_*` variables.
+The app's main-process output for a run is in `<profile>/main.log`.
+
 ## Security-sensitive code
 
 Lanes run agents that execute shell commands as the user. Treat these areas as high risk: the Brain
@@ -187,7 +292,10 @@ and anything that spawns a process.
 - Never read provider credential files, and never drive a provider login.
 - Put anything untrusted into a reviewer prompt only through `createFence()` from gates-core.
 
-Security-relevant PRs get an extra security review before merge.
+Security-relevant PRs get an extra security review before merge. List the SEC-IDs your change
+touches in the PR. `pnpm run merge` refuses a PR that changes a path in the security section of
+`.github/CODEOWNERS` until it has the `security-reviewed` label; a maintainer adds it once the
+review is done.
 
 ## Code style
 

@@ -36,7 +36,8 @@ export function initEvent({ cwd, sessionId, tools, mcpServers, model, permission
     model,
     permissionMode,
     slash_commands: [],
-    apiKeySource: 'none',
+    // As the real CLI (docs/SPIKE-EXEC-PATHS.md §13): a login or ANTHROPIC_AUTH_TOKEN reports "none".
+    apiKeySource: process.env.ANTHROPIC_API_KEY ? 'ANTHROPIC_API_KEY' : 'none',
     claude_code_version: FAKE_VERSION,
     output_style: 'default',
     agents: [],

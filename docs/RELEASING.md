@@ -4,7 +4,9 @@ Ninebrains ships **unsigned**. macOS builds are ad-hoc signed and not notarized,
 carry no Authenticode signature. The integrity guarantee comes from the `SHA256SUMS` published with
 every release (THREAT-MODEL SEC-37). Auto-update stays off until signing lands (SEC-36).
 
-- Workflow: `.github/workflows/release.yml` (manual only)
+- Workflow: `.github/workflows/release.yml` (manual only, from `main` or `release/*`)
+- Gate: `ci-ok` green on the exact commit (`tooling/scripts/require-green.mjs`), plus e2e in the run
+- Changelog: `CHANGELOG.md`, written by `pnpm run release:prepare X.Y.Z` (`tooling/scripts/changelog.mjs`)
 - Builder configs: `apps/emdash-desktop/electron-builder.config.ts` (stable), `electron-builder.canary.config.ts`
 - Signing switch: `apps/emdash-desktop/scripts/release/lib/signing.ts`
 - Checksums: `apps/emdash-desktop/scripts/release/checksums.mjs`
@@ -30,29 +32,89 @@ and we have no arm64 Windows machine to test on. Add it back once someone asks f
 
 Only Lucas publishes. Nothing is public until the draft is published.
 
-1. **Bump the version** in `apps/emdash-desktop/package.json` and merge that to `main`. The workflow
-   refuses a version input that doesn't match the file.
-2. **Dispatch the workflow** from `main`:
+1. **Prepare the release in a PR.** From an up-to-date `main`:
    ```sh
-   gh workflow run release.yml --repo Advance-Labs/ninebrains --ref main -f version=0.1.0
+   git switch -c chore/release-0.2.0 origin/main
+   pnpm run release:prepare 0.2.0      # bumps apps/emdash-desktop/package.json, writes CHANGELOG.md
+   ```
+   The new `CHANGELOG.md` section holds any hand-written notes from **Unreleased**, then the
+   Conventional Commit titles on `main` since the last `v*` tag, grouped into breaking changes,
+   features, fixes, performance, reverts and docs (`chore`, `ci`, `test`, `style`, `refactor` and
+   `build` are left out). Edit it into something a user wants to read. Commit with
+   `git commit -s -m "chore(release): 0.2.0"`, open the PR, and merge it with `pnpm run merge <pr>`
+   once `ci-ok` is green. The merge script waits for CI on the merge commit.
+2. **Dispatch the workflow** from `main` once `ci-ok` is green on the merge commit:
+   ```sh
+   gh workflow run release.yml --repo Advance-Labs/ninebrains --ref main -f version=0.2.0 -f channel=stable
    ```
    Or use **Actions → Release → Run workflow** in the GitHub UI. Expect about 30–60 runner-minutes. The
    macOS job is the long one because it packages two arches, and macOS minutes bill at 10×.
+   Preflight stops the run, before any build, when:
+   - the ref is not `main` or `release/*`;
+   - `ci-ok` is not green on the exact commit being built;
+   - the version input differs from `package.json`;
+   - `CHANGELOG.md` has no section for the version.
 3. **Review the draft** at **Releases**. Look for:
    - five installers, plus `SHA256SUMS` and `SHA256SUMS.json`;
-   - notes that include the sums and the unsigned warning;
+   - notes that start with the changelog section, then the sums and the unsigned warning;
    - the run summary line "Draft v0.1.0 is ready for review", which appears only after the draft
      was re-downloaded and re-verified;
    - a check on at least one real machine: download the installer, verify it (below), install it and
      launch it.
-4. **Publish** the draft. Publishing creates the `v0.1.0` tag at the commit the draft targets (the
+4. **Publish** the draft. Publishing creates the `v0.2.0` tag at the commit the draft targets (the
    commit the workflow built).
+
+### Canary builds
+
+```sh
+gh workflow run release.yml --repo Advance-Labs/ninebrains --ref main -f version=0.2.0 -f channel=canary
+```
+
+`version` is still the `package.json` version. The run derives `0.2.1-canary.<run number>` from it
+(`scripts/release/lib/version.ts`), packages with `electron-builder.canary.config.ts` and the
+`canary` build variant (app name **Ninebrains Canary**, app id `dev.advancelabs.ninebrains.canary`,
+its own `ninebrains-canary` data directory), and marks the draft as a **prerelease**. The notes are
+the **Unreleased** section plus the commits since the last tag; no `CHANGELOG.md` change is needed.
+Any version with a `-` suffix (`0.3.0-rc.1`) is also marked as a prerelease on the stable channel.
+
+### Hotfix branches (`release/0.x`)
+
+Fix a shipped release without shipping everything that has landed on `main` since:
+
+1. Branch from the tag you are fixing and push the branch: `git switch -c release/0.2 v0.2.0 &&
+   git push -u origin release/0.2`. CI runs on pushes to `release/**`, e2e included.
+2. Open fix PRs against `release/0.2` (`gh pr create --base release/0.2`). They get the same CI and
+   merge through `pnpm run merge <pr>`.
+3. Prepare the patch release on the branch (`pnpm run release:prepare 0.2.1` in a PR against
+   `release/0.2`), then dispatch from it: `gh workflow run release.yml --ref release/0.2 -f
+   version=0.2.1 -f channel=stable`.
+4. Bring the fix forward: cherry-pick it onto a branch from `main` and merge that PR too.
+
+## Rolling back
+
+There is no auto-update, so nothing reaches users on its own. Rolling back means stopping new
+downloads of a bad build and shipping a good one. **Never move or reuse a tag**; the workflow
+refuses a published version, and a changed tag breaks everyone's checksums.
+
+- **Still a draft:** delete the draft on the Releases page. Drafts create no tag.
+- **Published and bad:**
+  1. Stop new downloads now. Edit the release, put a "Do not install" warning at the top of the notes
+     and mark it as a prerelease, so it is no longer **Latest**: `gh release edit v0.2.0 --prerelease
+     --notes-file warning.md`. If the build is dangerous, delete its installer assets too
+     (`gh release delete-asset v0.2.0 <file> --yes`); keep the release and tag as the record.
+  2. Point **Latest** back at the last good release: `gh release edit v0.1.0 --latest`.
+  3. Ship the fix as a new version (`0.2.1`), from `main` or from a `release/0.2` hotfix branch.
+  4. If the bad change is on `main`, revert it through a PR (`git revert <sha>` on a branch, then
+     `pnpm run merge <pr>`). Do not push to `main`. The pre-push hook refuses it; the only override is
+     `NINEBRAINS_MERGE_GUARD=<sha being pushed>`, for when GitHub itself cannot merge.
+  5. Say what happened in the next release's notes (the **Unreleased** section of `CHANGELOG.md`).
 
 ### What the workflow does
 
 | Job | Runs on | Permissions | Does |
 |---|---|---|---|
-| `preflight` | ubuntu-latest | `contents: read` | Checks the version input against `package.json`; runs the SEC-36/SEC-37 node tests |
+| `preflight` | ubuntu-latest | `contents: read`, `checks: read` | Refuses refs other than `main`/`release/*` and commits without a green `ci-ok`; checks the version input against `package.json`; resolves the canary version; pulls the notes from `CHANGELOG.md`; runs the SEC-36/SEC-37 node tests |
+| `e2e` | ubuntu-22.04 | `contents: read` | `e2e.yml`: the built app under xvfb with the fake agent. The draft is not created unless it passes |
 | `build` ×3 | macos-14, windows-2022, ubuntu-22.04 | `contents: read` | `pnpm run build`, then `build.ts` in local mode; `verify-mac.ts` on macOS; uploads installers as workflow artifacts |
 | `attest` | ubuntu-latest | `id-token`, `attestations: write` | Build-provenance attestations. Skipped while the repo is private (see below) |
 | `release` | ubuntu-latest | `contents: write` | Writes and verifies `SHA256SUMS`, creates or reuses the draft, uploads with `--clobber`, deletes stale assets, then re-downloads the draft and re-verifies |
@@ -298,5 +360,7 @@ workflow itself (it has never been dispatched).
 | SEC-37: README documents `shasum -a 256 -c` and `gh attestation verify` | Documented here. The root README is a placeholder; link it to this section when the README is written. |
 | R8 (accepted): unsigned, checksums and attestations only | Unchanged. |
 
-Actions are referenced by version tag (`actions/checkout@v4` and so on), not by SHA, the same as
-every other workflow in this repo. Pinning all of them to SHAs is a separate follow-up.
+Every action in `release.yml`, `ci.yml`, `e2e.yml` and the composite actions they use is pinned to
+a commit SHA, with the version in a comment. Dependabot (`.github/dependabot.yml`, weekly) opens
+the PRs that move the pins. `build-matrix.yml` and `workspace-server-package-check.yml` are
+manual-only and still use version tags.

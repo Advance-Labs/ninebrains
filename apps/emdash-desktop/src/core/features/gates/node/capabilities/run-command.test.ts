@@ -1,8 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildSeatbeltProfile, createRunCommand } from './run-command';
+import {
+  ProcessGroupRegistry,
+  StopLatchedError,
+} from '@core/features/exec-runs/api/node/process-group';
+import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
+import { createRunCommand } from './run-command';
 import { tempRoot } from './test-fixtures';
+import { buildSeatbeltProfile } from './tests-sandbox';
 
 const root = tempRoot('nb-run-command-');
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -117,6 +123,12 @@ describe('SEC-20 tests gate is sandboxed', () => {
     expect(r).toMatchObject({ exitCode: 0, stdout: 'a b|$HOME|;id|' });
   });
 
+  it('T32 gate-built argv commands (the reviewer git calls) get GIT_NO_LAZY_FETCH=1', async () => {
+    const r = await runCommand('env', { argv: [], cwd: laneA, signal: signal() });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toMatch(/^GIT_NO_LAZY_FETCH=1$/m);
+  });
+
   it('SEC-16 never executes a binary planted in the worktree', async () => {
     const planted = join(laneA, 'node_modules', '.bin');
     mkdirSync(planted, { recursive: true });
@@ -137,6 +149,27 @@ describe('SEC-20 tests gate is sandboxed', () => {
     await expect(runCommand('true', { cwd: outside, signal: signal() })).rejects.toThrow(
       /not inside/
     );
+  });
+
+  it('runs in a lane worktree that is itself an allowed root, as the tests gate does', async () => {
+    const perLane = createRunCommand({
+      allowedRoots: () => [laneA],
+      ninebrainsDataDir: ninebrains,
+      killGraceMs: 2000,
+    });
+    const r = await perLane('pwd', { cwd: laneA, signal: signal() });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout.trim()).toBe(realpathSync(laneA));
+  });
+
+  it('never runs at a denied root itself, such as the review-checkout root', async () => {
+    const guarded = createRunCommand({
+      allowedRoots: () => [laneA],
+      deniedPaths: () => [laneA],
+      ninebrainsDataDir: ninebrains,
+      killGraceMs: 2000,
+    });
+    await expect(guarded('true', { cwd: laneA, signal: signal() })).rejects.toThrow(/not inside/);
   });
 
   it('escapes profile paths', () => {
@@ -162,6 +195,58 @@ describe('SEC-20 tests gate is sandboxed', () => {
     expect(profile).not.toContain('(subpath "/checkouts")');
     expect(profile).toContain('(subpath "/secrets")');
   });
+});
+
+describe('SEC-30 kill switch reaches tests-gate commands', () => {
+  it(
+    'supervisor.killAll kills a running tests command and its grandchild, and latches',
+    { timeout: 20_000 },
+    async () => {
+      const groups = new ProcessGroupRegistry();
+      const run = createRunCommand({
+        allowedRoots: () => [worktrees],
+        ninebrainsDataDir: ninebrains,
+        groups,
+        killGraceMs: 2000,
+      });
+      const supervisor = new ExecRunSupervisor({
+        userDataDir: dirname(ninebrains),
+        resolveBinary: async () => '/usr/bin/false',
+        allowedRoots: () => [worktrees],
+        maxConcurrentRuns: 1,
+        groups,
+      });
+      const pidFile = join(laneA, 'stop.pid');
+      const pending = run(
+        `trap '' TERM; (trap '' TERM; sh -c 'echo $$ > stop.pid; exec sleep 999') & wait`,
+        { cwd: laneA, signal: signal() }
+      );
+      for (
+        let i = 0;
+        i < 100 && !(existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim());
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const pid = Number(readFileSync(pidFile, 'utf8').trim());
+      expect(alive(pid)).toBe(true);
+      expect(groups.size).toBe(1);
+
+      const t0 = Date.now();
+      await supervisor.killAll();
+      while (alive(pid) && Date.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 50));
+      expect(alive(pid)).toBe(false);
+      expect(Date.now() - t0).toBeLessThan(5000);
+      expect((await pending).exitCode).not.toBe(0);
+
+      await expect(run('true', { cwd: laneA, signal: signal() })).rejects.toBeInstanceOf(
+        StopLatchedError
+      );
+      supervisor.clearStop();
+      expect((await run('true', { cwd: laneA, signal: signal() })).exitCode).toBe(0);
+      rmSync(pidFile);
+    }
+  );
 });
 
 describe.skipIf(process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec'))(

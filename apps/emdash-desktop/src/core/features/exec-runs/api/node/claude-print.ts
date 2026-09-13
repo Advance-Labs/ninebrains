@@ -83,17 +83,23 @@ export function buildClaudePrintArgv(spec: ExecRunSpec, files: ClaudeArgvFiles):
   return argv;
 }
 
-/** `--mcp-config` file body. Lane identity travels in each server's own env (spike §4). */
+/**
+ * `--mcp-config` file body. Lane identity travels in each server's own env (spike §4). Claude's
+ * config takes `"type": "http"` servers too (the SEO pack's remote servers), with their headers.
+ */
 export function buildClaudeMcpConfig(spec: ExecRunSpec): string {
   const mcpServers: Record<string, unknown> = {};
   for (const [name, server] of Object.entries(spec.mcpServers ?? {})) {
-    mcpServers[name] = {
-      type: 'stdio',
-      command: server.command,
-      args: [...(server.args ?? [])],
-      env: { ...server.env },
-      alwaysLoad: true,
-    };
+    mcpServers[name] =
+      server.type === 'http'
+        ? { type: 'http', url: server.url, headers: { ...server.headers }, alwaysLoad: true }
+        : {
+            type: 'stdio',
+            command: server.command,
+            args: [...(server.args ?? [])],
+            env: { ...server.env },
+            alwaysLoad: true,
+          };
   }
   return JSON.stringify({ mcpServers }, null, 2);
 }
@@ -179,6 +185,7 @@ export class ClaudeStreamParser implements AgentStreamParser {
       sessionId,
       model: typeof msg.model === 'string' ? msg.model : undefined,
       version: typeof msg.claude_code_version === 'string' ? msg.claude_code_version : undefined,
+      apiKeySource: typeof msg.apiKeySource === 'string' ? msg.apiKeySource : undefined,
       tools: Array.isArray(msg.tools) ? msg.tools.filter((t) => typeof t === 'string') : undefined,
     };
   }

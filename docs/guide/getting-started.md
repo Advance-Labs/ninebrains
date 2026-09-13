@@ -23,8 +23,8 @@ Download the build for your OS from
 [GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases).
 
 v0.1 builds are **not code-signed**. Before you open one, check it against the release's
-`SHA256SUMS` file and its build attestation. [RELEASING.md](../RELEASING.md) gives the commands,
-and explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScreen. Unsigned
+`SHA256SUMS` file. [Verify and open a download](verify-download.md) gives the commands, and
+explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScreen. Unsigned
 builds do not update themselves; download new releases by hand.
 
 ### From source
@@ -39,14 +39,16 @@ pnpm install
 pnpm run dev
 ```
 
-`pnpm run dev` builds the packages, watches them, and starts the app. To build the app without the
-dev server, run `pnpm --dir apps/emdash-desktop build`.
+`pnpm run dev` builds the packages, watches them, and starts the app. [Install from
+source](install-from-source.md) covers building the app without the dev server, and the problems
+people hit on a first build.
 
 ## First run
 
 There is no account to create and no sign-in step. Telemetry is off, and no telemetry endpoint is
 built into the app. Your data stays in the app's data folder
-(`~/Library/Application Support/ninebrains` on macOS).
+(`~/Library/Application Support/ninebrains` on macOS). [First run](first-run.md) lists what the app
+sets up the first time you use it, including hooks it adds to your Claude Code settings.
 
 ## 1. Add a project
 
@@ -75,21 +77,30 @@ Useful from here:
 
 [Lanes](lanes.md) covers the rest of the controls.
 
-## 4. Give the Brain a brief
+## 4. Set up gates
 
-<!-- VERIFY-AFTER-P2 -->
-Open the **Brain drawer** in the Lanes view and describe the work, the way you would brief a small
-team. The Brain splits it into jobs, links the ones that depend on each other, and hands each ready
-job to an idle lane in the project. Each lane's side panel shows its current job, finished work and
-notes.
+At the default settings, every job the Brain creates must pass the tests gate, and the tests gate
+needs a test command for the project. Without one, every job is blocked.
 
-If you would rather draw the plan, open the [planner](planner.md), lay out jobs and dependencies,
-and press **Run plan**.
-<!-- /VERIFY -->
+Open **Settings → Gates**. Under **Tests**, pick the project, type its test command (for example
+`pnpm test`) and click **Save test command**. See [Verification gates](gates.md#test-command).
 
-## 5. Watch the gates
+## 5. Give the Brain a brief
 
-<!-- VERIFY-AFTER-P2 -->
+Click **Brain** in the Lanes view's title bar to open the Brain drawer, then click **Start Brain**.
+The Brain is a Claude Code session of its own, in the project of a lane in the current tab. Type
+your brief into its terminal in the drawer, the way you would brief a small team.
+
+The Brain splits the work into jobs, links the ones that depend on each other, and the app hands
+each ready job to an idle lane in the project. Each lane's side panel shows its current job,
+finished work and notes.
+
+You can also lay the plan out on the [planner](planner.md) canvas and press **Run plan**. This
+build has no menu item or command that opens the planner yet.
+<!-- VERIFY: an entry point for the planner is being added -->
+
+## 6. Watch the gates
+
 When a lane reports a job as finished, its light turns to **verifying** while the job's gates run:
 tests, a screenshot check, an independent reviewer, or a citation check, depending on the job and
 your rigor settings.
@@ -97,12 +108,13 @@ your rigor settings.
 - If every gate passes, the job moves to the lane's **Done** list.
 - If a gate fails, the lane gets the feedback in its inbox and goes back to work.
 - After three failed attempts, the job is **blocked** and you get a notification.
-<!-- /VERIFY -->
+- If a gate cannot run because of your setup, the job is blocked at once.
 
-A job with no gates at all (for example, with rigor set to 0) is marked **unverified**, never
+A job with no gates at all (for example, with rigor set low) is marked **unverified**, never
 passed. See [Verification gates](gates.md).
 
 ## Next
 
 - Turn on a [pack](packs.md) for the project's kind of work.
+- Learn the [keyboard shortcuts](keyboard-shortcuts.md).
 - Read the [security overview](security.md) before running lanes on code or sites you do not trust.

@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { buildClaudeMcpConfig } from '@core/features/exec-runs/api/node/claude-print';
+import { buildCodexExecArgv } from '@core/features/exec-runs/api/node/codex-exec';
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
+import type { ExecRunSpec } from '@core/features/exec-runs/api/node/types';
 import { prepareReviewCheckout } from './review-checkout';
 import { createSpawnReviewer } from './spawn-reviewer';
 import {
@@ -160,6 +163,74 @@ describe('spawnReviewer options', () => {
     expect(JSON.parse(readFileSync(argvLog, 'utf8').trim()).argv).toContain(
       '--allowedTools=mcp__echo'
     );
+  });
+
+  it('SEO mcpServers bug: takes the packs McpServerEntry[] with http and stdio entries', async () => {
+    const { spawnReviewer } = reviewerWith({
+      FAKE_AGENT_SCRIPT: JSON.stringify([
+        { callTool: { server: 'echo', tool: 'echo', args: { text: 'gsc rows' } } },
+        { say: '{{lastToolResult}}' },
+      ]),
+    });
+    const { text } = await spawnReviewer(
+      'p',
+      opts({
+        mcpServers: [
+          {
+            name: 'aeo-search',
+            type: 'http',
+            url: 'https://aeo.example.invalid/mcp',
+            headers: { Authorization: 'Bearer t0k3n-value' },
+          },
+          {
+            name: 'echo',
+            type: 'stdio',
+            command: process.execPath,
+            args: [ECHO_MCP_SERVER],
+            env: {},
+          },
+        ],
+      })
+    );
+    expect(text).toContain('gsc rows');
+  });
+
+  it('writes http servers into the Claude MCP config and refuses them for Codex', () => {
+    const spec: ExecRunSpec = {
+      runId: 'r',
+      provider: 'claude',
+      preset: 'reviewer',
+      cwd: '/wt',
+      prompt: 'p',
+      budgets: { wallClockMs: 1000 },
+      mcpServers: { s: { type: 'http', url: 'https://x.invalid/mcp', headers: { A: 'b' } } },
+    };
+    expect(JSON.parse(buildClaudeMcpConfig(spec)).mcpServers.s).toEqual({
+      type: 'http',
+      url: 'https://x.invalid/mcp',
+      headers: { A: 'b' },
+      alwaysLoad: true,
+    });
+    expect(() => buildCodexExecArgv({ ...spec, provider: 'codex' }, '/wt')).toThrow(
+      /stdio MCP servers only/
+    );
+  });
+
+  it('rejects nameless, duplicate and non-http entries', async () => {
+    const { spawnReviewer } = reviewerWith({ FAKE_AGENT_SCRIPT: '[]' });
+    const echo = { name: 'e', type: 'stdio' as const, command: '/bin/echo', args: [], env: {} };
+    await expect(spawnReviewer('p', opts({ mcpServers: [{ ...echo, name: '' }] }))).rejects.toThrow(
+      /has no name/
+    );
+    await expect(spawnReviewer('p', opts({ mcpServers: [echo, echo] }))).rejects.toThrow(
+      /duplicate MCP server "e"/
+    );
+    await expect(
+      spawnReviewer(
+        'p',
+        opts({ mcpServers: [{ name: 'f', type: 'http', url: 'file:///etc/passwd', headers: {} }] })
+      )
+    ).rejects.toThrow(/invalid MCP server "f"/);
   });
 
   it('throws on an option it cannot honour, and on tools other than read-only', async () => {

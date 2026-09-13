@@ -12,6 +12,7 @@
  */
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
+import type { LaneGitPaths } from './lane-git-paths';
 import type { ExecPreset } from './types';
 
 export interface SandboxSettingsInput {
@@ -20,11 +21,15 @@ export interface SandboxSettingsInput {
   worktree: string;
   /** `<userData>/ninebrains`: tokens, lane mcp.json, Brain DB, evidence, transcripts. */
   ninebrainsDataDir: string;
+  /** All of `<userData>` (M4): app settings, other Emdash state, pack secrets. Denied whole. */
+  userDataDir?: string;
   siblingWorktrees?: readonly string[];
   claudeConfigDir?: string;
   codexHome?: string;
   egressAllowedDomains?: readonly string[];
   homeDir?: string;
+  /** The worktree's git dirs (`resolveLaneGitPaths`): their control files are write-denied (T36). */
+  git?: LaneGitPaths;
 }
 
 export interface ClaudeSandboxSettings {
@@ -44,25 +49,63 @@ export interface ClaudeSandboxSettings {
   permissions: { deny: string[] };
 }
 
-/** Credential and config locations every run is denied, relative to home. */
-const HOME_DENY = [
+/**
+ * M4: the one list of secret locations under home. The Claude settings file, the tests gate's
+ * macOS seatbelt profile and its Linux bubblewrap tmpfs mounts all read it, so they can't drift.
+ * `~/.cargo/credentials*` is spelled out as both files Cargo writes.
+ */
+export const SECRET_HOME_PATHS = [
   '.ssh',
   '.aws',
+  '.azure',
   '.config/gcloud',
   '.config/gh',
+  '.config/git/credentials',
+  '.git-credentials',
+  '.kube',
+  '.docker/config.json',
+  '.npmrc',
+  '.pypirc',
+  '.netrc',
+  '.cargo/credentials',
+  '.cargo/credentials.toml',
+  '.gnupg',
   '.codex',
   '.claude/.credentials.json',
   '.claude.json',
-  '.netrc',
-  '.npmrc',
-  '.docker/config.json',
-  '.kube',
-  '.gnupg',
-];
+] as const;
 
-/** Credential locations under `home`, shared with the tests gate's macOS profile (SEC-20). */
+/** Credential locations under `home`. */
 export function credentialDenyPaths(home: string = homedir()): string[] {
-  return HOME_DENY.map((p) => join(home, p));
+  return SECRET_HOME_PATHS.map((p) => join(home, p));
+}
+
+/** Everything a run or the tests gate may never read: the home secrets plus all of `<userData>`. */
+export function secretDenyPaths(input: { homeDir?: string; userDataDir?: string } = {}): string[] {
+  return [
+    ...(input.userDataDir ? [resolve(input.userDataDir)] : []),
+    ...credentialDenyPaths(input.homeDir),
+  ];
+}
+
+/**
+ * T36: the repo files that make git run programs or pick filters: config (fsmonitor, filter
+ * drivers, sshCommand, hooksPath), per-worktree config, `info/attributes`, hooks, and a linked
+ * worktree's `.git` gitfile (which names the git dir, config included). The app runs git against
+ * the repo outside any sandbox, so a lane may not write them. Objects, refs and the index stay
+ * writable, so a lane can still commit.
+ */
+export function gitControlPaths(git: LaneGitPaths): string[] {
+  return [
+    ...new Set([
+      ...(git.gitFile ? [git.gitFile] : []),
+      join(git.commonDir, 'config'),
+      join(git.commonDir, 'config.worktree'),
+      join(git.gitDir, 'config.worktree'),
+      join(git.commonDir, 'info', 'attributes'),
+      join(git.commonDir, 'hooks'),
+    ]),
+  ];
 }
 
 const isInside = (child: string, parent: string): boolean => {
@@ -76,7 +119,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
   const denyRead = [
     resolve(input.ninebrainsDataDir),
     ...(input.siblingWorktrees ?? []).map((p) => resolve(p)),
-    ...credentialDenyPaths(home),
+    ...secretDenyPaths({ homeDir: home, userDataDir: input.userDataDir }),
     ...(input.claudeConfigDir ? [join(resolve(input.claudeConfigDir), '.credentials.json')] : []),
     ...(input.codexHome ? [resolve(input.codexHome)] : []),
   ].filter((p) => p !== worktree);
@@ -86,6 +129,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
   if (clash) throw new Error(`Run directory ${worktree} lies inside a denied path ${clash}`);
 
   const unique = [...new Set(denyRead)];
+  const gitDeny = input.git ? gitControlPaths(input.git) : [];
   const settings: ClaudeSandboxSettings = {
     sandbox: {
       enabled: true,
@@ -97,7 +141,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
         denyRead: unique,
         allowRead: [worktree],
         allowWrite: input.preset === 'worker' ? [worktree] : [],
-        denyWrite: input.preset === 'reviewer' ? [worktree] : [],
+        denyWrite: [...(input.preset === 'reviewer' ? [worktree] : []), ...gitDeny],
       },
     },
     permissions: {
@@ -105,6 +149,7 @@ export function buildClaudeSandboxSettings(input: SandboxSettingsInput): ClaudeS
         ...unique.flatMap((p) => [`Read(/${p}/**)`, `Edit(/${p}/**)`]),
         // A reviewer may not modify even its own disposable checkout.
         ...(input.preset === 'reviewer' ? [`Edit(/${worktree}/**)`] : []),
+        ...gitDeny.flatMap((p) => [`Edit(/${p})`, `Edit(/${p}/**)`]),
       ],
     },
   };

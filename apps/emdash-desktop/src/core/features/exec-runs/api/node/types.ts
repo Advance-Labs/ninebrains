@@ -4,6 +4,7 @@
  * Everything here is data. The supervisor, the argv builders and the stream parsers live in
  * sibling files so the gates slice can import them through this `api/node` surface.
  */
+import type { LaunchRouting } from '@core/features/routing/api/node/launch-env';
 
 export type ExecProvider = 'claude' | 'codex';
 
@@ -13,11 +14,15 @@ export type ExecProvider = 'claude' | 'codex';
  */
 export type ExecPreset = 'worker' | 'reviewer';
 
-export interface McpServerSpec {
-  command: string;
-  args?: readonly string[];
-  env?: Readonly<Record<string, string>>;
-}
+/** One MCP server for a run. Claude takes both kinds; Codex runs take stdio servers only. */
+export type McpServerSpec =
+  | {
+      type?: 'stdio';
+      command: string;
+      args?: readonly string[];
+      env?: Readonly<Record<string, string>>;
+    }
+  | { type: 'http'; url: string; headers?: Readonly<Record<string, string>> };
 
 export interface RunBudgets {
   /** Hard wall-clock limit. The supervisor kills the process group when it passes. */
@@ -58,6 +63,12 @@ export interface ExecRunSpec {
   /** Sandbox network egress allowlist for Claude runs (SEC-32). Omitted: CLI default. */
   egressAllowedDomains?: readonly string[];
   auth?: ProviderAuthEnv;
+  /**
+   * The model route (`routing/api/node/launch-env`): the subscription (default) or a model
+   * profile, plus Lever A's subagent tier. The supervisor turns it into env and Codex config and
+   * checks SEC-39 on the result. Reviewers never set it.
+   */
+  routing?: LaunchRouting;
 }
 
 export interface TokenUsage {
@@ -79,7 +90,15 @@ export const totalTokens = (u: TokenUsage): number =>
 
 /** Provider-neutral view of one stream event. */
 export type AgentEvent =
-  | { kind: 'init'; sessionId?: string; model?: string; version?: string; tools?: string[] }
+  | {
+      kind: 'init';
+      sessionId?: string;
+      model?: string;
+      version?: string;
+      tools?: string[];
+      /** Claude: which credential the CLI resolved (`none` for a login or a gateway token). */
+      apiKeySource?: string;
+    }
   | { kind: 'text'; text: string }
   | { kind: 'tool-use'; id: string; name: string; input: unknown }
   | { kind: 'tool-result'; toolUseId: string; isError: boolean }
@@ -120,7 +139,9 @@ export type ExecRunEndReason =
   | 'tokens'
   | 'cancelled'
   | 'killed'
-  | 'spawn-failed';
+  | 'spawn-failed'
+  /** SEC-41: the CLI's init event named another credential or model than the route. */
+  | 'credential-mismatch';
 
 export interface ExecRunResult {
   runId: string;
@@ -143,6 +164,8 @@ export type ExecRunEvent =
   | { type: 'started'; runId: string; provider: ExecProvider; preset: ExecPreset; pid: number }
   | { type: 'agent'; runId: string; event: AgentEvent }
   | { type: 'budget-exceeded'; runId: string; budget: 'wall-clock' | 'tokens' }
+  /** A security-relevant refusal, for `security_events` once SEC-33 lands (logged until then). */
+  | { type: 'security'; runId: string; kind: 'credential-mismatch'; detail: string }
   | { type: 'finished'; runId: string; result: ExecRunResult }
   | { type: 'stop-latched'; activeRuns: number }
   | { type: 'stop-cleared' };

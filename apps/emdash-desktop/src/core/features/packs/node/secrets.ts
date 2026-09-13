@@ -9,6 +9,17 @@ export interface SecretResolver {
   describeLocation(name: string): string;
 }
 
+/**
+ * Where the settings page stores a pack secret (the OS keychain in the app). Write-only from
+ * the renderer's side: `has` answers set or missing, and nothing here ever returns a value.
+ */
+export interface PackSecretStore {
+  has(name: string): Promise<boolean>;
+  /** Throws when secure storage is unavailable; never falls back to plaintext (SEC-27). */
+  set(name: string, value: string): Promise<void>;
+  clear(name: string): Promise<void>;
+}
+
 export const DEFAULT_SECRET_ENV_PREFIX = 'NINEBRAINS_SECRET_';
 
 /** Reads `NINEBRAINS_SECRET_<NAME>` from an environment. Good for development and CI. */

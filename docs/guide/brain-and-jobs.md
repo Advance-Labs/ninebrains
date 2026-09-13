@@ -14,9 +14,8 @@ The **Brain** is the central coordinator. It holds:
 A **job** is one unit of work routed to one lane. It is not the same as an Emdash task, which is a
 worktree session.
 
-The Brain logic lives in [`@ninebrains/brain-core`](../../packages/brain-core/README.md). Agents
-reach it through [`@ninebrains/brain-mcp`](../../packages/brain-mcp/), a small MCP server that
-every lane runs.
+Agents reach the Brain through `brain-mcp`, a small MCP server that the app starts for every lane.
+It forwards each tool call to the app and holds no data of its own.
 
 ## Job states
 
@@ -76,28 +75,40 @@ When a job is ready, the Brain picks a lane in this order:
    chain.
 4. The least-loaded lane.
 
-<!-- VERIFY-AFTER-P2 -->
 ## Giving the Brain a brief
 
-Open the **Brain drawer** in the Lanes view. The Brain is itself a Claude Code session with the
-Brain's tools in Brain mode. Describe the work; the Brain breaks it into jobs, links their
-dependencies, and hands ready jobs to idle lanes. An unread badge shows new messages, and each
-lane's inbox is visible from the drawer.
+Click **Brain** in the Lanes view's title bar to open the Brain drawer, then click **Start Brain**.
+The Brain is itself a Claude Code session, in a worktree of its own, with the Brain's tools. It
+runs in the project of a lane in the current tab, and it can plan only inside that project.
+
+Type the brief into the Brain's terminal in the drawer. The Brain breaks the work into jobs and
+links their dependencies. The app then hands ready jobs to idle lanes.
+
+The drawer also shows:
+
+- whether dispatch is running, paused or stopped, with a **Pause** / **Resume** button;
+- how many jobs are ready, running, verifying, blocked and done;
+- each lane's unread messages, with a **Message** button to write to a lane;
+- **Replies**, the Brain's own inbox.
 
 ## Dispatch
 
-The dispatcher pairs ready jobs with idle lanes in the same project:
+The dispatcher pairs ready jobs with idle lanes in the same project. It assigns the job first, so
+the lane does not need to call `claim_job`.
 
 - An **attended** lane gets the job pasted into its terminal as a prompt. Ninebrains pastes only
   when the lane is idle, never while it is waiting on a permission prompt, and strips control
-  characters so a job cannot type keystrokes.
-- An **unattended** run starts `claude -p` or `codex exec` with the job on stdin. See
-  [Unattended runs](unattended-runs.md).
+  characters so a job cannot type keystrokes. If the paste does not land, the job goes back to
+  ready.
+- An **unattended** lane runs the job with `claude -p`, with the job on stdin. See
+  [Unattended runs](unattended-runs.md). Lanes are attended by default, and this build has no
+  control to change a lane's mode.
+  <!-- VERIFY: a lane mode picker (attended or unattended) is being added -->
 
 ## Several Brains
 
-You can run more than one Brain session. Replies go back to the Brain that sent the message.
-<!-- /VERIFY -->
+Click **+ Brain** in the drawer to start another Brain session. Each has its own tab in the drawer.
+Messages you send from the drawer go out as the selected Brain, so replies come back to it.
 
 ## Where the data lives
 

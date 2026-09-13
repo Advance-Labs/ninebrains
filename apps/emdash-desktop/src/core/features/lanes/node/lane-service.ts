@@ -1,5 +1,6 @@
 import { err, ok, type Result } from '@emdash/shared';
 import { cell, peek, type Cell } from '@emdash/wire/state';
+import { MODEL_PROFILES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import {
   LANE_SLOT_COUNT,
   SSH_UNSUPPORTED_MESSAGE,
@@ -9,6 +10,7 @@ import {
   type LaneError,
   type LaneEvent,
   type LaneProvider,
+  type LaneRunMode,
   type LaneSession,
   type LanesGridConfig,
   type LaneSlot,
@@ -16,10 +18,12 @@ import {
   type LaneTabConfig,
 } from '../api';
 import type {
+  LaneAgentDetail,
   LaneAgentSnapshot,
   LaneLaunchOverrides,
   LaneProjectInfo,
   LaneServicePorts,
+  LaneUpstreamLaunch,
 } from './lane-ports';
 import { mapLaneSession, mapLaneStatus } from './lane-status';
 
@@ -31,6 +35,11 @@ const EMPTY_SNAPSHOT: LaneAgentSnapshot = { agents: new Map(), sessions: new Map
 function laneError(type: LaneError['type'], message: string): LaneError {
   return { type, message };
 }
+
+const PROFILES_DISABLED = laneError(
+  'routing-disabled',
+  'Model profiles are off in this build, so the lane stays on your subscription.'
+);
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -62,6 +71,8 @@ export class LaneService {
   private saveChain: Promise<void> = Promise.resolve();
   private initializing: Promise<void> | null = null;
   private unsubscribeFeed: (() => void) | null = null;
+  private readonly worktrees = new Map<string, string>();
+  private readonly listeners = new Set<() => void>();
 
   constructor(
     private readonly ports: LaneServicePorts,
@@ -109,11 +120,46 @@ export class LaneService {
   }
 
   /**
-   * Launch hook for `TuiConversationProvider` (SEAMS §3.7). Phase 2 returns the
-   * per-lane `--mcp-config` and env here; Phase 1 leaves launches untouched.
+   * Launch hook for `TuiConversationProvider` (SEAMS §3.7): the Brain returns
+   * the per-lane `--mcp-config`/`--settings` flags. Non-lane conversations and
+   * a service without a Brain launch untouched.
    */
-  resolveLaneLaunch(_conversationId: string): LaneLaunchOverrides | undefined {
-    return undefined;
+  resolveLaneLaunch(
+    conversationId: string,
+    upstream?: LaneUpstreamLaunch
+  ): LaneLaunchOverrides | undefined {
+    if (!this.ports.brain || !upstream) return undefined;
+    const lane = this.findConfigByConversation(conversationId);
+    if (!lane) return undefined;
+    this.worktrees.set(lane.laneId, upstream.cwd);
+    return this.ports.brain.resolveLaunch(lane, upstream);
+  }
+
+  /** Called after every publish (board, lights). Returns an unsubscribe. */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** Re-derives the lights, e.g. after a Brain job changed state. */
+  refresh(): void {
+    this.publish();
+  }
+
+  /** Hook state for a conversation, with the detail the paste rule needs. */
+  agentStateOf(
+    conversationId: string
+  ):
+    | ({ status: NonNullable<ReturnType<LaneAgentSnapshot['agents']['get']>> } & LaneAgentDetail)
+    | undefined {
+    const status = this.snapshot.agents.get(conversationId);
+    if (!status) return undefined;
+    return { status, ...this.snapshot.details?.get(conversationId) };
+  }
+
+  /** The lane's worktree, once a session has been provisioned or launched this run. */
+  worktreePathOf(laneId: string): string | null {
+    return this.worktrees.get(laneId) ?? null;
   }
 
   async createTab(title?: string): Promise<Result<{ tabId: string }, LaneError>> {
@@ -155,8 +201,12 @@ export class LaneService {
     projectId: string;
     provider: LaneProvider;
     model?: string;
+    roleId?: string;
+    subagentModel?: string;
+    authProfileId?: string;
   }): Promise<Result<{ laneId: string }, LaneError>> {
     await this.initialize();
+    if (input.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
     const tab = this.grid.tabs.find((candidate) => candidate.tabId === input.tabId);
     if (!tab) return err(laneError('tab-not-found', 'That tab no longer exists.'));
     if (tab.slots[input.slot]) {
@@ -182,6 +232,9 @@ export class LaneService {
       browserId: `lane-${laneId}`,
       asleep: false,
       conversationReady: false,
+      ...(input.roleId ? { roleId: input.roleId } : {}),
+      ...(input.subagentModel ? { subagentModel: input.subagentModel } : {}),
+      ...(input.authProfileId ? { authProfileId: input.authProfileId } : {}),
     };
     tab.slots[input.slot] = config;
     this.projectNames.set(project.projectId, project.name);
@@ -210,6 +263,7 @@ export class LaneService {
     } catch (error) {
       return err(laneError('stop-failed', messageOf(error)));
     }
+    this.ports.brain?.releaseLaunch(laneId);
     this.setRuntime(laneId, { session: 'stopped', error: null });
     return ok(undefined);
   }
@@ -233,6 +287,17 @@ export class LaneService {
     return this.setAsleep(laneId, false);
   }
 
+  /** Persists how the Brain hands this lane its jobs. Attended is stored as no field. */
+  async setLaneMode(laneId: string, mode: LaneRunMode): Promise<Result<void, LaneError>> {
+    await this.initialize();
+    const location = this.locate(laneId);
+    if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    if (mode === 'unattended') location.config.runMode = 'unattended';
+    else delete location.config.runMode;
+    this.commit();
+    return ok(undefined);
+  }
+
   async removeLane(laneId: string, deleteWorktree: boolean): Promise<Result<void, LaneError>> {
     await this.initialize();
     const location = this.locate(laneId);
@@ -245,8 +310,10 @@ export class LaneService {
         this.ports.onError('lanes: stop on remove failed', error);
       }
     }
+    this.ports.brain?.releaseLaunch(laneId);
     tab.slots[slot] = null;
     this.runtime.delete(laneId);
+    this.worktrees.delete(laneId);
     this.commit();
     this.emit({ type: 'lane-removed', laneId });
     if (deleteWorktree) {
@@ -281,6 +348,32 @@ export class LaneService {
       });
     }
     return ok(undefined);
+  }
+
+  /**
+   * Lever A tier and Lever B auth mode (docs/plans/2026-09-12-model-routing.md). Stored with
+   * the lane and used from its next launch; `null` clears a field. An explicit `inherit` is
+   * kept, so it overrides a role's default.
+   */
+  async setLaneRouting(
+    laneId: string,
+    routing: { subagentModel: string | null; authProfileId: string | null }
+  ): Promise<Result<void, LaneError>> {
+    await this.initialize();
+    if (routing.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
+    const location = this.locate(laneId);
+    if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    const { config } = location;
+    if (routing.subagentModel === null) delete config.subagentModel;
+    else config.subagentModel = routing.subagentModel;
+    if (routing.authProfileId === null) delete config.authProfileId;
+    else config.authProfileId = routing.authProfileId;
+    this.commit();
+    return ok(undefined);
+  }
+
+  private get profilesEnabled(): boolean {
+    return this.ports.modelProfilesEnabled ?? MODEL_PROFILES_ENABLED;
   }
 
   private async load(): Promise<void> {
@@ -341,6 +434,10 @@ export class LaneService {
     try {
       const provisioned = await this.ports.tasks.provision(initial.config.taskId);
       if (!provisioned.success) return this.failStart(laneId, provisioned.error);
+      this.worktrees.set(laneId, provisioned.data.path);
+      await this.ports.brain
+        ?.prepareLaunch(initial.config)
+        .catch((error: unknown) => this.ports.onError('lanes: Brain launch prep failed', error));
       // Re-read: the lane may have moved or been removed while provisioning.
       const location = this.locate(laneId);
       if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
@@ -391,6 +488,14 @@ export class LaneService {
     this.publish();
   }
 
+  private findConfigByConversation(conversationId: string): LaneConfig | undefined {
+    for (const tab of this.grid.tabs) {
+      const lane = tab.slots.find((candidate) => candidate?.conversationId === conversationId);
+      if (lane) return lane;
+    }
+    return undefined;
+  }
+
   private locate(laneId: string): LaneLocation | undefined {
     for (const tab of this.grid.tabs) {
       const slot = tab.slots.findIndex((lane) => lane?.laneId === laneId);
@@ -437,13 +542,16 @@ export class LaneService {
         title: tab.title,
         slots: tab.slots.map((config, slot) => {
           if (!config) return null;
+          const override = this.ports.brain?.override(config.laneId);
           const status = mapLaneStatus({
             asleep: config.asleep,
             agent: this.snapshot.agents.get(config.conversationId),
+            job: override?.job,
           });
           statuses[config.laneId] = status;
           return {
             ...config,
+            ...(override?.activeJobId ? { activeJobId: override.activeJobId } : {}),
             tabId: tab.tabId,
             slot: slot as LaneSlot,
             session: this.sessionOf(config),
@@ -457,5 +565,12 @@ export class LaneService {
     };
     this.board.set(board);
     this.statuses.set(statuses);
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.ports.onError('lanes: change listener failed', error);
+      }
+    }
   }
 }

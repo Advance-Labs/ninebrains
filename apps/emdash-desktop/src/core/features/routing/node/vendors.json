@@ -1,0 +1,83 @@
+{
+  "comment": "SEC-44 vendor allowlist. Only vendors reviewed in docs/research/VENDORS.md (R0, SAFE) or first-party APIs ship here. A profile's base URL host must be in its vendor's hosts; users may add only loopback local profiles. Adding a vendor needs a VENDORS.md review first.",
+  "vendors": [
+    {
+      "id": "anthropic",
+      "label": "Anthropic API",
+      "kinds": ["anthropic-api"],
+      "protocols": ["anthropic"],
+      "hosts": ["api.anthropic.com"],
+      "baseUrls": { "anthropic": "https://api.anthropic.com" },
+      "docsUrl": "https://code.claude.com/docs/en/llm-gateway",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "First-party. The user's own Anthropic API key, billed per token."
+    },
+    {
+      "id": "openai",
+      "label": "OpenAI API",
+      "kinds": ["openai-api"],
+      "protocols": ["openai-responses"],
+      "hosts": ["api.openai.com"],
+      "baseUrls": { "openai-responses": "https://api.openai.com/v1" },
+      "docsUrl": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "First-party. The user's own OpenAI API key, for Codex."
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter",
+      "kinds": ["anthropic-compatible"],
+      "protocols": ["anthropic"],
+      "hosts": ["openrouter.ai"],
+      "baseUrls": { "anthropic": "https://openrouter.ai/api" },
+      "docsUrl": "https://openrouter.ai/docs/guides/guides/claude-code-integration",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "VENDORS.md §2.5: SAFE for the Anthropic protocol with paid models. Its Responses API is beta (REVIEW), and :free models are REVIEW."
+    },
+    {
+      "id": "fireworks",
+      "label": "Fireworks AI",
+      "kinds": ["anthropic-compatible"],
+      "protocols": ["anthropic"],
+      "hosts": ["api.fireworks.ai"],
+      "baseUrls": { "anthropic": "https://api.fireworks.ai/inference" },
+      "docsUrl": "https://docs.fireworks.ai/tools-sdks/anthropic-compatibility",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "VENDORS.md §2.8: SAFE for the Anthropic protocol (Bearer auth). Model ids are accounts/fireworks/models/..., so set the tier models. Responses stores data by default (REVIEW)."
+    },
+    {
+      "id": "ollama",
+      "label": "Ollama (this machine)",
+      "kinds": ["local"],
+      "protocols": ["anthropic", "openai-responses"],
+      "hosts": ["127.0.0.1", "localhost"],
+      "baseUrls": {
+        "anthropic": "http://127.0.0.1:11434",
+        "openai-responses": "http://127.0.0.1:11434/v1"
+      },
+      "docsUrl": "https://docs.ollama.com/api/anthropic-compatibility",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "VENDORS.md §3: v0.14.0+ for Claude Code, v0.13.3+ for Codex. A preset only; any loopback URL is allowed for local profiles."
+    },
+    {
+      "id": "lmstudio",
+      "label": "LM Studio (this machine)",
+      "kinds": ["local"],
+      "protocols": ["anthropic", "openai-responses"],
+      "hosts": ["127.0.0.1", "localhost"],
+      "baseUrls": {
+        "anthropic": "http://127.0.0.1:1234",
+        "openai-responses": "http://127.0.0.1:1234/v1"
+      },
+      "docsUrl": "https://lmstudio.ai/docs/developer/anthropic-compat",
+      "termsUrl": null,
+      "reviewedAt": "2026-09-12",
+      "note": "VENDORS.md §3: 0.4.1+ for Claude Code, 0.3.29+ for Codex. A preset only."
+    }
+  ]
+}

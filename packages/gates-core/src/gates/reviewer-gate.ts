@@ -42,16 +42,30 @@ export interface ReviewerGateOptions {
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}$/;
 
 /**
- * Repository config is writable by the lane, so stop it from running programs
- * during a diff (fsmonitor hooks, external diff drivers, pagers).
+ * Repository config may be writable by the lane, so stop it from running
+ * programs during a diff: a lazy fetch of a missing object through a promisor
+ * remote and its `core.sshCommand` (T32), fsmonitor hooks, external diff
+ * drivers, pagers. The gate puts these before every git call it makes,
+ * including a caller's `diffArgs`. git older than 2.44 rejects
+ * `--no-lazy-fetch`, so there the gate fails closed. `protocol.allow=never`
+ * would not do instead: a repo-level `protocol.ssh.allow=always` overrides it.
  */
-const SAFE_GIT = ['-c', 'core.fsmonitor=false', '-c', 'diff.external=', '-c', 'core.pager=cat'];
+const SAFE_GIT = [
+  '--no-lazy-fetch',
+  '-c',
+  'core.fsmonitor=false',
+  '-c',
+  'diff.external=',
+  '-c',
+  'core.pager=cat',
+];
 
+/** The diff subcommand; the gate adds its hardening flags in front. */
 export function defaultDiffArgs(_job: GateJob, base: string): string[] {
-  return [...SAFE_GIT, 'diff', '--no-ext-diff', '--no-textconv', '--no-color', base, '--'];
+  return ['diff', '--no-ext-diff', '--no-textconv', '--no-color', base, '--'];
 }
 
-const DEFAULT_UNTRACKED_ARGS = [...SAFE_GIT, 'ls-files', '--others', '--exclude-standard'];
+const DEFAULT_UNTRACKED_ARGS = ['ls-files', '--others', '--exclude-standard'];
 
 const FOCUS: Record<ReviewFocus, string> = {
   general:
@@ -71,6 +85,46 @@ const fail = (feedback: string, evidence: GateResult['evidence'] = []): GateResu
   feedback,
 });
 
+/** A filter driver name that is safe inside `-c filter.<name>.<key>=`. */
+const DRIVER = /^[A-Za-z0-9._-]{1,128}$/;
+
+type Git = (argv: string[]) => ReturnType<GateContext['capabilities']['runCommand']>;
+
+/**
+ * T31. `git diff` against the checkout's files runs each changed file's `clean`
+ * filter, and `.gitattributes` is lane-written. git has no switch that turns
+ * every filter off, so read the drivers the config defines (`git config` runs
+ * no filter) and blank each one, the same rule as the app's review checkout.
+ * Fails closed on an unreadable config or an odd name.
+ *
+ * The listing and the diff are two git processes, so this holds only if the
+ * lane cannot change the checkout's config in between (T33). The app's
+ * checkout is its own repository for that reason. A `prepareReviewCheckout`
+ * that hands out a linked worktree of the lane repo reopens the race.
+ */
+async function filterDriverOverrides(git: Git): Promise<string[]> {
+  const listed = await git(['config', '--null', '--name-only', '--get-regexp', '^filter\\.']);
+  if (listed.exitCode === 1) return []; // no filter.* keys
+  if (listed.exitCode !== 0) {
+    throw new Error(`git config exited with ${listed.exitCode}.\n${tailLines(listed.stderr, 5)}`);
+  }
+  const names = new Set(
+    listed.stdout
+      .split('\0')
+      .filter(Boolean)
+      .map((key) => key.slice('filter.'.length, key.lastIndexOf('.')))
+  );
+  const flags: string[] = [];
+  for (const name of names) {
+    if (!DRIVER.test(name)) {
+      throw new Error(`Refusing a repo with filter driver ${JSON.stringify(name)}.`);
+    }
+    for (const key of ['smudge', 'clean', 'process']) flags.push('-c', `filter.${name}.${key}=`);
+    flags.push('-c', `filter.${name}.required=false`);
+  }
+  return flags;
+}
+
 export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
   const id = options.id ?? 'reviewer';
   const title = options.title ?? 'Reviewer';
@@ -79,12 +133,18 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
   const diffArgs = options.diffArgs ?? defaultDiffArgs;
 
   async function review(ctx: GateContext, checkout: ReviewCheckout, base: string) {
-    const git = (argv: string[]) =>
-      ctx.capabilities.runCommand('git', { argv, cwd: checkout.path, signal: ctx.signal });
+    const run: Git = (argv) =>
+      ctx.capabilities.runCommand('git', {
+        argv: [...SAFE_GIT, ...argv],
+        cwd: checkout.path,
+        signal: ctx.signal,
+      });
 
     let diff: string;
     let untracked = '';
     try {
+      const hardening = await filterDriverOverrides(run);
+      const git: Git = (argv) => run([...hardening, ...argv]);
       const result = await git(diffArgs(ctx.job, base));
       if (result.exitCode !== 0) {
         return fail(

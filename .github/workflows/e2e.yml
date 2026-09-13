@@ -1,0 +1,84 @@
+name: E2E
+
+# Ninebrains-only (docs/UPSTREAM-PATCHES.md). Reusable: ci.yml calls it on the run-e2e label, the
+# weekly schedule, pushes to release/** and manual runs; release.yml calls it before building.
+# It launches the built Electron app under xvfb with the fake agent (tooling/fake-agent), an
+# isolated profile and a temp HOME, so no real credits are spent and no real keychain is touched.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: electron (xvfb)
+    # 22.04, like the release build: 24.04 restricts unprivileged user namespaces, which Electron's
+    # sandbox needs.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # zsh: the harness launches the app with SHELL=/bin/zsh.
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsecret-1-dev pkg-config xvfb zsh
+
+      # Full install with lifecycle scripts: the app needs Electron and Electron-built natives.
+      - name: Setup build environment
+        uses: ./.github/actions/setup-build
+
+      # The renderer build runs out of the default ~2 GB heap on the runner (same as release.yml).
+      - name: Build workspace
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm run build
+
+      # postinstall skips the Electron-ABI rebuild when CI is set, so better-sqlite3 is still built
+      # for system Node here and the app boots into its recovery window. Rebuild it for Electron.
+      - name: Rebuild native modules for Electron
+        working-directory: apps/emdash-desktop
+        run: pnpm run rebuild
+
+      # The tests gate refuses to run without an OS sandbox on Linux (SEC-20), and brain-fanout and
+      # self-heal both reach it. Same install and smoke test as ci.yml's desktop-spawn shard.
+      - name: Install bubblewrap for the tests-gate sandbox
+        run: |
+          sudo apt-get install -y -q bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          bwrap --ro-bind / / --unshare-net --die-with-parent true
+          echo "bubblewrap $(bwrap --version) works"
+
+      # Each suite gets a hard timeout. The built app stays in the tray after its window closes, so
+      # Playwright's app.close() can hang (docs/FORK.md); exit 124 means that, not a failed check.
+      - name: Run e2e suites
+        working-directory: apps/emdash-desktop
+        run: |
+          status=0
+          for suite in lanes-smoke brain-fanout self-heal; do
+            echo "::group::$suite"
+            if timeout --kill-after=30s 10m xvfb-run -a --server-args="-screen 0 1920x1080x24" node "e2e/$suite.e2e.mjs"; then
+              echo "$suite: pass"
+            else
+              rc=$?
+              if [ "$rc" -eq 124 ]; then
+                echo "::error title=e2e $suite::timed out after 10 min (a hung app.close() on the tray process shows up this way)"
+              else
+                echo "::error title=e2e $suite::exited $rc"
+              fi
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-evidence
+          path: |
+            /tmp/ninebrains-e2e-*/**/*.png
+            /tmp/ninebrains-e2e-*/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7

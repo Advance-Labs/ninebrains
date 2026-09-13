@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { subagentModelSchema } from '@core/features/routing/api';
 
 /**
  * `pack.json` — a discipline pack: lane roles, skills, MCP servers and gates.
@@ -97,6 +98,8 @@ export const roleSchema = z.strictObject({
   systemPrompt: z.string().trim().min(20).max(20_000),
   provider: z.enum(['claude', 'codex']).optional(),
   model: text(80).optional(),
+  /** Lever A default for lanes in this role: their subagents' model. A lane's own choice wins. */
+  subagentModel: subagentModelSchema.optional(),
   gates: z.array(z.string().regex(GATE_ID)).max(10),
 });
 export type PackRole = z.infer<typeof roleSchema>;

@@ -22,7 +22,8 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * The docs are written to read correctly on GitHub first, so they link to each other with real
  * relative paths (`gates.md`, `../THREAT-MODEL.md`) and out to source (`../../packages/gates-core`).
  * Rewrite both at build time: a published doc becomes its site route (with the trailing slash
- * Astro emits), and anything else becomes the file on GitHub.
+ * Astro emits), and anything else becomes the file on GitHub. The repo is private, so those GitHub
+ * links 404 for readers: `scripts/check-links.mjs` fails the build on any of them.
  *
  * Astro caches rendered entries, so editing this function alone does not change the output. The
  * build script clears `.astro` for that reason.
@@ -107,6 +108,9 @@ export default defineConfig({
           items: [
             { label: 'Overview', slug: 'index' },
             { label: 'Getting started', slug: 'getting-started' },
+            { label: 'Install from source', slug: 'install-from-source' },
+            { label: 'First run', slug: 'first-run' },
+            { label: 'Verify and open a download', slug: 'verify-download' },
           ],
         },
         {
@@ -119,6 +123,15 @@ export default defineConfig({
             { label: 'Packs', slug: 'packs' },
             { label: 'Unattended runs', slug: 'unattended-runs' },
             { label: 'Accounts', slug: 'accounts' },
+            { label: 'Everyday workflow', slug: 'ide-workflow' },
+            { label: 'Keyboard shortcuts', slug: 'keyboard-shortcuts' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'Configuration', slug: 'configuration' },
+            { label: 'Files outside the data folder', slug: 'files-outside-data-folder' },
             { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],
         },
@@ -132,7 +145,10 @@ export default defineConfig({
         },
         {
           label: 'Contributing',
-          items: [{ label: 'Architecture', slug: 'architecture' }],
+          items: [
+            { label: 'Architecture', slug: 'architecture' },
+            { label: 'Contributing', slug: 'contributing' },
+          ],
         },
       ],
     }),
