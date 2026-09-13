@@ -34,6 +34,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm run build
 
+      # postinstall skips the Electron-ABI rebuild when CI is set, so better-sqlite3 is still built
+      # for system Node here and the app boots into its recovery window. Rebuild it for Electron.
+      - name: Rebuild native modules for Electron
+        working-directory: apps/emdash-desktop
+        run: pnpm run rebuild
+
       # Each suite gets a hard timeout. The built app stays in the tray after its window closes, so
       # Playwright's app.close() can hang (docs/FORK.md); exit 124 means that, not a failed check.
       - name: Run e2e suites
