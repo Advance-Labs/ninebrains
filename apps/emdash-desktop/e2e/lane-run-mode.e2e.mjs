@@ -43,13 +43,16 @@ async function main() {
     await page.waitForFunction(
       (slot) =>
         document
-          .querySelector(`[data-testid="lane-cell"][data-slot="${slot}"] [data-testid="lane-run-mode"]`)
+          .querySelector(
+            `[data-testid="lane-cell"][data-slot="${slot}"] [data-testid="lane-run-mode"]`
+          )
           ?.getAttribute('data-mode') === 'unattended',
       0,
       { timeout: LONG }
     );
     const badgeText = await runModeButton(page, 0).textContent();
-    if (!badgeText?.includes('Unattended')) throw new Error(`expected an Unattended badge, got ${badgeText}`);
+    if (!badgeText?.includes('Unattended'))
+      throw new Error(`expected an Unattended badge, got ${badgeText}`);
     step(`lane is unattended (badge: "${badgeText.trim()}")`);
 
     step('switching back to attended needs no confirmation');
@@ -57,7 +60,9 @@ async function main() {
     await page.waitForFunction(
       (slot) =>
         document
-          .querySelector(`[data-testid="lane-cell"][data-slot="${slot}"] [data-testid="lane-run-mode"]`)
+          .querySelector(
+            `[data-testid="lane-cell"][data-slot="${slot}"] [data-testid="lane-run-mode"]`
+          )
           ?.getAttribute('data-mode') === 'attended',
       0,
       { timeout: LONG }

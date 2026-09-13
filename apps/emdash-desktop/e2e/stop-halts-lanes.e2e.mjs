@@ -51,7 +51,9 @@ async function main() {
     await setTestCommand(page, TEST_COMMAND);
     await openLanes(page);
     await addLane(page, 0);
-    await page.locator('[data-testid="lane-cell"][data-slot="0"] .xterm').waitFor({ timeout: LONG });
+    await page
+      .locator('[data-testid="lane-cell"][data-slot="0"] .xterm')
+      .waitFor({ timeout: LONG });
     await until(
       'the lane launch config',
       () => launchConfigs(userData).filter((c) => !c.dir.startsWith('brain-')).length === 1
@@ -92,9 +94,14 @@ async function main() {
       body: 'Only runs after Clear STOP and the lane is restarted.',
     });
     await sleep(3_000);
-    const [stateA, stateB] = await Promise.all([jobState(brain, jobA.id), jobState(brain, jobB.id)]);
+    const [stateA, stateB] = await Promise.all([
+      jobState(brain, jobA.id),
+      jobState(brain, jobB.id),
+    ]);
     if (stateA !== 'ready' || stateB !== 'ready')
-      throw new Error(`both jobs should stay ready while STOP is latched, got A=${stateA} B=${stateB}`);
+      throw new Error(
+        `both jobs should stay ready while STOP is latched, got A=${stateA} B=${stateB}`
+      );
     step('confirmed: both jobs stayed ready, dispatch is latched');
 
     step('clicking Clear STOP');
