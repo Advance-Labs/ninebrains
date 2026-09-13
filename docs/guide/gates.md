@@ -73,7 +73,6 @@ them away. Packs add their own defaults, such as the SEO pack's `seo-evidence` g
 
 Set rigor in **Settings → Gates**. The app can also hold a per-project override, but there is no
 control for it in this build.
-<!-- VERIFY: a per-project rigor override in the app is being added -->
 
 ## Test command
 
@@ -120,9 +119,10 @@ requests, or a difference from the baseline above 1% fail the gate before any re
 If the page is clean, a separate reviewer looks at the screenshots and gives a JSON verdict.
 
 The app captures the lane's own browser through the Chrome DevTools Protocol, attached only to that
-lane's registered browser. If DevTools is open on that browser, the capture fails with "gate
-skipped: devtools open", and the gate fails. Unattended runs use an offscreen window on the same
-browser partition.
+lane's registered browser. If DevTools is open on that browser (or another debugger is attached),
+the capture fails with "gate skipped: devtools open", and the job is blocked as a setup problem
+instead of spending a self-heal attempt on something the worker can't fix. Unattended runs use an
+offscreen window on the same browser partition.
 
 The gate needs the lane's preview URL. If no dev server is running for the lane, the gate fails
 with "No preview URL for this lane". See

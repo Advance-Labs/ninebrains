@@ -23,7 +23,6 @@ each rigor level attaches.
 
 Each project can hold these values. Set `testCommand` in **Settings → Gates → Tests**. The rigor
 overrides cannot be set in this build.
-<!-- VERIFY: a per-project rigor override is being added -->
 
 | Field | Meaning |
 |---|---|
@@ -38,7 +37,6 @@ With no `testCommand`, the tests gate reports a setup problem and the job is blo
 
 The tests gate reads two per-project options. Both default to off, and neither can be set in this
 build.
-<!-- VERIFY: the tests-gate project settings are being wired -->
 
 | Option | When on |
 |---|---|

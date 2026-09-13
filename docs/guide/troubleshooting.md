@@ -51,8 +51,8 @@ The screenshot gate attaches to the lane's browser through the Chrome DevTools P
 DevTools is open on that browser, it cannot attach, so it reports the capture as skipped and the
 gate fails. The same happens with "another debugger is attached to the lane browser".
 
-Close DevTools on the lane's browser. The failed check counts as one of the job's three attempts,
-so the lane gets the feedback and completes again.
+Like a missing test command, this is a setup problem: the job is blocked at once and no attempt is
+used. Close DevTools (or the other debugger) on the lane's browser, then requeue the blocked job.
 
 ### The screenshot gate says "No preview URL"
 
