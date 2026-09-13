@@ -87,6 +87,15 @@ export class RigorResolver {
     return { ...(this.projects.get(projectId) ?? EMPTY_PROJECT_PREFS) };
   }
 
+  /**
+   * `testsGate.allowNetwork` / `testsGate.allowUnsandboxed` for `createRunCommand`'s
+   * `projectSettings` hook. Both default to false; only Settings → Gates sets them (SEC-08).
+   */
+  testsGateSettingsFor(projectId: string): { allowNetwork: boolean; allowUnsandboxed: boolean } {
+    const prefs = this.projectPrefs(projectId);
+    return { allowNetwork: prefs.allowNetwork, allowUnsandboxed: prefs.allowUnsandboxed };
+  }
+
   async setProjectPrefs(projectId: string, prefs: ProjectGatePrefs): Promise<void> {
     await this.deps.prefs.set(projectId, prefs);
     this.projects.set(projectId, { ...prefs });

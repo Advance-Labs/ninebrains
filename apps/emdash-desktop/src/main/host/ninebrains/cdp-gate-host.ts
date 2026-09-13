@@ -18,7 +18,12 @@
  * - Every command has its own deadline, so a target that never answers fails
  *   this capture instead of holding the whole gate until its time limit.
  */
-import type { FailedRequest, ScreenshotCapture, Viewport } from '@emdash/gates-core';
+import {
+  GatePreconditionError,
+  type FailedRequest,
+  type ScreenshotCapture,
+  type Viewport,
+} from '@emdash/gates-core';
 import type { LaneBrowserTarget, ScreenshotHost } from '@core/features/gates/node/runner/ports';
 
 export interface CdpDebuggerLike {
@@ -60,7 +65,12 @@ export interface CdpGateHostDeps {
   commandTimeoutMs?: number;
 }
 
-export class GateSkippedError extends Error {
+/**
+ * A `GatePreconditionError`: this reason is an environment state (DevTools
+ * open, another debugger attached), never something the worker's change can
+ * fix, so the screenshot gate must not spend a self-heal attempt on it.
+ */
+export class GateSkippedError extends GatePreconditionError {
   constructor(reason: string) {
     super(`gate skipped: ${reason}`);
     this.name = 'GateSkippedError';

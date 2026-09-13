@@ -90,7 +90,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `.github/ISSUE_TEMPLATE/config.yml` | Links → our repo | |
 | `package.json` (root), `tooling/scripts/check.mjs` | `licenses` script, added to `pnpm check` | Licence gate (task 0.4) |
 | `tooling/scripts/check.mjs`, `package.json` (root) | `check` runs `format:check` (was `format`, which rewrote files) and the new `test:tooling` step; `--write` / `check:write` restores the writing mode; `test:tooling` script runs the node tests in `tooling/scripts`, `tooling/fake-agent/test` and `scripts/release`; `hooks:install`, `merge`, `require-green`, `labels:sync` and `release:prepare` scripts for the merge guard and releases (W7 CI) | `pnpm run check` now matches what CI runs and never edits the tree, so a green local check means a green `static` job |
-| `README.md` | Replaced with a short Ninebrains placeholder; later (`53253af4c`, W7 docs) the feature list and quick start corrected to match the code: unwired features listed as "in the code, not yet reachable from the app", a "Set up gates" step, and the Brain started from the Lanes title bar | The README must not claim what the app cannot do yet |
+| `README.md` | Replaced with a short Ninebrains placeholder; later (`53253af4c`, W7 docs) the feature list and quick start corrected to match the code: unwired features listed as "in the code, not yet reachable from the app", a "Set up gates" step, and the Brain started from the Lanes title bar; later still (W7 `w7/testsgate-prefs`) the "not yet reachable" list was retired, since the Planner, lane roles and modes and the per-project rigor override all have entry points now | The README must not claim what the app cannot do yet |
 | `apps/emdash-desktop/vitest.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI`; new `node-spawn` project (`maxWorkers: 2`, `sequence.groupOrder: 1`) takes the spawn-heavy suites out of `node`; `browser` gets `testTimeout: 15_000` and `optimizeDeps.include` for the JSX runtime (W7 CI) | CI can run real-browser tests. Spawn-heavy suites (gates capabilities, exec-runs, brain stop/unattended, override-launch) get less contention instead of looser deadlines (SEC-30 keeps its 5 s). The late JSX-runtime discovery reloaded Vite mid-run and failed browser tests |
 | `packages/chat-ui/vite.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI` (W7 CI) | Same switch as the desktop app |
 | `CONTRIBUTING.md` | "Before you open a PR" rewritten (non-mutating `check`, `hooks:install`, browser-test switches); new "Sign your commits (DCO)", "CI and merging" and "End-to-end tests" sections; commands list and security section updated (W7 CI) | The old text said CI ran checks on PRs, which was false, and had no DCO, merge flow or e2e guidance |
@@ -294,6 +294,30 @@ Ninebrains files also touched: brain-core `types.ts` and `protocol/{ops,execute,
 `planner/node/{ports,brain-plan-target,planner-service}.ts`, `brain/api/contract.ts`,
 `brain/node/brain-service.ts`, `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`,
 `e2e/{harness,brain-fanout.e2e,self-heal.e2e}.mjs`.
+
+## 16. Tests-gate project settings (W7 `w7/testsgate-prefs`)
+
+The only upstream (forked-from-Emdash) file changed is `README.md`, logged in its §4 row. `gates/**`
+(beyond `capabilities/`) and `main/bootstrap/boot/ninebrains/**` are already Ninebrains-only (§ New
+Ninebrains-only files below), so the feature itself landed entirely inside files this fork owns:
+
+- `gates/api/contract.ts`: `gatesProjectPrefsViewSchema` gains `rigorLevel`, `allowNetwork`,
+  `allowUnsandboxed`; new `setProjectSettings` op.
+- `gates/node/project-prefs-service.ts`: `setProjectSettings`, and `getProjectPrefs`/
+  `setTestCommand` now also return the new fields.
+- `gates/node/wire-controller.ts`: wires `setProjectSettings` into the existing `gates` domain
+  controller (no new domain registration, so `manifests/*` needed no change this time).
+- `gates/node/rigor/project-prefs.ts`, `gates/contributions/mementos.ts`: `ProjectGatePrefs` and
+  its memento schema gain `allowNetwork`/`allowUnsandboxed`, both defaulting to false. The memento
+  bumps to schema version '2' with a real `up()` migration (not a same-version `.default(false)`)
+  so a v1 row stored before this change still reads both flags as strictly `false` in production
+  (2026-09-13 security-review fix; SEC-08, `gates/node/rigor/project-prefs-schema.test.ts`).
+- `gates/node/rigor/rigor.ts`: `RigorResolver.testsGateSettingsFor(projectId)`.
+- `gates/browser/{test-command-section,gates-settings-view}.tsx`: the rigor-override select and
+  the two warning-labelled toggles in Settings → Gates.
+- `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`: `createRunCommand`'s
+  `projectSettings` hook now resolves the running job's lane worktree to a project id and reads
+  `rigor.testsGateSettingsFor` (was previously unwired, so the opt-ins were unreachable).
 
 ## New Ninebrains-only files
 

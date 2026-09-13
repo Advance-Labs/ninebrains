@@ -101,9 +101,8 @@ the lane does not need to call `claim_job`.
   characters so a job cannot type keystrokes. If the paste does not land, the job goes back to
   ready.
 - An **unattended** lane runs the job with `claude -p`, with the job on stdin. See
-  [Unattended runs](unattended-runs.md). Lanes are attended by default, and this build has no
-  control to change a lane's mode.
-  <!-- VERIFY: a lane mode picker (attended or unattended) is being added -->
+  [Unattended runs](unattended-runs.md). Lanes are attended by default; switch a lane's mode with
+  the hand icon in its header.
 
 ## Several Brains
 

@@ -15,9 +15,7 @@ Ninebrains starts the CLI in print mode and reads its event stream:
 Unattended runs carry out the reviewer side of verification gates. They can also carry out
 Brain-dispatched work, for a lane set to unattended mode. In this build, both use Claude Code.
 
-Lanes are attended by default. A lane's mode is kept in memory, so a restart makes every lane
-attended again. There is no control in the app to switch a lane to unattended yet.
-<!-- VERIFY: a lane mode picker (attended or unattended) is being added -->
+Lanes are attended by default. A lane's mode is saved with the lane, so it survives a restart.
 
 ## Making a lane unattended
 

@@ -5,9 +5,8 @@ description: >-
   modules that group nodes. Run plan compiles it into Brain jobs, idempotently and without cycles.
 ---
 
-The planner is a canvas for one project's plan. This build has no menu item or command that opens
-it yet.
-<!-- VERIFY: an entry point for the planner is being added -->
+The planner is a canvas for one project's plan. Open it with the **Planner** button in the Lanes
+view's title bar, or the **Open Planner** command in the command palette.
 
 On the canvas:
 

@@ -19,6 +19,15 @@ Updated 2026-09-12 after a security review of the daily-use commits (branch `w7/
 Pack secrets, the unattended toggle and role prompts hold. One finding is fixed: T37 (Clear STOP
 resumed a dispatcher the user had paused). SEC-27 now has its at-rest scan.
 
+Updated 2026-09-13 (branch `w7/testsgate-prefs`): R11 and R12's `testsGate.allowNetwork` /
+`allowUnsandboxed` opt-ins are wired to real per-project storage and a Settings → Gates UI for the
+first time (SEC-08). Not a new finding: the gap those risks accepted was previously unreachable
+(always false), so this only makes the documented, accepted risk real and user-controllable. A
+same-day independent security review of that change found one finding, fixed the same day: the
+project-prefs memento stayed at schema version '1', so a row stored before this change could read
+the two new flags as `undefined` rather than `false` in a production build (never exploited; see
+SEC-08).
+
 Inputs: plan `2026-09-10-oss-agent-workbench.md` (D5, D6, Phase 6), `docs/SEAMS.md` (§3.6–3.8,
 §3.12–3.14, §3.16–3.17), `brain-remediation-spec.md` (a real RCE in our earlier voice orchestrator),
 the `gates-core` and `citations` READMEs, the brain-core/brain-mcp checkpoint (`06f5d8284`), and the
@@ -191,6 +200,33 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   set any kind; a Brain-written planner draft that declares a weaker kind is refused.
   Tests `SEC-08 agents cannot declare a weaker kind` (brain and lane tokens, each weaker kind →
   FORBIDDEN) and `SEC-08 ui kind adds the screenshot floor`.
+  **Extended 2026-09-13 (W7 testsgate-prefs):** the project rigor override and the tests-gate
+  sandbox opt-outs (`testsGate.allowNetwork`, `testsGate.allowUnsandboxed`, R11/R12) are the same
+  boundary. They live in the gates project-prefs memento behind `setProjectSettings`, a Settings →
+  Gates wire-rpc op (`apps/emdash-desktop/.../gates/api/contract.ts`) registered only in the
+  renderer controller manifest (`manifests/shared/domain-contracts.ts`,
+  `manifests/node/controllers.ts`); it has no counterpart in brain-core's `BrainOp` vocabulary
+  (`LANE_OPS`/`BRAIN_OPS`/`SESSION_OPS`, `packages/brain-core/src/protocol/ops.ts`), so no lane or
+  Brain token can reach it, structurally, not by a runtime check. Both flags default to false; the
+  UI shows a destructive-toned warning next to each toggle before it can be turned on. The rigor
+  override is a single 0-10 level applied to both the testing and security sliders together (the
+  independent per-slider override the store already supported stays reachable programmatically,
+  just not from this UI). `createRunCommand`'s `projectSettings` hook now reads the running
+  project's prefs through `RigorResolver.testsGateSettingsFor`, resolved from the job's lane
+  worktree, not from a job record.
+  Test `SEC-08: agent identities cannot reach this service` (`project-prefs-service.test.ts`) pins
+  that the three project-prefs ops have no `BrainOp` counterpart.
+  **Fixed 2026-09-13 (independent security review):** `gatesProjectPrefsSchema` stayed at version
+  '1' when the two flags were added, only as `.default(false)` on the schema. `VersionedSchema`
+  only validates a resolved version's own schema in dev (`versioned-schema.ts`); a v1 row already
+  at the latest version takes a fast path with no schema validation at all in production, so a
+  memento stored before this change would read back with both flags `undefined`, not `false`
+  (never exploited — every consumer checks `=== true`/`!== true` strictly). Fixed by bumping the
+  memento to version '2' with a real `up()` migration that sets both fields explicitly
+  (`gates/contributions/mementos.ts`); a v1 row is then never "already at the latest version", so
+  the migration runs in dev and production alike, independent of `isDevMode()`.
+  Test `SEC-08: a legacy v1 row reads with both flags strictly false in production`
+  (`gates/node/rigor/project-prefs-schema.test.ts`), run with `NODE_ENV=production`.
 - **SEC-09 Messages are data.** `read_inbox` returns JSON with `from` on every message; the dispatcher
   never concatenates inbox bodies into a lane's instructions. Messages from lanes to a Brain are
   marked `untrusted: true`.
@@ -558,8 +594,8 @@ has its `argv` option. Item 9: the app's `fetchText` pins at connect time with `
 | R8 | Unsigned builds, verified by checksums and attestations only. | No signing spend yet (plan §9 Q4). | 7.1 |
 | R9 | Lanes share one OS user, so there is no kernel-level isolation between lanes. | Containers or VMs per lane are out of v0.1 scope. | v0.3 |
 | R10 | Pack MCP servers launch with `npx` at an exact version but no integrity check, so a compromised registry or package mirror could serve different code for the same version (SEC-26 not met). | Bundled packs only, pinned exact versions, no `@latest`. App-owned installs with `--ignore-scripts` and an integrity hash are not built yet. | Phase 5 follow-up |
-| R11 | A project that sets `testsGate.allowUnsandboxed` runs its tests gate with no OS sandbox on Linux without bubblewrap and on Windows. Lane-controlled scripts then run as the user with only the scrubbed env, the timeout, the group or tree kill and the output cap. They can read the user's files and reach the network. | Explicit per-project opt-in (default off). Without it, the gate refuses: "tests gate needs a sandbox (install bubblewrap) or an explicit per-project opt-in". | when a Windows sandbox is available |
-| R12 | With `testsGate.allowNetwork`, the tests gate reaches the network. Without it, loopback stays open for dev servers, so tests can reach local services, including the Brain endpoint. | The endpoint still needs a token, and failed auth is rate-limited before any token is resolved (L3). | — |
+| R11 | A project that sets `testsGate.allowUnsandboxed` runs its tests gate with no OS sandbox on Linux without bubblewrap and on Windows. Lane-controlled scripts then run as the user with only the scrubbed env, the timeout, the group or tree kill and the output cap. They can read the user's files and reach the network. **Wired 2026-09-13:** until then `createRunCommand` was never given a `projectSettings` source, so the opt-in was unreachable and the gate always refused (safer than documented). Settings → Gates now sets it per project, default false, with a warning in the UI | Explicit per-project opt-in (default off), user-set only (SEC-08). Without it, the gate refuses: "tests gate needs a sandbox (install bubblewrap) or an explicit per-project opt-in". | when a Windows sandbox is available |
+| R12 | With `testsGate.allowNetwork`, the tests gate reaches the network. Without it, loopback stays open for dev servers, so tests can reach local services, including the Brain endpoint. **Wired 2026-09-13:** same gap and fix as R11 | The endpoint still needs a token, and failed auth is rate-limited before any token is resolved (L3). | — |
 | R13 | Codex has no max-turns flag and reports usage only at `turn.completed`. So `maxTurns` does not apply to Codex, and a single `codex exec` turn can overrun `maxTokens` before the supervisor sees it. The wall clock is the real cap. | Codex is experimental in v0.1; the wall-clock budget always applies. | when Codex streams usage mid-turn |
 | R14 | A process that calls `setsid()` leaves its process group and survives STOP. After an app crash, the process groups of old runs are not killed on restart: `recover()` closes their transcripts as `killed` but never signals old pids, which may have been reused. | Killing a reused pid is worse. bubblewrap's `--die-with-parent` covers the Linux tests gate. | job objects / cgroups |
 | R15 | The L3 pre-auth budget is shared, so a local process that floods the endpoint with bad tokens also gets valid lanes 429s until it refills (5/s). | A local attacker can already exhaust the 64 connections. Refusing before token resolution keeps the flood cheap. | per-peer budgets |

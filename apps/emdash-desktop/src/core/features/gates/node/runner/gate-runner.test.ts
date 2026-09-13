@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { COMPLETE_JOB_TOOL } from '@emdash/gates-core';
+import { COMPLETE_JOB_TOOL, GatePreconditionError } from '@emdash/gates-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readJobHistory } from '../evidence/evidence';
 import { JOB_BLOCKED_NOTIFICATION_KIND } from '../notifications/job-blocked';
@@ -119,6 +119,28 @@ describe('gate runner verdicts', () => {
     await f.runner.verifyJob(job.id);
     expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
     expect(f.job(job.id).reason).toContain('is not available');
+    expect(f.brain.readInbox(LANE)).toHaveLength(0);
+  });
+
+  it('DevTools open on the lane browser blocks the job as a setup problem, not a spent attempt', async () => {
+    // Real built-ins (no `gates` override): the tests gate passes, and every
+    // viewport of the screenshot gate fails on the same GatePreconditionError.
+    const f = await setup({
+      prefs: { testCommand: 'pnpm test' },
+      previewUrl: 'http://127.0.0.1:5173/',
+      screenshots: {
+        capture: async () => {
+          throw new GatePreconditionError('gate skipped: devtools open');
+        },
+      },
+    });
+    const job = f.createJob({ gates: [], kind: 'ui' }, 'Hero section');
+
+    await f.runner.verifyJob(job.id);
+
+    // Blocked at once, like the missing-test-command and gone-lane setup problems above.
+    expect(f.job(job.id)).toMatchObject({ state: 'blocked', attempts: 0 });
+    expect(f.job(job.id).reason).toContain('setup problem, not your change');
     expect(f.brain.readInbox(LANE)).toHaveLength(0);
   });
 

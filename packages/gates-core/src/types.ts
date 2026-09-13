@@ -41,6 +41,22 @@ export interface GateResult {
   metrics?: Record<string, number>;
 }
 
+/**
+ * Thrown by a capability when a gate could not reach a verdict about the
+ * agent's work because of an environment precondition — DevTools open on the
+ * lane browser, another debugger attached, and the like. This is never the
+ * worker's to fix by changing code, so a gate that catches it must not report
+ * an ordinary failure: the app's gate runner treats it like a setup problem
+ * (SEC-20's `configurationError` metric) and does not spend a self-heal
+ * attempt on it.
+ */
+export class GatePreconditionError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'GatePreconditionError';
+  }
+}
+
 export interface Viewport {
   label: string;
   width: number;

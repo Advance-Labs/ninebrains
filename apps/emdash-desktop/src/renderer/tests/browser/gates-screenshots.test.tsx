@@ -156,6 +156,8 @@ describe.skipIf(!import.meta.env.VITE_GATES_SCREENSHOTS)('gates screenshots', ()
     onProjectChange: vi.fn(),
     savedCommand: 'pnpm test',
     onSave: async () => null,
+    savedSettings: { rigorLevel: null, allowNetwork: false, allowUnsandboxed: false },
+    onSaveSettings: async () => null,
   };
 
   it('verification modal, light, 1440', async () => {

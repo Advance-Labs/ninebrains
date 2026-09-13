@@ -21,6 +21,7 @@ export type {
   JobKind,
   Viewport,
 } from './types';
+export { GatePreconditionError } from './types';
 export {
   EvidencePathError,
   FsEvidenceStore,
@@ -59,6 +60,7 @@ export {
 export { TESTS_LOG_LINES, testsGate, type TestsGateOptions } from './gates/tests-gate';
 export {
   DEFAULT_VIEWPORTS,
+  SCREENSHOT_PRECONDITION_METRIC,
   screenshotGate,
   type ScreenshotGateOptions,
 } from './gates/screenshot-gate';

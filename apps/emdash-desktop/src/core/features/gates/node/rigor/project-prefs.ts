@@ -9,12 +9,18 @@ export interface ProjectGatePrefs {
   securityRigor: number | null;
   /** SEC-20: set by the user only. */
   testCommand: string | null;
+  /** `testsGate.allowNetwork` (SEC-20/R12). Set by the user only, from Settings → Gates. */
+  allowNetwork: boolean;
+  /** `testsGate.allowUnsandboxed` (SEC-20/R11). Set by the user only, from Settings → Gates. */
+  allowUnsandboxed: boolean;
 }
 
 export const EMPTY_PROJECT_PREFS: ProjectGatePrefs = {
   testingRigor: null,
   securityRigor: null,
   testCommand: null,
+  allowNetwork: false,
+  allowUnsandboxed: false,
 };
 
 /**
@@ -105,15 +111,16 @@ export function createMementoProjectPrefsStore(
 
   return {
     async get(projectId) {
-      const { testingRigor, securityRigor, testCommand } = await read(
-        gatesProjectPrefsMemento,
-        project(projectId)
-      );
-      return { testingRigor, securityRigor, testCommand };
+      const { testingRigor, securityRigor, testCommand, allowNetwork, allowUnsandboxed } =
+        await read(gatesProjectPrefsMemento, project(projectId));
+      return { testingRigor, securityRigor, testCommand, allowNetwork, allowUnsandboxed };
     },
     set(projectId, prefs) {
       return serial(async () => {
-        await write(gatesProjectPrefsMemento, project(projectId), { version: '1', ...prefs });
+        await write(gatesProjectPrefsMemento, project(projectId), {
+          version: '2' as const,
+          ...prefs,
+        });
         const index = await read(gatesPrefsIndexMemento, app);
         if (!index.projectIds.includes(projectId)) {
           await write(gatesPrefsIndexMemento, app, {

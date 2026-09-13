@@ -17,6 +17,17 @@ export interface GatesProjectPrefsService {
     projectId: string;
     testCommand: string | null;
   }): Promise<Result<GatesProjectPrefsView, GatesError>>;
+  /**
+   * SEC-08: the project rigor override and the tests-gate sandbox opt-outs. `rigorLevel` null
+   * uses the app's rigor sliders for both testing and security; a level overrides both together.
+   * `allowNetwork` and `allowUnsandboxed` both default to false.
+   */
+  setProjectSettings(input: {
+    projectId: string;
+    rigorLevel: number | null;
+    allowNetwork: boolean;
+    allowUnsandboxed: boolean;
+  }): Promise<Result<GatesProjectPrefsView, GatesError>>;
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -24,10 +35,18 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 export function createProjectPrefsService(
   rigor: Pick<RigorResolver, 'projectPrefs' | 'setProjectPrefs'>
 ): GatesProjectPrefsService {
-  const view = (projectId: string): GatesProjectPrefsView => ({
-    projectId,
-    testCommand: rigor.projectPrefs(projectId).testCommand,
-  });
+  const view = (projectId: string): GatesProjectPrefsView => {
+    const prefs = rigor.projectPrefs(projectId);
+    return {
+      projectId,
+      testCommand: prefs.testCommand,
+      // Independent overrides (set outside this UI) show as "use app default" rather than a
+      // level that doesn't match either slider.
+      rigorLevel: prefs.testingRigor === prefs.securityRigor ? prefs.testingRigor : null,
+      allowNetwork: prefs.allowNetwork,
+      allowUnsandboxed: prefs.allowUnsandboxed,
+    };
+  };
 
   return {
     async getProjectPrefs(projectId) {
@@ -58,6 +77,30 @@ export function createProjectPrefsService(
       }
       return ok(view(projectId));
     },
+
+    async setProjectSettings({ projectId, rigorLevel, allowNetwork, allowUnsandboxed }) {
+      if (
+        rigorLevel !== null &&
+        (!Number.isInteger(rigorLevel) || rigorLevel < 0 || rigorLevel > 10)
+      ) {
+        return err({ type: 'refused', message: 'Rigor must be an integer from 0 to 10.' });
+      }
+      try {
+        await rigor.setProjectPrefs(projectId, {
+          ...rigor.projectPrefs(projectId),
+          testingRigor: rigorLevel,
+          securityRigor: rigorLevel,
+          allowNetwork,
+          allowUnsandboxed,
+        });
+      } catch (error) {
+        return err({
+          type: 'unavailable',
+          message: `Could not save the project's gate settings: ${message(error)}`,
+        });
+      }
+      return ok(view(projectId));
+    },
   };
 }
 
@@ -70,4 +113,5 @@ const UNAVAILABLE: GatesError = {
 export const unavailableProjectPrefsService: GatesProjectPrefsService = {
   getProjectPrefs: async () => err(UNAVAILABLE),
   setTestCommand: async () => err(UNAVAILABLE),
+  setProjectSettings: async () => err(UNAVAILABLE),
 };

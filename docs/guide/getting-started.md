@@ -95,9 +95,8 @@ The Brain splits the work into jobs, links the ones that depend on each other, a
 each ready job to an idle lane in the project. Each lane's side panel shows its current job,
 finished work and notes.
 
-You can also lay the plan out on the [planner](planner.md) canvas and press **Run plan**. This
-build has no menu item or command that opens the planner yet.
-<!-- VERIFY: an entry point for the planner is being added -->
+You can also lay the plan out on the [planner](planner.md) canvas and press **Run plan**. Click
+**Planner** in the Lanes view's title bar, or run **Open Planner** from the command palette.
 
 ## 6. Watch the gates
 

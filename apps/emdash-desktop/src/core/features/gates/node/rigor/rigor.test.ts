@@ -73,7 +73,13 @@ describe('rigor resolver', () => {
 
   it('setProjectPrefs updates the cache and the store', async () => {
     const { rigor } = await resolver();
-    await rigor.setProjectPrefs('p1', { testingRigor: 0, securityRigor: 0, testCommand: 'make' });
+    await rigor.setProjectPrefs('p1', {
+      testingRigor: 0,
+      securityRigor: 0,
+      testCommand: 'make',
+      allowNetwork: false,
+      allowUnsandboxed: false,
+    });
     expect(floor(rigor, 'p1', 'ui')).toEqual([]);
     expect(rigor.projectPrefs('p1').testCommand).toBe('make');
   });
@@ -82,6 +88,28 @@ describe('rigor resolver', () => {
     expect(gateJobKindOf({ gates: [], kind: 'ui' })).toBe('ui');
     expect(gateJobKindOf({ gates: [], kind: 'video' })).toBe('code');
     expect(gateJobKindOf(null)).toBe('code');
+  });
+
+  describe("testsGateSettingsFor (SEC-08: feeds createRunCommand's projectSettings hook)", () => {
+    it('defaults both to false', async () => {
+      const { rigor } = await resolver();
+      expect(rigor.testsGateSettingsFor('p1')).toEqual({
+        allowNetwork: false,
+        allowUnsandboxed: false,
+      });
+    });
+
+    it('reflects the stored per-project opt-ins, independently of rigor', async () => {
+      const { rigor } = await resolver({}, { p1: { allowNetwork: true, allowUnsandboxed: true } });
+      expect(rigor.testsGateSettingsFor('p1')).toEqual({
+        allowNetwork: true,
+        allowUnsandboxed: true,
+      });
+      expect(rigor.testsGateSettingsFor('other')).toEqual({
+        allowNetwork: false,
+        allowUnsandboxed: false,
+      });
+    });
   });
 });
 
@@ -159,14 +187,38 @@ describe('memento project prefs store', () => {
       testingRigor: null,
       securityRigor: null,
       testCommand: null,
+      allowNetwork: false,
+      allowUnsandboxed: false,
     });
-    await store.set('p1', { testingRigor: 8, securityRigor: 2, testCommand: 'pnpm test' });
-    await store.set('p1', { testingRigor: 9, securityRigor: 2, testCommand: 'pnpm test' });
+    await store.set('p1', {
+      testingRigor: 8,
+      securityRigor: 2,
+      testCommand: 'pnpm test',
+      allowNetwork: false,
+      allowUnsandboxed: false,
+    });
+    await store.set('p1', {
+      testingRigor: 9,
+      securityRigor: 2,
+      testCommand: 'pnpm test',
+      allowNetwork: true,
+      allowUnsandboxed: true,
+    });
     expect(await store.get('p1')).toEqual({
       testingRigor: 9,
       securityRigor: 2,
       testCommand: 'pnpm test',
+      allowNetwork: true,
+      allowUnsandboxed: true,
     });
     expect(await store.listProjects()).toEqual(['p1']);
+  });
+
+  it('defaults allowNetwork and allowUnsandboxed to false (SEC-08)', async () => {
+    const store = createMementoProjectPrefsStore(async () => fakeClient());
+    expect(await store.get('unset')).toMatchObject({
+      allowNetwork: false,
+      allowUnsandboxed: false,
+    });
   });
 });

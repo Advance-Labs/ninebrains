@@ -15,9 +15,24 @@ import {
   formatIssues,
   parseReviewerVerdict,
 } from '../reviewer-verdict';
-import type { Evidence, Gate, GateJob, ReviewCheckout, Viewport } from '../types';
+import {
+  GatePreconditionError,
+  type Evidence,
+  type Gate,
+  type GateJob,
+  type ReviewCheckout,
+  type Viewport,
+} from '../types';
 import { createFence } from '../untrusted';
 import { errorMessage } from '../util';
+
+/**
+ * Set when every viewport failed to capture on a `GatePreconditionError`
+ * (DevTools open, another debugger attached): nothing about the page was
+ * ever checked, so the gate runner must treat this like a setup problem, not
+ * a verdict, and not spend a self-heal attempt on it.
+ */
+export const SCREENSHOT_PRECONDITION_METRIC = 'screenshotPrecondition';
 
 export const DEFAULT_VIEWPORTS: Viewport[] = [
   { label: 'desktop', width: 1440, height: 900 },
@@ -74,6 +89,7 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
       let consoleErrors = 0;
       let failedRequests = 0;
       let worstDiff = 0;
+      let preconditionFailures = 0;
 
       for (const viewport of viewports) {
         const tag = `${viewport.label} ${viewport.width}px`;
@@ -84,6 +100,7 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
             signal: ctx.signal,
           });
         } catch (error) {
+          if (error instanceof GatePreconditionError) preconditionFailures += 1;
           problems.push(`[${tag}] capture failed: ${errorMessage(error)}`);
           continue;
         }
@@ -161,6 +178,20 @@ export function screenshotGate(options: ScreenshotGateOptions = {}): Gate {
         const listed = problems.slice(0, MAX_LISTED).map((p) => `- ${p}`);
         if (problems.length > MAX_LISTED)
           listed.push(`- … and ${problems.length - MAX_LISTED} more`);
+        // Every viewport failed on a precondition (DevTools open, another debugger
+        // attached), so nothing about the page itself was ever checked: this is a
+        // setup problem for the user, not a verdict on the change.
+        if (preconditionFailures === viewports.length) {
+          return {
+            pass: false,
+            evidence,
+            feedback:
+              "The screenshot gate could not attach to the lane's browser, so it never checked " +
+              `the page:\n${listed.join('\n')}\nThis is a setup problem, not your change: close ` +
+              "DevTools (or the other debugger) on the lane's browser, then requeue the job.",
+            metrics: { ...metrics, [SCREENSHOT_PRECONDITION_METRIC]: 1 },
+          };
+        }
         return {
           pass: false,
           evidence,
