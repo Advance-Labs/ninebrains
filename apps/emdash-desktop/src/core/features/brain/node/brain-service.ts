@@ -485,6 +485,13 @@ export class BrainService {
    * between them. Best-effort and idempotent: this reads the lane's held job fresh right before
    * acting, and if some other path (the dispatcher's own not-ready release, a second STOP) has
    * already moved it, there is nothing left to do.
+   *
+   * Deliberately not `HELD_STATES`: a `verifying` job's lane has already called `complete_job`,
+   * and its gates run under the supervisor that STOP kills, so there is no agent work to hand
+   * back (a process that outlives `complete_job` is R14). Like a manual requeue, the requeue
+   * resets the attempt budget; the job's history shows a `failed` step with the STOP reason.
+   * A paste already in flight still reaches the stopping lane's terminal, which may act on it
+   * until the kill lands, but it can no longer complete the job: the Brain has released it (T42).
    */
   private requeueHeldJob(laneId: string): void {
     const held = this.brain.listJobs(APP_IDENTITY, {
