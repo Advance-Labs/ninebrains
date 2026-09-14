@@ -56,13 +56,24 @@ const APPROVING_REVIEWER = JSON.stringify([{ say: '{"pass": true, "issues": []}'
  * FAKE_AGENT_SCRIPT and FAKE_AGENT_ARGV_LOG are baked into the wrapper as file paths instead.
  * Interactive runs (lanes, Brain sessions) default to the test's lane script; `-p` runs to the
  * approving reviewer.
+ *
+ * An unattended run (`claude -p`, preset "worker", see `unattended.ts`) gets the SAME narrow env
+ * as a reviewer run (SEC-13's `buildUnattendedEnv`/`run-env.ts` allowlist), so it can't carry
+ * FAKE_AGENT_SCRIPT either — deliberately: that allowlist is a security control (SEC-40 and
+ * friends, docs/THREAT-MODEL.md) and this harness must not widen it. A worker run is
+ * distinguishable from a reviewer run by argv alone, with no env needed: only a reviewer's argv
+ * carries `--tools=` (`buildClaudePrintArgv`, preset "reviewer"); a worker only ever gets
+ * `--allowedTools=`. So the wrapper picks the default script by that argv shape, baked in as a
+ * file path at wrapper-creation time — no environment variable crosses the allowlist.
  */
-function installFakeClaude(home, { laneScript, argvLog }) {
+function installFakeClaude(home, { laneScript, unattendedScript, argvLog }) {
   const fake = resolveFakeClaude();
   const bin = join(home, '.local', 'bin');
   mkdirSync(bin, { recursive: true });
   const reviewer = join(home, '.fake-agent-reviewer.json');
   writeFileSync(reviewer, APPROVING_REVIEWER);
+  const worker = join(home, '.fake-agent-unattended.json');
+  writeFileSync(worker, unattendedScript ?? APPROVING_REVIEWER);
   const lane = join(home, '.fake-agent-lane.json');
   if (laneScript) writeFileSync(lane, laneScript);
   const interactive = laneScript
@@ -74,7 +85,16 @@ function installFakeClaude(home, { laneScript, argvLog }) {
     [
       '#!/bin/sh',
       `: "\${FAKE_AGENT_ARGV_LOG:=${argvLog}}"; export FAKE_AGENT_ARGV_LOG`,
-      `case " $* " in *" -p "*) : "\${FAKE_AGENT_SCRIPT:=${reviewer}}"; export FAKE_AGENT_SCRIPT ;; *) ${interactive} ;; esac`,
+      'case " $* " in',
+      '  *" -p "*)',
+      '    case "$*" in',
+      `      *--tools=*) : "\${FAKE_AGENT_SCRIPT:=${reviewer}}" ;;`,
+      `      *) : "\${FAKE_AGENT_SCRIPT:=${worker}}" ;;`,
+      '    esac',
+      '    export FAKE_AGENT_SCRIPT',
+      '    ;;',
+      `  *) ${interactive} ;;`,
+      'esac',
       `exec "${process.execPath}" "${fake}" "$@"`,
       '',
     ].join('\n')
@@ -83,8 +103,13 @@ function installFakeClaude(home, { laneScript, argvLog }) {
   return { bin, fake };
 }
 
-/** `env` adds variables for the app and every agent it spawns (e.g. FAKE_AGENT_SCRIPT). */
-export async function launchApp({ env: extraEnv = {} } = {}) {
+/**
+ * `env` adds variables for the app and every agent it spawns (e.g. FAKE_AGENT_SCRIPT).
+ * `unattendedScript` is a fake-agent script (JSON string) baked into the wrapper as the default
+ * for an unattended `claude -p` (worker preset) run — see `installFakeClaude`'s doc comment for
+ * why this can't go through `env`.
+ */
+export async function launchApp({ env: extraEnv = {}, unattendedScript } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'ninebrains-e2e-'));
   const home = join(root, 'home');
   const userData = join(root, 'user-data');
@@ -96,6 +121,7 @@ export async function launchApp({ env: extraEnv = {} } = {}) {
   const argvLog = join(root, 'argv.log');
   const { bin, fake } = installFakeClaude(home, {
     laneScript: extraEnv.FAKE_AGENT_SCRIPT,
+    unattendedScript,
     argvLog,
   });
 
