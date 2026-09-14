@@ -263,8 +263,37 @@ jobs:
           export PR_TITLE
           node tooling/scripts/pr-hygiene.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
+      # Exempt only when BOTH hold: the PR was opened by the bot account itself (`pr.user`, set by
+      # GitHub when the PR was created — a push can't touch it), AND the diff between base and head
+      # (computed locally with git, not read from the API) touches only workflow/composite-action
+      # YAML with every changed line a bare `uses:` pin bump. Commit-level metadata (author.login,
+      # verification, committer) is never trusted here: it can be forged by pushing through GitHub's
+      # Contents/Git Data API with the author email set to Dependabot's. Anything else — including
+      # a bot-authored PR whose diff strays from a pin bump — falls through to the check below. An
+      # API or git failure also falls through: fail closed.
+      - name: Is this a verified bot PR?
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        id: bot-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if result="$(node tooling/scripts/bot-pr.mjs --repo "$REPO" --pr "$NUMBER" --base "$BASE_SHA" --head "$HEAD_SHA")"; then
+            if [ "$result" = exempt ]; then
+              echo "::notice::PR #$NUMBER is a verified bot PR; skipping the upstream-patch log check."
+              echo "exempt=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "$result"
+              echo "exempt=false" >>"$GITHUB_OUTPUT"
+            fi
+          else
+            echo "::warning::bot-pr.mjs failed; treating PR #$NUMBER as not exempt."
+            echo "exempt=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - name: Upstream-patch log
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.bot-pr.outputs.exempt != 'true' }}
         run: node tooling/scripts/check-upstream-patches.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
   e2e:

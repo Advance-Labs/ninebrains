@@ -93,7 +93,7 @@ Left as "Emdash" on purpose: copy that is only reachable through the gated accou
 | `README.md` | Replaced with a short Ninebrains placeholder; later (`53253af4c`, W7 docs) the feature list and quick start corrected to match the code: unwired features listed as "in the code, not yet reachable from the app", a "Set up gates" step, and the Brain started from the Lanes title bar; later still (W7 `w7/testsgate-prefs`) the "not yet reachable" list was retired, since the Planner, lane roles and modes and the per-project rigor override all have entry points now | The README must not claim what the app cannot do yet |
 | `apps/emdash-desktop/vitest.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI`; new `node-spawn` project (`maxWorkers: 2`, `sequence.groupOrder: 1`) takes the spawn-heavy suites out of `node`; `browser` gets `testTimeout: 15_000` and `optimizeDeps.include` for the JSX runtime (W7 CI) | CI can run real-browser tests. Spawn-heavy suites (gates capabilities, exec-runs, brain stop/unattended, override-launch) get less contention instead of looser deadlines (SEC-30 keeps its 5 s). The late JSX-runtime discovery reloaded Vite mid-run and failed browser tests |
 | `packages/chat-ui/vite.config.ts` | `EMDASH_TEST_BROWSER=1` forces the `browser` project on under `CI` (W7 CI) | Same switch as the desktop app |
-| `CONTRIBUTING.md` | "Before you open a PR" rewritten (non-mutating `check`, `hooks:install`, browser-test switches); new "Sign your commits (DCO)", "CI and merging" and "End-to-end tests" sections; commands list and security section updated (W7 CI); later a note that the pre-push hook skips the Playwright `browser` projects and how to opt back in (W7 `w7/prepush-skip-browser`) | The old text said CI ran checks on PRs, which was false, and had no DCO, merge flow or e2e guidance. The hook note matches what `pre-push.mjs` now does |
+| `CONTRIBUTING.md` | "Before you open a PR" rewritten (non-mutating `check`, `hooks:install`, browser-test switches); new "Sign your commits (DCO)", "CI and merging" and "End-to-end tests" sections; commands list and security section updated (W7 CI); later a note that the pre-push hook skips the Playwright `browser` projects and how to opt back in (W7 `w7/prepush-skip-browser`); later still, the `pr-hygiene` row notes that a Dependabot-opened PR whose diff is an in-place `@ref`/comment-only pin swap (`tooling/scripts/bot-pr.mjs`) skips only the upstream-patch log step (W7 `w7/verified-bot-pr`) | The old text said CI ran checks on PRs, which was false, and had no DCO, merge flow or e2e guidance. The hook note matches what `pre-push.mjs` now does. Dependabot PRs that bump inherited-workflow action pins always failed the upstream-patch step because a bot can't write the row; the exemption checks the unforgeable PR author plus the diff shape (git-computed, each hunk an equal-count pin-for-pin swap with only the ref/comment free to change), not commit metadata, which GitHub signs identically for anyone who pushes through its Contents/Git Data API with Dependabot's author email |
 | `.github/PULL_REQUEST_TEMPLATE.md` | Replaced: checklist for `pnpm run check`, DCO and title, the upstream-patch log, new dependencies and licences, security areas with SEC-IDs, local browser tests, 1440/390 screenshots, real-CLI use (W7 CI) | Matches what `ci.yml` and `pnpm run merge` enforce, plus what they cannot check |
 | `nx.json` | `EMDASH_TEST_BROWSER` added to the `test` target's env inputs (W7 CI) | A forced browser run must not reuse a cached result from a run that skipped the browser project |
 
@@ -350,6 +350,16 @@ Ninebrains-only files below), so the feature itself landed entirely inside files
 `.github/workflows/ci.yml`, `.github/workflows/e2e.yml`, `.github/actions/ci-setup/action.yml`,
 `tooling/scripts/{check-upstream-patches,pr-hygiene,ci-ok,nx-affected,vitest-flaky-reporter}.mjs`
 and their `*.test.mjs` (W7 CI).
+
+`tooling/scripts/bot-pr.mjs` and its test (W7 `w7/verified-bot-pr`): the verified-bot-PR check the
+`pr-hygiene` job's upstream-patch step now runs first, so a Dependabot PR can skip that step without
+a human writing its row. Exempts only a PR opened by the bot account (from the API, unforgeable)
+whose diff (computed locally with git) touches only workflow/composite-action YAML and, in every
+hunk, swaps an equal, non-zero count of `uses:` pins one-for-one in place — each removed/added pair
+keeps the same indentation, list marker and `owner/repo[/path]`, so only the `@ref` and its trailing
+comment can change. Commit-level metadata is deliberately not trusted, since GitHub signs a commit
+identically for anyone who pushes it through the Contents/Git Data API with the author email set to
+Dependabot's.
 Merge guard: `tooling/scripts/{pre-push,require-green,merge-pr}.mjs` and their `*.test.mjs`,
 `tooling/git-hooks/pre-push`, `.github/CODEOWNERS` (W7 CI).
 Repo hygiene: `.github/dependabot.yml`, `tooling/scripts/sync-labels.mjs` and its test (W7 CI).
