@@ -93,7 +93,18 @@ describe('runPrePush', () => {
     const env = { PATH: '/bin', GIT_DIR: '/repo/.git', GIT_INDEX_FILE: '/repo/.git/index' };
     runPrePush({ stdin: line('refs/heads/feat/x'), env, run: (cmd, args, childEnv) => (envs.push(childEnv), 0), git, log: () => {} });
     assert.equal(envs.length, 3);
-    for (const childEnv of envs) assert.deepEqual(childEnv, { PATH: '/bin' });
+    for (const childEnv of envs) assert.deepEqual(childEnv, { PATH: '/bin', EMDASH_TEST_SKIP_BROWSER: '1' });
+  });
+
+  it('skips the browser test projects, unless the pusher forces them on', () => {
+    const envs = [];
+    const run = (cmd, args, childEnv) => (envs.push(childEnv), 0);
+    runPrePush({ stdin: line('refs/heads/feat/x'), env: {}, run, git, log: () => {} });
+    assert.equal(envs[1].EMDASH_TEST_SKIP_BROWSER, '1');
+    envs.length = 0;
+    runPrePush({ stdin: line('refs/heads/feat/x'), env: { EMDASH_TEST_BROWSER: '1' }, run, git, log: () => {} });
+    // vitest.config.ts: EMDASH_TEST_BROWSER=1 wins over EMDASH_TEST_SKIP_BROWSER.
+    assert.equal(envs[1].EMDASH_TEST_BROWSER, '1');
   });
 });
 
