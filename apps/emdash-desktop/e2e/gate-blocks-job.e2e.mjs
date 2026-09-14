@@ -9,7 +9,7 @@
 // Run: `pnpm run build` at the repo root first, then `node e2e/gate-blocks-job.e2e.mjs`.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   LONG,
