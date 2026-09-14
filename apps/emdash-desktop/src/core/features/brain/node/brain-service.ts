@@ -459,7 +459,15 @@ export class BrainService {
               }).length > 0
           )
           .map((lane) => lane.laneId),
-      stopLane: (laneId) => lanes.stop(laneId),
+      stopLane: async (laneId) => {
+        // Requeue first and synchronously: the docs promise the held job goes back to
+        // `ready` as part of STOP, not as a side effect of the lane's terminal reporting its
+        // own exit (which may be slow, or never arrive at all if the process ignores signals
+        // until SIGKILL). Doing this before the (possibly slow) lane stop keeps the two
+        // outcomes from racing each other.
+        this.requeueHeldJob(laneId);
+        await lanes.stop(laneId);
+      },
       onError,
       onStopped: () => {
         this.views.schedule();
@@ -467,6 +475,34 @@ export class BrainService {
       },
     });
     return ok({ killedRuns: result.killedRuns, stoppedLanes: result.stoppedLanes });
+  }
+
+  /**
+   * STOP (SEC-30): gives back the job a stopped lane was holding, so it never sits in
+   * `claimed`/`running` for a lane that no longer has an agent working it. `claimed` jobs have
+   * a direct edge back to `ready`; `running` jobs do not (state-machine.ts), so they are failed
+   * and immediately requeued instead — one synchronous pair of calls, nothing can interleave
+   * between them. Best-effort and idempotent: this reads the lane's held job fresh right before
+   * acting, and if some other path (the dispatcher's own not-ready release, a second STOP) has
+   * already moved it, there is nothing left to do.
+   */
+  private requeueHeldJob(laneId: string): void {
+    const held = this.brain.listJobs(APP_IDENTITY, {
+      laneId,
+      states: ['claimed', 'running'],
+      limit: 1,
+    })[0];
+    if (!held) return;
+    try {
+      if (held.state === 'claimed') {
+        this.brain.releaseJob(APP_IDENTITY, held.id);
+      } else {
+        this.brain.failJob(APP_IDENTITY, held.id, 'STOP: the lane holding this job was stopped');
+        this.brain.requeueJob(APP_IDENTITY, held.id);
+      }
+    } catch (error) {
+      this.deps.onError('brain: STOP requeue failed', error);
+    }
   }
 
   clearStop(): Result<void, BrainError> {

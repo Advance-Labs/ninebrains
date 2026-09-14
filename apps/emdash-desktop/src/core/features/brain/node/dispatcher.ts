@@ -205,10 +205,17 @@ export class Dispatcher {
       outcome = 'not-ready';
     }
     const { brain } = this.ports;
-    if (outcome === 'pasted') {
-      brain.startRun(APP_IDENTITY, { jobId: job.id, laneId: lane.laneId, mode: 'attended' });
-    } else {
-      brain.releaseJob(APP_IDENTITY, job.id);
+    // STOP (T-stop-requeue) can requeue this same job out from under an in-flight paste — it
+    // reads the lane's held job fresh and does not wait on this call. If that happened, the job
+    // is no longer `claimed` and finishing here would throw; there is nothing left to apply.
+    try {
+      if (outcome === 'pasted') {
+        brain.startRun(APP_IDENTITY, { jobId: job.id, laneId: lane.laneId, mode: 'attended' });
+      } else {
+        brain.releaseJob(APP_IDENTITY, job.id);
+      }
+    } catch (error) {
+      this.ports.onError('brain: dispatch settle failed', error);
     }
     this.release(lane.laneId);
     return { ...record, outcome };
