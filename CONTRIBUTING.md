@@ -193,8 +193,12 @@ Once the repository is public or on GitHub Team, add a ruleset for `main` and `r
 `apps/emdash-desktop/e2e/` drives the built Electron app with Playwright.
 
 - Build first, from the repo root: `pnpm run build`. Then run a suite:
-  `node apps/emdash-desktop/e2e/lanes-smoke.e2e.mjs` (also `brain-fanout` and `self-heal`).
+  `node apps/emdash-desktop/e2e/lanes-smoke.e2e.mjs` (also `brain-fanout`, `self-heal`,
+  `stop-halts-lanes`, `lane-run-mode` and `lane-from-pack-role`).
   `pnpm --dir apps/emdash-desktop run e2e` builds the app and runs the lanes smoke test.
+- [docs/testing/DOGFOOD-MATRIX.md](docs/testing/DOGFOOD-MATRIX.md) tracks every user-facing flow
+  from the guide against what actually covers it (unit, e2e, or manual only), with a priority.
+  Check it before adding a new e2e suite, so you don't duplicate coverage.
 - The harness (`e2e/harness.mjs`) gives each run a temp HOME, an isolated profile and the fake agent
   as `claude` on PATH, so no real credits are spent. It sets `NINEBRAINS_E2E=1` and launches with
   `--use-mock-keychain`, so macOS never prompts for, or touches, your login keychain.
@@ -262,13 +266,18 @@ Run a real CLI only by hand, and say in the PR that you did.
 ## End-to-end tests
 
 The Electron tests in `apps/emdash-desktop/e2e/` drive the built app with Playwright and the fake
-agent. They are kept out of CI.
+agent. They are too slow for every push, so CI runs them (`.github/workflows/e2e.yml`, under xvfb)
+only when a PR carries the `run-e2e` label, weekly, on pushes to `release/**`, and before every
+release. Add the label to any PR that touches lanes, the Brain, gates or the e2e harness. The
+daily-use coverage they give is mapped in [`docs/testing/DOGFOOD-MATRIX.md`](docs/testing/DOGFOOD-MATRIX.md).
 
 1. Build from the repo root: `pnpm run build`. It builds the workspace packages the app bundles.
    On a fresh worktree, `pnpm --dir apps/emdash-desktop build` alone fails with
    `@emdash/wire/worker` unresolved.
 2. Run one test, for example `node apps/emdash-desktop/e2e/self-heal.e2e.mjs`
-   (`brain-fanout.e2e.mjs` and `lanes-smoke.e2e.mjs` work the same way).
+   (`brain-fanout.e2e.mjs`, `lanes-smoke.e2e.mjs`, `stop-halts-lanes.e2e.mjs`,
+   `lane-run-mode.e2e.mjs` and `lane-from-pack-role.e2e.mjs` work the same way). See
+   [docs/testing/DOGFOOD-MATRIX.md](docs/testing/DOGFOOD-MATRIX.md) for what each flow covers.
 
 Each run gets a temp profile and HOME, `--use-mock-keychain` and a fake `claude` on PATH. Lanes and
 reviewer runs get an allowlisted environment, so the harness bakes the test's lane script and an

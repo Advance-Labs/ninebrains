@@ -64,7 +64,9 @@ pnpm --dir apps/emdash-desktop e2e:run     # the lanes smoke test, without build
 pnpm --dir apps/emdash-desktop e2e:brain   # build, then the Brain fan-out test
 ```
 
-The end-to-end tests are kept out of CI.
+CI runs the end-to-end tests only when a PR carries the `run-e2e` label, weekly, on pushes to
+`release/**`, and before every release. Add the label to a PR that touches lanes, the Brain or
+gates.
 
 ## The fake agent
 
