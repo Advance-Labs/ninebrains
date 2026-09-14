@@ -476,27 +476,38 @@ describe('WorkspaceScanScheduler', () => {
   });
 
   it('drops a failed watch and retries it from the polling floor without an unhandled rejection', async () => {
-    const repo = repoTarget('repo-1', '/repos/main');
-    const unhandled = vi.fn();
-    process.on('unhandledRejection', unhandled);
-    const { watcher, scheduler } = createHarness([repo], { pollIntervalMs: 25 });
-
+    // Real timers raced the poll floor here: at a 25 ms retry interval, a loaded
+    // machine can delay the assertion loop long enough for the retry to have
+    // already landed by the time it observes the "dropped" state. Fake timers
+    // make the failure, the retry, and the observation happen in a fixed order.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
     try {
-      expect(watcher.watchCount('/repos/main')).toBe(1);
-      const failed = watcher.rejectReady('/repos/main', new Error('watch attach failed'));
+      const repo = repoTarget('repo-1', '/repos/main');
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+      const { watcher, scheduler } = createHarness([repo], { pollIntervalMs: 25 });
 
-      await eventually(() => {
+      try {
+        expect(watcher.watchCount('/repos/main')).toBe(1);
+        const failed = watcher.rejectReady('/repos/main', new Error('watch attach failed'));
+
+        // Flush the microtask chain that turns the rejected readiness into onError,
+        // without letting any timer (i.e. the poll floor) run yet.
+        await vi.advanceTimersByTimeAsync(0);
         expect(failed.released).toBe(true);
         expect(watcher.roots.has('/repos/main')).toBe(false);
-      });
-      await eventually(() => expect(watcher.watchCount('/repos/main')).toBe(2));
-      await new Promise((resolve) => setImmediate(resolve));
 
-      expect(watcher.roots.has('/repos/main')).toBe(true);
-      expect(unhandled).not.toHaveBeenCalled();
+        // Advance exactly one poll interval: the floor retries the dropped watch.
+        await vi.advanceTimersByTimeAsync(25);
+        expect(watcher.watchCount('/repos/main')).toBe(2);
+        expect(watcher.roots.has('/repos/main')).toBe(true);
+        expect(unhandled).not.toHaveBeenCalled();
+      } finally {
+        process.off('unhandledRejection', unhandled);
+        await scheduler.dispose();
+      }
     } finally {
-      process.off('unhandledRejection', unhandled);
-      await scheduler.dispose();
+      vi.useRealTimers();
     }
   });
 

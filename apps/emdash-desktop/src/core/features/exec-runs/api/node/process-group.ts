@@ -63,10 +63,18 @@ export function signalGroup(
   try {
     process.kill(-pid, signal);
   } catch (err) {
-    // ESRCH: the whole group is already gone.
-    if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err;
+    // ESRCH: the whole group is already gone. EPERM: under load, the OS can recycle a pid
+    // (and thus this process-group id) between the leader exiting and this reap signal, so
+    // `-pid` may now belong to a group we never started and don't own (R14: killing a reused
+    // pid is worse, which is why we don't retry with a broader signal here either). Either way
+    // there is nothing left of *our* group to signal, so this is not a failure worth throwing.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ESRCH' && code !== 'EPERM') throw err;
   }
 }
+
+/** A `signalGroup` failure `trySignalGroup` tolerated (never ESRCH/EPERM — those aren't reported). */
+export type SignalFailure = { pid: number | undefined; signal: NodeJS.Signals; error: unknown };
 
 export class StopLatchedError extends Error {
   constructor(what: string) {
@@ -104,12 +112,21 @@ export class ProcessGroupRegistry {
     child.once('exit', () => this.live.delete(child));
   }
 
-  /** Latches, then SIGTERMs every tracked group and SIGKILLs it after `graceMs`. */
-  async killAll(graceMs: number): Promise<void> {
+  /**
+   * Latches, then SIGTERMs every tracked group and SIGKILLs it after `graceMs`. A signal failure
+   * (anything `signalGroup` doesn't already treat as "the group is gone") is always logged
+   * (`trySignalGroup`); `onSignalFailure`, when given, also gets each one — the caller's own
+   * place to record it, e.g. a run's transcript. Never throws; `killAll` still completes and
+   * every group is still signalled even if every one of them fails.
+   */
+  async killAll(
+    graceMs: number,
+    onSignalFailure?: (failure: SignalFailure) => void
+  ): Promise<void> {
     this.latched = true;
     await Promise.all(
       [...this.live].map(([child, platform]) =>
-        terminateGroup(child, graceMs, platform).catch(() => undefined)
+        terminateGroup(child, graceMs, platform, onSignalFailure).catch(() => undefined)
       )
     );
   }
@@ -123,24 +140,64 @@ export class ProcessGroupRegistry {
 export const processGroups = new ProcessGroupRegistry();
 
 /**
+ * SEC-30: `signalGroup` already tolerates ESRCH/EPERM (an already-gone or recycled group), but
+ * `terminateGroup`'s whole contract is "always settles" — STOP (`killAll`) and the wall-clock
+ * timeout both call it fire-and-forget (`void`), so any other exception here would otherwise
+ * become an unhandled rejection instead of the resolved/rejected promise nobody is positioned to
+ * catch. Always logs; also reports to `onFailure` when the caller has somewhere better to put it
+ * (a run's transcript). Best effort either way: log/report, then move on.
+ */
+function trySignalGroup(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  platform: NodeJS.Platform,
+  onFailure?: (failure: SignalFailure) => void
+): void {
+  try {
+    signalGroup(child, signal, platform);
+  } catch (err) {
+    console.error(
+      `[process-group] signalGroup(${signal}) failed for pid ${child.pid ?? 'unknown'}:`,
+      err
+    );
+    // The report hook must not break the "never throws" contract either: a throw here would stop
+    // STOP's `killAll` loop early, crash the main process from the grace-period `setTimeout`, or
+    // leave an unhandled rejection on the final SIGKILL.
+    try {
+      onFailure?.({ pid: child.pid, signal, error: err });
+    } catch (reportErr) {
+      console.error('[process-group] onFailure hook threw:', reportErr);
+    }
+  }
+}
+
+/**
  * SIGTERM the group, then SIGKILL it after `graceMs` whether or not the leader exited, because
  * grandchildren that ignore SIGTERM outlive their parent. Resolves once the leader has exited.
+ * `onSignalFailure`, when given, is called for each of the three signals here that fails (beyond
+ * ESRCH/EPERM, which `signalGroup` already treats as "the group is gone" and never reports) — the
+ * caller's hook to record it somewhere more durable than the console `trySignalGroup` always logs
+ * to.
  */
 export function terminateGroup(
   child: ChildProcess,
   graceMs: number,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  onSignalFailure?: (failure: SignalFailure) => void
 ): Promise<void> {
   const exited = new Promise<void>((resolve) => {
     if (child.exitCode !== null || child.signalCode !== null) resolve();
     else child.once('exit', () => resolve());
   });
-  signalGroup(child, 'SIGTERM', platform);
-  const timer = setTimeout(() => signalGroup(child, 'SIGKILL', platform), graceMs);
+  trySignalGroup(child, 'SIGTERM', platform, onSignalFailure);
+  const timer = setTimeout(
+    () => trySignalGroup(child, 'SIGKILL', platform, onSignalFailure),
+    graceMs
+  );
   return exited.then(async () => {
     // The leader may exit on SIGTERM while a grandchild ignores it: finish the job.
     await new Promise((r) => setTimeout(r, Math.min(graceMs, 50)));
     clearTimeout(timer);
-    signalGroup(child, 'SIGKILL', platform);
+    trySignalGroup(child, 'SIGKILL', platform, onSignalFailure);
   });
 }

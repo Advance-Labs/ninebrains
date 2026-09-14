@@ -379,3 +379,14 @@ No upstream (Emdash) file was patched for this work. `.github/workflows/e2e.yml`
 `CONTRIBUTING.md` are Ninebrains-only already (see above); adding the three new suites to the
 `for suite in ...` list and the suite lists in `CONTRIBUTING.md` needed no patch-log entry beyond
 naming the new files, done above under "New Ninebrains-only files".
+
+## 18. Load-flaky tests and the SEC-30 reap hang (W7 `w7/flaky-tests`)
+
+The product fix (T44) is in Ninebrains-only files (`exec-runs/api/node/{process-group,run-supervisor}.ts`).
+Two tests inherited from Emdash changed so they pass under the load of a full `nx affected` run; no
+assertion changed in either.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/runtimes/workspace-registry/node/scan/scheduler.test.ts` | "drops a failed watch and retries it from the polling floor" runs on fake timers (`vi.useFakeTimers` + `advanceTimersByTimeAsync`) instead of racing the scheduler's real 25 ms retry with a real-timer poll | Under load the retry re-added the watch before the test observed the dropped state; 12/12 under load after |
+| `packages/core/src/runtimes/workspace-registry/node/api/activation.contract.test.ts` | `createRegistryRuntime()` takes an optional `teardownTimeoutMs`; the "deactivate kills sessions, runs teardown exactly once" test gets its own 4 s bound and a 15 s test timeout, while the hanging-teardown test keeps 500 ms | The two tests shared one 500 ms bound tuned for the hanging case; spawning a real PTY shell under load took longer, so a real teardown was cut off as if it hung (3/8 failed under load before, 16/16 after) |
