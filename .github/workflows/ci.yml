@@ -263,10 +263,14 @@ jobs:
           export PR_TITLE
           node tooling/scripts/pr-hygiene.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
-      # A verified Dependabot PR (real signed/web-flow-committed commits, single-parent, opened by
-      # the bot account itself) cannot write the upstream-patch row a human would, so it skips the
-      # check below. Anything else — including a spoofed author email, which this does not trust —
-      # falls through to the check. An API failure also falls through: fail closed.
+      # Exempt only when BOTH hold: the PR was opened by the bot account itself (`pr.user`, set by
+      # GitHub when the PR was created — a push can't touch it), AND the diff between base and head
+      # (computed locally with git, not read from the API) touches only workflow/composite-action
+      # YAML with every changed line a bare `uses:` pin bump. Commit-level metadata (author.login,
+      # verification, committer) is never trusted here: it can be forged by pushing through GitHub's
+      # Contents/Git Data API with the author email set to Dependabot's. Anything else — including
+      # a bot-authored PR whose diff strays from a pin bump — falls through to the check below. An
+      # API or git failure also falls through: fail closed.
       - name: Is this a verified bot PR?
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         id: bot-pr
@@ -275,7 +279,7 @@ jobs:
           REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if result="$(node tooling/scripts/bot-pr.mjs --repo "$REPO" --pr "$NUMBER")"; then
+          if result="$(node tooling/scripts/bot-pr.mjs --repo "$REPO" --pr "$NUMBER" --base "$BASE_SHA" --head "$HEAD_SHA")"; then
             if [ "$result" = exempt ]; then
               echo "::notice::PR #$NUMBER is a verified bot PR; skipping the upstream-patch log check."
               echo "exempt=true" >>"$GITHUB_OUTPUT"
