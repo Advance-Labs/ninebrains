@@ -60,7 +60,15 @@ describe('workspace registry activation lifecycle', () => {
   let wire: TestWire<typeof workspaceRegistryContract>;
   let killedPaths: string[];
 
-  function createRegistryRuntime(): WorkspaceRegistryRuntime {
+  // 500ms is tuned for "a hanging teardown is cut off at the time-box" below, which needs the
+  // cutoff to fire fast and deterministically. Every other test's teardown is a real script
+  // spawned over a real PTY, so it races that same 500ms bound for no reason: under load, just
+  // spawning the shell can take longer than that before the trivial command inside it even runs.
+  // Tests whose teardown is expected to actually finish should override to a bound with real
+  // headroom instead of sharing the hanging-test's tight one.
+  function createRegistryRuntime(
+    overrides: { teardownTimeoutMs?: number } = {}
+  ): WorkspaceRegistryRuntime {
     return new WorkspaceRegistryRuntime({
       handle,
       clock,
@@ -68,7 +76,7 @@ describe('workspace registry activation lifecycle', () => {
         killedPaths.push(workspacePath);
       },
       scripts: scriptsWire.client,
-      activation: { teardownTimeoutMs: 500 },
+      activation: { teardownTimeoutMs: overrides.teardownTimeoutMs ?? 500 },
     });
   }
 
@@ -206,42 +214,54 @@ describe('workspace registry activation lifecycle', () => {
     await expect(fs.stat(path.join(workspacePath, 'run-marker'))).rejects.toThrow();
   });
 
-  it('deactivate kills sessions, runs teardown exactly once, and clears activation', async () => {
-    const workspacePath = await makeWorkspace('lifecycle', {
-      teardown: 'echo teardown >> teardown-log',
-    });
+  it(
+    'deactivate kills sessions, runs teardown exactly once, and clears activation',
+    { timeout: 15_000 },
+    async () => {
+      // Unlike the hanging-teardown test above, this teardown is expected to actually finish —
+      // give it a bound with real headroom instead of racing the tight one tuned for that other
+      // test, and a matching test timeout so this bound is what settles it, not vitest's default.
+      wire.dispose();
+      runtime.dispose();
+      runtime = createRegistryRuntime({ teardownTimeoutMs: 4_000 });
+      wire = createTestWire(workspaceRegistryContract, createWorkspaceRegistryController(runtime));
 
-    const activated = await wire.client.activateWorkspace({ workspaceId: 'ws-lifecycle' });
-    expect(activated.success).toBe(true);
+      const workspacePath = await makeWorkspace('lifecycle', {
+        teardown: 'echo teardown >> teardown-log',
+      });
 
-    const deactivated = await wire.client.deactivateWorkspace({ workspaceId: 'ws-lifecycle' });
-    expect(deactivated).toEqual({ success: true, data: undefined });
-    expect(killedPaths).toEqual([workspacePath]);
-    await expect(fs.readFile(path.join(workspacePath, 'teardown-log'), 'utf8')).resolves.toBe(
-      'teardown\n'
-    );
-    const records = await listRecords();
-    expect(records['ws-lifecycle']?.runtime?.activation ?? null).toBeNull();
+      const activated = await wire.client.activateWorkspace({ workspaceId: 'ws-lifecycle' });
+      expect(activated.success).toBe(true);
 
-    // Teardown joins the Activity timeline like every other lifecycle step.
-    await eventually(async () => {
-      const current = await listRecords();
-      expect(current['ws-lifecycle']?.runtime?.lifecycle).toEqual([
-        expect.objectContaining({
-          id: 'teardown',
-          status: 'succeeded',
-          params: { provenance: 'activation' },
-        }),
-      ]);
-    });
+      const deactivated = await wire.client.deactivateWorkspace({ workspaceId: 'ws-lifecycle' });
+      expect(deactivated).toEqual({ success: true, data: undefined });
+      expect(killedPaths).toEqual([workspacePath]);
+      await expect(fs.readFile(path.join(workspacePath, 'teardown-log'), 'utf8')).resolves.toBe(
+        'teardown\n'
+      );
+      const records = await listRecords();
+      expect(records['ws-lifecycle']?.runtime?.activation ?? null).toBeNull();
 
-    // Idempotent on inactive workspaces: sessions are swept again, teardown is not re-run.
-    const again = await wire.client.deactivateWorkspace({ workspaceId: 'ws-lifecycle' });
-    expect(again.success).toBe(true);
-    await expect(fs.readFile(path.join(workspacePath, 'teardown-log'), 'utf8')).resolves.toBe(
-      'teardown\n'
-    );
-  });
+      // Teardown joins the Activity timeline like every other lifecycle step.
+      await eventually(async () => {
+        const current = await listRecords();
+        expect(current['ws-lifecycle']?.runtime?.lifecycle).toEqual([
+          expect.objectContaining({
+            id: 'teardown',
+            status: 'succeeded',
+            params: { provenance: 'activation' },
+          }),
+        ]);
+      });
+
+      // Idempotent on inactive workspaces: sessions are swept again, teardown is not re-run.
+      const again = await wire.client.deactivateWorkspace({ workspaceId: 'ws-lifecycle' });
+      expect(again.success).toBe(true);
+      await expect(fs.readFile(path.join(workspacePath, 'teardown-log'), 'utf8')).resolves.toBe(
+        'teardown\n'
+      );
+    }
+  );
 
   it('a hanging teardown is cut off at the time-box and deactivation still succeeds', async () => {
     await makeWorkspace('hanging', { teardown: 'sleep 30' });
