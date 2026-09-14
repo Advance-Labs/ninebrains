@@ -98,8 +98,11 @@ function argvLog(root) {
  */
 function assertWrapperSelectsByArgv(root) {
   const wrapper = join(root, 'home', '.local', 'bin', 'claude');
+  // The wrapper only defaults FAKE_AGENT_ARGV_LOG (`${VAR:=...}`), so these calibration calls log
+  // to their own file and never count as the app's `-p` runs in `argv.log`.
+  const env = { ...process.env, FAKE_AGENT_ARGV_LOG: join(root, 'argv-calibration.log') };
   const runOnce = (args) =>
-    execFileSync(wrapper, ['-p', ...args, 'irrelevant prompt'], { encoding: 'utf8' });
+    execFileSync(wrapper, ['-p', ...args, 'irrelevant prompt'], { encoding: 'utf8', env });
 
   const worker = runOnce(['--allowedTools=Bash']);
   if (!worker.includes('Building')) {
