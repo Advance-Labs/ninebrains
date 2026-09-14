@@ -1,7 +1,7 @@
 // Run: node --test tooling/scripts/bot-pr.test.mjs
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { pinOnlyDiff, prAuthorIsBot, verifiedBotPr } from './bot-pr.mjs';
+import { checkBotPr, pinOnlyDiff, prAuthorIsBot, verifiedBotPr } from './bot-pr.mjs';
 
 const BOT = 'dependabot[bot]';
 const botPr = (overrides = {}) => ({ user: { login: BOT, type: 'Bot' }, ...overrides });
@@ -76,7 +76,7 @@ index d1b9b5c71..251d04b05 100644
 `;
     const { ok, reasons } = pinOnlyDiff(diff);
     assert.equal(ok, false);
-    assert.match(reasons.join(';'), /not a bare action pin.*timeout-minutes/);
+    assert.match(reasons.join(';'), /not an equal, non-zero pin-for-pin swap/);
   });
 
   it('rejects a non-workflow file', () => {
@@ -137,6 +137,20 @@ index d1b9b5c71..251d04b05
     assert.match(reasons.join(';'), /changes a file's mode/);
   });
 
+  it('rejects a diff carrying rename headers directly (defensive-only branch)', () => {
+    // `git diff --no-renames` never emits `rename from`/`rename to` — a rename shows as a delete +
+    // add instead, caught by the file-mode check. This exercises the defensive branch directly, in
+    // case pinOnlyDiff is ever called with a diff computed without that flag.
+    const diff = `diff --git a/.github/workflows/old.yml b/.github/workflows/new.yml
+similarity index 100%
+rename from .github/workflows/old.yml
+rename to .github/workflows/new.yml
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /renames a file/);
+  });
+
   it('rejects an empty diff', () => {
     assert.equal(pinOnlyDiff('').ok, false);
     assert.equal(pinOnlyDiff(undefined).ok, false);
@@ -156,7 +170,7 @@ index d1b9b5c71..251d04b05 100644
     assert.match(reasons.join(';'), /not a bare action pin.*run:/);
   });
 
-  it('rejects a uses: line that also changes with:', () => {
+  it('rejects a uses: line paired with a with: line in the same hunk', () => {
     const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
 index d1b9b5c71..251d04b05 100644
 --- a/.github/workflows/ci.yml
@@ -172,7 +186,7 @@ index d1b9b5c71..251d04b05 100644
 `;
     const { ok, reasons } = pinOnlyDiff(diff);
     assert.equal(ok, false);
-    assert.match(reasons.join(';'), /not a bare action pin.*persist-credentials/);
+    assert.match(reasons.join(';'), /not a bare action pin.*with:/);
   });
 
   it('fails closed on tabs, trailing junk and malformed pin lines', () => {
@@ -205,6 +219,75 @@ index d1b9b5c71..251d04b05 100644
 +      - uses: actions/checkout@v7; rm -rf /
 `;
     assert.equal(pinOnlyDiff(trailingJunk).ok, false);
+  });
+
+  it('rejects a step moved to a new indent', () => {
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20 +20 @@ jobs:
+-      - uses: actions/checkout@v4
++        - uses: actions/checkout@v7
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /indentation changed/);
+  });
+
+  it('rejects an action swapped for a different one', () => {
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20 +20 @@ jobs:
+-      - uses: actions/checkout@v4
++      - uses: some-other/action@v4
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /action changed/);
+  });
+
+  it('rejects a pure addition of a uses: line', () => {
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20,0 +21 @@ jobs:
++      - uses: actions/checkout@v7
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /not an equal, non-zero pin-for-pin swap/);
+  });
+
+  it('rejects uneven removed/added counts even when every line is a pin', () => {
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20,2 +20 @@ jobs:
+-      - uses: actions/checkout@v4
+-      - uses: actions/cache@v4
++      - uses: actions/checkout@v7
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /not an equal, non-zero pin-for-pin swap/);
+  });
+
+  it('accepts a ref-only change even when the trailing comment also changes', () => {
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20 +20 @@ jobs:
+-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, true, reasons.join('; '));
   });
 });
 
@@ -240,5 +323,47 @@ index d1b9b5c71..251d04b05 100644
     const { exempt, reasons } = verifiedBotPr({ pr, diffText: '' });
     assert.equal(exempt, false);
     assert.equal(reasons.length, 2);
+  });
+});
+
+describe('checkBotPr wiring', () => {
+  const ghApiOk = () => JSON.stringify(botPr());
+  const gitOk = (args) => (args[0] === 'merge-base' ? 'deadbeef' : PR_3_DIFF);
+
+  it('exempts a verified bot PR through the full wiring', () => {
+    const { exempt, reasons } = checkBotPr({ repo: 'o/r', pr: 1, base: 'b', head: 'h', ghApi: ghApiOk, git: gitOk });
+    assert.equal(exempt, true, reasons.join('; '));
+  });
+
+  it('surfaces a throwing gh api call as an error the CLI turns into a non-zero exit', () => {
+    const ghApi = () => {
+      throw new Error('gh api: rate limited');
+    };
+    assert.throws(
+      () => checkBotPr({ repo: 'o/r', pr: 1, base: 'b', head: 'h', ghApi, git: gitOk }),
+      /rate limited/
+    );
+  });
+
+  it('surfaces a throwing git merge-base as an error', () => {
+    const git = (args) => {
+      if (args[0] === 'merge-base') throw new Error('fatal: no merge base');
+      return PR_3_DIFF;
+    };
+    assert.throws(
+      () => checkBotPr({ repo: 'o/r', pr: 1, base: 'b', head: 'h', ghApi: ghApiOk, git }),
+      /no merge base/
+    );
+  });
+
+  it('surfaces a throwing git diff as an error', () => {
+    const git = (args) => {
+      if (args[0] === 'merge-base') return 'deadbeef';
+      throw new Error('fatal: bad revision');
+    };
+    assert.throws(
+      () => checkBotPr({ repo: 'o/r', pr: 1, base: 'b', head: 'h', ghApi: ghApiOk, git }),
+      /bad revision/
+    );
   });
 });
