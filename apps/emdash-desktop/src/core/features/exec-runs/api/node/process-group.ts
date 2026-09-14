@@ -160,7 +160,14 @@ function trySignalGroup(
       `[process-group] signalGroup(${signal}) failed for pid ${child.pid ?? 'unknown'}:`,
       err
     );
-    onFailure?.({ pid: child.pid, signal, error: err });
+    // The report hook must not break the "never throws" contract either: a throw here would stop
+    // STOP's `killAll` loop early, crash the main process from the grace-period `setTimeout`, or
+    // leave an unhandled rejection on the final SIGKILL.
+    try {
+      onFailure?.({ pid: child.pid, signal, error: err });
+    } catch (reportErr) {
+      console.error('[process-group] onFailure hook threw:', reportErr);
+    }
   }
 }
 
