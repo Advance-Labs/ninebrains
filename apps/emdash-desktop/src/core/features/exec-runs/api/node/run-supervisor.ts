@@ -452,8 +452,17 @@ export class ExecRunSupervisor {
 
       child.once('close', (code, signal) => {
         clearTimeout(wallTimer);
-        // Reap anything the agent left running in its group (dev servers, watchers).
-        signalGroup(child, 'SIGKILL', this.platform);
+        // Reap anything the agent left running in its group (dev servers, watchers). SEC-30:
+        // signalGroup already tolerates ESRCH/EPERM (the group, or its recycled pid, is gone
+        // from our side), but this catch is the backstop — a reap failure of any kind must
+        // never stop `resolve(result)` below from running, or the run would hang forever.
+        let reapError: string | undefined;
+        try {
+          signalGroup(child, 'SIGKILL', this.platform);
+        } catch (err) {
+          reapError = err instanceof Error ? err.message : String(err);
+          transcript.record('security', { kind: 'reap-failed', detail: reapError });
+        }
         const outcome = parser.finish();
         const reason: ExecRunEndReason =
           run.endReason ??
@@ -468,6 +477,7 @@ export class ExecRunSupervisor {
                   : 'completed');
         const errors = [...outcome.errors];
         if (spawnError) errors.push(spawnError.message);
+        if (reapError) errors.push(`failed to reap leftover processes: ${reapError}`);
         if (reason !== 'completed' && stderrTail.trim())
           errors.push(stderrTail.trim().slice(-2000));
         const result: ExecRunResult = {

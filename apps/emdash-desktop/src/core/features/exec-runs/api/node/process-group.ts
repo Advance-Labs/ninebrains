@@ -63,8 +63,13 @@ export function signalGroup(
   try {
     process.kill(-pid, signal);
   } catch (err) {
-    // ESRCH: the whole group is already gone.
-    if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err;
+    // ESRCH: the whole group is already gone. EPERM: under load, the OS can recycle a pid
+    // (and thus this process-group id) between the leader exiting and this reap signal, so
+    // `-pid` may now belong to a group we never started and don't own (R14: killing a reused
+    // pid is worse, which is why we don't retry with a broader signal here either). Either way
+    // there is nothing left of *our* group to signal, so this is not a failure worth throwing.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ESRCH' && code !== 'EPERM') throw err;
   }
 }
 
@@ -123,6 +128,29 @@ export class ProcessGroupRegistry {
 export const processGroups = new ProcessGroupRegistry();
 
 /**
+ * SEC-30: `signalGroup` already tolerates ESRCH/EPERM (an already-gone or recycled group), but
+ * `terminateGroup`'s whole contract is "always settles" — STOP (`killAll`) and the wall-clock
+ * timeout both call it fire-and-forget (`void`), so any other exception here would otherwise
+ * become an unhandled rejection instead of the resolved/rejected promise nobody is positioned to
+ * catch.
+ * Best effort: log and move on.
+ */
+function trySignalGroup(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  platform: NodeJS.Platform
+): void {
+  try {
+    signalGroup(child, signal, platform);
+  } catch (err) {
+    console.error(
+      `[process-group] signalGroup(${signal}) failed for pid ${child.pid ?? 'unknown'}:`,
+      err
+    );
+  }
+}
+
+/**
  * SIGTERM the group, then SIGKILL it after `graceMs` whether or not the leader exited, because
  * grandchildren that ignore SIGTERM outlive their parent. Resolves once the leader has exited.
  */
@@ -135,12 +163,12 @@ export function terminateGroup(
     if (child.exitCode !== null || child.signalCode !== null) resolve();
     else child.once('exit', () => resolve());
   });
-  signalGroup(child, 'SIGTERM', platform);
-  const timer = setTimeout(() => signalGroup(child, 'SIGKILL', platform), graceMs);
+  trySignalGroup(child, 'SIGTERM', platform);
+  const timer = setTimeout(() => trySignalGroup(child, 'SIGKILL', platform), graceMs);
   return exited.then(async () => {
     // The leader may exit on SIGTERM while a grandchild ignores it: finish the job.
     await new Promise((r) => setTimeout(r, Math.min(graceMs, 50)));
     clearTimeout(timer);
-    signalGroup(child, 'SIGKILL', platform);
+    trySignalGroup(child, 'SIGKILL', platform);
   });
 }

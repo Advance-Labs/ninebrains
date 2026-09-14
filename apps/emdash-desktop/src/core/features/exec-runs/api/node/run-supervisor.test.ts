@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   ExecRunRejectedError,
   ExecRunSupervisor,
@@ -239,4 +239,92 @@ describe('SEC-30 kill switch', () => {
       expect(sup.stopLatched).toBe(false);
     }
   );
+
+  // SEC-30: under load, the OS can recycle a process-group id between a leader exiting and the
+  // reap signal that follows it, so `process.kill(-pid, ...)` can throw EPERM against a group we
+  // never started. These two tests inject exactly that EPERM once, only on the process-group
+  // (negative-pid) form of the call `signalGroup` makes, and let every other `process.kill` call
+  // (including this file's own `alive()` liveness checks) through to the real implementation, so
+  // the underlying processes are still genuinely reaped and nothing is left running afterward.
+  function injectOneGroupEperm(): { restore: () => void } {
+    const realKill = process.kill.bind(process);
+    let thrown = false;
+    const spy = vi
+      .spyOn(process, 'kill')
+      .mockImplementation((pid: number, signal?: string | number) => {
+        if (!thrown && pid < 0) {
+          thrown = true;
+          throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+        }
+        return realKill(pid, signal);
+      });
+    return { restore: () => spy.mockRestore() };
+  }
+
+  it('does not hang a run when its reap signal hits a recycled process-group id (EPERM)', async () => {
+    // `signalGroup` itself already treats EPERM like ESRCH (the group is gone from our side
+    // either way), so this resolves clean with no reported error — exactly as an already-gone
+    // group (ESRCH) always has. Before that fix, this EPERM was an uncaught exception thrown
+    // from inside the `close` handler, before `resolve(result)`, so the run never settled.
+    const injected = injectOneGroupEperm();
+    try {
+      const result = await supervisor(fakeClaude(steps([{ say: 'hi' }]))).run(spec());
+      expect(result).toMatchObject({ ok: true, reason: 'completed', errors: [] });
+    } finally {
+      injected.restore();
+    }
+  });
+
+  it('does not hang a run and reports it when the reap signal fails for an unexpected reason', async () => {
+    // Anything `signalGroup` doesn't already recognize as "the group is gone" (unlike ESRCH and
+    // EPERM) is a genuine backstop case: `resolve(result)` still must not depend on it, and
+    // unlike the tolerated codes above, it should show up rather than vanish silently.
+    const realKill = process.kill.bind(process);
+    let thrown = false;
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (!thrown && pid < 0) {
+        thrown = true;
+        throw Object.assign(new Error('kill EIO'), { code: 'EIO' });
+      }
+      return realKill(pid, signal);
+    });
+    try {
+      const result = await supervisor(fakeClaude(steps([{ say: 'hi' }]))).run(spec());
+      expect(result).toMatchObject({ ok: true, reason: 'completed' });
+      expect(result.errors.join()).toMatch(/failed to reap leftover processes/);
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
+  it('killAll still kills every run and stays latched when one signal hits a recycled pid', async () => {
+    const injected = injectOneGroupEperm();
+    try {
+      const sup = supervisor(stubborn);
+      const specs = Array.from({ length: 2 }, () => spec());
+      const results = specs.map((s) => sup.run(s));
+      const pidFiles = specs.map((s) => join(s.cwd, 'grandchild.pid'));
+      for (
+        let i = 0;
+        i < 100 && !pidFiles.every((f) => existsSync(f) && readFileSync(f, 'utf8').trim());
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const pids = pidFiles.map((f) => Number(readFileSync(f, 'utf8').trim()));
+      expect(pids.every(alive)).toBe(true);
+
+      await sup.killAll();
+      for (let i = 0; i < 100 && pids.some(alive); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(pids.filter(alive)).toEqual([]);
+      for (const r of await Promise.all(results)) expect(r.reason).toBe('killed');
+      expect(sup.stopLatched).toBe(true);
+      sup.clearStop();
+    } finally {
+      injected.restore();
+    }
+  });
 });
