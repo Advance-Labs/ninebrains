@@ -327,4 +327,77 @@ describe('SEC-30 kill switch', () => {
       injected.restore();
     }
   });
+
+  it('killAll still completes and stays latched, and reports it, when a STOP-path signal fails unexpectedly', async () => {
+    // Unlike the two EPERM tests above, EIO isn't a code `signalGroup` treats as "the group is
+    // gone" — it should be reported, not swallowed. This is one of the three STOP-path signals
+    // inside terminateGroup, not the post-close reap the other two tests cover.
+    //
+    // The mock only throws for these two runs' own leader pids (learned from their `started`
+    // events, negated to match `signalGroup`'s `-pid` form) — never "the first negative-pid call
+    // system-wide". terminateGroup's own trailing, 50ms-delayed final SIGKILL from the *previous*
+    // test's killAll can still be in flight when this test's spy is installed (`run.done` settles
+    // before that tail finishes), and an unscoped mock would consume its one-shot throw on that
+    // unrelated call instead of on anything this test does.
+    const sup = supervisor(stubborn);
+    const events: ExecRunEvent[] = [];
+    sup.onEvent((e) => events.push(e));
+    const specs = Array.from({ length: 2 }, () => spec());
+    const results = specs.map((s) => sup.run(s));
+    for (let i = 0; i < 100 && events.filter((e) => e.type === 'started').length < 2; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const leaderPids = events
+      .filter((e): e is Extract<ExecRunEvent, { type: 'started' }> => e.type === 'started')
+      .map((e) => e.pid);
+    expect(leaderPids).toHaveLength(2);
+
+    const realKill = process.kill.bind(process);
+    let thrown = false;
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (!thrown && leaderPids.includes(-pid)) {
+        thrown = true;
+        throw Object.assign(new Error('kill EIO'), { code: 'EIO' });
+      }
+      return realKill(pid, signal);
+    });
+    try {
+      const pidFiles = specs.map((s) => join(s.cwd, 'grandchild.pid'));
+      for (
+        let i = 0;
+        i < 100 && !pidFiles.every((f) => existsSync(f) && readFileSync(f, 'utf8').trim());
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const pids = pidFiles.map((f) => Number(readFileSync(f, 'utf8').trim()));
+      expect(pids.every(alive)).toBe(true);
+
+      await sup.killAll();
+      for (let i = 0; i < 100 && pids.some(alive); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      // killAll's own liveness/latch guarantees hold exactly as without the injected failure.
+      expect(pids.filter(alive)).toEqual([]);
+      const settled = await Promise.all(results);
+      for (const r of settled) expect(r.reason).toBe('killed');
+      expect(sup.stopLatched).toBe(true);
+
+      // The failure was recorded, not silently dropped: one run's result carries it, and it was
+      // emitted live as a `security` event with the same detail.
+      expect(settled.some((r) => r.errors.some((e) => e.includes('kill EIO')))).toBe(true);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: 'security',
+          kind: 'signal-failed',
+          detail: expect.stringContaining('kill EIO'),
+        })
+      );
+
+      sup.clearStop();
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
 });

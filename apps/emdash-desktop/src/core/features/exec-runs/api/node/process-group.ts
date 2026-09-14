@@ -73,6 +73,9 @@ export function signalGroup(
   }
 }
 
+/** A `signalGroup` failure `trySignalGroup` tolerated (never ESRCH/EPERM — those aren't reported). */
+export type SignalFailure = { pid: number | undefined; signal: NodeJS.Signals; error: unknown };
+
 export class StopLatchedError extends Error {
   constructor(what: string) {
     super(`STOP is latched: refusing to start ${what}`);
@@ -109,12 +112,21 @@ export class ProcessGroupRegistry {
     child.once('exit', () => this.live.delete(child));
   }
 
-  /** Latches, then SIGTERMs every tracked group and SIGKILLs it after `graceMs`. */
-  async killAll(graceMs: number): Promise<void> {
+  /**
+   * Latches, then SIGTERMs every tracked group and SIGKILLs it after `graceMs`. A signal failure
+   * (anything `signalGroup` doesn't already treat as "the group is gone") is always logged
+   * (`trySignalGroup`); `onSignalFailure`, when given, also gets each one — the caller's own
+   * place to record it, e.g. a run's transcript. Never throws; `killAll` still completes and
+   * every group is still signalled even if every one of them fails.
+   */
+  async killAll(
+    graceMs: number,
+    onSignalFailure?: (failure: SignalFailure) => void
+  ): Promise<void> {
     this.latched = true;
     await Promise.all(
       [...this.live].map(([child, platform]) =>
-        terminateGroup(child, graceMs, platform).catch(() => undefined)
+        terminateGroup(child, graceMs, platform, onSignalFailure).catch(() => undefined)
       )
     );
   }
@@ -132,13 +144,14 @@ export const processGroups = new ProcessGroupRegistry();
  * `terminateGroup`'s whole contract is "always settles" — STOP (`killAll`) and the wall-clock
  * timeout both call it fire-and-forget (`void`), so any other exception here would otherwise
  * become an unhandled rejection instead of the resolved/rejected promise nobody is positioned to
- * catch.
- * Best effort: log and move on.
+ * catch. Always logs; also reports to `onFailure` when the caller has somewhere better to put it
+ * (a run's transcript). Best effort either way: log/report, then move on.
  */
 function trySignalGroup(
   child: ChildProcess,
   signal: NodeJS.Signals,
-  platform: NodeJS.Platform
+  platform: NodeJS.Platform,
+  onFailure?: (failure: SignalFailure) => void
 ): void {
   try {
     signalGroup(child, signal, platform);
@@ -147,28 +160,37 @@ function trySignalGroup(
       `[process-group] signalGroup(${signal}) failed for pid ${child.pid ?? 'unknown'}:`,
       err
     );
+    onFailure?.({ pid: child.pid, signal, error: err });
   }
 }
 
 /**
  * SIGTERM the group, then SIGKILL it after `graceMs` whether or not the leader exited, because
  * grandchildren that ignore SIGTERM outlive their parent. Resolves once the leader has exited.
+ * `onSignalFailure`, when given, is called for each of the three signals here that fails (beyond
+ * ESRCH/EPERM, which `signalGroup` already treats as "the group is gone" and never reports) — the
+ * caller's hook to record it somewhere more durable than the console `trySignalGroup` always logs
+ * to.
  */
 export function terminateGroup(
   child: ChildProcess,
   graceMs: number,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  onSignalFailure?: (failure: SignalFailure) => void
 ): Promise<void> {
   const exited = new Promise<void>((resolve) => {
     if (child.exitCode !== null || child.signalCode !== null) resolve();
     else child.once('exit', () => resolve());
   });
-  trySignalGroup(child, 'SIGTERM', platform);
-  const timer = setTimeout(() => trySignalGroup(child, 'SIGKILL', platform), graceMs);
+  trySignalGroup(child, 'SIGTERM', platform, onSignalFailure);
+  const timer = setTimeout(
+    () => trySignalGroup(child, 'SIGKILL', platform, onSignalFailure),
+    graceMs
+  );
   return exited.then(async () => {
     // The leader may exit on SIGTERM while a grandchild ignores it: finish the job.
     await new Promise((r) => setTimeout(r, Math.min(graceMs, 50)));
     clearTimeout(timer);
-    trySignalGroup(child, 'SIGKILL', platform);
+    trySignalGroup(child, 'SIGKILL', platform, onSignalFailure);
   });
 }

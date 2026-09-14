@@ -34,6 +34,7 @@ import {
   spawnInGroup,
   terminateGroup,
   type ProcessGroupRegistry,
+  type SignalFailure,
 } from './process-group';
 import { createRedactor, describeEnvForTranscript } from './redact';
 import { buildUnattendedEnv } from './run-env';
@@ -106,11 +107,20 @@ interface ActiveRun {
   endReason?: ExecRunEndReason;
   terminating?: Promise<void>;
   done: Promise<ExecRunResult>;
+  transcript: TranscriptWriter;
+  /** SEC-30: signal failures from `terminate()` (STOP, cancel, wall-clock), folded into the
+   * result's `errors` once the run closes — the same visibility the post-close reap gets. */
+  signalFailures: string[];
 }
 
 const STDERR_TAIL = 8 * 1024;
 /** Upper bound for killAll even if a process ignores SIGKILL (uninterruptible sleep). */
 const KILL_ALL_SLACK_MS = 2500;
+
+function describeSignalFailure(failure: SignalFailure): string {
+  const message = failure.error instanceof Error ? failure.error.message : String(failure.error);
+  return `signalGroup(${failure.signal}) failed for pid ${failure.pid ?? 'unknown'}: ${message}`;
+}
 
 export class ExecRunSupervisor {
   private readonly active = new Map<string, ActiveRun>();
@@ -230,7 +240,15 @@ export class ExecRunSupervisor {
     if (reason === 'wall-clock' || reason === 'tokens') {
       this.emit({ type: 'budget-exceeded', runId, budget: reason });
     }
-    run.terminating = terminateGroup(run.child, this.graceMs, this.platform);
+    // SEC-30: SIGTERM/SIGKILL failures here (STOP, cancel, wall-clock) get the same visibility
+    // as the post-close reap — recorded to this run's transcript and its eventual `errors`, and
+    // emitted live, instead of only reaching the console via `trySignalGroup`.
+    run.terminating = terminateGroup(run.child, this.graceMs, this.platform, (failure) => {
+      const detail = describeSignalFailure(failure);
+      run.signalFailures.push(detail);
+      run.transcript.record('security', { kind: 'signal-failed', detail });
+      this.emit({ type: 'security', runId, kind: 'signal-failed', detail });
+    });
     return run.terminating;
   }
 
@@ -389,7 +407,12 @@ export class ExecRunSupervisor {
       platform: this.platform,
       argvGuard: guard,
     });
-    const run: ActiveRun = { child, done: undefined as unknown as Promise<ExecRunResult> };
+    const run: ActiveRun = {
+      child,
+      done: undefined as unknown as Promise<ExecRunResult>,
+      transcript,
+      signalFailures: [],
+    };
     this.active.set(spec.runId, run);
 
     run.done = new Promise<ExecRunResult>((resolve) => {
@@ -455,13 +478,20 @@ export class ExecRunSupervisor {
         // Reap anything the agent left running in its group (dev servers, watchers). SEC-30:
         // signalGroup already tolerates ESRCH/EPERM (the group, or its recycled pid, is gone
         // from our side), but this catch is the backstop — a reap failure of any kind must
-        // never stop `resolve(result)` below from running, or the run would hang forever.
+        // never stop `resolve(result)` below from running, or the run would hang forever. Given
+        // the same treatment as a `terminate()` signal failure: transcript, `errors`, and event.
         let reapError: string | undefined;
         try {
           signalGroup(child, 'SIGKILL', this.platform);
         } catch (err) {
-          reapError = err instanceof Error ? err.message : String(err);
-          transcript.record('security', { kind: 'reap-failed', detail: reapError });
+          reapError = describeSignalFailure({ pid: child.pid, signal: 'SIGKILL', error: err });
+          transcript.record('security', { kind: 'signal-failed', detail: reapError });
+          this.emit({
+            type: 'security',
+            runId: spec.runId,
+            kind: 'signal-failed',
+            detail: reapError,
+          });
         }
         const outcome = parser.finish();
         const reason: ExecRunEndReason =
@@ -478,6 +508,8 @@ export class ExecRunSupervisor {
         const errors = [...outcome.errors];
         if (spawnError) errors.push(spawnError.message);
         if (reapError) errors.push(`failed to reap leftover processes: ${reapError}`);
+        // SEC-30: any STOP/cancel/wall-clock signal failures collected by `terminate()`.
+        errors.push(...run.signalFailures);
         if (reason !== 'completed' && stderrTail.trim())
           errors.push(stderrTail.trim().slice(-2000));
         const result: ExecRunResult = {

@@ -164,8 +164,16 @@ export type ExecRunEvent =
   | { type: 'started'; runId: string; provider: ExecProvider; preset: ExecPreset; pid: number }
   | { type: 'agent'; runId: string; event: AgentEvent }
   | { type: 'budget-exceeded'; runId: string; budget: 'wall-clock' | 'tokens' }
-  /** A security-relevant refusal, for `security_events` once SEC-33 lands (logged until then). */
-  | { type: 'security'; runId: string; kind: 'credential-mismatch'; detail: string }
+  /** A security-relevant refusal, for `security_events` once SEC-33 lands (logged until then).
+   * `signal-failed`: a SEC-30 kill signal (the post-close reap, or one of `killAll`'s/the
+   * wall-clock timeout's SIGTERM/SIGKILLs) failed for a reason `signalGroup` doesn't already
+   * treat as "the group is gone" (ESRCH/EPERM never reach here). */
+  | {
+      type: 'security';
+      runId: string;
+      kind: 'credential-mismatch' | 'signal-failed';
+      detail: string;
+    }
   | { type: 'finished'; runId: string; result: ExecRunResult }
   | { type: 'stop-latched'; activeRuns: number }
   | { type: 'stop-cleared' };
