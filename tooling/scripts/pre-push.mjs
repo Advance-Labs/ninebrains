@@ -113,9 +113,14 @@ export function runPrePush({
   if (commands.length > 0 && git(['status', '--porcelain']).trim()) {
     log('pre-push: warning: uncommitted changes are in the working tree, and the checks see them.');
   }
+  // The Playwright browser projects are skipped here (apps/emdash-desktop/vitest.config.ts reads
+  // EMDASH_TEST_SKIP_BROWSER): under a full local `nx affected` run they time out on load, not on
+  // bugs, and block the push. CI's test-browser job still runs them on every PR.
+  // `EMDASH_TEST_BROWSER=1 git push` forces them back on.
+  const childEnv = { ...checkEnv(env), EMDASH_TEST_SKIP_BROWSER: '1' };
   for (const [cmd, args] of commands) {
     log(`\npre-push: ${cmd} ${args.join(' ')}`);
-    const status = run(cmd, args, checkEnv(env));
+    const status = run(cmd, args, childEnv);
     if (status !== 0) {
       log(`\npre-push: failed at "${cmd} ${args.join(' ')}". Fix it, or push with --no-verify (CI will still run it).`);
       return typeof status === 'number' ? status : 1;

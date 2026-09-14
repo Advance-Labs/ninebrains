@@ -111,6 +111,10 @@ It refuses pushes to `main`. Before any other push it runs `format:check`, `nx a
 typecheck and test against `origin/main`, and the upstream-patch log check. It checks your working
 tree, so commit first. `git push --no-verify` skips it; CI still runs everything.
 
+The hook skips the Playwright `browser` test projects: in a full local run they time out under load
+and would block pushes for no real failure. CI's `test-browser` job still runs them on every PR.
+Push with `EMDASH_TEST_BROWSER=1 git push` to include them.
+
 CI runs the Playwright-backed `browser` projects too, but run them locally for UI changes. The first
 run on a machine needs:
 
