@@ -263,8 +263,33 @@ jobs:
           export PR_TITLE
           node tooling/scripts/pr-hygiene.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
+      # A verified Dependabot PR (real signed/web-flow-committed commits, single-parent, opened by
+      # the bot account itself) cannot write the upstream-patch row a human would, so it skips the
+      # check below. Anything else — including a spoofed author email, which this does not trust —
+      # falls through to the check. An API failure also falls through: fail closed.
+      - name: Is this a verified bot PR?
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        id: bot-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if result="$(node tooling/scripts/bot-pr.mjs --repo "$REPO" --pr "$NUMBER")"; then
+            if [ "$result" = exempt ]; then
+              echo "::notice::PR #$NUMBER is a verified bot PR; skipping the upstream-patch log check."
+              echo "exempt=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "$result"
+              echo "exempt=false" >>"$GITHUB_OUTPUT"
+            fi
+          else
+            echo "::warning::bot-pr.mjs failed; treating PR #$NUMBER as not exempt."
+            echo "exempt=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - name: Upstream-patch log
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.bot-pr.outputs.exempt != 'true' }}
         run: node tooling/scripts/check-upstream-patches.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
   e2e:
