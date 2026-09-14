@@ -170,7 +170,15 @@ describe('BrainService', () => {
 
     await service.stopAll();
 
-    expect(brain.getJob(APP_IDENTITY, job.id)).toMatchObject({ state: 'ready', laneId: null });
+    // Like a manual requeue, a STOP requeue hands back a clean job: a fresh attempt budget and
+    // no leftover reason or result (T42). Intended, not incidental, so it is pinned here.
+    expect(brain.getJob(APP_IDENTITY, job.id)).toMatchObject({
+      state: 'ready',
+      laneId: null,
+      attempts: 0,
+      reason: null,
+      result: null,
+    });
   });
 
   it('STOP requeues a claimed-but-not-yet-running job too', async () => {
