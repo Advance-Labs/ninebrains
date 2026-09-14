@@ -160,6 +160,34 @@ describe('exec run supervisor', () => {
       /not inside/
     );
   });
+
+  it('T43 refuses an unattended run at the lane worktree root by default', async () => {
+    const laneRoot = lane();
+    await expect(
+      supervisor(fakeClaude(), { allowedRoots: () => [laneRoot] }).run(spec({ cwd: laneRoot }))
+    ).rejects.toThrow(/not inside/);
+  });
+
+  it('T43 allows an unattended run at exactly its own lane worktree root', async () => {
+    const laneRoot = lane();
+    const result = await supervisor(fakeClaude(), {
+      allowedRoots: () => [laneRoot],
+      exactRootsAllowed: () => [laneRoot],
+    }).run(spec({ cwd: laneRoot }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('T43 still refuses a shared root (e.g. checkoutRoot) exactly, even alongside a lane root', async () => {
+    const laneRoot = lane();
+    const checkoutRoot = join(root, `checkouts-${randomUUID().slice(0, 8)}`);
+    mkdirSync(checkoutRoot, { recursive: true });
+    await expect(
+      supervisor(fakeClaude(), {
+        allowedRoots: () => [laneRoot, checkoutRoot],
+        exactRootsAllowed: () => [laneRoot],
+      }).run(spec({ cwd: checkoutRoot }))
+    ).rejects.toThrow(/not inside/);
+  });
 });
 
 describe('SEC-30 kill switch', () => {
