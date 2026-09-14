@@ -52,7 +52,7 @@ means no automated check exists and one is not planned here. "none" means an act
 | screenshot gate | 3 widths, console/network/diff checks, then a reviewer verdict | P0 | e2e `self-heal` (deliberately broken UI job, fixed, attempt 2 passes with 3 screenshots); unit `gates/node/runner/self-heal.test.ts` |
 | reviewer / security-review gate | Disposable checkout, read-only reviewer, JSON verdict | P0 | unit `gates/node/capabilities/{review-checkout,spawn-reviewer}.test.ts`; e2e `brain-fanout` uses the approving-reviewer path but never exercises a `pass:false` verdict end to end |
 | fact-check gate | `claims.json`, SSRF-safe fetch, grounded/imprecise/invented/uncited | P1 | unit `gates/node/capabilities/{fetch-text,ip-policy}.test.ts`; no e2e (needs the research pack, not in the candidate list) |
-| Retry/attempt/feedback rules (3 strikes → blocked) | Feedback in inbox, third failure blocks | P0 | e2e `self-heal` (one retry cycle only, not the third-strike block); unit `gates/node/runner/gate-runner.test.ts` covers the full state table |
+| Retry/attempt/feedback rules (3 strikes → blocked) | Feedback in inbox, third failure blocks | P0 | e2e `self-heal` (one retry cycle) and **`gate-blocks-job` (new, this PR)** covers the third-strike block, no fourth attempt, and the Brain drawer's blocked count; unit `gates/node/runner/gate-runner.test.ts` covers the full state table |
 | No test command → job blocked at once | Setup problem, no attempt used | P0 | unit `gates/node/project-prefs-service.test.ts`; manual check: `docs/guide/troubleshooting.md#every-job-is-blocked-with-no-test-command-is-set-for-this-project` |
 | Rigor settings (testing/security 0–10) | Which gates attach by default | P1 | unit `gates/node/rigor/rigor.test.ts` |
 | Evidence storage/retention | `ninebrains/evidence/<jobId>/<attempt>/`, 30 days | P2 | unit `gates/node/evidence/evidence.test.ts` |
@@ -78,7 +78,7 @@ means no automated check exists and one is not planned here. "none" means an act
 | Environment allow-list (no `GITHUB_TOKEN`, `AWS_*`, etc.) | Only login vars, `PATH`, `HOME`, locale, proxy | P0 (security) | unit `exec-runs/api/node/run-env.test.ts`, `run-env-routing.test.ts` |
 | Permission-bypass guard | No `--dangerously-skip-permissions` etc. can ever be built | P0 (security) | unit `exec-runs/api/node/argv-guard.test.ts` |
 | Transcript redaction | Keys/tokens stripped before writing | P0 (security) | unit `exec-runs/api/node/redact.test.ts` |
-| Actually running a job unattended end to end (`claude -p`) | A lane switched to unattended completes a real Brain job headless | P0 | **none at e2e level** — see "Known app/test gaps" below; the interactive lane path is covered (`brain-fanout`), the headless path is not |
+| Actually running a job unattended end to end (`claude -p`) | A lane switched to unattended completes a real Brain job headless | P0 | **e2e `unattended-job` (new, this PR)** — the harness gap (baking `FAKE_AGENT_SCRIPT` into the wrapper by argv shape, no env) is fixed and independently verified in the suite; the suite still SKIPs on a separate real app bug it found — see "Known app/test gaps" #6 |
 | Codex unattended runs (experimental) | `codex exec --json` | P2 (documented experimental) | unit `exec-runs/api/node/codex-exec.test.ts`; no e2e (fake agent stands in for `claude` only) |
 
 ## Model routing and accounts
@@ -96,17 +96,19 @@ means no automated check exists and one is not planned here. "none" means an act
 
 | Feature | Flow | Priority | Coverage today |
 |---|---|---|---|
-| Open Planner (command palette / Lanes titlebar / Brain drawer) | Opens the current project's canvas | P0 | unit `planner/contributions/commands.test.ts`; component `planner/browser/planner-canvas.browser.test.tsx`; **no e2e** |
-| Build a plan (jobs, notes, modules, edges) | Toolbar add + drag to connect | P1 | component `planner/browser/planner-canvas.browser.test.tsx`; unit `planner/api/schema.test.ts` |
-| Run plan → compiles to Brain jobs, idempotent, cycle refusal | ⌘Enter/Ctrl+Enter compiles the canvas | P0 | unit `planner/node/planner-service.test.ts` (idempotency, cycle refusal, archiving removed nodes); **no e2e** proves a plan reaching the Brain drawer as live jobs |
+| Open Planner (command palette / Lanes titlebar / Brain drawer) | Opens the current project's canvas | P0 | unit `planner/contributions/commands.test.ts`; component `planner/browser/planner-canvas.browser.test.tsx`; **e2e `planner-run-plan` (new, this PR)** opens it from the Lanes titlebar |
+| Build a plan (jobs, notes, modules, edges) | Toolbar add + drag to connect | P1 | component `planner/browser/planner-canvas.browser.test.tsx`; unit `planner/api/schema.test.ts`; **e2e `planner-run-plan`** adds two job nodes and drags a real edge between them (React Flow's `data-nodeid`/`data-handlepos` handle attributes) |
+| Run plan → compiles to Brain jobs, idempotent, cycle refusal | ⌘Enter/Ctrl+Enter compiles the canvas | P0 | unit `planner/node/planner-service.test.ts` (idempotency, cycle refusal, archiving removed nodes); **e2e `planner-run-plan` (new, this PR)** clicks Run plan and asserts the compiled jobs reach the Brain with the right dependency (the depended-on job `ready`, the dependent job `proposed`), cross-checked directly against the Brain DB |
 | Draft from brief | Not available in v0.1 | P2 (documented not-built) | n/a |
 | Canvas persistence (viewport 90 days, damaged canvas loads empty) | Per-project save/load | P1 | unit `planner/node/planner-service.test.ts` |
 
-This was one of the task's likely e2e candidates (open the Planner, build a small plan, Run plan,
-jobs appear in the Brain). It is not implemented in this PR: driving the canvas (React Flow-style
-drag-to-connect) reliably through Playwright needs its own investigation into stable drag targets,
-and `planner-canvas.browser.test.tsx` already exercises the compile logic at the component level.
-Left as a **P0 gap** — see "Known app/test gaps" below.
+**Resolved in this PR.** The previous edition of this matrix left "open the Planner, build a small
+plan, Run plan, jobs appear in the Brain" as a P0 gap, expecting React Flow's drag-to-connect
+canvas to need its own investigation into stable drag targets. It turned out to have one:
+`@xyflow/react`'s `Handle` component renders `data-nodeid`/`data-handlepos` attributes, so a source
+handle and a target handle are addressable directly, and a plain `page.mouse.down()` / `move()` /
+`up()` sequence between them creates a real edge. See
+`apps/emdash-desktop/e2e/planner-run-plan.e2e.mjs`.
 
 ## Security controls (cross-cutting)
 
@@ -141,7 +143,9 @@ or a real multi-day machine, so they stay manual:
       brief, watch a job go through tests → screenshot → reviewer gates with real (not fake) agent
       output.
 - [ ] Switch a lane to unattended and let a real `claude -p` run complete a real Brain job headless
-      (the e2e suite only proves the UI toggle; see the gap above).
+      (`unattended-job.e2e.mjs` proves the fake-agent path once the run starts, but the run itself
+      is currently broken by a real app bug — see "Known app/test gaps" #3 — so this still needs a
+      real login until that is fixed).
 - [ ] Two Claude Code accounts (`CLAUDE_CONFIG_DIR`): confirm each has independent trust, hooks and
       login status, and that a lane launched from a terminal with one account set actually uses it.
 - [ ] Enable the SEO pack for real against the hosted AEO Toolkit endpoint (or a self-hosted one),
@@ -156,24 +160,33 @@ or a real multi-day machine, so they stay manual:
 
 Bugs and coverage holes found while building this matrix, not fixed here per the task's scope:
 
-1. **Planner has no e2e coverage (P0 gap).** "Open Planner → build a plan → Run plan → jobs appear
-   in the Brain" is a documented, real user flow (`docs/guide/planner.md`,
-   `docs/guide/getting-started.md#5-give-the-brain-a-brief`) with zero end-to-end proof against the
-   built app. The component test (`planner-canvas.browser.test.tsx`) and service test
-   (`planner-service.test.ts`) cover the logic in isolation but never through the real Electron UI
-   with a live Brain. Recommend a follow-up spike on driving React Flow-style canvases with
-   Playwright before attempting this suite.
-2. **Unattended job execution has no e2e coverage (P0 gap).** `lane-run-mode.e2e.mjs` (this PR)
-   proves the attended ⇄ unattended UI toggle, but not a Brain job actually completing through a
-   real `claude -p` unattended run. Repro of why it is hard: the harness's `FAKE_AGENT_SCRIPT` is
-   baked into the interactive `claude` wrapper as a file path (`installFakeClaude` in
-   `harness.mjs`), but an unattended run's environment is built from
-   `exec-runs/api/node/run-env.ts`'s narrow allowlist, which does not carry `FAKE_AGENT_SCRIPT`
-   through — so a `-p` launch always falls back to the wrapper's default approving-reviewer script
-   (`{"pass": true, "issues": []}`), which never calls `complete_job`. Fixing this needs either a
-   allowlisted test-only escape hatch in `run-env.ts`, or a way to bake a lane-specific unattended
-   script into the run the way `installFakeClaude` does for the interactive case.
-3. **STOP's documented behavior for an untouched idle lane is correct, but easy to
+1. **Resolved (this PR): Planner e2e coverage.** See the Planner section above and
+   `planner-run-plan.e2e.mjs`.
+2. **Resolved (this PR): the harness half of the unattended-job gap.** `unattended-job.e2e.mjs`
+   proves a lane switched to unattended, dispatching a Brain job to it, spawns the fake `claude`
+   through the exec supervisor as a real child process, and that `installFakeClaude`
+   (`harness.mjs`) can hand it a script with no environment variable crossing the SEC-13/SEC-40
+   allowlist: the wrapper picks its default script from argv shape alone (a reviewer run's argv
+   always carries `--tools=`; a worker run never does), which the suite verifies directly by
+   invoking the wrapper binary itself with each shape. `run-env.ts` was not touched.
+3. **New (this PR): unattended job execution is broken end to end (P0 app bug).** Found while
+   building `unattended-job.e2e.mjs` — the suite reaches this bug immediately and SKIPs (with the
+   repro) rather than asserting the real thing, so it will start passing for free once this is
+   fixed. `runJobUnattended` (`brain/node/unattended.ts`) passes `cwd: lane.worktreePath` straight
+   to the exec supervisor. The supervisor's `allowedRoots()`
+   (`create-ninebrains-services.ts`: `[...laneWorktrees(), checkoutRoot]`) is built from
+   `laneWorktrees()`, which is each lane's own worktree path — the same value as `cwd`. But
+   `resolveRunCwd` (`exec-runs/api/node/run-paths.ts`) requires `cwd` to be strictly *inside* a
+   root; a root that matches `cwd` exactly is refused on purpose (its own test: "refuses ... the
+   root itself"). So **every unattended job run fails at once**, before the agent is ever spawned,
+   with `Run cwd ... is not inside an allowed worktree root`. The tests gate hits the identical
+   shape (it also runs in the lane worktree, one of its own allowed roots) and already has a fix:
+   `resolveGateCwd` in `gates/node/capabilities/run-command.ts` explicitly accepts an exact-root
+   match unless denied. `runJobUnattended` has no equivalent and calls the supervisor directly.
+   **Repro:** switch any lane to unattended, dispatch it any job (e.g. `create_job` with no
+   `dependsOn`), watch it fail immediately with that message. Not fixed here — out of scope for a
+   test PR, and not a harness issue.
+4. **STOP's documented behavior for an untouched idle lane is correct, but easy to
    misread from the docs alone (not a bug, a doc-clarity note).**
    `docs/guide/unattended-runs.md#the-stop-switch` says STOP "also stops the terminal session of
    every attended lane that holds a Brain job" — confirmed exactly true by `stop-halts-lanes.e2e.mjs`:
@@ -183,10 +196,10 @@ Bugs and coverage holes found while building this matrix, not fixed here per the
    click that lane's own "Start agent" button. A user who clears STOP and expects work to resume on
    its own will see nothing happen. **Documented in this PR** in `docs/guide/unattended-runs.md`
    (the STOP switch) and `docs/guide/troubleshooting.md`.
-4. **Resolved (PR #5):** the stale `<!-- VERIFY -->` markers in `planner.md`,
+5. **Resolved (PR #5):** the stale `<!-- VERIFY -->` markers in `planner.md`,
    `unattended-runs.md` and `brain-and-jobs.md` that denied the Planner entry point and the lane
    mode control. This branch was first cut before PR #5 merged.
-5. **Fixed in this PR:** `docs/guide/contributing.md` and root `CONTRIBUTING.md` said the e2e suites
+6. **Fixed in this PR:** `docs/guide/contributing.md` and root `CONTRIBUTING.md` said the e2e suites
    are "kept out of CI". `.github/workflows/e2e.yml` runs them on the `run-e2e` label, weekly, on
    `release/**` pushes and before every release; both docs now say so.
 
@@ -197,7 +210,16 @@ Bugs and coverage holes found while building this matrix, not fixed here per the
 | `apps/emdash-desktop/e2e/stop-halts-lanes.e2e.mjs` | STOP latches dispatch, requeues the held job, stops that lane; Clear STOP; restart; dispatch resumes | New, added in this PR |
 | `apps/emdash-desktop/e2e/lane-run-mode.e2e.mjs` | Attended → unattended (with confirmation) → attended (no confirmation) | New, added in this PR |
 | `apps/emdash-desktop/e2e/lane-from-pack-role.e2e.mjs` | Enable the coding pack, add a lane with the Builder role, role's system prompt reaches the real launch | New, added in this PR |
+| `apps/emdash-desktop/e2e/unattended-job.e2e.mjs` | A lane switched to unattended, dispatched a job, and a real `claude -p` (worker preset) run — the wrapper's argv-based script selection is verified directly; the full flow SKIPs on the app bug in gap #3 above | New, added in this PR |
+| `apps/emdash-desktop/e2e/planner-run-plan.e2e.mjs` | Planner: add two job nodes, drag a real edge between them, Run plan, the compiled jobs reach the Brain with the right dependency (ready / proposed) | New, added in this PR |
+| `apps/emdash-desktop/e2e/gate-blocks-job.e2e.mjs` | A UI job that never gets fixed fails its screenshot gate three times, blocks with no fourth attempt, and the Brain drawer shows "1 blocked" | New, added in this PR |
 
-All three build with `pnpm --dir apps/emdash-desktop run build` and pass locally
+All suites build with `pnpm --dir apps/emdash-desktop run build` and pass locally 3 times in a row
 (`node apps/emdash-desktop/e2e/<suite>.e2e.mjs`), and are added to the `for suite in ...` list in
 `.github/workflows/e2e.yml`.
+
+**P0 coverage, after this update:** the three P0 flows this matrix previously listed with no e2e
+proof at all now each have a suite: Planner (`planner-run-plan`, passing), the third-gate-failure
+block (`gate-blocks-job`, passing), and unattended job execution (`unattended-job`, which reaches
+and reports the app bug in gap #3 above, then SKIPs instead of asserting the full flow — it will
+start asserting the real thing for free once that bug is fixed).
