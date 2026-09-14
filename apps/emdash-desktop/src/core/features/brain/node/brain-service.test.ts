@@ -158,6 +158,44 @@ describe('BrainService', () => {
     expect(service.dispatcher.state).toMatchObject({ paused: false, stopLatched: false });
   });
 
+  it('STOP requeues the job a dispatched lane held, even though the lane port never reports an exit', async () => {
+    const { service, brain } = await setup();
+    service.start();
+    const job = brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'Work' });
+    await service.dispatcher.tick();
+    // The fake `lanes.stop` port below (see `setup()`) only records the call; it never fires a
+    // terminal-exit event, a hook, or any other signal back into the Brain. If STOP's requeue
+    // depended on one of those to arrive, this job would stay `running` forever.
+    expect(brain.getJob(APP_IDENTITY, job.id).state).toBe('running');
+
+    await service.stopAll();
+
+    // Like a manual requeue, a STOP requeue hands back a clean job: a fresh attempt budget and
+    // no leftover reason or result (T42). Intended, not incidental, so it is pinned here.
+    expect(brain.getJob(APP_IDENTITY, job.id)).toMatchObject({
+      state: 'ready',
+      laneId: null,
+      attempts: 0,
+      reason: null,
+      result: null,
+    });
+  });
+
+  it('STOP requeues a claimed-but-not-yet-running job too', async () => {
+    const { service, brain } = await setup();
+    service.start();
+    await service.dispatcher.tick(); // registers the lane with the Brain, no job to dispatch yet
+    // Claimed directly (bypassing the dispatcher paste/startRun flow) to catch the job mid-flight,
+    // the way STOP can see it: assigned to the lane, but not yet running.
+    const job = brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'Work' });
+    brain.assignJob(APP_IDENTITY, job.id, 'lane-1');
+    expect(brain.getJob(APP_IDENTITY, job.id).state).toBe('claimed');
+
+    await service.stopAll();
+
+    expect(brain.getJob(APP_IDENTITY, job.id)).toMatchObject({ state: 'ready', laneId: null });
+  });
+
   it('T37 Clear STOP keeps a pause the user set before STOP', async () => {
     const { service, brain } = await setup();
     service.start();
