@@ -13,22 +13,20 @@
 // ever gets `--allowedTools=`. No environment variable crosses the allowlist.
 //
 // A SEPARATE, real app bug surfaced while building this suite (see "Known app/test gaps" #6 in
-// the matrix): every unattended job run fails immediately, before the fake agent is ever
-// spawned, with "Run cwd ... is not inside an allowed worktree root". `runJobUnattended` passes
-// `cwd: lane.worktreePath` straight to the exec supervisor, whose `allowedRoots()`
-// (create-ninebrains-services.ts) is `[...laneWorktrees(), checkoutRoot]` — and `laneWorktrees()`
-// is each lane's own worktree path, i.e. cwd is always exactly equal to one of its own allowed
-// roots. `resolveRunCwd` (run-paths.ts) requires cwd to be a path *strictly inside* a root — a
-// root matching cwd exactly is refused, on purpose (see its own test: "refuses ... the root
-// itself"). The tests gate hit this same shape (a gate also runs a command in the lane worktree
-// itself, one of its own allowed roots) and worked around it with `resolveGateCwd` in
-// gates/node/capabilities/run-command.ts, which explicitly accepts an exact root match unless
-// denied. `runJobUnattended` calls the supervisor directly and has no equivalent. This is an app
-// bug, not a test gap; this suite does not fix it (out of scope, and not a harness fix) — it
-// detects the known failure signature and prints SKIP with the repro instead of failing, so a
-// real fix (giving the exec supervisor the same same-root allowance, or handing it worktree
-// *parent* directories the way the tests gate's roots imply) makes this suite start asserting
-// the real thing for free.
+// the matrix, and THREAT-MODEL.md T43): every unattended job run failed immediately, before the
+// fake agent was ever spawned, with "Run cwd ... is not inside an allowed worktree root".
+// `runJobUnattended` passes `cwd: lane.worktreePath` straight to the exec supervisor, whose
+// `allowedRoots()` (create-ninebrains-services.ts) is `[...laneWorktrees(), checkoutRoot]` — and
+// `laneWorktrees()` is each lane's own worktree path, i.e. cwd is always exactly equal to one of
+// its own allowed roots. `resolveRunCwd` (run-paths.ts) required cwd to be a path *strictly
+// inside* a root, with no exception. The tests gate hit this same shape (a gate also runs a
+// command in the lane worktree itself, one of its own allowed roots) and worked around it with
+// `resolveGateCwd` in gates/node/capabilities/run-command.ts, which explicitly accepts an exact
+// root match unless denied. **Fixed (T43):** `resolveRunCwd` now takes an `exactRootsAllowed`
+// list; the exec supervisor is wired to accept an exact match only for a lane's own worktree,
+// never the shared review-checkout root, and `resolveGateCwd` shares the same mechanism instead
+// of its own copy. This suite no longer expects the failure signature below; it is a hard
+// failure now, not a SKIP.
 //
 // Run: `pnpm run build` at the repo root first, then `node e2e/unattended-job.e2e.mjs`.
 import { execFileSync } from 'node:child_process';
@@ -61,9 +59,6 @@ const UNATTENDED_SCRIPT = [
     callTool: { server: 'brain', tool: 'complete_job', args: { jobId: JOB_ID, summary: SUMMARY } },
   },
 ];
-
-/** The exact-root resolveRunCwd bug's failure text (brain/node/unattended.ts's failJob reason). */
-const KNOWN_BUG_SIGNATURE = /not inside an allowed worktree root/;
 
 const cell = (page, slot) => page.locator(`[data-testid="lane-cell"][data-slot="${slot}"]`);
 const runModeButton = (page, slot) => cell(page, slot).getByTestId('lane-run-mode');
@@ -103,8 +98,11 @@ function argvLog(root) {
  */
 function assertWrapperSelectsByArgv(root) {
   const wrapper = join(root, 'home', '.local', 'bin', 'claude');
+  // The wrapper only defaults FAKE_AGENT_ARGV_LOG (`${VAR:=...}`), so these calibration calls log
+  // to their own file and never count as the app's `-p` runs in `argv.log`.
+  const env = { ...process.env, FAKE_AGENT_ARGV_LOG: join(root, 'argv-calibration.log') };
   const runOnce = (args) =>
-    execFileSync(wrapper, ['-p', ...args, 'irrelevant prompt'], { encoding: 'utf8' });
+    execFileSync(wrapper, ['-p', ...args, 'irrelevant prompt'], { encoding: 'utf8', env });
 
   const worker = runOnce(['--allowedTools=Bash']);
   if (!worker.includes('Building')) {
@@ -159,7 +157,7 @@ async function main() {
     step(`created job ${jobId}`);
 
     const settled = await until(
-      'the job to reach a terminal state (done, or a known app bug failing it fast)',
+      'the job to reach a terminal state (done)',
       async () => {
         const list = await brainCall(brain.url, brain.token, 'list_jobs', { limit: 50 });
         const found = (Array.isArray(list) ? list : list.jobs).find((j) => j.id === jobId);
@@ -168,19 +166,6 @@ async function main() {
       120_000
     );
 
-    if (settled.state === 'failed' && KNOWN_BUG_SIGNATURE.test(settled.reason ?? '')) {
-      step(`SKIP: known app bug, not a harness gap — job failed instantly: ${settled.reason}`);
-      process.stdout.write(
-        'SKIP unattended job e2e: runJobUnattended passes cwd=lane.worktreePath straight to the ' +
-          "exec supervisor, whose allowedRoots() is each lane's own worktree path — an exact " +
-          'match resolveRunCwd (run-paths.ts) refuses on purpose. The tests gate hit the same ' +
-          'shape and worked around it with resolveGateCwd (gates/node/capabilities/run-command.ts); ' +
-          'runJobUnattended has no equivalent. Repro: switch any lane to unattended, dispatch it ' +
-          'any job, watch it fail at once with "not inside an allowed worktree root". See the ' +
-          'file header and docs/testing/DOGFOOD-MATRIX.md "Known app/test gaps" #6.\n'
-      );
-      return;
-    }
     if (settled.state !== 'done') {
       throw new Error(`job did not reach done: ${JSON.stringify(settled)}`);
     }

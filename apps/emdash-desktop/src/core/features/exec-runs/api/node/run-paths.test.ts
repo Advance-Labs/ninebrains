@@ -47,3 +47,39 @@ describe('SEC-31 unattended scope', () => {
     await expect(resolveRunCwd(escape, [worktrees])).rejects.toThrow(/not inside/);
   });
 });
+
+describe('T43 exactRootsAllowed: a run at its own single-owner root', () => {
+  const roots = join(root, 't42-roots');
+  const checkoutRoot = join(roots, 'checkouts');
+  const laneRoot = join(roots, 'lane-b');
+  const sibling = join(roots, 'lane-c');
+  const escape = join(root, 't42-elsewhere');
+  mkdirSync(checkoutRoot, { recursive: true });
+  mkdirSync(laneRoot, { recursive: true });
+  mkdirSync(sibling, { recursive: true });
+  mkdirSync(escape, { recursive: true });
+
+  it('allows a cwd exactly at a root listed in exactRootsAllowed (its own lane worktree)', async () => {
+    await expect(resolveRunCwd(laneRoot, [laneRoot, checkoutRoot], [laneRoot])).resolves.toBe(
+      realpathSync(laneRoot)
+    );
+  });
+
+  it('still refuses a shared root exactly, even when other roots allow it', async () => {
+    await expect(resolveRunCwd(checkoutRoot, [laneRoot, checkoutRoot], [laneRoot])).rejects.toThrow(
+      /not inside/
+    );
+  });
+
+  it('still refuses a sibling root that was never listed', async () => {
+    await expect(resolveRunCwd(sibling, [laneRoot, checkoutRoot], [laneRoot])).rejects.toThrow(
+      /not inside/
+    );
+  });
+
+  it('still refuses an escape outside every root', async () => {
+    await expect(resolveRunCwd(escape, [laneRoot, checkoutRoot], [laneRoot])).rejects.toThrow(
+      /not inside/
+    );
+  });
+});

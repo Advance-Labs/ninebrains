@@ -57,6 +57,12 @@ export interface ExecRunSupervisorOptions {
   resolveBinary: ResolveProviderBinary;
   /** Worktree roots plus the review-checkout root. A run's cwd must sit inside one (SEC-31). */
   allowedRoots: () => readonly string[];
+  /**
+   * T43: which of `allowedRoots` a run's cwd may equal exactly, not just sit inside — a lane's own
+   * worktree, never the shared review-checkout root (see `resolveRunCwd`). Default: none, so an
+   * exact match at any root is refused.
+   */
+  exactRootsAllowed?: () => readonly string[];
   maxConcurrentRuns: number;
   parentEnv?: Readonly<Record<string, string | undefined>>;
   platform?: NodeJS.Platform;
@@ -241,7 +247,11 @@ export class ExecRunSupervisor {
   private async launch(spec: ExecRunSpec): Promise<ActiveRun> {
     const { userDataDir } = this.options;
     const paths = runPaths(userDataDir, spec.runId);
-    const cwd = await resolveRunCwd(spec.cwd, this.options.allowedRoots());
+    const cwd = await resolveRunCwd(
+      spec.cwd,
+      this.options.allowedRoots(),
+      this.options.exactRootsAllowed?.()
+    );
     const binary = await this.options.resolveBinary(spec.provider);
     await ensurePrivateDir(paths.root);
     await ensurePrivateDir(paths.configDir);

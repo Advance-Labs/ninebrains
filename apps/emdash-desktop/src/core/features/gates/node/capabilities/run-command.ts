@@ -128,30 +128,27 @@ class TailBuffer {
 
 /**
  * The tests gate runs in the lane worktree itself, and each lane worktree is one of the allowed
- * roots. `resolveRunCwd` was built for the exec supervisor, whose roots are parent directories, so
- * it accepts only a path strictly inside a root. Here a cwd that is exactly an allowed root is
- * accepted too, unless that root is denied: the review-checkout root is, so nothing runs at that
- * shared root itself.
+ * roots. `resolveRunCwd`'s `exactRootsAllowed` (T43) is built for exactly this: a cwd that is
+ * exactly an allowed root is accepted, unless that root is denied — the review-checkout root is,
+ * so nothing runs at that shared root itself.
  */
 async function resolveGateCwd(
   cwd: string,
   roots: readonly string[],
   denied: readonly string[]
 ): Promise<string> {
-  const realCwd = isAbsolute(cwd) ? await realpath(cwd).catch(() => undefined) : undefined;
-  if (realCwd) {
-    const deniedReal = new Set(
-      await Promise.all(denied.map((path) => realpath(path).catch(() => path)))
-    );
-    for (const root of roots) {
-      if (!isAbsolute(root)) continue;
-      const info = await lstat(root).catch(() => undefined);
-      if (!info || info.isSymbolicLink() || !info.isDirectory()) continue;
-      const realRoot = await realpath(root);
-      if (realRoot === realCwd && !deniedReal.has(realRoot)) return realCwd;
-    }
+  const deniedReal = new Set(
+    await Promise.all(denied.map((path) => realpath(path).catch(() => path)))
+  );
+  const exactRootsAllowed: string[] = [];
+  for (const root of roots) {
+    if (!isAbsolute(root)) continue;
+    const info = await lstat(root).catch(() => undefined);
+    if (!info || info.isSymbolicLink() || !info.isDirectory()) continue;
+    const realRoot = await realpath(root);
+    if (!deniedReal.has(realRoot)) exactRootsAllowed.push(root);
   }
-  return resolveRunCwd(cwd, roots);
+  return resolveRunCwd(cwd, roots, exactRootsAllowed);
 }
 
 function findBwrap(options: RunCommandOptions): string | undefined {

@@ -203,6 +203,9 @@ export async function createNinebrainsServices(
       return resolved.data.path;
     },
     allowedRoots: () => [...laneWorktrees(), checkoutRoot],
+    // T43: a run's own lane worktree is a single-run root, so it may be the cwd itself; the
+    // review-checkout root holds several checkouts and is never listed here.
+    exactRootsAllowed: laneWorktrees,
     maxConcurrentRuns: 4,
   });
   // SEC-41 refusals. SEC-33's security_events table is still open, so they go to the log.
