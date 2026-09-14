@@ -81,12 +81,15 @@ function parseHunks(lines) {
   const hunks = [];
   let current = null;
   for (const line of lines) {
+    // The `--- a/…` and `+++ b/…` file headers come before the first `@@`, while `current` is still
+    // null, so nothing inside a hunk is excluded by prefix: a content line that itself starts with
+    // `--` or `++` must be counted and checked, not skipped.
     if (line.startsWith('@@')) {
       current = { removed: [], added: [] };
       hunks.push(current);
-    } else if (current && line.startsWith('-') && !line.startsWith('---')) {
+    } else if (current && line.startsWith('-')) {
       current.removed.push(line.slice(1));
-    } else if (current && line.startsWith('+') && !line.startsWith('+++')) {
+    } else if (current && line.startsWith('+')) {
       current.added.push(line.slice(1));
     }
   }

@@ -289,6 +289,24 @@ index d1b9b5c71..251d04b05 100644
     const { ok, reasons } = pinOnlyDiff(diff);
     assert.equal(ok, true, reasons.join('; '));
   });
+
+  it('counts content lines that start with -- or ++ instead of mistaking them for file headers', () => {
+    // Removed content `--x` shows as `---x` and added content `++y` as `+++y`. Both must be counted,
+    // so the pin swap here gains an extra removed and added line and the hunk is rejected.
+    const diff = `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d1b9b5c71..251d04b05 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20,2 +20,2 @@ jobs:
+-      - uses: actions/checkout@v4
+---x
++      - uses: actions/checkout@v7
++++y
+`;
+    const { ok, reasons } = pinOnlyDiff(diff);
+    assert.equal(ok, false);
+    assert.match(reasons.join(';'), /not a bare action pin/);
+  });
 });
 
 describe('verifiedBotPr', () => {
