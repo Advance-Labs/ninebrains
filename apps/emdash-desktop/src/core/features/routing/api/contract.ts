@@ -38,12 +38,42 @@ export type ProfilesListing = z.infer<typeof profilesListingSchema>;
 
 const profileKey = z.object({ profileId: profileIdSchema });
 
+/** Which auth mode a role (worker/subagent/reviewer) will actually run under, in plain terms. */
+export const agentRoleModeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('subscription') }),
+  z.object({ kind: z.literal('profile'), profileLabel: z.string(), tier: z.string() }),
+  z.object({ kind: z.literal('blocked'), reason: z.string() }),
+]);
+export type AgentRoleMode = z.infer<typeof agentRoleModeSchema>;
+
+/**
+ * Read-only visibility (Lucas's "oauth tools the user has" ask, `docs/plans/2026-09-15-routing-usability.md`):
+ * is the CLI installed, and what will each role actually run under. Never reads a credential file
+ * and spawns nothing new — D5. Roles are not provider-scoped today (`resolveRoute` isn't either),
+ * so `worker`/`subagent`/`reviewer` mode is identical for `claude` and `codex`; see
+ * `routing-service.ts`'s `agentCliStatus`.
+ */
+export const agentCliStatusSchema = z.object({
+  provider: z.enum(['claude', 'codex']),
+  installed: z.boolean(),
+  path: z.string().nullable(),
+  roles: z.array(
+    z.object({
+      role: z.enum(['worker', 'subagent', 'reviewer']),
+      mode: agentRoleModeSchema,
+    })
+  ),
+});
+export type AgentCliStatusEntry = z.infer<typeof agentCliStatusSchema>;
+
 /**
  * Settings → Models. SEC-40: the renderer can set, replace, test and delete a key, and never
  * read one. No procedure returns a key; `listProfiles` reports only `hasKey`.
  */
 export const routingContract = defineContract({
   listProfiles: procedure({ input: z.object({}), output: profilesListingSchema }),
+  /** Read-only: which CLIs are installed and which auth mode each role will run under. */
+  agentCliStatus: procedure({ input: z.object({}), output: z.array(agentCliStatusSchema) }),
   saveProfile: fallible({
     input: modelProfileInputSchema,
     data: z.object({ profileId: z.string() }),

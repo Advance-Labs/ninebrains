@@ -229,6 +229,12 @@ export async function createNinebrainsServices(
     keys: createProfileKeyStore(encryptedAppSecretsStore),
     testConnection: createConnectionTester({ isBlockedAddress }),
     onError,
+    resolveInstalled: async (provider) => {
+      const resolved = await deps.hostDependencies.resolver.resolve({ id: provider });
+      return resolved.success
+        ? { installed: true, path: resolved.data.path }
+        : { installed: false, path: null };
+    },
   });
 
   const brainLanes: BrainLanesPort = {

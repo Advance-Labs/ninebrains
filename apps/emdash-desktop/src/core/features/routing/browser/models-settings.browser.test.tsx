@@ -81,6 +81,7 @@ describe('Settings → Models', () => {
     listing = { enabled: true, profiles: [], vendors: [ANTHROPIC] };
     handle = seedSliceWire(routingDomain, routingContract, {
       listProfiles: async () => listing,
+      agentCliStatus: async () => [],
       saveProfile: async (input: unknown) => {
         saved.push(input);
         return ok({ profileId: 'p-new' });

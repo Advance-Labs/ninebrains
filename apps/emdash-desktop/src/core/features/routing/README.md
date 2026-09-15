@@ -24,6 +24,7 @@ Lever B (model profiles, your own API keys) is behind the `MODEL_PROFILES_ENABLE
 | `node/wire-controller.ts` | Wires `routingContract` to `routingService` for IPC. |
 | `browser/lane-routing.tsx` | The lane header badge and add-lane fields for subagent model and auth profile. |
 | `browser/models-settings-view.tsx`, `browser/add-profile-form.tsx` | Settings → Models. |
+| `browser/agent-cli-status.tsx` | The read-only "Agents" panel in Settings → Models: which CLI is installed and what auth mode each role runs under (below). |
 | `contributions/lanes.ts`, `contributions/settings-page.tsx` | Registers the lane badge and the settings page into their host slices. |
 
 ## Flow
@@ -59,6 +60,21 @@ lands in:
 Managed (enterprise-policy) settings outrank `--settings`. Since Ninebrains can't override those,
 `managed-settings.ts` checks them ahead of launch and refuses rather than proceeding under an
 unknown credential (SEC-39).
+
+## Agent CLI status (read-only visibility)
+
+`docs/plans/2026-09-15-routing-usability.md` §1. `RoutingService.agentCliStatus()` answers "the
+oauth tools the user has": for each CLI (`claude`, `codex`), whether it's installed and where, and
+for each role (`worker`, `subagent`, `reviewer`) which auth mode `resolveRoute` would give it
+today. It spawns nothing new — `installed`/`path` come from the same `hostDependencies.resolver`
+call `create-ninebrains-services.ts` already makes for the reviewer's `installed` set — and reads
+no credential file (D5). When `MODEL_PROFILES_ENABLED` is off, every role reads as the
+subscription, the same rule `listProfiles` follows: profiles are ignored entirely, never partially
+applied. Routing roles are not provider-scoped today (`resolveRoute` never checks a profile's
+`kind` against a `provider`), so a role's mode is identical for `claude` and `codex` — this mirrors
+`resolveRoute`'s existing behavior, not a new gap. The renderer (`browser/agent-cli-status.tsx`,
+rendered in `models-settings-view.tsx`'s "Agents" section) is pure display: no control lives there,
+only the read.
 
 ## SEC requirements
 
@@ -102,6 +118,13 @@ unknown credential (SEC-39).
   pinning case in `spawnReviewer options`.
 - `apps/emdash-desktop/src/core/features/routing/api/node/price.test.ts` — `SEC-43 usd()`, `SEC-43
   refusesUnpriced`, `SEC-43 checkBudget: refuse, never downgrade`.
+- `apps/emdash-desktop/src/core/features/routing/node/routing-service.test.ts` — `agentCliStatus`:
+  both CLIs installed with no profiles, a cheap-tier profile routing only the subagent role, a
+  disabled profile falling back to the subscription, `MODEL_PROFILES_ENABLED` off ignoring a
+  configured profile, and a not-installed CLI still returning role info.
+- `apps/emdash-desktop/src/core/features/routing/browser/agent-cli-status.browser.test.tsx` — the
+  "Agents" panel: loading, an installed CLI with its path, a not-installed CLI, a profile mode, and
+  a blocked reviewer's reason text.
 
 ## Decisions made while blocked
 

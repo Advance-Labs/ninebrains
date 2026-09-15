@@ -1,9 +1,13 @@
 export {
+  agentCliStatusSchema,
+  agentRoleModeSchema,
   connectionTestSchema,
   profilesListingSchema,
   routingContract,
   routingDomain,
   routingErrorSchema,
+  type AgentCliStatusEntry,
+  type AgentRoleMode,
   type ConnectionTest,
   type ProfilesListing,
   type RoutingContract,

@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { err, ok, type Result } from '@emdash/shared';
-import type { ConnectionTest, ProfilesListing, RoutingError } from '../api/contract';
+import type {
+  AgentCliStatusEntry,
+  AgentRoleMode,
+  ConnectionTest,
+  ProfilesListing,
+  RoutingError,
+} from '../api/contract';
 import type { LaunchRouting, ProfileLaunch } from '../api/node/launch-env';
 import {
   DEFERRED_KINDS,
@@ -15,10 +21,14 @@ import {
   type ModelProfileView,
 } from '../api/profile';
 import type { ProfileKeyStore } from './keys';
-import { resolveRoute } from './policy';
+import { resolveRoute, type RouteDecision, type RoutingRole } from './policy';
 import { createMemoryProfilesRepo, type ProfilesRepo, type StoredProfile } from './profiles-repo';
 import type { ConnectionTester } from './test-connection';
 import { VENDORS, vendorProblem } from './vendors';
+
+const AGENT_CLI_PROVIDERS = ['claude', 'codex'] as const;
+type AgentCliProvider = (typeof AGENT_CLI_PROVIDERS)[number];
+const AGENT_CLI_ROLES: readonly RoutingRole[] = ['worker', 'subagent', 'reviewer'];
 
 /** A lane as routing sees it. */
 export interface RoutingLane {
@@ -48,6 +58,11 @@ export interface RoutingService {
    * missing, disabled, keyless or unhealthy — a reviewer pin is never silently downgraded.
    */
   prepareReviewerRoute(profileId: string): Promise<LaunchRouting>;
+  /**
+   * Read-only visibility, no new spawn: which CLIs are installed, and which auth mode each role
+   * (worker/subagent/reviewer) will actually run under today. Never reads a credential file (D5).
+   */
+  agentCliStatus(): Promise<AgentCliStatusEntry[]>;
 }
 
 export interface RoutingServiceDeps {
@@ -59,6 +74,14 @@ export interface RoutingServiceDeps {
   newId?: () => string;
   now?: () => number;
   onError(context: string, error: unknown): void;
+  /**
+   * Whether the given CLI is on this machine, and where — the same dependency-resolver call
+   * `create-ninebrains-services.ts` already makes for the reviewer's `installed` set. No new
+   * probing mechanism, and never touches a credential file (D5).
+   */
+  resolveInstalled(
+    provider: AgentCliProvider
+  ): Promise<{ installed: boolean; path: string | null }>;
 }
 
 const DISABLED: RoutingError = {
@@ -88,6 +111,25 @@ export function toProfileLaunch(profile: ModelProfile): ProfileLaunch {
     ...(profile.model ? { model: profile.model } : {}),
     tierModels: profile.tierModels,
   };
+}
+
+/** `RouteDecision` -> the plain-words mode the wire contract carries (SEC-42's reason included verbatim). */
+function decisionToMode(decision: RouteDecision, profiles: readonly ModelProfile[]): AgentRoleMode {
+  switch (decision.status) {
+    case 'subscription':
+      return { kind: 'subscription' };
+    case 'blocked':
+      return { kind: 'blocked', reason: decision.reason };
+    case 'profile': {
+      const profile = profiles.find((p) => p.id === decision.profileId);
+      // resolveRoute only ever returns an id it found in the same `profiles` list.
+      return {
+        kind: 'profile',
+        profileLabel: profile?.label ?? decision.profileId,
+        tier: profile?.tier ?? '',
+      };
+    }
+  }
 }
 
 export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
@@ -260,6 +302,26 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
         auth: { mode: 'profile', profile: toProfileLaunch(profile), ...(key ? { key } : {}) },
       };
     },
+
+    async agentCliStatus() {
+      // Off in this build: every role reads as the subscription, same rule as listProfiles —
+      // profiles are ignored entirely, never partially applied.
+      const profiles = deps.enabled ? deps.profiles.list() : [];
+      const results = await Promise.all(
+        AGENT_CLI_PROVIDERS.map(async (provider) => {
+          const { installed, path } = await deps.resolveInstalled(provider);
+          // Routing roles are not provider-scoped today: `resolveRoute` never checks a profile's
+          // kind against `provider`, so `worker`/`subagent`/`reviewer` mode is identical for
+          // `claude` and `codex` here — mirroring resolveRoute's existing behavior, not a new gap.
+          const roles = AGENT_CLI_ROLES.map((role) => ({
+            role,
+            mode: decisionToMode(resolveRoute(role, { profiles }), profiles),
+          }));
+          return { provider, installed, path, roles };
+        })
+      );
+      return results;
+    },
   };
 }
 
@@ -280,5 +342,6 @@ export function createDisabledRoutingService(): RoutingService {
       modelCount: null,
     }),
     onError: () => {},
+    resolveInstalled: async () => ({ installed: false, path: null }),
   });
 }

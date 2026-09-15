@@ -30,6 +30,8 @@ const NOOP_TESTER: ConnectionTester = async () => ({
   modelCount: 0,
 });
 
+const INSTALLED_EVERYWHERE = async () => ({ installed: true, path: '/usr/local/bin/mock' });
+
 function harness(overrides: Partial<RoutingServiceDeps> = {}) {
   const repo = createMemoryProfilesRepo();
   const sink = fakeSink();
@@ -46,6 +48,7 @@ function harness(overrides: Partial<RoutingServiceDeps> = {}) {
       let n = 0;
       return () => `profile-${++n}`;
     })(),
+    resolveInstalled: INSTALLED_EVERYWHERE,
     ...overrides,
   });
   return { repo, sink, keys, service, onError };
@@ -63,6 +66,14 @@ const LOCAL_INPUT: ModelProfileInput = {
   kind: 'local',
   protocol: 'anthropic',
   baseUrl: 'http://127.0.0.1:11434',
+};
+
+const CHEAP_INPUT: ModelProfileInput = {
+  label: 'OpenRouter cheap',
+  kind: 'anthropic-compatible',
+  vendorId: 'openrouter',
+  baseUrl: 'https://openrouter.ai/api',
+  tier: 'cheap',
 };
 
 const KEY = 'sk-ant-donotleakthisvalue999888777';
@@ -286,5 +297,93 @@ describe('SEC-42 prepareReviewerRoute: a reviewer pin is never silently downgrad
   it('blocks rather than routes when profiles are off in this build', async () => {
     const { service } = harness({ enabled: false });
     await expect(service.prepareReviewerRoute('anything')).rejects.toThrow();
+  });
+});
+
+describe('agentCliStatus', () => {
+  it('both CLIs installed, no profiles: every role on both providers is the subscription', async () => {
+    const { service } = harness();
+    const status = await service.agentCliStatus();
+    expect(status).toHaveLength(2);
+    for (const entry of status) {
+      expect(entry.installed).toBe(true);
+      expect(entry.path).toBe('/usr/local/bin/mock');
+      expect(entry.roles).toEqual([
+        { role: 'worker', mode: { kind: 'subscription' } },
+        { role: 'subagent', mode: { kind: 'subscription' } },
+        { role: 'reviewer', mode: { kind: 'subscription' } },
+      ]);
+    }
+    expect(status.map((e) => e.provider).sort()).toEqual(['claude', 'codex']);
+  });
+
+  it('a cheap-tier profile routes the subagent role there; worker and reviewer stay on the subscription', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile(CHEAP_INPUT);
+    if (!saved.success) throw new Error(saved.error.message);
+    const [claude] = await service.agentCliStatus();
+    const subagent = claude.roles.find((r) => r.role === 'subagent');
+    expect(subagent?.mode).toEqual({
+      kind: 'profile',
+      profileLabel: 'OpenRouter cheap',
+      tier: 'cheap',
+    });
+    const worker = claude.roles.find((r) => r.role === 'worker');
+    expect(worker?.mode).toEqual({ kind: 'subscription' });
+    const reviewer = claude.roles.find((r) => r.role === 'reviewer');
+    expect(reviewer?.mode).toEqual({ kind: 'subscription' });
+  });
+
+  it('a disabled cheap-tier profile falls back to the subscription (same resolveRoute semantics as policy.test.ts)', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile({ ...CHEAP_INPUT, enabled: false });
+    if (!saved.success) throw new Error(saved.error.message);
+    const [claude] = await service.agentCliStatus();
+    const subagent = claude.roles.find((r) => r.role === 'subagent');
+    expect(subagent?.mode).toEqual({ kind: 'subscription' });
+  });
+
+  it('MODEL_PROFILES_ENABLED off: every role reports subscription even with profiles configured', async () => {
+    const { repo } = harness();
+    // Seed a profile directly on the repo, bypassing saveProfile's `enabled` gate, so a
+    // disabled build's `agentCliStatus` can be checked against a repo that already has one.
+    repo.insert({
+      id: 'p1',
+      label: 'OpenRouter cheap',
+      kind: 'anthropic-compatible',
+      vendorId: 'openrouter',
+      protocol: 'anthropic',
+      baseUrl: 'https://openrouter.ai/api',
+      tierModels: {},
+      tier: 'cheap',
+      price: { inPerMTok: null, outPerMTok: null, cacheReadPerMTok: null, cacheWritePerMTok: null },
+      contextWindow: null,
+      enabled: true,
+      hasKey: false,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    const { service } = harness({ enabled: false, profiles: repo });
+    const status = await service.agentCliStatus();
+    for (const entry of status) {
+      for (const { mode } of entry.roles) {
+        expect(mode).toEqual({ kind: 'subscription' });
+      }
+    }
+  });
+
+  it('a CLI that is not installed still returns role info, independent of installed/path', async () => {
+    const { service } = harness({
+      resolveInstalled: async (provider) =>
+        provider === 'codex'
+          ? { installed: false, path: null }
+          : { installed: true, path: '/bin/claude' },
+    });
+    const status = await service.agentCliStatus();
+    const codex = status.find((e) => e.provider === 'codex')!;
+    expect(codex.installed).toBe(false);
+    expect(codex.path).toBeNull();
+    expect(codex.roles).toHaveLength(3);
+    expect(codex.roles.every((r) => r.mode.kind === 'subscription')).toBe(true);
   });
 });

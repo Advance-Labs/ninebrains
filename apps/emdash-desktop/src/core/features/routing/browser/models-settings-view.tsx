@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
 import { cn } from '@core/primitives/styling/browser/cn';
 import type {
+  AgentCliStatusEntry,
   ConnectionTest,
   ModelProfileView,
   ProfileKind,
@@ -21,6 +22,7 @@ import {
   TIER_LABELS,
   type SaveProfile,
 } from './add-profile-form';
+import { AgentCliStatusSection } from './agent-cli-status';
 
 const KIND_LABELS: Record<ProfileKind, string> = {
   'anthropic-api': 'Anthropic API',
@@ -46,6 +48,8 @@ export type ProfileTestState = ConnectionTest | 'testing';
 export type ModelsSettingsPanelProps = {
   /** Null while loading. */
   listing: ProfilesListing | null;
+  /** Null while loading. The "Agents" panel (D5: read-only, no new spawn or credential access). */
+  agentStatus?: AgentCliStatusEntry[] | null;
   tests?: Readonly<Record<string, ProfileTestState>>;
   onSaveProfile: SaveProfile;
   onTest: (profileId: string) => void;
@@ -318,6 +322,9 @@ export function ModelsSettingsPanel(props: ModelsSettingsPanelProps) {
           description="Choose which models your lanes use. Your own subscription login stays the default."
         />
         <div className="flex flex-col gap-6">
+          <SettingsSection title="Agents" bare>
+            <AgentCliStatusSection status={props.agentStatus ?? null} />
+          </SettingsSection>
           <SettingsSection title="Subagent model (Lever A)" bare>
             <p className="rounded-lg border border-border px-3 py-3 text-sm text-foreground-muted">
               Each lane picks the Claude model its subagents use. Set it in the lane header, or when
@@ -361,6 +368,7 @@ async function run<T>(
 
 export function ModelsSettingsView() {
   const [listing, setListing] = useState<ProfilesListing | null>(null);
+  const [agentStatus, setAgentStatus] = useState<AgentCliStatusEntry[] | null>(null);
   const [tests, setTests] = useState<Record<string, ProfileTestState>>({});
   const reviewerRoute = useAppSettingsKey('ninebrains.routing');
   const refresh = useCallback(async () => {
@@ -375,10 +383,22 @@ export function ModelsSettingsView() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    void (async () => {
+      try {
+        setAgentStatus(await (await getRoutingClient()).agentCliStatus({}));
+      } catch (error) {
+        toast.error('Could not load agent status', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  }, []);
 
   return (
     <ModelsSettingsPanel
       listing={listing}
+      agentStatus={agentStatus}
       tests={tests}
       onSaveProfile={async (input, key) => {
         const saved = await run('Could not save the profile', (c) => c.saveProfile(input));
