@@ -63,7 +63,7 @@ means no automated check exists and one is not planned here. "none" means an act
 |---|---|---|---|
 | Enable/disable a pack per project | Settings → Packs → switch | P0 | **e2e `lane-from-pack-role` (new, this PR)** exercises enabling the coding pack; component `packs/browser/packs-slice.browser.test.tsx` |
 | Disclosure step for a pack that sends data elsewhere (SEO pack) | "Enable and send this data" confirmation | P0 (privacy) | component `packs/browser/packs-disclosure.browser.test.tsx`; no e2e (would need real AEO Toolkit MCP servers or a stub) |
-| Roles reach a lane's launch (system prompt, MCP servers, gates) | `--append-system-prompt`, pack's MCP servers in the launch config | P0 | **e2e `lane-from-pack-role` (new, this PR)** (asserts the real `claude` argv carries the role's prompt); unit `packs/node/resolve-launch.test.ts` |
+| Roles reach a lane's launch (system prompt, MCP servers) | `--append-system-prompt`, pack's MCP servers in the launch config. `resolve-launch.ts` also computes a role's `defaultGates`, but nothing reads that field yet — see the Packs guide's note that a role's gates are not yet applied to its jobs | P0 | **e2e `lane-from-pack-role` (new, this PR)** (asserts the real `claude` argv carries the role's prompt); unit `packs/node/resolve-launch.test.ts` |
 | Secrets: set/clear via keychain, write-only | Settings → Packs → paste a value → Save; never read back | P0 (security) | unit `packs/node/packs-secrets.test.ts` |
 | Missing-secret servers left out with a warning | A server that needs an unset secret doesn't launch | P1 | unit `packs/node/resolve-launch.test.ts` |
 | SEO pack self-hosting (`AEO_MCP_BASE_URL` scheme check) | Only `https`, or `http` on localhost | P1 (security) | unit `packs/node/aeo-settings.test.ts` |
