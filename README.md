@@ -1,5 +1,8 @@
 # Ninebrains
 
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE.md)
+[![CI](https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml/badge.svg)](https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml)
+
 **Run a grid of Claude Code and Codex agents in parallel, each in its own git worktree, with a
 central Brain that hands out the work and gates that check it before it counts as done.**
 
@@ -44,16 +47,27 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 - **The Brain.** A drawer in the Lanes view runs a Claude Code session as the Brain. You type a
   brief into it; it creates jobs and links their dependencies, and the app dispatches ready jobs to
   idle lanes.
+
+  ![The Brain drawer with a job plan and dispatch status](docs/screenshots/brain-drawer-plan-1440.png)
+
 - **Gates in the loop.** A failed gate sends feedback to the lane and retries, up to three
   attempts, then blocks and tells you. The screenshot gate captures the lane's own browser at
   three widths.
+
+  ![A gate's verification result with evidence for a job](docs/screenshots/gates-verification-1440.png)
+
 - **Rigor settings.** Two 0–10 sliders in Settings → Gates decide which gates every job gets, and
   a project can override them in Settings → Gates → Tests.
 - **Planner.** A canvas where jobs are nodes and dependencies are edges, opened from the Planner
   button in the Lanes title bar. **Run plan** compiles it into Brain jobs, idempotently, and
   refuses cycles.
+
+  ![The planner canvas with job nodes and dependency edges](docs/screenshots/planner-1440.png)
+
 - **Lane roles and modes.** Start a lane from a pack role, and switch a lane between attended and
   unattended from its header.
+
+  ![The add-lane form with a role picked from a pack](docs/screenshots/lanes-add-lane-role-1440.png)
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
 with a morning digest, a video pack, signed builds and auto-update.
