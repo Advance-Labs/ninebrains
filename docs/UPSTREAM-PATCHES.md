@@ -279,6 +279,27 @@ New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/r
 `src/renderer/tests/browser/routing-screenshots.test.tsx`, `docs/screenshots/routing-*.png`,
 `docs/research/VENDORS.md`, `docs/guide/models.md`.
 
+### 14a. Reviewer routing wired (W7 `w7/routing-wave2`, R4, decided 2026-09-15)
+
+No manifest or contract registrations here: the reviewer pin is an app setting
+(`ninebrains.routing`, `routing/contributions/settings.ts`), not a new wire contract, and the
+Settings → Models page already exists (14 above). Append-only field additions to existing
+Ninebrains files.
+
+Ninebrains files touched: `exec-runs/api/node/types.ts` (`ExecRunSpec.reviewerRoute`),
+`exec-runs/api/node/run-supervisor.ts` (routes a `reviewer` preset on `reviewerRoute`, refuses a
+spec that mixes it with `routing`), `routing/node/routing-service.ts` (`prepareReviewerRoute`),
+`gates/node/capabilities/spawn-reviewer.ts` (`ReviewerRoute.routing`, `deps.route` may now be
+async), `main/bootstrap/boot/ninebrains/reviewer-route.ts` (reads the pin, calls
+`prepareReviewerRoute`), `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts` (wires
+`deps.appSettings.get('ninebrains.routing')`, folding `MODEL_PROFILES_ENABLED` in before
+`reviewer-route.ts` ever sees a pin), `core/manifests/shared/settings-contributions.ts`
+(`'ninebrains.routing': routingSettingsContribution`), `routing/browser/models-settings-view.tsx`
+(the "Reviewer model" picker).
+
+New files: `routing/contributions/settings.ts`,
+`main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
+
 ## 15. UI jobs and the test command (W7 `w7/self-heal-e2e`)
 
 | File | What | Why |

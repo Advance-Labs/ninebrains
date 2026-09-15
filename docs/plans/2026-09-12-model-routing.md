@@ -196,7 +196,7 @@ reviewer or tests-gate evidence (research §3).
 | **R1 Lever A** | Per-lane/role `subagentModel` (Claude alias or ID), persisted, emitted as `CLAUDE_CODE_SUBAGENT_MODEL` for attended and unattended claude; lane badge | SEC-39 snapshots | 1–2 d |
 | **R2 profiles + keys** | Schema, `vendors.json`, repo + migration, `keys.ts`, Settings → Models (add, test, delete; write-only key). SEC-39–46 and T38–T41 into the threat model | SEC-40, SEC-44 | 2–3 d |
 | **R3 exec + lane wiring** | `launch-env.ts` per §4.3; `ResolvedRoute` through `ExecRunSpec`; lane auth mode "subscription / API key: <profile>"; SEC-12 trusted values and SEC-13 env allowlist updated deliberately; SEC-41 check in the supervisor | SEC-39, SEC-41, SEC-45; a run against a local mock Anthropic-compatible server | 3–4 d |
-| **R4 policy** | `policy.ts`, tiers, pack role `tier`, planner per-job profile, reviewer pin via `reviewer-route.ts` | SEC-42, policy table | 2–3 d |
+| **R4 policy** | `policy.ts`, tiers, reviewer pin via `reviewer-route.ts` (wired 2026-09-15, see decision below). Still open: pack role `tier`, planner per-job profile | SEC-42, policy table | 2–3 d |
 | **R5 budgets + cost** | `usd()`, `maxUsd` in the supervisor, `run_costs` persisted (survives restart, SEC-29), daily/plan caps, cost view per job/lane/plan/day | SEC-43, SEC-29 extended | 3–4 d |
 | **R6 fallback** | Error classes from stream events and exit codes; per-profile circuit breaker; worker fallback within tier or lower, never for reviewers; swaps in `run_costs.swapped_from` and security events | fallback matrix, SEC-42 | 3 d |
 | **R7 Brain tier request** | If §9.5 is yes: `create_job` tier hint mapped in main within caps | SEC-08-style test | 1 d |
@@ -224,6 +224,29 @@ weeks for R0–R7.
 2. Stale prices: visible and editable, `priced_at_version` stored, unpriced refused.
 3. A lane spends a key directly (T39): accepted risk R19, bounded by vendor-side limits.
 4. Scope creep toward OmniRoute's feature set: anything beyond this plan needs a new decision.
+
+## 9a. Reviewer routing, decided (2026-09-15)
+
+Item 5 below ("a Brain session may request a tier") is still open; this is narrower: which model a
+reviewer *run itself* uses.
+
+1. **Default: the subscription, no setup.** With no reviewer profile configured, reviewers run on
+   the user's subscription login exactly as before this decision — `reviewer-route.ts`'s
+   `routeReviewer` TODO stub's `{ provider: 'claude' }` result, unchanged in this case.
+2. **An optional reviewer pin.** A new app-level setting (`ninebrains.routing`, Settings → Models,
+   next to the profile list) lets the user pick one profile for reviewers. When set,
+   `resolveRoute('reviewer', { explicitProfileId })` decides the route; missing, disabled, keyless
+   or unhealthy blocks the review (SEC-42) — never a silent fallback to the subscription or a
+   cheaper tier, and never a pass.
+3. **A separate field, not `ExecRunSpec.routing`.** That field's invariant ("reviewers never set
+   it") stands. The resolved route is `ExecRunSpec.reviewerRoute`, set only by the reviewer spawn
+   path (`gates-core`'s `reviewer-gate`, which supplies `purpose` but no routing data itself, and
+   `spawn-reviewer.ts`, which calls `reviewer-route.ts`). No job, lane, Brain MCP op or worktree
+   file can set or influence it; the supervisor refuses a spec that mixes the two fields (T45).
+4. **Off in a release build.** `MODEL_PROFILES_ENABLED` off: the pin setting is hidden and ignored,
+   reviewers always use the subscription there.
+5. **Every SEC-39..45 guarantee holds** for both a subscription and a profile reviewer run, the
+   same as a worker run under the existing `routeLaunch`/`assertLaunchPolicy` machinery.
 
 ## 9. Decisions for Lucas
 
