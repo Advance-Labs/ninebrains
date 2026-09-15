@@ -27,6 +27,7 @@ The desktop app's tests run in Vitest, split into projects:
 | Project | Runs |
 |---|---|
 | `node` | Main-process and shared code in Node |
+| `node-spawn` | Suites that spawn real process trees (git, sh, the fake agent): gate capabilities, exec-runs, STOP, unattended runs, agent overrides. Runs at low concurrency, after `node`, so spawn timeouts hold on a loaded host |
 | `main-db` | Database code |
 | `migrations` | Database migrations |
 | `scripts` | The app's build and tooling scripts |

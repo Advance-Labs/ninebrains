@@ -3,7 +3,7 @@
 Ninebrains is a fork of [Emdash](https://github.com/generalaction/emdash) (Apache-2.0).
 
 - Upstream remote: `upstream` = `https://github.com/generalaction/emdash.git`. Never push to it.
-- Origin: `https://github.com/Advance-Labs/ninebrains.git` (private until reviews pass).
+- Origin: `https://github.com/Advance-Labs/ninebrains.git`.
 - Forked at upstream **`dbf690c`** (`Merge pull request #3183 … fix-hide-emdash-from-task-bar`), app version 1.2.4.
 - Every change to an inherited file is listed in [UPSTREAM-PATCHES.md](UPSTREAM-PATCHES.md).
 

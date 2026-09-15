@@ -30,6 +30,8 @@ Ninebrains is free and open source (Apache-2.0), and a fork of
 - [Packs](packs.md): coding, SEO and research bundles, and what the SEO pack sends where.
 - [Unattended runs](unattended-runs.md): budgets, the STOP switch, and what never runs on its own.
 - [Accounts](accounts.md): several Claude Code or Codex logins.
+- [Models](models.md): routing lanes and subagents to cheaper models, and what SEC-39 and SEC-41
+  protect against.
 - [Everyday workflow](ide-workflow.md): tasks, the editor, diffs, pull requests, MCP, skills and
   automations.
 - [Keyboard shortcuts](keyboard-shortcuts.md).

@@ -47,6 +47,7 @@ lane = worktree + terminal (claude | codex) + editor + browser
 | Planner canvas | `apps/emdash-desktop/src/core/features/planner/` |
 | Packs | `apps/emdash-desktop/src/core/features/packs/` |
 | Unattended runs | `apps/emdash-desktop/src/core/features/exec-runs/` |
+| Model routing (subagent model, optional profiles) | `apps/emdash-desktop/src/core/features/routing/` |
 | Gate capabilities (fetch, run command, reviewer, checkout) | `apps/emdash-desktop/src/core/features/gates/` |
 | Brain: DAG, state machine, mailbox, routing, store, endpoint | `packages/brain-core/` |
 | MCP shim each lane runs (its README covers the env contract and tools) | `packages/brain-mcp/` |

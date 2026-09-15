@@ -1,5 +1,12 @@
 # Ninebrains extension seams (task 0.2)
 
+**Historical record, not a live map.** Written at task 0.2, before any of this was built, as the
+pre-implementation mapping from upstream Emdash to the Ninebrains slices. Kept as-is for the
+record of what was planned and why; some paths and details below have since diverged from the
+shipped code (a few subdirectories described here were never created, for instance). For what is
+true today, read `docs/guide/architecture.md` and the README in each feature or package folder it
+points at.
+
 Upstream base: `generalaction/emdash` @ `dbf690c6a` (2026-09-10). Plan: `docs/superpowers/plans/2026-09-10-oss-agent-workbench.md` in the advance-labs repo.
 Every later phase builds from this file. Read it, then read the named upstream file. Don't read the whole tree.
 
