@@ -15,11 +15,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       with:
         version: 10.28.2
 
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: '24'
         cache: pnpm
@@ -49,12 +49,12 @@ runs:
 
     # Base/head for `nx affected`. On a push it is the last green run on that branch, which is
     # why ci.yml grants actions: read.
-    - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1 # v4.4.0
+    - uses: nrwl/nx-set-shas@afb73a62d26e41464e9254689e1fd6122ee683c1 # v5.0.1
       with:
         main-branch-name: ${{ github.base_ref || github.ref_name }}
 
     # Nx's local cache. PR runs restore from their base branch's entries; main never reads PR caches.
-    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .nx/cache
         key: nx-${{ runner.os }}-${{ inputs.nx-cache-key }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
