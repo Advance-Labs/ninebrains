@@ -165,9 +165,19 @@ function lane(overrides: Partial<Lane>): Lane {
   };
 }
 
-function LaneShell({ lane: shown, text }: { lane: Lane; text: string }) {
+function LaneShell({
+  lane: shown,
+  text,
+  height = 'h-56',
+}: {
+  lane: Lane;
+  text: string;
+  height?: string;
+}) {
   return (
-    <div className="@container flex h-56 min-w-0 flex-col overflow-hidden rounded-md border border-border">
+    <div
+      className={`@container flex ${height} min-w-0 flex-col overflow-hidden rounded-md border border-border`}
+    >
       <LaneHeader
         lane={shown}
         status={shown.status}
@@ -341,9 +351,32 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
     </div>
   );
 
+  // The 1440 shot: a real lane grid cell (as it renders in the app), not a
+  // small card afloat on an oversized canvas.
+  const addLaneGrid = (
+    <div className="grid h-full grid-cols-1 content-start gap-2 p-2 md:grid-cols-2">
+      <LaneShell
+        lane={lane({ runMode: 'unattended' })}
+        text="Brain job j2 runs headless with claude -p. This terminal is idle."
+        height="h-[32rem]"
+      />
+      <div className="@container flex h-[32rem] min-w-0 flex-col overflow-hidden rounded-md border border-border">
+        <AddLaneFields
+          tabId="tab-1"
+          slot={2}
+          projects={[
+            { id: 'p1', name: 'acme-site', type: 'local' },
+            { id: 'p2', name: 'billing-api', type: 'local' },
+          ]}
+          installed={['claude', 'codex']}
+        />
+      </div>
+    </div>
+  );
+
   it('add lane with a role picked, light, 1440', async () => {
     listing = { packs: [CODING_PACK], errors: [] };
-    await show('emlight', 1440, 640, addLane);
+    await show('emlight', 1440, 560, addLaneGrid);
     await clickEl('[aria-label="Role"]');
     const builder = await vi.waitFor(() => {
       const found = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
@@ -396,8 +429,10 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
       1440,
       900,
       <div className="flex h-full">
-        <div className="flex-1" />
-        <div className="w-[30rem]">
+        <div className="flex-1 p-2">
+          <Lanes />
+        </div>
+        <div className="w-[30rem] border-l border-border">
           <BrainDrawer
             projects={[{ projectId: 'p1', name: 'acme-site' }]}
             lanes={[
