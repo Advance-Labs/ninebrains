@@ -78,7 +78,7 @@ means no automated check exists and one is not planned here. "none" means an act
 | Environment allow-list (no `GITHUB_TOKEN`, `AWS_*`, etc.) | Only login vars, `PATH`, `HOME`, locale, proxy | P0 (security) | unit `exec-runs/api/node/run-env.test.ts`, `run-env-routing.test.ts` |
 | Permission-bypass guard | No `--dangerously-skip-permissions` etc. can ever be built | P0 (security) | unit `exec-runs/api/node/argv-guard.test.ts` |
 | Transcript redaction | Keys/tokens stripped before writing | P0 (security) | unit `exec-runs/api/node/redact.test.ts` |
-| Actually running a job unattended end to end (`claude -p`) | A lane switched to unattended completes a real Brain job headless | P0 | **e2e `unattended-job` (new, this PR)** — the harness gap (baking `FAKE_AGENT_SCRIPT` into the wrapper by argv shape, no env) is fixed and independently verified in the suite; the suite still SKIPs on a separate real app bug it found — see "Known app/test gaps" #6 |
+| Actually running a job unattended end to end (`claude -p`) | A lane switched to unattended completes a real Brain job headless | P0 | e2e `unattended-job`: the harness gap (baking `FAKE_AGENT_SCRIPT` into the wrapper by argv shape, no env) and the T43 cwd bug it found (see "Known app/test gaps" #3) are both fixed; the suite asserts the full flow (fake `claude -p` reaches `done`) rather than skipping |
 | Codex unattended runs (experimental) | `codex exec --json` | P2 (documented experimental) | unit `exec-runs/api/node/codex-exec.test.ts`; no e2e (fake agent stands in for `claude` only) |
 
 ## Model routing and accounts
@@ -142,10 +142,10 @@ or a real multi-day machine, so they stay manual:
 - [ ] Run a real coding job end to end with the real `claude` CLI: add a lane, give the Brain a
       brief, watch a job go through tests → screenshot → reviewer gates with real (not fake) agent
       output.
-- [ ] Switch a lane to unattended and let a real `claude -p` run complete a real Brain job headless
-      (`unattended-job.e2e.mjs` proves the fake-agent path once the run starts, but the run itself
-      is currently broken by a real app bug — see "Known app/test gaps" #3 — so this still needs a
-      real login until that is fixed).
+- [ ] Switch a lane to unattended and let a real `claude -p` run complete a real Brain job headless.
+      `unattended-job.e2e.mjs` proves the whole flow against the fake agent (including the T43 cwd
+      fix, "Known app/test gaps" #3); this manual step is only to confirm the same flow against the
+      real `claude` CLI, which no e2e suite exercises yet (see `docs/guide/unattended-runs.md#known-gaps`).
 - [ ] Two Claude Code accounts (`CLAUDE_CONFIG_DIR`): confirm each has independent trust, hooks and
       login status, and that a lane launched from a terminal with one account set actually uses it.
 - [ ] Enable the SEO pack for real against the hosted AEO Toolkit endpoint (or a self-hosted one),
@@ -169,23 +169,19 @@ Bugs and coverage holes found while building this matrix, not fixed here per the
    allowlist: the wrapper picks its default script from argv shape alone (a reviewer run's argv
    always carries `--tools=`; a worker run never does), which the suite verifies directly by
    invoking the wrapper binary itself with each shape. `run-env.ts` was not touched.
-3. **New (this PR): unattended job execution is broken end to end (P0 app bug).** Found while
-   building `unattended-job.e2e.mjs` — the suite reaches this bug immediately and SKIPs (with the
-   repro) rather than asserting the real thing, so it will start passing for free once this is
-   fixed. `runJobUnattended` (`brain/node/unattended.ts`) passes `cwd: lane.worktreePath` straight
-   to the exec supervisor. The supervisor's `allowedRoots()`
-   (`create-ninebrains-services.ts`: `[...laneWorktrees(), checkoutRoot]`) is built from
-   `laneWorktrees()`, which is each lane's own worktree path — the same value as `cwd`. But
-   `resolveRunCwd` (`exec-runs/api/node/run-paths.ts`) requires `cwd` to be strictly *inside* a
-   root; a root that matches `cwd` exactly is refused on purpose (its own test: "refuses ... the
-   root itself"). So **every unattended job run fails at once**, before the agent is ever spawned,
-   with `Run cwd ... is not inside an allowed worktree root`. The tests gate hits the identical
-   shape (it also runs in the lane worktree, one of its own allowed roots) and already has a fix:
-   `resolveGateCwd` in `gates/node/capabilities/run-command.ts` explicitly accepts an exact-root
-   match unless denied. `runJobUnattended` has no equivalent and calls the supervisor directly.
-   **Repro:** switch any lane to unattended, dispatch it any job (e.g. `create_job` with no
-   `dependsOn`), watch it fail immediately with that message. Not fixed here — out of scope for a
-   test PR, and not a harness issue.
+3. **Resolved (PR #11): unattended job execution was broken end to end (P0 app bug, THREAT-MODEL.md
+   T43).** Found while building `unattended-job.e2e.mjs`: `runJobUnattended`
+   (`brain/node/unattended.ts`) passes `cwd: lane.worktreePath` straight to the exec supervisor. The
+   supervisor's `allowedRoots()` (`create-ninebrains-services.ts`: `[...laneWorktrees(),
+   checkoutRoot]`) is built from `laneWorktrees()`, which is each lane's own worktree path — the
+   same value as `cwd`. But `resolveRunCwd` (`exec-runs/api/node/run-paths.ts`) required `cwd` to be
+   strictly *inside* a root, refusing a root that matched `cwd` exactly. So every unattended job run
+   failed at once, before the agent was ever spawned, with `Run cwd ... is not inside an allowed
+   worktree root`. Fixed by an `exactRootsAllowed` list on `resolveRunCwd`, wired to `laneWorktrees`
+   alone (never `checkoutRoot`, which stays refused exactly since it holds several runs' cwds); the
+   tests gate's `resolveGateCwd` (which had its own copy of the same exception) now delegates to the
+   same option instead of duplicating it. `unattended-job.e2e.mjs` no longer skips on this signature
+   and confirms the fake `claude -p` run reaches `done`.
 4. **STOP's documented behavior for an untouched idle lane is correct, but easy to
    misread from the docs alone (not a bug, a doc-clarity note).**
    `docs/guide/unattended-runs.md#the-stop-switch` says STOP "also stops the terminal session of
@@ -210,7 +206,7 @@ Bugs and coverage holes found while building this matrix, not fixed here per the
 | `apps/emdash-desktop/e2e/stop-halts-lanes.e2e.mjs` | STOP latches dispatch, requeues the held job, stops that lane; Clear STOP; restart; dispatch resumes | New, added in this PR |
 | `apps/emdash-desktop/e2e/lane-run-mode.e2e.mjs` | Attended → unattended (with confirmation) → attended (no confirmation) | New, added in this PR |
 | `apps/emdash-desktop/e2e/lane-from-pack-role.e2e.mjs` | Enable the coding pack, add a lane with the Builder role, role's system prompt reaches the real launch | New, added in this PR |
-| `apps/emdash-desktop/e2e/unattended-job.e2e.mjs` | A lane switched to unattended, dispatched a job, and a real `claude -p` (worker preset) run — the wrapper's argv-based script selection is verified directly; the full flow SKIPs on the app bug in gap #3 above | New, added in this PR |
+| `apps/emdash-desktop/e2e/unattended-job.e2e.mjs` | A lane switched to unattended, dispatched a job, and a fake-`claude -p` (worker preset) run reaches `done` — the wrapper's argv-based script selection is verified directly; PR #11 fixed the T43 cwd bug (gap #3 above) this suite found, so the full flow now asserts rather than skips | New, added in this PR; fixed to assert the full flow in PR #11 |
 | `apps/emdash-desktop/e2e/planner-run-plan.e2e.mjs` | Planner: add two job nodes, drag a real edge between them, Run plan, the compiled jobs reach the Brain with the right dependency (ready / proposed) | New, added in this PR |
 | `apps/emdash-desktop/e2e/gate-blocks-job.e2e.mjs` | A UI job that never gets fixed fails its screenshot gate three times, blocks with no fourth attempt, and the Brain drawer shows "1 blocked" | New, added in this PR |
 
@@ -219,7 +215,6 @@ All suites build with `pnpm --dir apps/emdash-desktop run build` and pass locall
 `.github/workflows/e2e.yml`.
 
 **P0 coverage, after this update:** the three P0 flows this matrix previously listed with no e2e
-proof at all now each have a suite: Planner (`planner-run-plan`, passing), the third-gate-failure
-block (`gate-blocks-job`, passing), and unattended job execution (`unattended-job`, which reaches
-and reports the app bug in gap #3 above, then SKIPs instead of asserting the full flow — it will
-start asserting the real thing for free once that bug is fixed).
+proof at all now each have a passing suite: Planner (`planner-run-plan`), the third-gate-failure
+block (`gate-blocks-job`), and unattended job execution (`unattended-job`, which found and, after
+PR #11 fixed the T43 cwd bug, now asserts the full flow end to end against the fake agent).
