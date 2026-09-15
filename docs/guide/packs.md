@@ -9,7 +9,8 @@ description: >-
 A **discipline pack** is a per-project bundle of four things:
 
 - **Roles.** A role is a lane preset: a system prompt, an optional provider and model, and default
-  gates. There is no way to start a lane from a role in this build (see below).
+  gates. Pick one when you [add a lane](lanes.md#adding-a-lane), once the project has enabled the
+  pack it belongs to. A role's gates are not yet applied to the jobs its lane works on (see below).
 - **Skills**, installed through the skills manager Ninebrains inherits from Emdash.
 - **MCP servers** for the lanes to use.
 - **Gates** that the pack's work must pass.

@@ -130,5 +130,5 @@ dialog can start a task from an issue.
 ## Settings pages
 
 **Settings** (Mod+,) has these pages, in order: General, Integrations, Interface, Browser,
-Repository, Prompts, System, Workspaces, Conversations, Agents, MCP, Skills, Packs, Gates and
-Machines.
+Repository, Prompts, System, Workspaces, Conversations, Agents, MCP, Skills, Packs, Gates, Models
+and Machines.

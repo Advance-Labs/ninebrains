@@ -93,6 +93,20 @@ gateway. When a Claude-protocol profile points at a host other than `api.anthrop
 shows a "Not supported by Anthropic" badge. The profile can still work, but Anthropic doesn't
 maintain or audit it, and some features may not work.
 
+### Reviewer model (optional pin)
+
+By default, every reviewer run — the `reviewer` and `security-review` gates — stays on your
+subscription, whichever agent did the work. Settings → Models has a **Reviewer model** picker, next
+to the profile list, that lets you pin reviewers to one model profile instead.
+
+Once you pin a reviewer profile, it is never silently downgraded (SEC-42): if the pinned profile is
+missing, disabled, has no key, or is unhealthy, the review is **blocked**, not passed and not
+retried on your subscription or a cheaper tier. Clear the picker to go back to the subscription
+default.
+
+The picker is part of Lever B, so it only appears in builds where model profiles are on; it is
+hidden and ignored in release builds, where reviewers always run on the subscription.
+
 ## SEC-39, in plain words
 
 A lane on your subscription never gets a gateway URL, token or key. Ninebrains blanks
@@ -129,7 +143,6 @@ These are wave 2 work, not built yet:
 
 - Costs and budgets in dollars.
 - Fallback to another model or vendor when one fails.
-- A pinned, protected model for reviewers.
 
 ## Troubleshooting
 
