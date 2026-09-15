@@ -1,6 +1,7 @@
 # Routing usability: four asks from Lucas
 
-Status: plan + first slice done, 2026-09-15. Lucas asked for visibility into "the oauth tools the
+Status: plan + first two slices done, 2026-09-15 (item 1's CLI/auth panel, then T47's
+`profilesEnabled` toggle that unblocks it in release builds). Lucas asked for visibility into "the oauth tools the
 user has" plus three related usability gaps in the routing/lane experience. This file covers all
 four: what's built now, and a design sketch for what's left. Inputs:
 `docs/plans/2026-09-12-model-routing.md` (the routing plan this extends), `docs/THREAT-MODEL.md`
@@ -27,15 +28,16 @@ Files:
 - Tests: `routing-service.test.ts`'s `agentCliStatus` suite,
   `browser/agent-cli-status.browser.test.tsx`.
 
-**Blocker for the profile half of this feature reaching production, flagged explicitly:**
-`MODEL_PROFILES_ENABLED` (`apps/emdash-desktop/src/core/primitives/app-identity/api/fork-flags.ts:30`)
-is `import.meta.env.DEV` — on in dev builds, off in every release build, per plan §9.1 ("Lucas
-decides"). The CLI-detection half of this panel (installed/path) works in any build and needs no
-flag decision. But the profile half — a role showing `kind: 'profile'` with a label and tier — can
-never be true for a real user until Lucas turns Lever B on for release builds. Until then, this
-panel is dev-only-useful for anything beyond "is the CLI installed." That decision (plan §9 item 1)
-is unchanged by this pass; it's just now more visibly blocking than before, because there's finally
-a UI that would show the result.
+**Blocker for the profile half of this feature reaching production — resolved, same day (T47).**
+`MODEL_PROFILES_ENABLED` was `import.meta.env.DEV` (on in dev builds, off in every release build,
+per plan §9.1 "Lucas decides"), so the profile half of this panel — a role showing `kind: 'profile'`
+with a label and tier — could never be true for a real user. Lucas decided: the flag is now always
+`true` (the code ships everywhere; SEC-39 through SEC-45 are enforced and independently reviewed,
+and the reviewer pin already shipped, T40), and the real on/off switch is a new user setting,
+`ninebrains.routing.profilesEnabled`, default `false`, flipped in Settings → Models next to this
+panel. Turning it on changes nothing by itself — every `RoutingService` method and the
+`agentCliStatus` panel still report the subscription until a profile is actually added. See
+THREAT-MODEL T47 for the full trust-boundary note.
 
 ## 2. MCP servers shared/scoped across lanes
 
@@ -96,4 +98,6 @@ a new persistence or display surface this would introduce; do not invent one now
 ## 5. Threat model
 
 See `docs/THREAT-MODEL.md` T46 (added this pass) for the security note on item 1's new
-information-disclosure surface. Items 2-4 above are future work with no new T/R ids claimed yet.
+information-disclosure surface, and T47 (added the same day) for `MODEL_PROFILES_ENABLED` moving
+from a build-time hold-back to the `ninebrains.routing.profilesEnabled` app setting. Items 2-4
+above are future work with no new T/R ids claimed yet.

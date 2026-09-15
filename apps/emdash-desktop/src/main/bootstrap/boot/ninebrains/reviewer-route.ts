@@ -25,9 +25,9 @@ import type { LaunchRouting } from '@core/features/routing/api/node/launch-env';
 export interface ReviewerRouteDeps {
   installed: ReadonlySet<ExecProvider>;
   /**
-   * The pinned reviewer profile id, or null when none is set. Always null in a release build
-   * (`MODEL_PROFILES_ENABLED` off): the caller is expected to fold that flag in here, so this
-   * file never imports a build flag itself.
+   * The pinned reviewer profile id, or null when none is set. Always null while the live
+   * `ninebrains.routing.profilesEnabled` setting (T47) is off: the caller is expected to fold
+   * that check in here, so this file never reads a build flag or a setting itself.
    */
   reviewerProfileId: () => Promise<string | null>;
   /**

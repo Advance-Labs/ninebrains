@@ -248,9 +248,30 @@ reviewer *run itself* uses.
 5. **Every SEC-39..45 guarantee holds** for both a subscription and a profile reviewer run, the
    same as a worker run under the existing `routeLaunch`/`assertLaunchPolicy` machinery.
 
+## 9b. Lever B reaches release builds, decided (2026-09-15)
+
+Item 1 below ("ship Lever B in v0.1") is decided: yes, safely, behind a user setting rather than a
+build flag (T47, `docs/THREAT-MODEL.md`, `docs/plans/2026-09-15-routing-usability.md`).
+
+1. **`MODEL_PROFILES_ENABLED` is always `true`.** With SEC-39 through SEC-45 enforced and
+   independently reviewed, and the reviewer pin (9a) shipped, there is no remaining reason to
+   compile Lever B out of release builds. The flag now only marks "the code ships in this build."
+2. **The real switch is `ninebrains.routing.profilesEnabled`**, a user setting next to the profile
+   list in Settings → Models, default `false`. The user turns it on deliberately; it is never read
+   from an environment variable or a project/job/worktree file, and — like the reviewer pin above —
+   it is reachable only through the app-settings wire controller, which has no `BrainOp`
+   counterpart, so no lane or Brain token can flip it (SEC-08).
+3. **Turning it on changes nothing by itself.** `RoutingService.enabled()` is read fresh on every
+   call, not cached at boot, so the toggle takes effect immediately; with no profile configured,
+   every role still reports and runs on the subscription, exactly as before.
+4. **Off still means off, mid-session too.** A profile row or a reviewer pin left in storage while
+   the setting is off is ignored, never read, and never deleted — flipping the setting back on
+   later still sees it.
+
 ## 9. Decisions for Lucas
 
-1. Ship Lever B (Settings → Models, the user's own keys) in v0.1, or only Lever A.
+1. ~~Ship Lever B (Settings → Models, the user's own keys) in v0.1, or only Lever A.~~ Decided
+   2026-09-15: yes, see §9b.
 2. The first vendor allowlist, after R0.
 3. Default tiers and caps (for example worker `standard`, subagent `cheap`, reviewer `strong`, a
    global daily cap of $X).

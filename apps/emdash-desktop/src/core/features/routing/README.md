@@ -2,7 +2,10 @@
 
 Model routing for Ninebrains (`docs/plans/2026-09-12-model-routing.md`), wave 1 (R0–R3) plus the
 start of wave 2 (`policy.ts`, `api/node/price.ts`; R4/R5). Lever A (subagent model) is always on.
-Lever B (model profiles, your own API keys) is behind the `MODEL_PROFILES_ENABLED` build flag.
+Lever B (model profiles, your own API keys) ships in every build (`MODEL_PROFILES_ENABLED` is
+always `true`, T47, `docs/plans/2026-09-15-routing-usability.md`); whether it's *active* is the
+user's own `ninebrains.routing.profilesEnabled` app setting, off by default, flipped in Settings →
+Models.
 
 ## Layout
 
@@ -68,9 +71,9 @@ oauth tools the user has": for each CLI (`claude`, `codex`), whether it's instal
 for each role (`worker`, `subagent`, `reviewer`) which auth mode `resolveRoute` would give it
 today. It spawns nothing new — `installed`/`path` come from the same `hostDependencies.resolver`
 call `create-ninebrains-services.ts` already makes for the reviewer's `installed` set — and reads
-no credential file (D5). When `MODEL_PROFILES_ENABLED` is off, every role reads as the
-subscription, the same rule `listProfiles` follows: profiles are ignored entirely, never partially
-applied. Routing roles are not provider-scoped today (`resolveRoute` never checks a profile's
+no credential file (D5). When `ninebrains.routing.profilesEnabled` is off (the default, T47), every
+role reads as the subscription, the same rule `listProfiles` follows: profiles are ignored
+entirely, never partially applied. Routing roles are not provider-scoped today (`resolveRoute` never checks a profile's
 `kind` against a `provider`), so a role's mode is identical for `claude` and `codex` — this mirrors
 `resolveRoute`'s existing behavior, not a new gap. The renderer (`browser/agent-cli-status.tsx`,
 rendered in `models-settings-view.tsx`'s "Agents" section) is pure display: no control lives there,
@@ -110,7 +113,7 @@ only the read.
 - `apps/emdash-desktop/src/core/features/routing/node/routing-service.test.ts` — `SEC-42
   prepareReviewerRoute: a reviewer pin is never silently downgraded`.
 - `apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/reviewer-route.test.ts` — default,
-  pinned, blocked and release-build cases of `routeReviewer`.
+  pinned, blocked and profiles-off (T47) cases of `routeReviewer`.
 - `apps/emdash-desktop/src/core/features/exec-runs/api/node/run-supervisor-routing.test.ts` —
   `SEC-42 a reviewer route is a separate field from a worker route`.
 - `apps/emdash-desktop/src/core/features/gates/node/capabilities/spawn-reviewer.test.ts` —
@@ -120,8 +123,17 @@ only the read.
   refusesUnpriced`, `SEC-43 checkBudget: refuse, never downgrade`.
 - `apps/emdash-desktop/src/core/features/routing/node/routing-service.test.ts` — `agentCliStatus`:
   both CLIs installed with no profiles, a cheap-tier profile routing only the subagent role, a
-  disabled profile falling back to the subscription, `MODEL_PROFILES_ENABLED` off ignoring a
-  configured profile, and a not-installed CLI still returning role info.
+  disabled profile falling back to the subscription, `profilesEnabled` off ignoring a configured
+  profile, and a not-installed CLI still returning role info; `T47: enabled() is read live` (a
+  flip from off to on, and on to off, without recreating the service).
+- `apps/emdash-desktop/src/core/features/routing/contributions/settings.test.ts` — the
+  `profilesEnabled` default, and `SEC-08: agent identities cannot reach this setting`.
+- `apps/emdash-desktop/src/core/features/lanes/node/lane-routing.test.ts` — `T47: a live toggle
+  takes effect on the next call, not the next restart`.
+- `apps/emdash-desktop/src/core/features/routing/browser/profiles-enabled-toggle.browser.test.tsx`
+  and `models-settings.browser.test.tsx` — the Settings → Models toggle: off by default, its
+  warning text, flipping it writes `profilesEnabled` (not the reviewer pin), and turning it on by
+  itself adds or lists no profile.
 - `apps/emdash-desktop/src/core/features/routing/browser/agent-cli-status.browser.test.tsx` — the
   "Agents" panel: loading, an installed CLI with its path, a not-installed CLI, a profile mode, and
   a blocked reviewer's reason text.
@@ -168,9 +180,11 @@ only the read.
    non-`reviewer`-preset spec that carries `reviewerRoute` (T45): no job, lane, Brain MCP op or
    worktree file can reach it, and `SpawnReviewerOptions` (a gate's only input) has no
    routing-shaped field for `assertSupportedOptions` to let through either.
-4. **Off in a release build.** `MODEL_PROFILES_ENABLED` off: the picker is hidden and the setting
-   is ignored (folded to `null` before `routeReviewer` sees it), so reviewers always run on the
-   subscription there.
+4. **Off by default, everywhere (T47).** While `ninebrains.routing.profilesEnabled` is off (its
+   default, in every build): the picker is hidden and the setting is ignored (folded to `null`
+   before `routeReviewer` sees it), so reviewers always run on the subscription. Read live on
+   every reviewer run, not cached, so flipping it on takes effect on the next review, not the next
+   restart.
 - R5: `api/node/price.ts`'s `usd`, `checkBudget` and `refusesUnpriced` are built and tested, but
   nothing calls them yet: no `run_costs`/`spend_caps` tables, no supervisor wiring, no cost view.
   Spike §13 Q3 found the CLI's own `--max-budget-usd` prices an unrecognized model at Opus rates,

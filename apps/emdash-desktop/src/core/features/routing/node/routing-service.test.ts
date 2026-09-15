@@ -38,7 +38,7 @@ function harness(overrides: Partial<RoutingServiceDeps> = {}) {
   const keys = createProfileKeyStore(sink);
   const onError = vi.fn();
   const service = createRoutingService({
-    enabled: true,
+    enabled: () => true,
     profiles: repo,
     keys,
     testConnection: NOOP_TESTER,
@@ -173,7 +173,7 @@ describe('SEC-40 keys are write-only', () => {
   });
 
   it('prepareLaunch throws when profiles are disabled', async () => {
-    const { service } = harness({ enabled: false });
+    const { service } = harness({ enabled: () => false });
     await expect(
       service.prepareLaunch({ laneId: 'l1', provider: 'claude', authProfileId: 'anything' })
     ).rejects.toThrow();
@@ -190,7 +190,7 @@ describe('SEC-40 keys are write-only', () => {
   });
 
   it('turns off every mutating call and empties list when the flag is off', async () => {
-    const { service } = harness({ enabled: false });
+    const { service } = harness({ enabled: () => false });
     expect(await service.listProfiles()).toEqual({ enabled: false, profiles: [], vendors: [] });
     const saved = await service.saveProfile(ANTHROPIC_INPUT);
     expect(saved.success).toBe(false);
@@ -295,7 +295,7 @@ describe('SEC-42 prepareReviewerRoute: a reviewer pin is never silently downgrad
   });
 
   it('blocks rather than routes when profiles are off in this build', async () => {
-    const { service } = harness({ enabled: false });
+    const { service } = harness({ enabled: () => false });
     await expect(service.prepareReviewerRoute('anything')).rejects.toThrow();
   });
 });
@@ -363,7 +363,7 @@ describe('agentCliStatus', () => {
       createdAt: 0,
       updatedAt: 0,
     });
-    const { service } = harness({ enabled: false, profiles: repo });
+    const { service } = harness({ enabled: () => false, profiles: repo });
     const status = await service.agentCliStatus();
     for (const entry of status) {
       for (const { mode } of entry.roles) {
@@ -385,5 +385,38 @@ describe('agentCliStatus', () => {
     expect(codex.path).toBeNull();
     expect(codex.roles).toHaveLength(3);
     expect(codex.roles.every((r) => r.mode.kind === 'subscription')).toBe(true);
+  });
+});
+
+describe('T47: enabled() is read live, not cached at construction', () => {
+  it('flips from off to on without recreating the service', async () => {
+    let on = false;
+    const { service } = harness({ enabled: () => on });
+    expect(await service.listProfiles()).toEqual({ enabled: false, profiles: [], vendors: [] });
+    on = true;
+    expect((await service.listProfiles()).enabled).toBe(true);
+  });
+
+  it('flips from on to off without recreating the service, and stored profiles are then ignored', async () => {
+    let on = true;
+    const { service } = harness({ enabled: () => on });
+    const saved = await service.saveProfile(ANTHROPIC_INPUT);
+    if (!saved.success) throw new Error(saved.error.message);
+    expect((await service.listProfiles()).profiles).toHaveLength(1);
+
+    on = false;
+    const listing = await service.listProfiles();
+    expect(listing).toEqual({ enabled: false, profiles: [], vendors: [] });
+    // The profile row itself is untouched (T47 requirement 4: off ignores it, never deletes it).
+    on = true;
+    expect((await service.listProfiles()).profiles).toHaveLength(1);
+  });
+
+  it('supports an async resolver, matching the real app-settings read', async () => {
+    let on = false;
+    const { service } = harness({ enabled: async () => on });
+    expect((await service.listProfiles()).enabled).toBe(false);
+    on = true;
+    expect((await service.listProfiles()).enabled).toBe(true);
   });
 });

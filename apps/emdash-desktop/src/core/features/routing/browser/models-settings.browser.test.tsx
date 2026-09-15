@@ -13,13 +13,21 @@ import {
 } from '../api';
 import { ModelsSettingsPanel, ModelsSettingsView } from './models-settings-view';
 
-// The reviewer pin is a plain app setting (SEC-42); this view's own tests are about profiles,
-// so the reviewer-pin hook is mocked like every other `useAppSettingsKey` consumer's browser test.
+// The reviewer pin and the T47 profiles-enabled toggle are plain app settings (SEC-42); this
+// view's own tests are about profiles, so the hook is mocked like every other
+// `useAppSettingsKey` consumer's browser test. `routingSettingsUpdate` lets a test assert on a
+// write without needing the real settings store.
+const routingSettingsUpdate = vi.fn();
+let routingSettingsValue: { profilesEnabled: boolean; reviewerProfileId: string | null } = {
+  profilesEnabled: false,
+  reviewerProfileId: null,
+};
 vi.mock('@core/features/settings/api/browser/use-app-settings-key', () => ({
   useAppSettingsKey: () => ({
-    value: { reviewerProfileId: null },
+    value: routingSettingsValue,
     isLoading: false,
-    update: vi.fn(),
+    isSaving: false,
+    update: routingSettingsUpdate,
   }),
 }));
 
@@ -78,6 +86,8 @@ describe('Settings → Models', () => {
   beforeEach(() => {
     saved.length = 0;
     keys.length = 0;
+    routingSettingsUpdate.mockClear();
+    routingSettingsValue = { profilesEnabled: false, reviewerProfileId: null };
     listing = { enabled: true, profiles: [], vendors: [ANTHROPIC] };
     handle = seedSliceWire(routingDomain, routingContract, {
       listProfiles: async () => listing,
@@ -106,7 +116,7 @@ describe('Settings → Models', () => {
     await handle.dispose();
   });
 
-  it('shows only the notice when profiles are off', async () => {
+  it('shows the notice and the toggle when profiles are off', async () => {
     listing = { enabled: false, profiles: [], vendors: [] };
     await act(async () => root.render(<ModelsSettingsView />));
     await vi.waitFor(() =>
@@ -114,6 +124,37 @@ describe('Settings → Models', () => {
     );
     expect(container.querySelector('form[aria-label="Add profile"]')).toBeNull();
     expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(container.querySelector('[data-testid="model-profile"]')).toBeNull();
+    // T47: the toggle itself is always shown, off state or on, so a user can turn it on.
+    const toggle = container.querySelector('[data-testid="profiles-enabled-toggle"]');
+    expect(toggle).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Model profiles"]')?.getAttribute('aria-checked')
+    ).toBe('false');
+  });
+
+  it('T47: flipping the toggle writes profilesEnabled, not reviewerProfileId', async () => {
+    await act(async () => root.render(<ModelsSettingsView />));
+    const toggle = await vi.waitFor(() => {
+      const found = container.querySelector<HTMLElement>('[aria-label="Model profiles"]');
+      if (!found) throw new Error('no toggle');
+      return found;
+    });
+    await act(async () => toggle.click());
+    expect(routingSettingsUpdate).toHaveBeenCalledTimes(1);
+    expect(routingSettingsUpdate.mock.calls[0]?.[0]).toEqual({ profilesEnabled: true });
+  });
+
+  it('T47: turning it on by itself changes nothing else — no profile is added or listed', async () => {
+    await act(async () => root.render(<ModelsSettingsView />));
+    const toggle = await vi.waitFor(() => {
+      const found = container.querySelector<HTMLElement>('[aria-label="Model profiles"]');
+      if (!found) throw new Error('no toggle');
+      return found;
+    });
+    await act(async () => toggle.click());
+    expect(saved).toHaveLength(0);
+    expect(keys).toHaveLength(0);
     expect(container.querySelector('[data-testid="model-profile"]')).toBeNull();
   });
 

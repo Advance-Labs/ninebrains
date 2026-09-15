@@ -206,7 +206,7 @@ export class LaneService {
     authProfileId?: string;
   }): Promise<Result<{ laneId: string }, LaneError>> {
     await this.initialize();
-    if (input.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
+    if (input.authProfileId && !(await this.profilesEnabled())) return err(PROFILES_DISABLED);
     const tab = this.grid.tabs.find((candidate) => candidate.tabId === input.tabId);
     if (!tab) return err(laneError('tab-not-found', 'That tab no longer exists.'));
     if (tab.slots[input.slot]) {
@@ -360,7 +360,7 @@ export class LaneService {
     routing: { subagentModel: string | null; authProfileId: string | null }
   ): Promise<Result<void, LaneError>> {
     await this.initialize();
-    if (routing.authProfileId && !this.profilesEnabled) return err(PROFILES_DISABLED);
+    if (routing.authProfileId && !(await this.profilesEnabled())) return err(PROFILES_DISABLED);
     const location = this.locate(laneId);
     if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
     const { config } = location;
@@ -372,8 +372,8 @@ export class LaneService {
     return ok(undefined);
   }
 
-  private get profilesEnabled(): boolean {
-    return this.ports.modelProfilesEnabled ?? MODEL_PROFILES_ENABLED;
+  private async profilesEnabled(): Promise<boolean> {
+    return (await this.ports.modelProfilesEnabled?.()) ?? MODEL_PROFILES_ENABLED;
   }
 
   private async load(): Promise<void> {

@@ -108,8 +108,13 @@ export type LaneServicePorts = {
   persistence: LanePersistencePort;
   agentFeed: LaneAgentFeedPort;
   brain?: LaneBrainPort;
-  /** `MODEL_PROFILES_ENABLED` unless a test says otherwise. */
-  modelProfilesEnabled?: boolean;
+  /**
+   * T47: the live `ninebrains.routing.profilesEnabled` setting, called on every
+   * `createLane`/`setLaneRouting` — not cached at construction, so a toggle in Settings → Models
+   * takes effect immediately. Falls back to `MODEL_PROFILES_ENABLED` (always true) when omitted,
+   * which is what tests that don't care about routing use.
+   */
+  modelProfilesEnabled?: () => boolean | Promise<boolean>;
   newId(): string;
   onError(context: string, error: unknown): void;
 };

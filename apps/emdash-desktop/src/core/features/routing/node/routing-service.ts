@@ -66,8 +66,12 @@ export interface RoutingService {
 }
 
 export interface RoutingServiceDeps {
-  /** `MODEL_PROFILES_ENABLED`. Off: no profile can be listed, written, tested or launched. */
-  enabled: boolean;
+  /**
+   * The live `ninebrains.routing.profilesEnabled` app setting (T47), read fresh on every call —
+   * never cached at service construction, so a toggle in Settings → Models takes effect on the
+   * next call, not the next restart. Off: no profile can be listed, written, tested or launched.
+   */
+  enabled(): boolean | Promise<boolean>;
   profiles: ProfilesRepo;
   keys: ProfileKeyStore;
   testConnection: ConnectionTester;
@@ -154,12 +158,12 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
 
   return {
     async listProfiles() {
-      if (!deps.enabled) return { enabled: false, profiles: [], vendors: [] };
+      if (!(await deps.enabled())) return { enabled: false, profiles: [], vendors: [] };
       return { enabled: true, profiles: deps.profiles.list().map(toView), vendors: [...VENDORS] };
     },
 
     async saveProfile(raw) {
-      if (!deps.enabled) return err(DISABLED);
+      if (!(await deps.enabled())) return err(DISABLED);
       const parsed = modelProfileInputSchema.safeParse(raw);
       if (!parsed.success) {
         return err({
@@ -204,7 +208,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     },
 
     async setProfileKey(profileId, key) {
-      if (!deps.enabled) return err(DISABLED);
+      if (!(await deps.enabled())) return err(DISABLED);
       if (!deps.profiles.get(profileId)) return err(notFound(profileId));
       if (!profileKeySchema.safeParse(key).success) {
         return err({ type: 'invalid', message: 'That does not look like an API key.' });
@@ -218,7 +222,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     },
 
     async clearProfileKey(profileId) {
-      if (!deps.enabled) return err(DISABLED);
+      if (!(await deps.enabled())) return err(DISABLED);
       if (!deps.profiles.get(profileId)) return err(notFound(profileId));
       try {
         await deps.keys.clear(profileId);
@@ -229,7 +233,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     },
 
     async deleteProfile(profileId) {
-      if (!deps.enabled) return err(DISABLED);
+      if (!(await deps.enabled())) return err(DISABLED);
       if (!deps.profiles.get(profileId)) return err(notFound(profileId));
       try {
         await deps.keys.clear(profileId);
@@ -240,7 +244,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     },
 
     async testConnection(profileId) {
-      if (!deps.enabled) return err(DISABLED);
+      if (!(await deps.enabled())) return err(DISABLED);
       const profile = deps.profiles.get(profileId);
       if (!profile) return err(notFound(profileId));
       let key: string | undefined;
@@ -258,7 +262,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     async prepareLaunch(lane) {
       const base = lane.subagentModel ? { subagentModel: lane.subagentModel } : {};
       if (!lane.authProfileId) return { auth: { mode: 'subscription' }, ...base };
-      if (!deps.enabled) throw new Error(DISABLED.message);
+      if (!(await deps.enabled())) throw new Error(DISABLED.message);
       const profile = deps.profiles.get(lane.authProfileId);
       if (!profile) {
         throw new Error(`The lane's model profile "${lane.authProfileId}" no longer exists.`);
@@ -277,7 +281,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     },
 
     async prepareReviewerRoute(profileId) {
-      if (!deps.enabled) throw new Error(DISABLED.message);
+      if (!(await deps.enabled())) throw new Error(DISABLED.message);
       const decision = resolveRoute('reviewer', {
         explicitProfileId: profileId,
         profiles: deps.profiles.list(),
@@ -306,7 +310,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
     async agentCliStatus() {
       // Off in this build: every role reads as the subscription, same rule as listProfiles —
       // profiles are ignored entirely, never partially applied.
-      const profiles = deps.enabled ? deps.profiles.list() : [];
+      const profiles = (await deps.enabled()) ? deps.profiles.list() : [];
       const results = await Promise.all(
         AGENT_CLI_PROVIDERS.map(async (provider) => {
           const { installed, path } = await deps.resolveInstalled(provider);
@@ -328,7 +332,7 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
 /** The controller's fallback when the composition root passes no service. */
 export function createDisabledRoutingService(): RoutingService {
   return createRoutingService({
-    enabled: false,
+    enabled: () => false,
     profiles: createMemoryProfilesRepo(),
     keys: {
       set: async () => Promise.reject(new Error(DISABLED.message)),

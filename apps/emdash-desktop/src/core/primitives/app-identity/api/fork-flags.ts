@@ -23,8 +23,17 @@ export const USER_PACKS_ENABLED: boolean = false;
 
 /**
  * Lever B of model routing (docs/plans/2026-09-12-model-routing.md): model profiles with the
- * user's own API keys, Settings → Models' profile list, and the API-key lane mode. On in dev
- * builds, off in release builds until Lucas decides (plan §8 Q1). Lever A (the subagent tier)
- * is always on.
+ * user's own API keys, Settings → Models' profile list, and the API-key lane mode. Lever A (the
+ * subagent tier) is always on.
+ *
+ * Was `import.meta.env.DEV` (a build-time hold-back) until 2026-09-15: with SEC-39 through SEC-45
+ * enforced and independently reviewed and the reviewer pin shipped (PR #4, T40), there is no
+ * remaining reason to compile the feature out of release builds. This flag now just marks "the
+ * code ships in this build" and stays `true` everywhere; the real on/off switch a user sees is
+ * the `ninebrains.routing` app setting's `profilesEnabled` field (default `false`,
+ * `docs/plans/2026-09-15-routing-usability.md`), which every call site below reads live, not at
+ * boot. A user turns it on in Settings → Models; nothing changes until they also add a profile
+ * (T47). SEC-08 still holds: that setting is reachable only through the app-settings wire
+ * controller, which has no `BrainOp` counterpart, so no lane or Brain token can flip it.
  */
-export const MODEL_PROFILES_ENABLED: boolean = import.meta.env.DEV;
+export const MODEL_PROFILES_ENABLED: boolean = true;
