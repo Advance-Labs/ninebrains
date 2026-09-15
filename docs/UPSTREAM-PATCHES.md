@@ -281,10 +281,12 @@ New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/r
 
 ### 14a. Reviewer routing wired (W7 `w7/routing-wave2`, R4, decided 2026-09-15)
 
-No manifest or contract registrations here: the reviewer pin is an app setting
-(`ninebrains.routing`, `routing/contributions/settings.ts`), not a new wire contract, and the
-Settings → Models page already exists (14 above). Append-only field additions to existing
-Ninebrains files.
+The reviewer pin reuses the existing app-settings mechanism (14's Settings → Models page; §10
+already registered `ninebrains.gates` on this same inherited file). No new wire contract.
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/settings-contributions.ts` | `+'ninebrains.routing': routingSettingsContribution` | The reviewer pin (`reviewerProfileId`), read by `reviewer-route.ts` |
 
 Ninebrains files touched: `exec-runs/api/node/types.ts` (`ExecRunSpec.reviewerRoute`),
 `exec-runs/api/node/run-supervisor.ts` (routes a `reviewer` preset on `reviewerRoute`, refuses a
@@ -293,9 +295,11 @@ spec that mixes it with `routing`), `routing/node/routing-service.ts` (`prepareR
 async), `main/bootstrap/boot/ninebrains/reviewer-route.ts` (reads the pin, calls
 `prepareReviewerRoute`), `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts` (wires
 `deps.appSettings.get('ninebrains.routing')`, folding `MODEL_PROFILES_ENABLED` in before
-`reviewer-route.ts` ever sees a pin), `core/manifests/shared/settings-contributions.ts`
-(`'ninebrains.routing': routingSettingsContribution`), `routing/browser/models-settings-view.tsx`
-(the "Reviewer model" picker).
+`reviewer-route.ts` ever sees a pin), `routing/browser/models-settings-view.tsx` (the "Reviewer
+model" picker).
+
+New files: `routing/contributions/settings.ts`,
+`main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
 
 New files: `routing/contributions/settings.ts`,
 `main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
