@@ -238,3 +238,53 @@ describe('SEC-40 setProfileKey registers the redactor secret', () => {
     expect(redact(`leaked ${KEY} right here`)).not.toContain(KEY);
   });
 });
+
+describe('SEC-42 prepareReviewerRoute: a reviewer pin is never silently downgraded', () => {
+  it('a pinned, healthy, keyed profile routes the reviewer to it', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile(ANTHROPIC_INPUT);
+    if (!saved.success) throw new Error(saved.error.message);
+    await service.setProfileKey(saved.data.profileId, KEY);
+    const routing = await service.prepareReviewerRoute(saved.data.profileId);
+    expect(routing.auth).toMatchObject({ mode: 'profile', key: KEY });
+  });
+
+  it('a local profile with no key still routes: the placeholder token is a launch-time concern', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile(LOCAL_INPUT);
+    if (!saved.success) throw new Error(saved.error.message);
+    const routing = await service.prepareReviewerRoute(saved.data.profileId);
+    expect(routing.auth).toMatchObject({ mode: 'profile' });
+    expect((routing.auth as { key?: string }).key).toBeUndefined();
+  });
+
+  it('blocks, never falls back, when the pinned profile is missing', async () => {
+    const { service } = harness();
+    await expect(service.prepareReviewerRoute('ghost')).rejects.toThrow(
+      /reviewer is blocked.*no longer exists/i
+    );
+  });
+
+  it('blocks when the pinned profile is disabled', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile({ ...ANTHROPIC_INPUT, enabled: false });
+    if (!saved.success) throw new Error(saved.error.message);
+    await expect(service.prepareReviewerRoute(saved.data.profileId)).rejects.toThrow(
+      /reviewer is blocked.*turned off/i
+    );
+  });
+
+  it('blocks when the pinned profile has no API key', async () => {
+    const { service } = harness();
+    const saved = await service.saveProfile(ANTHROPIC_INPUT);
+    if (!saved.success) throw new Error(saved.error.message);
+    await expect(service.prepareReviewerRoute(saved.data.profileId)).rejects.toThrow(
+      /reviewer is blocked.*no API key/i
+    );
+  });
+
+  it('blocks rather than routes when profiles are off in this build', async () => {
+    const { service } = harness({ enabled: false });
+    await expect(service.prepareReviewerRoute('anything')).rejects.toThrow();
+  });
+});

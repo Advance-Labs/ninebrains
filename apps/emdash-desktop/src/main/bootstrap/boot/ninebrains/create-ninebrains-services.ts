@@ -357,7 +357,17 @@ export async function createNinebrainsServices(
       }),
       spawnReviewer: createSpawnReviewer({
         supervisor,
-        route: (purpose) => routeReviewer(purpose, installed),
+        route: (purpose) =>
+          routeReviewer(purpose, {
+            installed,
+            // A release build (MODEL_PROFILES_ENABLED off) hides and ignores the reviewer pin
+            // setting: reviewers always run on the subscription there, whatever it holds.
+            reviewerProfileId: async () =>
+              MODEL_PROFILES_ENABLED
+                ? (await deps.appSettings.get('ninebrains.routing')).reviewerProfileId
+                : null,
+            prepareReviewerRoute: (profileId) => routing.prepareReviewerRoute(profileId),
+          }),
         checkoutRoot,
         laneWorktrees,
       }),

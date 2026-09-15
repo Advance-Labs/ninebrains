@@ -6,7 +6,7 @@ import { buildCodexExecArgv } from '@core/features/exec-runs/api/node/codex-exec
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
 import type { ExecRunSpec } from '@core/features/exec-runs/api/node/types';
 import { prepareReviewCheckout } from './review-checkout';
-import { createSpawnReviewer } from './spawn-reviewer';
+import { createSpawnReviewer, type SpawnReviewerDeps } from './spawn-reviewer';
 import {
   ECHO_MCP_SERVER,
   fakeClaudeWrapper,
@@ -32,7 +32,7 @@ rmSync(join(laneA, 'doomed.txt'));
 
 const VERDICT = '{"pass":true,"issues":[]}';
 
-function reviewerWith(env: Record<string, string>) {
+function reviewerWith(env: Record<string, string>, deps: Partial<SpawnReviewerDeps> = {}) {
   const supervisor = new ExecRunSupervisor({
     userDataDir: userData,
     resolveBinary: async () => fakeClaudeWrapper(root, env),
@@ -45,6 +45,7 @@ function reviewerWith(env: Record<string, string>) {
       supervisor,
       checkoutRoot: checkouts,
       laneWorktrees: () => lanePaths,
+      ...deps,
     }),
   };
 }
@@ -239,6 +240,14 @@ describe('spawnReviewer options', () => {
     await expect(spawnReviewer('p', unknown)).rejects.toThrow(/cannot honour option "network"/);
     const legacy = { ...opts(), readOnly: true } as unknown as SpawnReviewerOptions;
     await expect(spawnReviewer('p', legacy)).rejects.toThrow(/cannot honour option "readOnly"/);
+    // SEC-42 pinning: a gate (a job's own configuration) has no `routing` or `profileId` field in
+    // its options contract, and even a hostile caller that adds one at runtime is refused the
+    // same way as any other unknown option — the reviewer route can only come from `deps.route`.
+    const routed = {
+      ...opts(),
+      routing: { auth: { mode: 'subscription' } },
+    } as unknown as SpawnReviewerOptions;
+    await expect(spawnReviewer('p', routed)).rejects.toThrow(/cannot honour option "routing"/);
     await expect(spawnReviewer('p', opts({ tools: 'all' as 'read-only' }))).rejects.toThrow(
       /read-only/
     );
@@ -253,5 +262,45 @@ describe('spawnReviewer options', () => {
       /Reviewer run failed \(exit-nonzero\)/
     );
     expect(readdirSync(checkouts)).toEqual([]);
+  });
+});
+
+describe("SEC-42 `deps.route`'s `routing` reaches the run as `reviewerRoute`", () => {
+  const PROFILE = {
+    id: 'mock',
+    kind: 'local' as const,
+    protocol: 'anthropic' as const,
+    baseUrl: 'http://127.0.0.1:9',
+    model: 'qwen3-coder',
+  };
+
+  it('a pinned profile route drives the reviewer launch', async () => {
+    const { spawnReviewer } = reviewerWith(
+      { FAKE_AGENT_SCRIPT: JSON.stringify([{ say: VERDICT }]) },
+      {
+        route: () => ({
+          provider: 'claude',
+          routing: { auth: { mode: 'profile', profile: PROFILE, key: 'sk-mock-0000000000' } },
+        }),
+      }
+    );
+    const { text } = await spawnReviewer('p', opts());
+    expect(text).toBe(VERDICT);
+  });
+
+  it('a route pinned to one model, launched with another, is killed as a credential mismatch', async () => {
+    const { spawnReviewer } = reviewerWith(
+      { FAKE_AGENT_SCRIPT: JSON.stringify([{ sleep: 3000 }, { say: VERDICT }]) },
+      {
+        route: () => ({
+          provider: 'claude',
+          model: 'claude-haiku-4-5', // ExecRunSpec.model: not the profile's own `qwen3-coder`
+          routing: { auth: { mode: 'profile', profile: PROFILE, key: 'sk-mock-0000000000' } },
+        }),
+      }
+    );
+    await expect(spawnReviewer('p', opts())).rejects.toThrow(
+      /Reviewer run failed \(credential-mismatch\)/
+    );
   });
 });

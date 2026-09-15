@@ -13,6 +13,16 @@ import {
 } from '../api';
 import { ModelsSettingsPanel, ModelsSettingsView } from './models-settings-view';
 
+// The reviewer pin is a plain app setting (SEC-42); this view's own tests are about profiles,
+// so the reviewer-pin hook is mocked like every other `useAppSettingsKey` consumer's browser test.
+vi.mock('@core/features/settings/api/browser/use-app-settings-key', () => ({
+  useAppSettingsKey: () => ({
+    value: { reviewerProfileId: null },
+    isLoading: false,
+    update: vi.fn(),
+  }),
+}));
+
 // Settings → Models through the routing slice's own client, seeded with `seedSliceWire`.
 
 const ANTHROPIC: Vendor = {

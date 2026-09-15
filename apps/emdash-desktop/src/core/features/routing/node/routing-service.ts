@@ -15,6 +15,7 @@ import {
   type ModelProfileView,
 } from '../api/profile';
 import type { ProfileKeyStore } from './keys';
+import { resolveRoute } from './policy';
 import { createMemoryProfilesRepo, type ProfilesRepo, type StoredProfile } from './profiles-repo';
 import type { ConnectionTester } from './test-connection';
 import { VENDORS, vendorProblem } from './vendors';
@@ -40,6 +41,13 @@ export interface RoutingService {
    * never falls back to the subscription.
    */
   prepareLaunch(lane: RoutingLane): Promise<LaunchRouting>;
+  /**
+   * A pinned reviewer profile's route (SEC-42). `profileId` is the app's `ninebrains.routing`
+   * setting, read by the caller (`reviewer-route.ts`, wired in `create-ninebrains-services.ts`);
+   * this method never reads it itself. Rejects, rather than falling back, once the profile is
+   * missing, disabled, keyless or unhealthy — a reviewer pin is never silently downgraded.
+   */
+  prepareReviewerRoute(profileId: string): Promise<LaunchRouting>;
 }
 
 export interface RoutingServiceDeps {
@@ -223,6 +231,33 @@ export function createRoutingService(deps: RoutingServiceDeps): RoutingService {
       return {
         auth: { mode: 'profile', profile: toProfileLaunch(profile), ...(key ? { key } : {}) },
         ...base,
+      };
+    },
+
+    async prepareReviewerRoute(profileId) {
+      if (!deps.enabled) throw new Error(DISABLED.message);
+      const decision = resolveRoute('reviewer', {
+        explicitProfileId: profileId,
+        profiles: deps.profiles.list(),
+      });
+      if (decision.status !== 'profile') {
+        const reason = decision.status === 'blocked' ? decision.reason : 'it is not pinned';
+        throw new Error(`The reviewer is blocked: ${reason}.`);
+      }
+      const profile = deps.profiles.get(decision.profileId);
+      if (!profile) {
+        throw new Error(
+          `The reviewer is blocked: model profile "${decision.profileId}" no longer exists.`
+        );
+      }
+      const key = profile.hasKey ? await deps.keys.reveal(profile.id) : undefined;
+      if (profile.kind !== 'local' && !key) {
+        throw new Error(
+          `The reviewer is blocked: model profile "${profile.label}" has no API key. Add it in Settings → Models.`
+        );
+      }
+      return {
+        auth: { mode: 'profile', profile: toProfileLaunch(profile), ...(key ? { key } : {}) },
       };
     },
   };

@@ -279,6 +279,31 @@ New files: `src/core/features/routing/**`, `src/main/bootstrap/boot/ninebrains/r
 `src/renderer/tests/browser/routing-screenshots.test.tsx`, `docs/screenshots/routing-*.png`,
 `docs/research/VENDORS.md`, `docs/guide/models.md`.
 
+### 14a. Reviewer routing wired (W7 `w7/routing-wave2`, R4, decided 2026-09-15)
+
+The reviewer pin reuses the existing app-settings mechanism (14's Settings → Models page; §10
+already registered `ninebrains.gates` on this same inherited file). No new wire contract.
+
+| File | What | Why |
+|---|---|---|
+| `src/core/manifests/shared/settings-contributions.ts` | `+'ninebrains.routing': routingSettingsContribution` | The reviewer pin (`reviewerProfileId`), read by `reviewer-route.ts` |
+
+Ninebrains files touched: `exec-runs/api/node/types.ts` (`ExecRunSpec.reviewerRoute`),
+`exec-runs/api/node/run-supervisor.ts` (routes a `reviewer` preset on `reviewerRoute`, refuses a
+spec that mixes it with `routing`), `routing/node/routing-service.ts` (`prepareReviewerRoute`),
+`gates/node/capabilities/spawn-reviewer.ts` (`ReviewerRoute.routing`, `deps.route` may now be
+async), `main/bootstrap/boot/ninebrains/reviewer-route.ts` (reads the pin, calls
+`prepareReviewerRoute`), `main/bootstrap/boot/ninebrains/create-ninebrains-services.ts` (wires
+`deps.appSettings.get('ninebrains.routing')`, folding `MODEL_PROFILES_ENABLED` in before
+`reviewer-route.ts` ever sees a pin), `routing/browser/models-settings-view.tsx` (the "Reviewer
+model" picker).
+
+New files: `routing/contributions/settings.ts`,
+`main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
+
+New files: `routing/contributions/settings.ts`,
+`main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
+
 ## 15. UI jobs and the test command (W7 `w7/self-heal-e2e`)
 
 | File | What | Why |

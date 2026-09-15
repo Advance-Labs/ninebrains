@@ -1,8 +1,8 @@
 # routing
 
-Model routing for Ninebrains (`docs/plans/2026-09-12-model-routing.md`), wave 1 (R0–R3). Lever A
-(subagent model) is always on. Lever B (model profiles, your own API keys) is behind the
-`MODEL_PROFILES_ENABLED` build flag.
+Model routing for Ninebrains (`docs/plans/2026-09-12-model-routing.md`), wave 1 (R0–R3) plus the
+start of wave 2 (`policy.ts`, `api/node/price.ts`; R4/R5). Lever A (subagent model) is always on.
+Lever B (model profiles, your own API keys) is behind the `MODEL_PROFILES_ENABLED` build flag.
 
 ## Layout
 
@@ -13,6 +13,8 @@ Model routing for Ninebrains (`docs/plans/2026-09-12-model-routing.md`), wave 1 
 | `api/subagent-model.ts` | Lever A: `SubagentTier`, `resolveSubagentModel` (lane beats role, `inherit` emits nothing), and the model-id shape. |
 | `api/node/launch-env.ts` | `routeLaunch` and `assertLaunchPolicy`: turns a lane's routing into env, `--settings` env and Codex config, and is the one place SEC-39 is enforced. |
 | `api/node/managed-settings.ts` | Reads Claude Code's managed (enterprise) settings files and reports any gateway variable they set (SEC-39 refusal). |
+| `api/node/price.ts` | R5: `usd(usage, price)`, `checkBudget`, `refusesUnpriced` — a profile's own USD cost and cap check, never the CLI's `--max-budget-usd` (SEC-43). Pure; `run_costs` persistence and supervisor wiring are not built yet. |
+| `node/policy.ts` | R4: `resolveRoute(role, …)` — the tier a worker, subagent or reviewer runs at, and the SEC-42 pin (a reviewer blocks rather than falls back once every `strong`-tier profile is unavailable). Pure; nothing calls it yet (below). |
 | `node/vendors.json` | The bundled, reviewed vendor allowlist (SEC-44). |
 | `node/vendors.ts` | Loads and validates `vendors.json`, and checks a profile's base URL against it. |
 | `node/keys.ts` | `ninebrains.model.<id>` in the keychain-backed secret store (SEC-40). |
@@ -68,6 +70,8 @@ unknown credential (SEC-39).
 | SEC-41 | Managed Claude settings that set a gateway variable stop the launch outright | `api/node/managed-settings.ts` | `SEC-41 managed settings` |
 | SEC-44 | Only the allowed profile kinds, protocols and vendor hosts; no OAuth, cookie, session or token-file kind; no consumer login host | `api/profile.ts`, `node/vendors.ts` | `SEC-44 allowed credential kinds and vendors`, `SEC-44 vendor allowlist`, `SEC-44` (routing-service) |
 | SEC-45 | A profile launch's egress is the profile's host only (plus loopback for `local`) | `api/node/launch-env.ts` (`RoutedLaunch.egressHosts`) | covered inside the `SEC-39`/`R3` suites, no dedicated `describe` yet |
+| SEC-42 | An optional reviewer pin (one profile, `ninebrains.routing`); once pinned, unavailable (missing, disabled, keyless or unhealthy) means blocked, never a pass, a lower tier or the subscription; no job/lane/Brain MCP op or worktree file can set the route | `node/policy.ts` (`resolveRoute`), `node/routing-service.ts` (`prepareReviewerRoute`), `main/bootstrap/boot/ninebrains/reviewer-route.ts`, `gates/node/capabilities/spawn-reviewer.ts` (`ExecRunSpec.reviewerRoute`) | `SEC-42 reviewers are never downgraded`, `SEC-42 prepareReviewerRoute`, `SEC-42 a reviewer route is a separate field from a worker route` |
+| SEC-43 | USD cost is our own `usage × price`, never the CLI's `--max-budget-usd`; an unpriced profile refuses; a projected spend over its cap is refused, never moved to a cheaper model | `api/node/price.ts` (`usd`, `checkBudget`, `refusesUnpriced`) | `SEC-43 usd()`, `SEC-43 refusesUnpriced`, `SEC-43 checkBudget: refuse, never downgrade` |
 
 ## Tests
 
@@ -85,6 +89,19 @@ unknown credential (SEC-39).
 - `apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/routing-launch.e2e.test.ts` — `SEC-39
   subscription runs carry no routing` (e2e), `R3 a profile run reaches only its host, with only its
   key (SEC-40)`.
+- `apps/emdash-desktop/src/core/features/routing/node/policy.test.ts` — `SEC-42 reviewers are never
+  downgraded`.
+- `apps/emdash-desktop/src/core/features/routing/node/routing-service.test.ts` — `SEC-42
+  prepareReviewerRoute: a reviewer pin is never silently downgraded`.
+- `apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/reviewer-route.test.ts` — default,
+  pinned, blocked and release-build cases of `routeReviewer`.
+- `apps/emdash-desktop/src/core/features/exec-runs/api/node/run-supervisor-routing.test.ts` —
+  `SEC-42 a reviewer route is a separate field from a worker route`.
+- `apps/emdash-desktop/src/core/features/gates/node/capabilities/spawn-reviewer.test.ts` —
+  `` SEC-42 `deps.route`'s `routing` reaches the run as `reviewerRoute` `` and the `routing`-option
+  pinning case in `spawnReviewer options`.
+- `apps/emdash-desktop/src/core/features/routing/api/node/price.test.ts` — `SEC-43 usd()`, `SEC-43
+  refusesUnpriced`, `SEC-43 checkBudget: refuse, never downgrade`.
 
 ## Decisions made while blocked
 
@@ -107,11 +124,37 @@ unknown credential (SEC-39).
 
 ## Deferred to wave 2
 
-- R4: `policy.ts`, tiers, pack-role tier defaults, the planner's per-job profile, and the pinned
-  reviewer profile (SEC-42).
-- R5: USD budgets (SEC-43) and `run_costs`. Spike §13 Q3 found the CLI's own `--max-budget-usd`
-  prices an unrecognized model at Opus rates, so it's a coarse backstop only, never the real gate.
-- R6: fallback and the per-profile circuit breaker.
+- R4: `policy.ts`'s `resolveRoute` is built and tested. The reviewer pin is wired end to end
+  (below); a pack role's tier default and the planner's per-job profile (the `explicitProfileId`
+  input `resolveRoute` already accepts) are still open.
+
+### Reviewer routing (decided 2026-09-15)
+
+`ExecRunSpec.routing`'s contract still holds — reviewers never set it. Instead:
+
+1. **Default: the subscription, no setup.** `reviewer-route.ts`'s `routeReviewer` returns
+   `{ provider: 'claude' }` unless the app's `ninebrains.routing` setting names a pinned profile.
+2. **An optional reviewer pin.** Settings → Models has a "Reviewer model" picker next to the
+   profile list, backed by the plain app setting `ninebrains.routing` (`reviewerProfileId`), not
+   the routing wire contract. When set, `routing-service.ts`'s `prepareReviewerRoute(profileId)`
+   calls `resolveRoute('reviewer', { explicitProfileId: profileId, … })`; a missing, disabled,
+   keyless or unhealthy pin throws (SEC-42 block), never falls back.
+3. **A separate field, not `ExecRunSpec.routing`.** The resolved route becomes
+   `ExecRunSpec.reviewerRoute`, set only by `spawn-reviewer.ts` (from `reviewer-route.ts`).
+   `ExecRunSupervisor.launch` refuses a `reviewer`-preset spec that also carries `routing`, and a
+   non-`reviewer`-preset spec that carries `reviewerRoute` (T45): no job, lane, Brain MCP op or
+   worktree file can reach it, and `SpawnReviewerOptions` (a gate's only input) has no
+   routing-shaped field for `assertSupportedOptions` to let through either.
+4. **Off in a release build.** `MODEL_PROFILES_ENABLED` off: the picker is hidden and the setting
+   is ignored (folded to `null` before `routeReviewer` sees it), so reviewers always run on the
+   subscription there.
+- R5: `api/node/price.ts`'s `usd`, `checkBudget` and `refusesUnpriced` are built and tested, but
+  nothing calls them yet: no `run_costs`/`spend_caps` tables, no supervisor wiring, no cost view.
+  Spike §13 Q3 found the CLI's own `--max-budget-usd` prices an unrecognized model at Opus rates,
+  so it's a coarse backstop only, never the real gate.
+- R6: fallback and the per-profile circuit breaker. `policy.ts`'s `ProfileHealthState` already
+  names the breaker's three states so R6 only has to start writing them; `resolveRoute` reads them
+  today as "healthy" when absent.
 - R7: a Brain session requesting a tier in `create_job`.
 - R8: the local router (SEC-46), gated on whether R0 shows users actually need mixed vendors in one
   session.

@@ -66,9 +66,18 @@ export interface ExecRunSpec {
   /**
    * The model route (`routing/api/node/launch-env`): the subscription (default) or a model
    * profile, plus Lever A's subagent tier. The supervisor turns it into env and Codex config and
-   * checks SEC-39 on the result. Reviewers never set it.
+   * checks SEC-39 on the result. Reviewers never set it (use `reviewerRoute` instead); the
+   * supervisor refuses a `reviewer` preset spec that carries this field.
    */
   routing?: LaunchRouting;
+  /**
+   * The reviewer's own model route (SEC-42), a separate field from `routing` on purpose: no job,
+   * lane, Brain MCP op or worktree file can reach it, only the reviewer spawn path
+   * (`gates/node/capabilities/spawn-reviewer.ts`, driven by `reviewer-route.ts`'s pinned-profile
+   * setting). Undefined runs the reviewer on the user's subscription, exactly as before this
+   * field existed. The supervisor refuses a non-`reviewer` preset spec that carries it.
+   */
+  reviewerRoute?: LaunchRouting;
 }
 
 export interface TokenUsage {

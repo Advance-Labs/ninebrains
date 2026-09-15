@@ -123,3 +123,51 @@ describe('SEC-41 the active credential is checked at run start', () => {
     ).toMatch(/expected model/);
   });
 });
+
+describe('SEC-42 a reviewer route is a separate field from a worker route', () => {
+  const PROFILE = {
+    id: 'mock',
+    kind: 'local' as const,
+    protocol: 'anthropic' as const,
+    baseUrl: 'http://127.0.0.1:9',
+    model: 'qwen3-coder',
+  };
+  const reviewerRoute = {
+    auth: { mode: 'profile' as const, profile: PROFILE, key: 'sk-mock-0000000000' },
+  };
+
+  it('a reviewer preset run is routed onto `reviewerRoute`, not the subscription', async () => {
+    // No `model` override: `argvSpec` in run-supervisor picks up the route's own model
+    // (`qwen3-coder`), so the fake CLI reports exactly what `reviewerRoute` expects.
+    const done = await run(fakeClaude({ FAKE_AGENT_SCRIPT: JSON.stringify([{ say: 'ok' }]) }), {
+      preset: 'reviewer',
+      reviewerRoute,
+    }).result;
+    expect(done.reason).toBe('completed');
+  });
+
+  it('a reviewer preset run reporting the wrong model for its pinned profile is killed', async () => {
+    const { result } = run(fakeClaude(SLOW), {
+      preset: 'reviewer',
+      model: 'claude-haiku-4-5', // argv gets this, not the profile's `qwen3-coder`
+      reviewerRoute,
+    });
+    expect((await result).reason).toBe('credential-mismatch');
+  });
+
+  it('refuses a reviewer preset run that also sets `routing`: no job field reaches the reviewer route', async () => {
+    const { result } = run(fakeClaude({}), {
+      preset: 'reviewer',
+      routing: { auth: { mode: 'subscription' } },
+    });
+    await expect(result).rejects.toThrow(/reviewer run must not set `routing`/);
+  });
+
+  it('refuses a worker preset run that sets `reviewerRoute`', async () => {
+    const { result } = run(fakeClaude({}), {
+      preset: 'worker',
+      reviewerRoute,
+    });
+    await expect(result).rejects.toThrow(/Only a reviewer run may set `reviewerRoute`/);
+  });
+});
