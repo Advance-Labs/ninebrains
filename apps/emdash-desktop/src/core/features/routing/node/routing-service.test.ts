@@ -49,6 +49,7 @@ function harness(overrides: Partial<RoutingServiceDeps> = {}) {
       return () => `profile-${++n}`;
     })(),
     resolveInstalled: INSTALLED_EVERYWHERE,
+    reviewerProfileId: async () => null,
     ...overrides,
   });
   return { repo, sink, keys, service, onError };
@@ -385,6 +386,87 @@ describe('agentCliStatus', () => {
     expect(codex.path).toBeNull();
     expect(codex.roles).toHaveLength(3);
     expect(codex.roles.every((r) => r.mode.kind === 'subscription')).toBe(true);
+  });
+
+  describe('T46 fix: the reviewer row mirrors routeReviewer, not a tier scan', () => {
+    /** A harness pinned to profile `p1` (or, with `enabled: false`, one whose pin is folded to
+     * null the way `create-ninebrains-services.ts` does), with `keys.reveal` spied so every case
+     * below can assert the panel's no-reveal property directly. */
+    function pinnedHarness(options: { enabled?: boolean; pin?: string | null } = {}) {
+      const repo = createMemoryProfilesRepo();
+      const sink = fakeSink();
+      const keys = createProfileKeyStore(sink);
+      const revealSpy = vi.spyOn(keys, 'reveal');
+      const service = createRoutingService({
+        enabled: () => options.enabled ?? true,
+        profiles: repo,
+        keys,
+        testConnection: NOOP_TESTER,
+        onError: vi.fn(),
+        resolveInstalled: INSTALLED_EVERYWHERE,
+        newId: () => 'p1', // matches the pin below, so `saveProfile` creates exactly what's pinned
+        reviewerProfileId: async () => (options.pin === undefined ? 'p1' : options.pin),
+      });
+      return { service, repo, revealSpy };
+    }
+
+    async function reviewerModeOf(service: ReturnType<typeof pinnedHarness>['service']) {
+      const [claude] = await service.agentCliStatus();
+      return claude.roles.find((r) => r.role === 'reviewer')!.mode;
+    }
+
+    it('unpinned reviewer reads as the subscription, even with a strong-tier profile enabled', async () => {
+      const { service } = pinnedHarness({ pin: null });
+      const saved = await service.saveProfile({ ...ANTHROPIC_INPUT, tier: 'strong' });
+      if (!saved.success) throw new Error(saved.error.message);
+      expect(await reviewerModeOf(service)).toEqual({ kind: 'subscription' });
+    });
+
+    it('a pinned, enabled, keyed profile routes the reviewer to it, without revealing the key', async () => {
+      const { service, revealSpy } = pinnedHarness();
+      const saved = await service.saveProfile(ANTHROPIC_INPUT);
+      if (!saved.success) throw new Error(saved.error.message);
+      await service.setProfileKey(saved.data.profileId, KEY);
+      expect(await reviewerModeOf(service)).toEqual({
+        kind: 'profile',
+        profileLabel: ANTHROPIC_INPUT.label,
+        tier: 'standard', // modelProfileInputSchema's default; ANTHROPIC_INPUT sets none
+      });
+      expect(revealSpy).not.toHaveBeenCalled();
+    });
+
+    it('a pinned but disabled profile renders blocked, not the subscription or a stale profile mode', async () => {
+      const { service, revealSpy } = pinnedHarness();
+      const saved = await service.saveProfile({ ...ANTHROPIC_INPUT, enabled: false });
+      if (!saved.success) throw new Error(saved.error.message);
+      const mode = await reviewerModeOf(service);
+      expect(mode.kind).toBe('blocked');
+      expect((mode as { reason: string }).reason).toMatch(/turned off/i);
+      expect(revealSpy).not.toHaveBeenCalled();
+    });
+
+    it('a pinned profile with no key renders blocked, without ever calling reveal', async () => {
+      const { service, revealSpy } = pinnedHarness();
+      const saved = await service.saveProfile(ANTHROPIC_INPUT);
+      if (!saved.success) throw new Error(saved.error.message);
+      const mode = await reviewerModeOf(service);
+      expect(mode.kind).toBe('blocked');
+      expect((mode as { reason: string }).reason).toMatch(/no API key/i);
+      expect(revealSpy).not.toHaveBeenCalled();
+    });
+
+    it('profiles off: reviewer reads as the subscription even with a pin configured, and keys are never touched', async () => {
+      // Mirrors create-ninebrains-services.ts's fold: the pin closure itself resolves to null
+      // while profiles are off, whatever the stored setting says — the same as `pin: null`.
+      const { service, revealSpy } = pinnedHarness({ enabled: false, pin: null });
+      const [claude, codex] = await service.agentCliStatus();
+      for (const entry of [claude, codex]) {
+        for (const { mode } of entry.roles) {
+          expect(mode).toEqual({ kind: 'subscription' });
+        }
+      }
+      expect(revealSpy).not.toHaveBeenCalled();
+    });
   });
 });
 

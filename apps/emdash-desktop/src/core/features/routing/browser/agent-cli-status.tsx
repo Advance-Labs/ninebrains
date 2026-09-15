@@ -5,6 +5,11 @@ import type { AgentCliStatusEntry, AgentRoleMode } from '../api';
  * Read-only "Agents" panel (`docs/plans/2026-09-15-routing-usability.md`): which CLI is
  * installed, and what auth mode each role will actually run under. No control here, only
  * visibility — the routes themselves are set elsewhere (the lane header, the reviewer pin).
+ *
+ * Worker and subagent are approximate, not per-lane: they show the tier default a lane gets when
+ * it names no profile of its own, not a guarantee for every existing lane (a lane that does name
+ * one runs under a different, per-lane check this panel doesn't read). Reviewer is exact — there
+ * is one pin, not a tier scan, so it's the same route an actual review would get right now.
  */
 
 const PROVIDER_LABELS: Record<AgentCliStatusEntry['provider'], string> = {
@@ -16,6 +21,12 @@ const ROLE_LABELS: Record<AgentCliStatusEntry['roles'][number]['role'], string> 
   worker: 'Worker',
   subagent: 'Subagent',
   reviewer: 'Reviewer',
+};
+
+/** Only worker/subagent are approximate (see the module doc above); the reviewer row is exact. */
+const ROLE_CAPTION: Partial<Record<AgentCliStatusEntry['roles'][number]['role'], string>> = {
+  worker: ' (tier default; a lane with its own profile may differ)',
+  subagent: ' (tier default; a lane with its own profile may differ)',
 };
 
 function modeText(mode: AgentRoleMode): string {
@@ -55,6 +66,7 @@ function ProviderCard({ entry }: { entry: AgentCliStatusEntry }) {
           >
             <span className="font-medium text-foreground">{ROLE_LABELS[role]}:</span>{' '}
             {modeText(mode)}
+            {ROLE_CAPTION[role]}
           </li>
         ))}
       </ul>

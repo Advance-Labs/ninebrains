@@ -92,4 +92,14 @@ describe('Agents status panel', () => {
     expect(reviewer?.textContent).toContain('blocked');
     expect(reviewer?.textContent).toContain('model profile "Strong reviewer" is turned off');
   });
+
+  it('T46 fix: worker/subagent are captioned as an approximation; the reviewer row is not', async () => {
+    await act(async () => root.render(<AgentCliStatusSection status={[BLOCKED_REVIEWER]} />));
+    const worker = container.querySelector('[data-testid="agent-cli-status-role-worker"]');
+    const subagent = container.querySelector('[data-testid="agent-cli-status-role-subagent"]');
+    const reviewer = container.querySelector('[data-testid="agent-cli-status-role-reviewer"]');
+    expect(worker?.textContent).toContain('tier default');
+    expect(subagent?.textContent).toContain('tier default');
+    expect(reviewer?.textContent).not.toContain('tier default');
+  });
 });
