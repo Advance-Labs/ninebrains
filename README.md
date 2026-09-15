@@ -1,17 +1,26 @@
-# Ninebrains
+<p align="center">
+  <img src="docs/brand/ninebrains-mark.svg" alt="" width="112" height="112">
+</p>
 
-[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE.md)
-[![CI](https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml/badge.svg)](https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml)
+<h1 align="center">Ninebrains</h1>
 
-**Run a grid of Claude Code and Codex agents in parallel, each in its own git worktree, with a
-central Brain that hands out the work and gates that check it before it counts as done.**
+<p align="center">
+  <strong>Run a grid of Claude Code and Codex agents in parallel, each in its own git worktree,<br>
+  with a central Brain that hands out the work and gates that check it before it counts as done.</strong>
+</p>
 
-![Four agent lanes in a 2×2 grid, each in its own worktree](docs/screenshots/lanes-grid-1440.png)
+<p align="center">
+  <a href="LICENSE.md"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-blue.svg"></a>
+  <a href="https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml/badge.svg"></a>
+</p>
 
-Ninebrains is a free, Apache-2.0 desktop app for macOS, Windows and Linux. It is a fork of
-[Emdash](https://github.com/generalaction/emdash) by General Action.
+<p align="center">
+  <img src="docs/screenshots/lanes-grid-1440.png" alt="Four agent lanes in a 2×2 grid, each in its own worktree" width="100%">
+</p>
 
-**Status:** pre-release. v0.1 is being built now, and builds are unsigned.
+Ninebrains is a free, Apache-2.0 desktop app for macOS, Windows and Linux, and a fork of
+[Emdash](https://github.com/generalaction/emdash) by General Action. **Status:** pre-release. v0.1
+is being built now, and builds are unsigned.
 
 ## What it is, and why
 
@@ -19,13 +28,10 @@ One coding agent in one terminal is easy to follow. Four at once is not: they sh
 step on each other's files, and nobody checks their claims before you read them.
 
 Ninebrains gives each agent a **lane**: its own git worktree and branch, its own terminal, an
-editor and a browser for its dev server. A tab shows four lanes in a 2×2 grid, and you can open as
-many tabs as you like.
-
-A central **Brain** holds the plan as a graph of **jobs** with dependencies, plus a mailbox. It
-hands ready jobs to idle lanes. When a lane says it is done, **verification gates** run a second,
-independent check (tests, screenshots, a read-only reviewer, citation checks) before the work
-counts. No agent grades its own work.
+editor and a browser for its dev server. A central **Brain** holds the plan as a graph of **jobs**
+with dependencies, plus a mailbox, and hands ready jobs to idle lanes. When a lane says it is done,
+**verification gates** run a second, independent check before the work counts. No agent grades its
+own work.
 
 The name comes from the octopus: one central brain, plus a small brain in each of its eight arms.
 
@@ -35,8 +41,19 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 
 - **Lanes grid.** 2×2 lanes per tab, unlimited tabs, status lights driven by the agents' own hooks,
   sleep (hide a lane; its agent keeps running), maximize, and a per-lane browser.
-- **Packs.** Per-project bundles of roles, skills, MCP servers and gates, for coding, SEO and
+- **The Brain.** A drawer in the Lanes view runs a Claude Code session as the Brain, which turns a
+  brief into a job graph and dispatches ready jobs to idle lanes.
+- **Verification gates.** Tests, a three-width screenshot check, a read-only reviewer and citation
+  checks. A failed gate sends feedback back to the lane and retries, up to three attempts, then
+  blocks and tells you.
+- **Rigor settings.** Two 0-10 sliders in Settings → Gates decide which gates every job gets, with
+  a per-project override.
+- **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
+  into Brain jobs, idempotently, and refuses cycles.
+- **Packs.** Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO and
   research. Every pack is off until you turn it on.
+- **Lane roles and modes.** Start a lane from a pack role, and switch a lane between attended and
+  unattended from its header.
 - **Unattended runs.** `claude -p` and experimental `codex exec` runs, with per-run budgets, a
   sandbox, a minimal environment and a STOP switch that ends every run in under 5 seconds.
 - **Everything Emdash does:** worktrees, terminals, Monaco editor, diffs, pull requests, issue
@@ -44,45 +61,65 @@ The name comes from the octopus: one central brain, plus a small brain in each o
 - **Nothing phones home.** Telemetry is off, with no endpoint built in. No hosted account. No
   update feed until builds are signed.
 
-- **The Brain.** A drawer in the Lanes view runs a Claude Code session as the Brain. You type a
-  brief into it; it creates jobs and links their dependencies, and the app dispatches ready jobs to
-  idle lanes.
-
-  ![The Brain drawer with a job plan and dispatch status](docs/screenshots/brain-drawer-plan-1440.png)
-
-- **Gates in the loop.** A failed gate sends feedback to the lane and retries, up to three
-  attempts, then blocks and tells you. The screenshot gate captures the lane's own browser at
-  three widths.
-
-  ![A gate's verification result with evidence for a job](docs/screenshots/gates-verification-1440.png)
-
-- **Rigor settings.** Two 0–10 sliders in Settings → Gates decide which gates every job gets, and
-  a project can override them in Settings → Gates → Tests.
-- **Planner.** A canvas where jobs are nodes and dependencies are edges, opened from the Planner
-  button in the Lanes title bar. **Run plan** compiles it into Brain jobs, idempotently, and
-  refuses cycles.
-
-  ![The planner canvas with job nodes and dependency edges](docs/screenshots/planner-1440.png)
-
-- **Lane roles and modes.** Start a lane from a pack role, and switch a lane between attended and
-  unattended from its header.
-
-  ![The add-lane form with a role picked from a pack](docs/screenshots/lanes-add-lane-role-1440.png)
-
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
 with a morning digest, a video pack, signed builds and auto-update.
+
+### A closer look
+
+<table>
+<tr>
+<td width="50%">
+
+**The Brain**
+
+Type a brief into the Brain's terminal. It creates jobs, links their dependencies, and the app
+dispatches ready jobs to idle lanes.
+
+<img src="docs/screenshots/brain-drawer-plan-1440.png" alt="The Brain drawer with a job plan and dispatch status">
+
+</td>
+<td width="50%">
+
+**Verification gates**
+
+Every attempt keeps its evidence: test output, screenshots at three widths, and the reviewer's
+verdict.
+
+<img src="docs/screenshots/gates-verification-1440.png" alt="A gate's verification result with evidence for two attempts">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Planner**
+
+Draw the plan as jobs and dependency edges, then compile it into Brain jobs with **Run plan**.
+
+<img src="docs/screenshots/planner-1440.png" alt="The planner canvas with job nodes grouped into a module and dependency edges">
+
+</td>
+<td width="50%">
+
+**Lane roles**
+
+Start a lane from a pack role. Its prompt, agent and model preferences fill in automatically.
+
+<img src="docs/screenshots/lanes-add-lane-role-1440.png" alt="The add-lane form with the Builder role picked from the coding pack">
+
+</td>
+</tr>
+</table>
 
 ## Install
 
 ### Download
 
 Builds for macOS, Windows and Linux will be on
-[GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases).
-
-v0.1 builds are **not code-signed**. macOS Gatekeeper and Windows SmartScreen will warn you.
-Check every download against the release's `SHA256SUMS` file and build attestation before you open
-it. [docs/RELEASING.md](docs/RELEASING.md) has the exact commands and how to get past each warning.
-Unsigned builds do not auto-update.
+[GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases). v0.1 builds are **not
+code-signed**; macOS Gatekeeper and Windows SmartScreen will warn you, and unsigned builds do not
+auto-update. Check every download against the release's `SHA256SUMS` file and build attestation
+before you open it. [docs/RELEASING.md](docs/RELEASING.md) has the exact commands.
 
 ### Build from source
 
@@ -113,8 +150,7 @@ them; it never logs in for you.
    pick the project, type its test command (for example `pnpm test`) and click **Save test
    command**.
 5. **Give the Brain a brief.** Click **Brain** in the Lanes title bar, then **Start Brain**, and
-   type the brief into the Brain's terminal. The Brain breaks it into jobs, and the app hands them
-   to idle lanes.
+   type the brief into its terminal. The Brain breaks it into jobs and hands them to idle lanes.
 6. **Watch the gates.** When a lane finishes a job, its light turns to *verifying* while the gates
    run. A failed gate sends the lane back to work with the feedback; a passed job lands in the
    lane's Done list.
@@ -131,26 +167,6 @@ The [getting-started guide](docs/guide/getting-started.md) covers each step in d
 | **Gate** | An independent check that must pass before a job counts as done: tests, screenshot, reviewer, security review, fact-check |
 | **Pack** | A per-project bundle of lane roles, skills, MCP servers and default gates |
 
-## Security and privacy
-
-- **Your logins stay yours.** Ninebrains launches your own logged-in `claude` and `codex` CLIs. It
-  never reads, copies or stores their credentials, and never runs a login for you.
-- **Telemetry is off**, and no telemetry endpoint is built in.
-- **Lanes are contained.** Each launch gets its own token for the Brain, which listens on
-  `127.0.0.1` only and rejects web pages. Reviewers run in a disposable, read-only checkout.
-  Unattended runs get a sandbox and a minimal environment, and never a permission-bypass flag.
-- **The SEO pack sends data to Advance Labs when you enable it.** It is off by default. With its
-  default address, lanes send your Google access token and search data to Advance Labs' hosted AEO
-  Toolkit endpoint. You can self-host that server and point the pack at it with
-  `AEO_MCP_BASE_URL`, and then nothing goes to Advance Labs. See
-  [Packs](docs/guide/packs.md#what-the-seo-pack-sends-and-to-whom).
-- **Accepted risks** are written down, not hidden. With the provider sandbox off, a lane can read
-  what your user can read.
-
-Read the [security overview](docs/guide/security.md) and the full
-[threat model](docs/THREAT-MODEL.md). Report vulnerabilities to **security@advancelabs.dev**, as
-described in [docs/SECURITY.md](docs/SECURITY.md).
-
 ## How it compares
 
 These are layers, not rivals. Ninebrains runs Claude Code, and it is Emdash underneath.
@@ -159,23 +175,39 @@ These are layers, not rivals. Ninebrains runs Claude Code, and it is Emdash unde
 |---|---|---|---|
 | The agent itself | Yes | Launches it | Launches it, unchanged |
 | Other agent CLIs | — | Codex, OpenCode, Amp and others | Lanes: Claude Code and Codex. Other agents still work in Emdash tasks |
-| One worktree per agent | You set it up | Yes | Yes |
 | Several agents on screen at once | One terminal each | Split panes within one task | 2×2 grid of lanes across worktrees, unlimited tabs |
 | Shared plan with dependencies | — | — | Brain job graph and planner canvas |
-| Messages between agents | — | — | Brain mailbox |
 | Independent check before "done" | — | — | Verification gates, three attempts, then blocked |
 | Domain bundles | Your own skills and MCP config | Skills and MCP catalog | Packs: coding, SEO, research |
 | Scheduled or unattended work | `claude -p` in your own scripts | Cron automations | Budgeted runs with a STOP switch |
 | Telemetry | Anthropic's own settings apply | PostHog analytics | Off, no endpoint |
 | Remote machines over SSH | — | Yes | Inherited for tasks; lanes are local-only |
 
-## FAQ
+## Security and privacy
+
+- **Your logins stay yours.** Ninebrains launches your own logged-in `claude` and `codex` CLIs. It
+  never reads, copies or stores their credentials, and never runs a login for you.
+- **Telemetry is off**, and no telemetry endpoint is built in.
+- **Lanes are contained.** Each launch gets its own token for the Brain, which listens on
+  `127.0.0.1` only and rejects web pages. Reviewers run in a disposable, read-only checkout, and
+  unattended runs get a sandbox, a minimal environment and never a permission-bypass flag.
+- **The SEO pack sends data to Advance Labs when you enable it**, off by default. With its default
+  address, lanes send your Google access token and search data to Advance Labs' hosted AEO Toolkit
+  endpoint; self-host it and point the pack at `AEO_MCP_BASE_URL` and nothing goes to Advance Labs.
+  See [Packs](docs/guide/packs.md#what-the-seo-pack-sends-and-to-whom).
+
+Read the [security overview](docs/guide/security.md) and the full
+[threat model](docs/THREAT-MODEL.md). Report vulnerabilities to **security@advancelabs.dev**, as
+described in [docs/SECURITY.md](docs/SECURITY.md).
+
+<details>
+<summary>FAQ</summary>
 
 **Does it cost extra?**
 Ninebrains is free and open source. It runs your own `claude` and `codex` CLIs under your own
-login or API key, so usage is whatever your provider plan or key charges. Ninebrains makes no claim
-about which quota or billing its runs draw from. The SEO pack's hosted endpoint is free to use
-today; that may change if AEO Toolkit billing is switched on, and you can self-host it.
+login or API key, so usage is whatever your provider plan or key charges. The SEO pack's hosted
+endpoint is free to use today; that may change if AEO Toolkit billing is switched on, and you can
+self-host it.
 
 **What data leaves my machine?**
 Your agents talk to Anthropic or OpenAI exactly as they would in your terminal. The app calls
@@ -192,11 +224,17 @@ scrubbed environment, timeouts and process kills), and Windows paths are not yet
 **Can I use more than one Claude account?**
 Yes, with one config directory per account. See [Accounts](docs/guide/accounts.md).
 
+</details>
+
 ## Documentation
 
 The [user guide](docs/guide/README.md) lives in `docs/guide/` and is published at
-`docs.advancelabs.dev/ninebrains`. Contributors: [CONTRIBUTING.md](CONTRIBUTING.md) and
-[architecture](docs/guide/architecture.md).
+`docs.advancelabs.dev/ninebrains`.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [architecture](docs/guide/architecture.md). Please read
+the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Credits and licence
 
@@ -211,5 +249,4 @@ The SEO pack uses Advance Labs' [AEO Toolkit](https://github.com/Advance-Labs/ae
 
 Apache-2.0. See [LICENSE.md](LICENSE.md) and [NOTICE](NOTICE).
 Copyright 2026 Advance Labs Inc. Portions copyright General Action, Inc.
-
-Please read the [Code of Conduct](CODE_OF_CONDUCT.md).
+</content>
