@@ -277,7 +277,20 @@ export class ExecRunSupervisor {
     // The model route (SEC-39, SEC-40). An account API key is the one legacy non-subscription
     // mode: it keeps its key, so only the gateway neutralizers are dropped from its route.
     const accountKey = Boolean(spec.auth?.ANTHROPIC_API_KEY);
-    const route = routeLaunch(spec.provider, spec.routing);
+    // SEC-42: a reviewer's route is a separate field (`reviewerRoute`) from a worker's (`routing`),
+    // so no job, lane, Brain MCP op or worktree file can steer a reviewer onto a route it never
+    // sees the name of. Each preset is refused outright if it carries the other preset's field,
+    // rather than silently ignoring it.
+    if (spec.preset === 'reviewer' && spec.routing !== undefined) {
+      throw new Error('A reviewer run must not set `routing`; only `reviewerRoute` is honoured.');
+    }
+    if (spec.preset !== 'reviewer' && spec.reviewerRoute !== undefined) {
+      throw new Error('Only a reviewer run may set `reviewerRoute`.');
+    }
+    const route = routeLaunch(
+      spec.provider,
+      spec.preset === 'reviewer' ? spec.reviewerRoute : spec.routing
+    );
     if (accountKey && route.mode !== 'subscription') {
       throw new Error('A run cannot use both an account API key and a model profile.');
     }

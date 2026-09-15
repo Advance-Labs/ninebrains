@@ -22,6 +22,7 @@ import type {
   ProviderAuthEnv,
   RunBudgets,
 } from '@core/features/exec-runs/api/node/types';
+import type { LaunchRouting } from '@core/features/routing/api/node/launch-env';
 import { isReviewCheckout, prepareReviewCheckout } from './review-checkout';
 import type { Evidence, ReviewerMcpServers, SpawnReviewer, SpawnReviewerOptions } from './types';
 
@@ -33,12 +34,19 @@ const DEFAULT_BUDGETS: RunBudgets = { wallClockMs: 10 * 60_000, maxTurns: 40 };
 export interface ReviewerRoute {
   provider: ExecProvider;
   model?: string;
+  /**
+   * The reviewer's pinned model profile route (SEC-42), from `reviewer-route.ts`'s app setting.
+   * Undefined: the reviewer runs on the user's subscription login, unchanged from before this
+   * field existed. Becomes `ExecRunSpec.reviewerRoute`, never `.routing` (that field's own
+   * contract says reviewers never set it).
+   */
+  routing?: LaunchRouting;
 }
 
 export interface SpawnReviewerDeps {
   supervisor: Pick<ExecRunSupervisor, 'run'>;
-  /** Picks provider and model per gate `purpose`, e.g. Codex reviews Claude's work. */
-  route?: (purpose: string) => ReviewerRoute;
+  /** Picks provider, model and route per gate `purpose`, e.g. Codex reviews Claude's work. */
+  route?: (purpose: string) => ReviewerRoute | Promise<ReviewerRoute>;
   auth?: (provider: ExecProvider) => ProviderAuthEnv | undefined;
   budgets?: RunBudgets;
   /** Parent dir for review checkouts; must be in the supervisor's allowed roots. */
@@ -165,7 +173,8 @@ export function createSpawnReviewer(deps: SpawnReviewerDeps): SpawnReviewer {
     const cwd = checkout?.path ?? source;
     try {
       const attached = await copyAttachments(opts.attachments, cwd);
-      const route = deps.route?.(opts.purpose) ?? { provider: 'claude' as const };
+      const requestedRoute = deps.route ? await deps.route(opts.purpose) : undefined;
+      const route: ReviewerRoute = requestedRoute ?? { provider: 'claude' };
       const denied = [...(reuse ? [] : [source]), ...(deps.laneWorktrees?.() ?? [])];
       const result = await deps.supervisor.run(
         {
@@ -179,6 +188,7 @@ export function createSpawnReviewer(deps: SpawnReviewerDeps): SpawnReviewer {
           mcpServers,
           siblingWorktrees: [...new Set(denied)].filter((p) => p !== cwd),
           auth: deps.auth?.(route.provider),
+          reviewerRoute: route.routing,
         },
         { signal: opts.signal }
       );

@@ -1,8 +1,9 @@
 import type { Result } from '@emdash/shared';
 import { ConfirmationDialog } from '@emdash/ui/react/components';
 import { PageLayout, SettingsSection } from '@emdash/ui/react/patterns';
-import { Alert, Badge, Button, Tooltip, toast } from '@emdash/ui/react/primitives';
+import { Alert, Badge, Button, Text, Tooltip, toast } from '@emdash/ui/react/primitives';
 import { useCallback, useEffect, useState } from 'react';
+import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
 import { cn } from '@core/primitives/styling/browser/cn';
 import type {
   ConnectionTest,
@@ -51,6 +52,10 @@ export type ModelsSettingsPanelProps = {
   onSetKey: (profileId: string, key: string) => Promise<boolean>;
   onClearKey: (profileId: string) => void;
   onDelete: (profileId: string) => Promise<void>;
+  /** The reviewer pin (SEC-42): null (the default) means "your subscription login". */
+  reviewerProfileId?: string | null;
+  onSetReviewerProfileId?: (profileId: string | null) => void;
+  reviewerRouteDisabled?: boolean;
 };
 
 function hostOf(baseUrl: string): string {
@@ -214,6 +219,45 @@ function ProfileRow({
   );
 }
 
+function ReviewerRouteSection({
+  profiles,
+  reviewerProfileId,
+  disabled,
+  onChange,
+}: {
+  profiles: readonly ModelProfileView[];
+  reviewerProfileId: string | null;
+  disabled?: boolean;
+  onChange: (profileId: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3">
+      <label htmlFor="reviewer-profile" className="text-sm font-medium text-foreground">
+        Reviewer model
+      </label>
+      <select
+        id="reviewer-profile"
+        className="w-full max-w-sm rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+        value={reviewerProfileId ?? ''}
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.value || null)}
+      >
+        <option value="">Your subscription login (default)</option>
+        {profiles.map((profile) => (
+          <option key={profile.id} value={profile.id}>
+            {profile.label}
+          </option>
+        ))}
+      </select>
+      <Text variant="description" tone="muted">
+        Pin every reviewer run to one model profile. Once pinned, if that profile becomes
+        unavailable, disabled or keyless, the review is blocked rather than run on your subscription
+        or a cheaper model.
+      </Text>
+    </div>
+  );
+}
+
 function ProfilesSection(props: ModelsSettingsPanelProps & { listing: ProfilesListing }) {
   const { listing } = props;
   if (!listing.enabled) {
@@ -247,6 +291,14 @@ function ProfilesSection(props: ModelsSettingsPanelProps & { listing: ProfilesLi
             />
           ))}
         </div>
+      )}
+      {listing.profiles.length > 0 && props.onSetReviewerProfileId && (
+        <ReviewerRouteSection
+          profiles={listing.profiles.filter((profile) => profile.enabled)}
+          reviewerProfileId={props.reviewerProfileId ?? null}
+          disabled={props.reviewerRouteDisabled}
+          onChange={props.onSetReviewerProfileId}
+        />
       )}
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-foreground">Add profile</span>
@@ -310,6 +362,7 @@ async function run<T>(
 export function ModelsSettingsView() {
   const [listing, setListing] = useState<ProfilesListing | null>(null);
   const [tests, setTests] = useState<Record<string, ProfileTestState>>({});
+  const reviewerRoute = useAppSettingsKey('ninebrains.routing');
   const refresh = useCallback(async () => {
     try {
       setListing(await (await getRoutingClient()).listProfiles({}));
@@ -368,6 +421,9 @@ export function ModelsSettingsView() {
         await run('Could not delete the profile', (c) => c.deleteProfile({ profileId }));
         await refresh();
       }}
+      reviewerProfileId={reviewerRoute.value?.reviewerProfileId ?? null}
+      reviewerRouteDisabled={reviewerRoute.isLoading || reviewerRoute.isSaving}
+      onSetReviewerProfileId={(profileId) => reviewerRoute.update({ reviewerProfileId: profileId })}
     />
   );
 }

@@ -9,6 +9,7 @@ import {
   localProjectSettingsSchemaContribution,
   projectSettingsContribution,
 } from '@core/features/projects/contributions/settings';
+import { routingSettingsContribution } from '@core/features/routing/contributions/settings';
 import { changesViewModeSettingsContribution } from '@core/features/source-control/contributions/settings';
 import { taskSettingsContribution } from '@core/features/tasks/contributions/settings';
 import { terminalSettingsContribution } from '@core/features/terminals/contributions/settings';
@@ -46,6 +47,7 @@ export const appSettingsSchemaContributions = {
   changesViewMode: changesViewModeSettingsContribution,
   remoteMachine: hostSettingsSchemaContribution,
   'ninebrains.gates': gatesSettingsContribution,
+  'ninebrains.routing': routingSettingsContribution,
 } as const;
 
 export type AppSettings = SettingsValues<typeof appSettingsSchemaContributions>;
