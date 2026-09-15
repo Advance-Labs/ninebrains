@@ -416,3 +416,12 @@ assertion changed in either.
 |---|---|---|
 | `packages/core/src/runtimes/workspace-registry/node/scan/scheduler.test.ts` | "drops a failed watch and retries it from the polling floor" runs on fake timers (`vi.useFakeTimers` + `advanceTimersByTimeAsync`) instead of racing the scheduler's real 25 ms retry with a real-timer poll | Under load the retry re-added the watch before the test observed the dropped state; 12/12 under load after |
 | `packages/core/src/runtimes/workspace-registry/node/api/activation.contract.test.ts` | `createRegistryRuntime()` takes an optional `teardownTimeoutMs`; the "deactivate kills sessions, runs teardown exactly once" test gets its own 4 s bound and a 15 s test timeout, while the hanging-teardown test keeps 500 ms | The two tests shared one 500 ms bound tuned for the hanging case; spawning a real PTY shell under load took longer, so a real teardown was cut off as if it hung (3/8 failed under load before, 16/16 after) |
+
+## 19. The welcome screen's Emdash wordmark (W8 `w8/welcome-banner`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/assets/images/ytbanner.webp` | Replaced with the lower band of the same painting, cropped below the wordmark (2048×1152 → 2048×516, 139 KB → 58 KB) | The Emdash wordmark and logo are painted into the image itself, centred and fully legible. `welcome.tsx` renders it at 40% opacity under a gradient mask, which does not hide a mark that is part of the artwork, so every Ninebrains user saw "Emdash" on the welcome screen. The crop keeps the same painting and mood and carries no text. |
+
+The file keeps its upstream name. It is no longer a YouTube banner, but renaming it would churn the
+import in `welcome.tsx` for no user-visible gain.
