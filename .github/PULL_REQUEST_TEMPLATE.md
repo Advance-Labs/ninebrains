@@ -23,3 +23,6 @@ At 1440 px and 390 px wide.
 - [ ] Security-sensitive area (Brain, gates, packs, lanes, exec runs, anything that spawns a process, release, CI): the SEC-IDs are listed here and a security review is requested, or none is touched
 - [ ] A real `claude` or `codex` CLI was used: said so here, with what I ran, or only the fake agent was used
 - [ ] Docs in `docs/guide/` updated when behaviour or setup changed
+
+Full Electron e2e runs on the weekly schedule and on `release/**`; a maintainer adds the `run-e2e`
+label here if your change needs it sooner.
