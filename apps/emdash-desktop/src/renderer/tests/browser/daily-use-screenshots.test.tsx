@@ -214,6 +214,53 @@ function Lanes() {
   );
 }
 
+// The real lane grid is a fixed 2x2 of slots (lanes-grid-layout.tsx), not a
+// responsive column count. Four lanes here, not two, is what the app actually
+// shows at this width; two would leave half the grid empty. At a real 2x2
+// cell's width the header has little room beside its badges and icons, so
+// (unlike the wider lanes-run-mode-1440 cells) these use short project/branch
+// names that actually fit instead of truncating to a couple of characters.
+function FourLanes() {
+  return (
+    <div className="grid h-full grid-cols-2 grid-rows-2 gap-2 p-2">
+      <LaneShell
+        lane={lane({ projectName: 'shop', branch: 'main' })}
+        text="› Building the pricing page."
+        height="h-full"
+      />
+      <LaneShell
+        lane={lane({
+          laneId: 'lane-b',
+          slot: 1,
+          provider: 'codex',
+          status: 'idle',
+          projectName: 'docs',
+          branch: 'main',
+        })}
+        text="› Ready for the next job."
+        height="h-full"
+      />
+      <LaneShell
+        lane={lane({ laneId: 'lane-c', slot: 2, projectName: 'api', branch: 'main' })}
+        text="› Running the payments migration."
+        height="h-full"
+      />
+      <LaneShell
+        lane={lane({
+          laneId: 'lane-d',
+          slot: 3,
+          provider: 'codex',
+          status: 'idle',
+          projectName: 'web',
+          branch: 'main',
+        })}
+        text="› Ready for the next job."
+        height="h-full"
+      />
+    </div>
+  );
+}
+
 beforeAll(() => {
   (
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
@@ -429,8 +476,8 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
       1440,
       900,
       <div className="flex h-full">
-        <div className="flex-1 p-2">
-          <Lanes />
+        <div className="flex-1">
+          <FourLanes />
         </div>
         <div className="w-[30rem] border-l border-border">
           <BrainDrawer
