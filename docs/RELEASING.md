@@ -357,7 +357,7 @@ workflow itself (it has never been dispatched).
 | SEC-37 test: the workflow re-verifies sums before publishing | Met, twice: before upload, and again after re-downloading the draft. Publishing stays a human step after both. |
 | SEC-37: CI builds from a tag | **Deviation.** Dispatch-only, by decision (Actions minutes, and publishing is Lucas's call). The draft is pinned to the built commit, and publishing creates the tag at that commit, so the tag and the bytes still match. |
 | SEC-37: provenance attestations | **Partial.** The `attest` job exists but GitHub only offers attestations on public repos or Enterprise Cloud. It turns on automatically when the repo goes public, or with repo variable `NINEBRAINS_ATTEST=true`. |
-| SEC-37: README documents `shasum -a 256 -c` and `gh attestation verify` | Documented here. The root README is a placeholder; link it to this section when the README is written. |
+| SEC-37: README documents `shasum -a 256 -c` and `gh attestation verify` | Met. The commands are here; the root README's Download section tells readers to check every download against the release's `SHA256SUMS` and attestation, and links to this file. |
 | R8 (accepted): unsigned, checksums and attestations only | Unchanged. |
 
 Every action in `release.yml`, `ci.yml`, `e2e.yml` and the composite actions they use is pinned to
