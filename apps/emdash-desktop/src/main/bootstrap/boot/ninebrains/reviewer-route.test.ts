@@ -54,9 +54,10 @@ describe('routeReviewer (SEC-42)', () => {
     ).rejects.toThrow(/reviewer is blocked/);
   });
 
-  it('a release build (the caller folds MODEL_PROFILES_ENABLED into `reviewerProfileId`) ignores any stored pin', async () => {
-    // The caller (create-ninebrains-services.ts) is expected to resolve to null when the fork
-    // flag is off; this file has no build-flag import of its own, so this is that contract.
+  it('profiles off (T47): the caller folds `profilesEnabled` into `reviewerProfileId`, ignoring any stored pin', async () => {
+    // The caller (create-ninebrains-services.ts) is expected to resolve to null when the live
+    // `ninebrains.routing.profilesEnabled` setting is off; this file has no settings or build-flag
+    // import of its own, so this is that contract.
     const prepareReviewerRoute = vi.fn(async () => PROFILE_ROUTING);
     const route = await routeReviewer(
       'reviewer',

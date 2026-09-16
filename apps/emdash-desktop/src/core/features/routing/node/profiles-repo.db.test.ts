@@ -92,11 +92,13 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
 
   it('never writes the key to the database file, or its WAL sibling', async () => {
     const service = createRoutingService({
-      enabled: true,
+      enabled: () => true,
       profiles: createProfilesRepo(opened.connection),
       keys: createProfileKeyStore(fakeSink()),
       testConnection: NOOP_TESTER,
       onError: () => {},
+      resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);
@@ -117,11 +119,13 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
   it('round-trips every field through the repo', async () => {
     const repo = createProfilesRepo(opened.connection);
     const service = createRoutingService({
-      enabled: true,
+      enabled: () => true,
       profiles: repo,
       keys: createProfileKeyStore(fakeSink()),
       testConnection: NOOP_TESTER,
       onError: () => {},
+      resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);
@@ -141,11 +145,13 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
   it('skips a row whose base_url was hand-edited off the vendor allowlist', async () => {
     const repo = createProfilesRepo(opened.connection);
     const service = createRoutingService({
-      enabled: true,
+      enabled: () => true,
       profiles: repo,
       keys: createProfileKeyStore(fakeSink()),
       testConnection: NOOP_TESTER,
       onError: () => {},
+      resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);

@@ -223,12 +223,34 @@ export async function createNinebrainsServices(
 
   // Model routing (docs/plans/2026-09-12-model-routing.md): profiles in the Brain DB, keys in
   // the keychain (SEC-40), Test connection under the SEC-21 address policy.
+  //
+  // T47: `MODEL_PROFILES_ENABLED` (fork-flags.ts) is now always true — the feature ships in every
+  // build. Whether it's actually active is the user's own `ninebrains.routing.profilesEnabled`
+  // setting (default false), read live here and in `routeReviewer` below, never cached at boot,
+  // so a toggle in Settings → Models takes effect immediately, not on the next restart.
+  const profilesEnabled = async () =>
+    MODEL_PROFILES_ENABLED && (await deps.appSettings.get('ninebrains.routing')).profilesEnabled;
+  // The one place the reviewer pin is read (SEC-42). `routeReviewer` and `agentCliStatus` both
+  // take this exact closure — a second read of the setting here would risk agreeing on
+  // `profilesEnabled` but disagreeing on the pin the moment it changes mid-request; one closure
+  // makes that structurally impossible, not just unlikely.
+  const reviewerProfileId = async () =>
+    (await profilesEnabled())
+      ? (await deps.appSettings.get('ninebrains.routing')).reviewerProfileId
+      : null;
   const routing = createRoutingService({
-    enabled: MODEL_PROFILES_ENABLED,
+    enabled: profilesEnabled,
     profiles: createProfilesRepo(opened.connection),
     keys: createProfileKeyStore(encryptedAppSecretsStore),
     testConnection: createConnectionTester({ isBlockedAddress }),
     onError,
+    resolveInstalled: async (provider) => {
+      const resolved = await deps.hostDependencies.resolver.resolve({ id: provider });
+      return resolved.success
+        ? { installed: true, path: resolved.data.path }
+        : { installed: false, path: null };
+    },
+    reviewerProfileId,
   });
 
   const brainLanes: BrainLanesPort = {
@@ -275,7 +297,13 @@ export async function createNinebrainsServices(
     routing: { prepare: (lane) => routing.prepareLaunch(lane) },
     onError,
   });
-  lanes = createLaneService(deps, brainService.laneBrainPort());
+  // T47: the same live setting read `routing` and the reviewer route use, so a lane's
+  // client-side check (LaneService.createLane/setLaneRouting) can't accept an authProfileId that
+  // prepareLaunch would then refuse at launch time.
+  lanes = createLaneService(
+    { ...deps, modelProfilesEnabled: profilesEnabled },
+    brainService.laneBrainPort()
+  );
   brainService.start();
   // SEC-30: the app menu and tray STOP call the Brain in main, never through the renderer.
   deps.scope.add(registerAgentStopControls(brainStopControls(brainService)));
@@ -360,12 +388,10 @@ export async function createNinebrainsServices(
         route: (purpose) =>
           routeReviewer(purpose, {
             installed,
-            // A release build (MODEL_PROFILES_ENABLED off) hides and ignores the reviewer pin
-            // setting: reviewers always run on the subscription there, whatever it holds.
-            reviewerProfileId: async () =>
-              MODEL_PROFILES_ENABLED
-                ? (await deps.appSettings.get('ninebrains.routing')).reviewerProfileId
-                : null,
+            // T47: the same closure `routing.agentCliStatus()` reads (above) — profiles off (the
+            // common default) hides and ignores the reviewer pin setting: reviewers always run
+            // on the subscription then, whatever it holds.
+            reviewerProfileId,
             prepareReviewerRoute: (profileId) => routing.prepareReviewerRoute(profileId),
           }),
         checkoutRoot,

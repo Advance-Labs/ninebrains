@@ -91,3 +91,43 @@ export function resolveRoute(role: RoutingRole, input: ResolveRouteInput): Route
   // subscription to fall back to; a reviewer pinned to `strong` does not (SEC-42).
   return fallbackOrBlocked(role, `every ${tier}-tier model profile is unavailable`);
 }
+
+export type ReviewerProfileStatus<P extends ModelProfile = ModelProfile> =
+  | { ok: true; profile: P }
+  | { ok: false; reason: string };
+
+/**
+ * Whether a pinned reviewer profile is actually launchable — without revealing its key. Shared by
+ * `RoutingService.prepareReviewerRoute` (which, once this says `ok`, goes on to reveal the key and
+ * build the launch route) and `agentCliStatus` (which never reveals a key at all, T46/T47's fix):
+ * factoring the check into one function is what keeps the two from drifting into two different
+ * definitions of "blocked", which is exactly the bug this replaced (`agentCliStatus` was calling
+ * `resolveRoute` without the pin at all, so it could never agree with `routeReviewer`).
+ *
+ * Mirrors `routeReviewer`/`prepareReviewerRoute` exactly except for the reveal itself: same
+ * `resolveRoute('reviewer', …)` call, same "no longer exists" and "is turned off"/"is unavailable"
+ * reasons, plus the one check `resolveRoute` cannot make on its own — a profile with no key (and
+ * not `local`, which needs none) is not launchable either, so it is `ok: false` here too, using
+ * the flag on the profile record (`hasKey`) rather than a decrypted key.
+ */
+export function reviewerProfileStatus<P extends ModelProfile & { hasKey: boolean }>(
+  profileId: string,
+  profiles: readonly P[],
+  health?: readonly ProfileHealthState[]
+): ReviewerProfileStatus<P> {
+  const decision = resolveRoute('reviewer', { explicitProfileId: profileId, profiles, health });
+  if (decision.status !== 'profile') {
+    return {
+      ok: false,
+      reason: decision.status === 'blocked' ? decision.reason : 'it is not pinned',
+    };
+  }
+  const profile = profiles.find((p) => p.id === decision.profileId);
+  if (!profile) {
+    return { ok: false, reason: `model profile "${decision.profileId}" no longer exists` };
+  }
+  if (profile.kind !== 'local' && !profile.hasKey) {
+    return { ok: false, reason: `model profile "${profile.label}" has no API key` };
+  }
+  return { ok: true, profile };
+}

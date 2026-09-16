@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelProfile } from '../api/profile';
-import { resolveRoute, ROLE_TIER, type ProfileHealthState } from './policy';
+import { resolveRoute, reviewerProfileStatus, ROLE_TIER, type ProfileHealthState } from './policy';
 
 const UNPRICED = {
   inPerMTok: null,
@@ -25,6 +25,12 @@ function profile(overrides: Partial<ModelProfile> & { id: string }): ModelProfil
     updatedAt: 0,
     ...overrides,
   };
+}
+
+function keyedProfile(
+  overrides: Partial<ModelProfile & { hasKey: boolean }> & { id: string }
+): ModelProfile & { hasKey: boolean } {
+  return { ...profile(overrides), hasKey: overrides.hasKey ?? true };
 }
 
 describe('resolveRoute: role tier defaults', () => {
@@ -149,5 +155,62 @@ describe('SEC-42 reviewers are never downgraded', () => {
       status: 'blocked',
       reason: 'every strong-tier model profile is unavailable',
     });
+  });
+});
+
+describe('reviewerProfileStatus: the non-revealing predicate T46 factored out', () => {
+  it('is ok for a pinned, enabled, keyed profile', () => {
+    const profiles = [keyedProfile({ id: 'p1', label: 'Strong reviewer', tier: 'strong' })];
+    const status = reviewerProfileStatus('p1', profiles);
+    expect(status).toEqual({ ok: true, profile: profiles[0] });
+  });
+
+  it('is ok for a local profile with no key: local needs none', () => {
+    const profiles = [
+      keyedProfile({ id: 'p1', kind: 'local', protocol: 'anthropic', hasKey: false }),
+    ];
+    expect(reviewerProfileStatus('p1', profiles)).toEqual({ ok: true, profile: profiles[0] });
+  });
+
+  it('blocks a pinned profile with no key, the check resolveRoute alone cannot make', () => {
+    const profiles = [
+      keyedProfile({ id: 'p1', label: 'Strong reviewer', tier: 'strong', hasKey: false }),
+    ];
+    expect(reviewerProfileStatus('p1', profiles)).toEqual({
+      ok: false,
+      reason: 'model profile "Strong reviewer" has no API key',
+    });
+  });
+
+  it('blocks a missing pin, same reason resolveRoute already gives', () => {
+    expect(reviewerProfileStatus('ghost', [])).toEqual({
+      ok: false,
+      reason: 'model profile "ghost" no longer exists',
+    });
+  });
+
+  it('blocks a disabled pin, same reason resolveRoute already gives', () => {
+    const profiles = [
+      keyedProfile({ id: 'p1', label: 'Strong reviewer', tier: 'strong', enabled: false }),
+    ];
+    expect(reviewerProfileStatus('p1', profiles)).toEqual({
+      ok: false,
+      reason: 'model profile "Strong reviewer" is turned off',
+    });
+  });
+
+  it('blocks an unhealthy pin, same reason resolveRoute already gives', () => {
+    const profiles = [keyedProfile({ id: 'p1', label: 'Strong reviewer', tier: 'strong' })];
+    const health: ProfileHealthState[] = [{ profileId: 'p1', state: 'open' }];
+    expect(reviewerProfileStatus('p1', profiles, health)).toEqual({
+      ok: false,
+      reason: 'model profile "Strong reviewer" is unavailable',
+    });
+  });
+
+  it('never reads a key field beyond the hasKey flag: the profile object passed in is returned untouched', () => {
+    const profiles = [keyedProfile({ id: 'p1', tier: 'strong' })];
+    const status = reviewerProfileStatus('p1', profiles);
+    expect(status.ok && status.profile).toBe(profiles[0]);
   });
 });

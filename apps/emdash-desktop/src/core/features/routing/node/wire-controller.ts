@@ -6,6 +6,7 @@ import type { RoutingService } from './routing-service';
 export function createRoutingWireController(service: RoutingService): Controller {
   return createController(routingContract, {
     listProfiles: () => service.listProfiles(),
+    agentCliStatus: () => service.agentCliStatus(),
     saveProfile: (input) => service.saveProfile(input),
     setProfileKey: ({ profileId, key }) => service.setProfileKey(profileId, key),
     clearProfileKey: ({ profileId }) => service.clearProfileKey(profileId),

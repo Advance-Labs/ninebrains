@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
 import { cn } from '@core/primitives/styling/browser/cn';
 import type {
+  AgentCliStatusEntry,
   ConnectionTest,
   ModelProfileView,
   ProfileKind,
@@ -21,6 +22,8 @@ import {
   TIER_LABELS,
   type SaveProfile,
 } from './add-profile-form';
+import { AgentCliStatusSection } from './agent-cli-status';
+import { ProfilesEnabledToggle } from './profiles-enabled-toggle';
 
 const KIND_LABELS: Record<ProfileKind, string> = {
   'anthropic-api': 'Anthropic API',
@@ -46,12 +49,21 @@ export type ProfileTestState = ConnectionTest | 'testing';
 export type ModelsSettingsPanelProps = {
   /** Null while loading. */
   listing: ProfilesListing | null;
+  /** Null while loading. The "Agents" panel (D5: read-only, no new spawn or credential access). */
+  agentStatus?: AgentCliStatusEntry[] | null;
   tests?: Readonly<Record<string, ProfileTestState>>;
   onSaveProfile: SaveProfile;
   onTest: (profileId: string) => void;
   onSetKey: (profileId: string, key: string) => Promise<boolean>;
   onClearKey: (profileId: string) => void;
   onDelete: (profileId: string) => Promise<void>;
+  /**
+   * T47's real on/off switch (`ninebrains.routing.profilesEnabled`), default false. Undefined
+   * while loading.
+   */
+  profilesEnabled?: boolean;
+  onSetProfilesEnabled?: (enabled: boolean) => void;
+  profilesEnabledDisabled?: boolean;
   /** The reviewer pin (SEC-42): null (the default) means "your subscription login". */
   reviewerProfileId?: string | null;
   onSetReviewerProfileId?: (profileId: string | null) => void;
@@ -260,17 +272,28 @@ function ReviewerRouteSection({
 
 function ProfilesSection(props: ModelsSettingsPanelProps & { listing: ProfilesListing }) {
   const { listing } = props;
+  const toggle = props.onSetProfilesEnabled && (
+    <ProfilesEnabledToggle
+      enabled={props.profilesEnabled ?? false}
+      disabled={props.profilesEnabledDisabled}
+      onChange={props.onSetProfilesEnabled}
+    />
+  );
   if (!listing.enabled) {
     return (
-      <Alert.Root status="info">
-        <Alert.Description>
-          Model profiles are off in this build. Lanes run on your own subscription login.
-        </Alert.Description>
-      </Alert.Root>
+      <div className="flex flex-col gap-4">
+        {toggle}
+        <Alert.Root status="info">
+          <Alert.Description>
+            Model profiles are off in this build. Lanes run on your own subscription login.
+          </Alert.Description>
+        </Alert.Root>
+      </div>
     );
   }
   return (
     <div className="flex flex-col gap-4">
+      {toggle}
       <p className="text-xs text-foreground-muted">
         Use your own API keys, or a model server on this machine. {KEY_NOTE}
       </p>
@@ -318,6 +341,9 @@ export function ModelsSettingsPanel(props: ModelsSettingsPanelProps) {
           description="Choose which models your lanes use. Your own subscription login stays the default."
         />
         <div className="flex flex-col gap-6">
+          <SettingsSection title="Agents" bare>
+            <AgentCliStatusSection status={props.agentStatus ?? null} />
+          </SettingsSection>
           <SettingsSection title="Subagent model (Lever A)" bare>
             <p className="rounded-lg border border-border px-3 py-3 text-sm text-foreground-muted">
               Each lane picks the Claude model its subagents use. Set it in the lane header, or when
@@ -361,8 +387,9 @@ async function run<T>(
 
 export function ModelsSettingsView() {
   const [listing, setListing] = useState<ProfilesListing | null>(null);
+  const [agentStatus, setAgentStatus] = useState<AgentCliStatusEntry[] | null>(null);
   const [tests, setTests] = useState<Record<string, ProfileTestState>>({});
-  const reviewerRoute = useAppSettingsKey('ninebrains.routing');
+  const routingSettings = useAppSettingsKey('ninebrains.routing');
   const refresh = useCallback(async () => {
     try {
       setListing(await (await getRoutingClient()).listProfiles({}));
@@ -375,10 +402,22 @@ export function ModelsSettingsView() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    void (async () => {
+      try {
+        setAgentStatus(await (await getRoutingClient()).agentCliStatus({}));
+      } catch (error) {
+        toast.error('Could not load agent status', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  }, []);
 
   return (
     <ModelsSettingsPanel
       listing={listing}
+      agentStatus={agentStatus}
       tests={tests}
       onSaveProfile={async (input, key) => {
         const saved = await run('Could not save the profile', (c) => c.saveProfile(input));
@@ -421,9 +460,17 @@ export function ModelsSettingsView() {
         await run('Could not delete the profile', (c) => c.deleteProfile({ profileId }));
         await refresh();
       }}
-      reviewerProfileId={reviewerRoute.value?.reviewerProfileId ?? null}
-      reviewerRouteDisabled={reviewerRoute.isLoading || reviewerRoute.isSaving}
-      onSetReviewerProfileId={(profileId) => reviewerRoute.update({ reviewerProfileId: profileId })}
+      profilesEnabled={routingSettings.value?.profilesEnabled ?? false}
+      profilesEnabledDisabled={routingSettings.isLoading || routingSettings.isSaving}
+      onSetProfilesEnabled={(enabled) => {
+        routingSettings.update({ profilesEnabled: enabled });
+        void refresh();
+      }}
+      reviewerProfileId={routingSettings.value?.reviewerProfileId ?? null}
+      reviewerRouteDisabled={routingSettings.isLoading || routingSettings.isSaving}
+      onSetReviewerProfileId={(profileId) =>
+        routingSettings.update({ reviewerProfileId: profileId })
+      }
     />
   );
 }

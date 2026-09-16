@@ -38,6 +38,8 @@ export type LaneServicesDependencies = {
     create(params: CreateConversationParams): Promise<unknown>;
     launch(input: { projectId: string; taskId: string; conversationId: string }): Promise<unknown>;
   };
+  /** T47: the live `ninebrains.routing.profilesEnabled` setting. Falls back to `MODEL_PROFILES_ENABLED` (always true) when omitted, which is what callers that don't care about routing use. */
+  modelProfilesEnabled?: () => boolean | Promise<boolean>;
 };
 
 /**
@@ -61,6 +63,7 @@ export function createLaneService(
       }),
       agentFeed: createTuiAgentFeed({ runtimes: deps.runtimes, onError }),
       brain,
+      modelProfilesEnabled: deps.modelProfilesEnabled,
       newId: () => randomUUID(),
       onError,
     },

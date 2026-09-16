@@ -12,7 +12,7 @@ import type { TuiSessionStatus } from './lane-status';
  */
 const LOCAL: LaneProjectInfo = { projectId: 'p1', name: 'Repo', host: 'local', baseRef: 'main' };
 
-function createHarness(options: { modelProfilesEnabled?: boolean } = {}) {
+function createHarness(options: { modelProfilesEnabled?: boolean | (() => boolean) } = {}) {
   let counter = 0;
   let stored: LanesGridConfig | null = null;
   let feedListener: ((snapshot: LaneAgentSnapshot) => void) | null = null;
@@ -54,7 +54,12 @@ function createHarness(options: { modelProfilesEnabled?: boolean } = {}) {
     },
     ...(options.modelProfilesEnabled === undefined
       ? {}
-      : { modelProfilesEnabled: options.modelProfilesEnabled }),
+      : {
+          modelProfilesEnabled:
+            typeof options.modelProfilesEnabled === 'function'
+              ? options.modelProfilesEnabled
+              : () => options.modelProfilesEnabled as boolean,
+        }),
     newId: () => `id-${++counter}-0000`,
     onError: vi.fn(),
   } satisfies LaneServicePorts;
@@ -158,6 +163,28 @@ describe('lane routing', () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.type).toBe('routing-disabled');
     expect(harness.service.getLane(laneId)?.authProfileId).toBeUndefined();
+  });
+
+  it('T47: a live toggle takes effect on the next call, not the next restart', async () => {
+    let on = false;
+    const harness = createHarness({ modelProfilesEnabled: () => on });
+    const created = await addLane(harness);
+    if (!created.success) throw new Error(created.error.message);
+    const { laneId } = created.data;
+
+    const refused = await harness.service.setLaneRouting(laneId, {
+      subagentModel: null,
+      authProfileId: 'profile-9',
+    });
+    expect(refused.success).toBe(false);
+
+    on = true;
+    const allowed = await harness.service.setLaneRouting(laneId, {
+      subagentModel: null,
+      authProfileId: 'profile-9',
+    });
+    expect(allowed.success).toBe(true);
+    expect(harness.service.getLane(laneId)?.authProfileId).toBe('profile-9');
   });
 
   it('returns lane-not-found for an unknown lane', async () => {

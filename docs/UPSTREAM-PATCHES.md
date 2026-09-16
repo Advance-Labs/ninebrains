@@ -258,9 +258,9 @@ Ninebrains files also touched: `exec-runs/api/node/{sandbox-settings,run-supervi
 
 ## 14. Model routing (W7 `routing`, wave 1)
 
-Append-only registrations. Lever B is behind the fork flag `MODEL_PROFILES_ENABLED`
+Append-only registrations. Lever B was behind the fork flag `MODEL_PROFILES_ENABLED`
 (`app-identity/api/fork-flags.ts`, a Ninebrains file: `import.meta.env.DEV`, so on in dev builds
-and off in release builds).
+and off in release builds) until 14b, which replaces it with a user setting.
 
 | File | What | Why |
 |---|---|---|
@@ -302,8 +302,24 @@ model" picker).
 New files: `routing/contributions/settings.ts`,
 `main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
 
-New files: `routing/contributions/settings.ts`,
-`main/bootstrap/boot/ninebrains/reviewer-route.test.ts`.
+### 14b. Lever B reaches release builds (T47, `w8/routing-ux`, 2026-09-15)
+
+No inherited-file registrations: `ninebrains.routing` was already registered (14a), so this pass
+only adds a field to its schema and changes how existing Ninebrains files read it. No table row.
+
+Ninebrains files touched: `app-identity/api/fork-flags.ts` (`MODEL_PROFILES_ENABLED` → always
+`true`), `routing/contributions/settings.ts` (`+profilesEnabled`, default `false`),
+`routing/node/routing-service.ts` (`RoutingServiceDeps.enabled` → a live `() => boolean |
+Promise<boolean>` resolver, read fresh on every call instead of captured once at construction),
+`main/bootstrap/boot/ninebrains/create-ninebrains-services.ts` (the `profilesEnabled()` closure
+read from `deps.appSettings`, used for both `routing`'s `enabled` and the reviewer route's fold),
+`lanes/node/{lane-ports,lane-service,ninebrains-services}.ts` (the client-side
+`modelProfilesEnabled` fast-fail becomes the same kind of live resolver, so it can't accept an
+`authProfileId` the now-live `prepareLaunch` check would then refuse), `main/bootstrap/boot/ninebrains/reviewer-route.ts`
+(doc comment only, no behavior change).
+
+New files: `routing/browser/profiles-enabled-toggle.tsx` (the Settings → Models toggle),
+`routing/contributions/settings.test.ts`.
 
 ## 15. UI jobs and the test command (W7 `w7/self-heal-e2e`)
 
