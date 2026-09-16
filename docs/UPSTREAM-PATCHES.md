@@ -425,3 +425,13 @@ assertion changed in either.
 
 The file keeps its upstream name. It is no longer a YouTube banner, but renaming it would churn the
 import in `welcome.tsx` for no user-visible gain.
+
+## 20. Two more load-flaky tests (W8 `w8/reap-flake`)
+
+No product code changed. Two tests inherited from Emdash changed so they pass under load; no
+assertion loosened in either.
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/core/features/exec-runs/api/node/run-supervisor.test.ts` | "does not hang a run and reports it when the reap signal fails for an unexpected reason" now scopes its injected `process.kill` throw to the run's own leader pid (learned from the `started` event), instead of throwing on the first negative-pid call system-wide — the same pattern the "STOP-path signal fails unexpectedly" test above it already used | `killAll()` races `terminateGroup`'s real signal chain against a fixed deadline (SEC-30) and can return before that chain's timer-delayed final SIGKILL fires. Under load a *previous* test's trailing SIGKILL landed after this test installed its mock, consuming the one-shot injected throw before the run's own post-close reap — `errors` came back empty (CI trace at `process-group.ts:201`). 10/10 alone, 5/5 whole-file under one parallel whole-file run after |
+| `apps/emdash-desktop/src/core/features/browser/browser/browser-webview-events.test.ts` | Every test's `bindBrowserWebviewEvents()` call is now tracked by a `bind()` wrapper and disposed in `afterEach` | `bindBrowserWebviewEvents` schedules real `setTimeout`s for history-state resync, cleared only by its returned `dispose()`. No test awaited those delays out and only one called `dispose()`, so a test's timers outlived it; because every test reuses `browserId: 'browser-1'` and a live session always exists by then, a leaked timer firing mid-test elsewhere wrote a stale webview's `canGoBack`/`canGoForward` over the *current* test's session — a load-dependent flake ("refreshes history state when Electron updates navigation entries after load events" asserted `canGoBack` false before the test itself set it true). 15/15 alone, 6/6 whole-file under two parallel contending runs after |
