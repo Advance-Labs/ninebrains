@@ -317,12 +317,12 @@ describe.skipIf(!import.meta.env.VITE_ROUTING_SCREENSHOTS)('routing screenshots'
   }
 
   it('models, light, 1440', async () => {
-    await show('emlight', 1440, 1700, <Models listing={LISTING} />);
+    await show('emlight', 1440, 1300, <Models listing={LISTING} />);
     await page.screenshot({ path: `${SHOTS}/routing-models-1440.png` });
   });
 
   it('models, dark, 390', async () => {
-    await show('emdark', 390, 2900, <Models listing={LISTING} />);
+    await show('emdark', 390, 2000, <Models listing={LISTING} />);
     await page.screenshot({ path: `${SHOTS}/routing-models-390.png` });
   });
 
@@ -330,7 +330,7 @@ describe.skipIf(!import.meta.env.VITE_ROUTING_SCREENSHOTS)('routing screenshots'
     await show(
       'emlight',
       1440,
-      900,
+      300,
       <Models listing={{ enabled: false, profiles: [], vendors: [] }} />
     );
     await page.screenshot({ path: `${SHOTS}/routing-models-disabled-1440.png` });
