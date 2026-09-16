@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browserDiagnosticsStore } from '@core/features/browser/api/browser/browser-diagnostics-store';
 import { browserSessionStore } from '@core/features/browser/api/browser/browser-session-store';
 import { bindBrowserWebviewEvents } from './browser-webview-events';
@@ -60,10 +60,30 @@ function asWebview(fake: FakeBrowserWebview): BrowserWebviewElement {
 }
 
 describe('bindBrowserWebviewEvents', () => {
+  // `bindBrowserWebviewEvents` schedules real setTimeouts (history-state resync) that only
+  // `dispose()` clears. No test here awaited those delays out, so left unbound they leak into
+  // later tests: a stale timer fires mid-test, reads a *different* (already-gone) webview's
+  // `canGoBack`, and writes it into `browserSessionStore` under the same reused `browserId`,
+  // producing a load-dependent flake in whichever later test happens to be running when the
+  // timer lands. `bind()` tracks every dispose so `afterEach` can tear them all down before the
+  // next test's `beforeEach` clears the store out from under them.
+  const disposers: Array<() => void> = [];
+  function bind(...args: Parameters<typeof bindBrowserWebviewEvents>): ReturnType<
+    typeof bindBrowserWebviewEvents
+  > {
+    const dispose = bindBrowserWebviewEvents(...args);
+    disposers.push(dispose);
+    return dispose;
+  }
+
   beforeEach(() => {
     vi.useRealTimers();
     browserDiagnosticsStore.clear();
     browserSessionStore.clear();
+  });
+
+  afterEach(() => {
+    for (const dispose of disposers.splice(0)) dispose();
   });
 
   it('updates browser session state from webview events', () => {
@@ -78,7 +98,7 @@ describe('bindBrowserWebviewEvents', () => {
     webview.titleText = 'Example';
     webview.back = true;
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     browserSessionStore.updateSession(session.browserId, { zoomFactor: 1.25 });
 
     expect(browserSessionStore.getSession(session.browserId)).toMatchObject({
@@ -163,7 +183,7 @@ describe('bindBrowserWebviewEvents', () => {
     browserSessionStore.updateSession(session.browserId, { zoomFactor: 1.5 });
     const webview = new FakeBrowserWebview();
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     webview.emit('dom-ready');
     webview.emit('did-navigate', { url: 'https://example.com/' });
     webview.emit('did-stop-loading');
@@ -179,7 +199,7 @@ describe('bindBrowserWebviewEvents', () => {
       taskId: 'task-1',
     });
     const webview = new FakeBrowserWebview();
-    const dispose = bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    const dispose = bind(session.browserId, asWebview(webview));
 
     dispose();
     webview.emit('dom-ready');
@@ -200,7 +220,7 @@ describe('bindBrowserWebviewEvents', () => {
       throw new Error('not ready');
     };
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     webview.emit('did-stop-loading');
     webview.emit('did-navigate', { url: 'https://example.com/' });
 
@@ -219,7 +239,7 @@ describe('bindBrowserWebviewEvents', () => {
     });
     const webview = new FakeBrowserWebview();
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     webview.emit('console-message', {
       level: 2,
       message: '%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold;',
@@ -241,7 +261,7 @@ describe('bindBrowserWebviewEvents', () => {
     const webview = new FakeBrowserWebview();
     webview.url = 'https://example.com/';
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     webview.emit('dom-ready');
     webview.emit('did-navigate', { url: 'https://example.com/docs' });
     expect(browserSessionStore.getSession(session.browserId)?.canGoBack).toBe(false);
@@ -267,7 +287,7 @@ describe('bindBrowserWebviewEvents', () => {
     const webview = new FakeBrowserWebview();
     webview.url = 'https://example.com/';
 
-    bindBrowserWebviewEvents(session.browserId, asWebview(webview));
+    bind(session.browserId, asWebview(webview));
     webview.emit('dom-ready');
     webview.emit('did-navigate', { url: 'https://example.com/docs' });
     webview.url = 'https://example.com/docs';
