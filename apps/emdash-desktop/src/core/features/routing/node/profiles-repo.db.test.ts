@@ -98,6 +98,7 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
       testConnection: NOOP_TESTER,
       onError: () => {},
       resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);
@@ -124,6 +125,7 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
       testConnection: NOOP_TESTER,
       onError: () => {},
       resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);
@@ -149,6 +151,7 @@ describe('SEC-40 no key bytes in the Brain DB', () => {
       testConnection: NOOP_TESTER,
       onError: () => {},
       resolveInstalled: async () => ({ installed: false, path: null }),
+      reviewerProfileId: async () => null,
     });
     const saved = await service.saveProfile(FULL_INPUT);
     if (!saved.success) throw new Error(saved.error.message);

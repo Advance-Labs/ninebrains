@@ -502,3 +502,30 @@ describe('T47: enabled() is read live, not cached at construction', () => {
     expect((await service.listProfiles()).enabled).toBe(true);
   });
 });
+
+describe('SEC-08: agent identities cannot reach ninebrains.routing', () => {
+  it('has no counterpart in the Brain protocol op vocabulary', async () => {
+    // ninebrains.routing (profilesEnabled and reviewerProfileId alike) is registered only as
+    // the renderer's app-settings wire domain (manifests/node/controllers.ts). Agents and Brain
+    // sessions act only through brain-core's BrainOp surface, which has no op that can read or
+    // write app settings at all — a lane or Brain token can only ever *ask* over
+    // LANE_OPS/BRAIN_OPS/SESSION_OPS (brain-core/src/protocol/ops.ts). This test pins that
+    // vocabulary so an op cannot be added there silently, the same convention
+    // project-prefs-service.test.ts uses for the gates settings boundary. It lives here, in a
+    // node/ file, rather than in contributions/settings.test.ts: that file sits under
+    // `contributions/`, which tsconfig.browser.json includes, and importing `@ninebrains/brain-core`
+    // there pulls its Node-only source into the renderer typecheck program, which has no Node
+    // types (T47/T46 fallout — see that file's own comment).
+    const { BRAIN_OPS, LANE_OPS, SESSION_OPS } = await import('@ninebrains/brain-core');
+    const allOps = new Set<string>([...BRAIN_OPS, ...LANE_OPS, ...SESSION_OPS]);
+    for (const forbidden of [
+      'setProfilesEnabled',
+      'updateAppSettings',
+      'setAppSettings',
+      'setRoutingSettings',
+      'setReviewerProfileId',
+    ]) {
+      expect(allOps.has(forbidden)).toBe(false);
+    }
+  });
+});
