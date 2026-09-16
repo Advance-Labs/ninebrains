@@ -68,9 +68,9 @@ describe('bindBrowserWebviewEvents', () => {
   // timer lands. `bind()` tracks every dispose so `afterEach` can tear them all down before the
   // next test's `beforeEach` clears the store out from under them.
   const disposers: Array<() => void> = [];
-  function bind(...args: Parameters<typeof bindBrowserWebviewEvents>): ReturnType<
-    typeof bindBrowserWebviewEvents
-  > {
+  function bind(
+    ...args: Parameters<typeof bindBrowserWebviewEvents>
+  ): ReturnType<typeof bindBrowserWebviewEvents> {
     const dispose = bindBrowserWebviewEvents(...args);
     disposers.push(dispose);
     return dispose;
