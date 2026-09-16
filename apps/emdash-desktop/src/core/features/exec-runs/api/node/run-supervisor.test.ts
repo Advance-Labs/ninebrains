@@ -279,17 +279,29 @@ describe('SEC-30 kill switch', () => {
     // Anything `signalGroup` doesn't already recognize as "the group is gone" (unlike ESRCH and
     // EPERM) is a genuine backstop case: `resolve(result)` still must not depend on it, and
     // unlike the tolerated codes above, it should show up rather than vanish silently.
+    //
+    // The mock only throws for this run's own leader pid (learned from its `started` event,
+    // negated to match `signalGroup`'s `-pid` form) — never "the first negative-pid call
+    // system-wide". `killAll()` races its own deadline against the real `terminateGroup` chain
+    // (SEC-30), so a *previous* test's trailing, timer-delayed final SIGKILL can still be in
+    // flight when this test's spy is installed; an unscoped mock would consume its one-shot
+    // throw on that unrelated call instead of on this run's own post-close reap.
+    const sup = supervisor(fakeClaude(steps([{ say: 'hi' }])));
+    let leaderPid: number | undefined;
+    sup.onEvent((e) => {
+      if (e.type === 'started') leaderPid = e.pid;
+    });
     const realKill = process.kill.bind(process);
     let thrown = false;
     const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
-      if (!thrown && pid < 0) {
+      if (!thrown && leaderPid !== undefined && pid === -leaderPid) {
         thrown = true;
         throw Object.assign(new Error('kill EIO'), { code: 'EIO' });
       }
       return realKill(pid, signal);
     });
     try {
-      const result = await supervisor(fakeClaude(steps([{ say: 'hi' }]))).run(spec());
+      const result = await sup.run(spec());
       expect(result).toMatchObject({ ok: true, reason: 'completed' });
       expect(result.errors.join()).toMatch(/failed to reap leftover processes/);
     } finally {
