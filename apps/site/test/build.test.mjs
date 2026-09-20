@@ -31,7 +31,11 @@ test('ships every asset the page references', () => {
 test('carries the head tags search and social cards need', () => {
   assert.match(flat, /<title>Ninebrains[^<]*Claude Code[^<]*<\/title>/);
   assert.match(flat, /<meta name="description" content="[^"]{80,300}"/);
-  assert.match(flat, /<meta property="og:image" content="\/assets\/ninebrains-banner\.png"/);
+  assert.match(
+    flat,
+    /<meta property="og:image" content="https:\/\/[^"]+\/assets\/ninebrains-banner\.png"/
+  );
+  assert.match(flat, /<link rel="canonical" href="https:\/\/[^"]+"/);
   assert.match(flat, /<meta name="twitter:card" content="summary_large_image"/);
   assert.match(flat, /"@type": "SoftwareApplication"/);
 });

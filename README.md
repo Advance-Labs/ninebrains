@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/ninebrains-banner.png" alt="Ninebrains: run a grid of AI coding agents, each in its own git worktree, with verification gates" width="100%">
+  <a href="https://ninebrains.vercel.app"><img src="docs/brand/ninebrains-banner.png" alt="Ninebrains: run a grid of AI coding agents, each in its own git worktree, with verification gates" width="100%"></a>
 </p>
 
 <h1 align="center">Ninebrains</h1>
@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="https://ninebrains.vercel.app">Website</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="docs/guide/README.md">Documentation</a> ·
   <a href="#how-it-compares">Compare</a> ·
