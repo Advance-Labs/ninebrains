@@ -93,6 +93,12 @@ every raster now come from `tooling/brand/` (`pnpm brand`); see `docs/brand/READ
 | `src/assets/images/emdash/*.png`, `*.icns`, `build/dmg-background.tiff` | Regenerated black and white; canary wears a ring and dev inverts | Same filenames, so upstream's asset wiring is untouched |
 | `src/assets/images/ytbanner.webp` | Desaturated once (`grayscale(1) contrast(1.08)`) | The welcome backdrop was the last colour surface in the app |
 | `src/renderer/tests/browser/routing-screenshots.test.tsx` | Passes `agentStatus` to the Models render | Without it the published screenshot read "Loading…"; the panel takes its data as a prop |
+| `src/assets/images/emdash/emdash.icns`, `src/assets/images/emdash/emdash-canary.icns` | Rebuilt from the new tile by `iconutil` | The packaged macOS icons; same filenames, so upstream's packaging is untouched |
+| `README.md` | Rewritten around the new banner, a keyword-first summary and a longer FAQ | The fork's own front page, and the repo's main search surface |
+| `package.json` (root) | `+brand`, `+brand:check` scripts | Entry points for `tooling/brand` |
+| `tooling/scripts/check.mjs` | `brand:check` added to the gate, with its own failure hint | A generated asset that drifts from `glyph.mjs` should fail the merge gate |
+| `.gitignore` | `+.vercel/` | The Vercel CLI's local project link for the landing page |
+| `pnpm-lock.yaml` | `@ninebrains/site` and its two dev dependencies (oxfmt, oxlint) | The new landing-page workspace |
 
 The Solarized themes keep their colour: only the default light and dark themes are monochrome.
 
