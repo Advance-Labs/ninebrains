@@ -1,0 +1,22 @@
+{
+  "name": "@ninebrains/site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Ninebrains landing page: one static page, no framework, no runtime dependencies.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "preview": "node build.mjs && python3 -m http.server 4330 --directory dist",
+    "lint": "oxlint src build.mjs",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "echo \"site: plain HTML, CSS and JS; nothing to typecheck\"",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.51.0",
+    "oxlint": "^1.66.0"
+  }
+}
