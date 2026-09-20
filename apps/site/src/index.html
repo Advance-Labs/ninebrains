@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ninebrains — run Claude Code and Codex agents in parallel</title>
+    <meta
+      name="description"
+      content="Free, open-source desktop app for macOS, Windows and Linux that runs a grid of AI coding agents in parallel. Each agent gets its own git worktree, a central Brain hands out the work, and verification gates prove it before it counts as done."
+    />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="canonical" href="https://ninebrains.runs-on.dev/" />
+    <meta property="og:url" content="https://ninebrains.runs-on.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ninebrains — run Claude Code and Codex agents in parallel" />
+    <meta
+      property="og:description"
+      content="A grid of coding agents, each in its own git worktree. A Brain hands out the work. Gates prove it before it counts as done. Apache-2.0, no telemetry."
+    />
+    <meta
+      property="og:image"
+      content="https://ninebrains.runs-on.dev/assets/ninebrains-banner.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Ninebrains — run Claude Code and Codex agents in parallel"
+    />
+    <meta
+      name="twitter:description"
+      content="A grid of coding agents, each in its own git worktree. A Brain hands out the work. Gates prove it before it counts as done."
+    />
+    <meta
+      name="twitter:image"
+      content="https://ninebrains.runs-on.dev/assets/ninebrains-banner.png"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Ninebrains",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Windows, Linux",
+        "description": "Open-source desktop workbench that runs parallel Claude Code and Codex agents, each in its own git worktree, with a central Brain and independent verification gates.",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "codeRepository": "https://github.com/Advance-Labs/ninebrains",
+        "author": {
+          "@type": "Organization",
+          "name": "Advance Labs Inc.",
+          "url": "https://advancelabs.dev"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="intro" aria-hidden="true"></canvas>
+
+    <header class="nav reveal" data-reveal>
+      <a class="brand" href="/" aria-label="Ninebrains home">
+        <svg class="mark" viewBox="0 0 70 70" aria-hidden="true" focusable="false">
+          <use href="#mark"></use>
+        </svg>
+        <span>ninebrains</span>
+      </a>
+      <nav>
+        <a href="https://docs.advancelabs.dev/ninebrains">Docs</a>
+        <a href="https://github.com/Advance-Labs/ninebrains">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow reveal" data-reveal data-delay="0">
+          Apache-2.0 · macOS, Windows, Linux · no telemetry
+        </p>
+        <h1 class="reveal" data-reveal data-delay="1">Run a grid of<br />coding agents.</h1>
+        <p class="lede reveal" data-reveal data-delay="2">
+          Claude Code and Codex, side by side, each in its own git worktree. A central Brain hands
+          out the work. Verification gates prove it before it counts as done.
+        </p>
+        <div class="cta reveal" data-reveal data-delay="3">
+          <a class="button primary" href="https://github.com/Advance-Labs/ninebrains"
+            >Read the source</a
+          >
+          <a class="button" href="https://docs.advancelabs.dev/ninebrains/getting-started/"
+            >Get started</a
+          >
+        </div>
+        <p class="note reveal" data-reveal data-delay="4">
+          Pre-release. v0.1 is being built in the open, and builds are not yet signed.
+        </p>
+      </section>
+
+      <section class="shot reveal" data-reveal>
+        <img
+          src="/assets/lanes-grid.png"
+          width="2880"
+          height="1746"
+          alt="Four AI coding agents running side by side in a 2x2 grid, each lane in its own git worktree with its own terminal"
+          fetchpriority="high"
+          decoding="async"
+        />
+      </section>
+
+      <section class="statement reveal" data-reveal>
+        <h2>One agent is easy to follow.<br /><em>Four is not.</em></h2>
+        <p>
+          They share a checkout, step on each other's files, and nobody checks their claims before
+          you read them. Ninebrains fixes the three things that actually break.
+        </p>
+      </section>
+
+      <section class="feature" id="lanes">
+        <div class="copy reveal" data-reveal>
+          <p class="kicker">01 — Lanes</p>
+          <h2>Every agent gets its own world.</h2>
+          <p>
+            Its own git worktree and branch, terminal, editor and browser. Four lanes to a tab, as
+            many tabs as you want. They cannot touch each other's files, so nothing merges by
+            accident.
+          </p>
+        </div>
+        <figure class="reveal" data-reveal>
+          <img
+            src="/assets/lanes-grid.png"
+            width="2880"
+            height="1746"
+            loading="lazy"
+            decoding="async"
+            alt="The lanes grid with four agents, each showing its own branch and status light"
+          />
+        </figure>
+      </section>
+
+      <section class="feature reverse" id="brain">
+        <div class="copy reveal" data-reveal>
+          <p class="kicker">02 — The Brain</p>
+          <h2>One plan, handed out as it unblocks.</h2>
+          <p>
+            The Brain holds the work as a graph of jobs with dependencies, plus a mailbox the lanes
+            can talk through. A job goes to whichever lane is idle, the moment everything it depends
+            on is done.
+          </p>
+        </div>
+        <figure class="reveal" data-reveal>
+          <img
+            src="/assets/brain-drawer.png"
+            width="2880"
+            height="1746"
+            loading="lazy"
+            decoding="async"
+            alt="The Brain drawer showing a compiled job plan and which lane each job was dispatched to"
+          />
+        </figure>
+      </section>
+
+      <section class="feature" id="gates">
+        <div class="copy reveal" data-reveal>
+          <p class="kicker">03 — Verification gates</p>
+          <h2>No agent grades its own work.</h2>
+          <p>
+            When a lane says it is done, a second, independent run has to prove it: the tests, a
+            screenshot check at three widths, a read-only reviewer that never sees the lane's
+            worktree. A failed gate sends feedback back with the evidence, three times, then blocks
+            the job and tells you.
+          </p>
+        </div>
+        <figure class="reveal" data-reveal>
+          <img
+            src="/assets/gates-verification.png"
+            width="2880"
+            height="1746"
+            loading="lazy"
+            decoding="async"
+            alt="A verification gate result with stored evidence from two attempts, including screenshots and test output"
+          />
+        </figure>
+      </section>
+
+      <section class="feature reverse" id="planner">
+        <div class="copy reveal" data-reveal>
+          <p class="kicker">04 — Planner</p>
+          <h2>Draw the plan. Run the plan.</h2>
+          <p>
+            Jobs are nodes, dependencies are edges. <strong>Run plan</strong> compiles the canvas
+            into Brain jobs, idempotently, and refuses a graph with a cycle in it.
+          </p>
+        </div>
+        <figure class="reveal" data-reveal>
+          <img
+            src="/assets/planner.png"
+            width="2880"
+            height="1800"
+            loading="lazy"
+            decoding="async"
+            alt="The planner canvas with job nodes grouped into a module, connected by dependency edges"
+          />
+        </figure>
+      </section>
+
+      <section class="facts reveal" data-reveal>
+        <dl>
+          <div>
+            <dt>4</dt>
+            <dd>lanes per tab, unlimited tabs</dd>
+          </div>
+          <div>
+            <dt>3</dt>
+            <dd>gate attempts, then it blocks</dd>
+          </div>
+          <div>
+            <dt>0</dt>
+            <dd>telemetry, with no endpoint built in</dd>
+          </div>
+          <div>
+            <dt>&lt;5s</dt>
+            <dd>for STOP to end every run</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="closer reveal" data-reveal>
+        <h2>Free, and yours to read.</h2>
+        <p>
+          Apache-2.0, a fork of <a href="https://github.com/generalaction/emdash">Emdash</a>. It
+          runs the <code>claude</code> and <code>codex</code> CLIs you are already logged in to, and
+          never touches your credentials.
+        </p>
+        <div class="cta">
+          <a class="button primary" href="https://github.com/Advance-Labs/ninebrains"
+            >Star it on GitHub</a
+          >
+          <a class="button" href="https://docs.advancelabs.dev/ninebrains">Read the docs</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 70 70" aria-hidden="true" focusable="false">
+          <use href="#mark"></use>
+        </svg>
+        <span>ninebrains</span>
+      </div>
+      <nav>
+        <a href="https://docs.advancelabs.dev/ninebrains">Documentation</a>
+        <a href="https://github.com/Advance-Labs/ninebrains/blob/main/docs/SECURITY.md">Security</a>
+        <a href="https://github.com/Advance-Labs/ninebrains/blob/main/LICENSE.md">Licence</a>
+        <a href="https://advancelabs.dev">Advance Labs</a>
+      </nav>
+      <p>© 2026 Advance Labs Inc. Portions © General Action, Inc.</p>
+    </footer>
+
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+      <symbol id="mark" viewBox="0 0 70 70">
+        <rect x="7.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="7.5" y="28.5" width="13" height="13" rx="2" />
+        <rect x="7.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="28.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="28.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="28.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="25" y="25" width="20" height="20" rx="2" />
+      </symbol>
+    </svg>
+
+    <script type="module" src="/site.js"></script>
+  </body>
+</html>

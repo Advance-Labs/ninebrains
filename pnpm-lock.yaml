@@ -328,6 +328,15 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
 
+  apps/site:
+    devDependencies:
+      oxfmt:
+        specifier: ^0.51.0
+        version: 0.51.0
+      oxlint:
+        specifier: ^1.66.0
+        version: 1.69.0(oxlint-tsgolint@0.23.0)
+
   apps/workspace-server:
     dependencies:
       '@emdash/core':

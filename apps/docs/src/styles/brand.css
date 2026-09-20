@@ -1,0 +1,44 @@
+/**
+ * Ninebrains docs: black and white.
+ *
+ * Starlight ships a blue-violet accent. The app's accent is monochrome (packages/theme: an
+ * explicit black-and-white ramp), so the docs follow it. Only the accent tokens are overridden;
+ * Starlight's own greys, spacing and type scale are left alone.
+ */
+
+/* Dark is Starlight's default theme, so the bare :root block is the dark palette. */
+:root {
+  --sl-color-accent-low: #1c1c1c;
+  --sl-color-accent: #6e6e6e;
+  --sl-color-accent-high: #ededed;
+  --sl-color-text-accent: #fafafa;
+  /* The hairline under the header and around cards, matched to the app's dark border. */
+  --sl-color-hairline-light: #2a2a2a;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #f0f0f0;
+  --sl-color-accent: #8f8f8f;
+  --sl-color-accent-high: #171717;
+  --sl-color-text-accent: #171717;
+  --sl-color-hairline-light: #e0e0e0;
+}
+
+/*
+ * Monochrome links lose the colour cue, so they carry an underline instead: without it a link
+ * in body copy is invisible against the text around it.
+ */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  text-decoration-thickness: 2px;
+}
+
+/* The site title sits next to the mark, which is already a black tile: keep the pairing tight. */
+.site-title img {
+  border-radius: 4px;
+}

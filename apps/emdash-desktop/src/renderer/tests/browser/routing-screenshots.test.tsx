@@ -20,6 +20,7 @@ import {
   type ProfilesListing,
   type Vendor,
 } from '@core/features/routing/api';
+import type { AgentCliStatusEntry } from '@core/features/routing/api';
 import { ModelsSettingsPanel } from '@core/features/routing/browser/models-settings-view';
 import { ThemeProvider } from '@core/primitives/theme/browser/theme-provider';
 import { resetWireConnection, seedWireConnection } from '@core/primitives/wire/browser/connection';
@@ -217,11 +218,40 @@ const CONNECTED = {
   modelCount: 12,
 };
 
+/**
+ * What the Agents panel shows on a machine with Claude installed and Codex not. The panel is
+ * read-only and takes its data as a prop: passing null leaves it reading "Loading…", which is
+ * not what the docs should publish.
+ */
+const AGENT_STATUS: AgentCliStatusEntry[] = [
+  {
+    provider: 'claude',
+    installed: true,
+    path: '/usr/local/bin/claude',
+    roles: [
+      { role: 'worker', mode: { kind: 'subscription' } },
+      { role: 'subagent', mode: { kind: 'subscription' } },
+      { role: 'reviewer', mode: { kind: 'subscription' } },
+    ],
+  },
+  {
+    provider: 'codex',
+    installed: false,
+    path: null,
+    roles: [
+      { role: 'worker', mode: { kind: 'subscription' } },
+      { role: 'subagent', mode: { kind: 'subscription' } },
+      { role: 'reviewer', mode: { kind: 'subscription' } },
+    ],
+  },
+];
+
 function Models({ listing }: { listing: ProfilesListing }) {
   return (
     <div className="h-full overflow-y-auto">
       <ModelsSettingsPanel
         listing={listing}
+        agentStatus={AGENT_STATUS}
         tests={{ 'p-ant': CONNECTED }}
         onSaveProfile={async () => true}
         onTest={noop}
