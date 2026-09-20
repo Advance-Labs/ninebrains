@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <pattern id="motif" width="120" height="120" patternUnits="userSpaceOnUse">
+      <g transform="scale(0.8)" opacity="0.055">
+        <rect x="7.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="7.5" y="28.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="7.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="28.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="28.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="28.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="25" y="25" width="20" height="20" rx="2" fill="#ffffff"/>
+      </g>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000" stop-opacity="1"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="#000000"/>
+  <rect width="1280" height="640" fill="url(#motif)"/>
+  <rect width="921.6" height="640" fill="url(#fade)"/>
+  <g transform="translate(96 202) scale(1.886)">
+    <rect x="7.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="7.5" y="28.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="7.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="28.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="28.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="7.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="28.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="49.5" y="49.5" width="13" height="13" rx="2" fill="#ffffff"/>
+  <rect x="25" y="25" width="20" height="20" rx="2" fill="#ffffff"/>
+  </g>
+  <text x="96" y="430" fill="#ffffff"
+    font-family="'Inter Variable', Inter, -apple-system, system-ui, sans-serif"
+    font-size="92" font-weight="600" letter-spacing="-2.5">ninebrains</text>
+  <text x="96" y="486" fill="#ffffff" opacity="0.62"
+    font-family="'Inter Variable', Inter, -apple-system, system-ui, sans-serif"
+    font-size="27" letter-spacing="-0.2">Run a grid of coding agents. Nothing is done until a second agent proves it.</text>
+</svg>

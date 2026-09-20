@@ -1,42 +1,50 @@
 export const NATURAL_WIDTH = 350;
 export const NATURAL_HEIGHT = 70;
 
-const ARM_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+/**
+ * The nine cells of the mark, in the 70x70 glyph box centred on (35, 35). The geometry is shared
+ * with `tooling/brand/glyph.mjs`, which renders the same grid into the icons, favicon and docs
+ * assets; change both together.
+ */
+const GAP = 21;
+const ARM = 13;
+const CORE = 20;
+const RADIUS = 2;
+
+const ARM_CELLS = [-1, 0, 1]
+  .flatMap((dx) => [-1, 0, 1].map((dy) => ({ dx, dy })))
+  .filter(({ dx, dy }) => dx !== 0 || dy !== 0);
 
 /**
- * The Ninebrains logo: the mark (one central brain, eight arms each ending in a small brain)
- * followed by the wordmark, in a 350x70 box. The arms are strokes, so the root <svg> must set
- * both `fill` and `stroke` to the logo paint; the filled shapes turn their stroke off.
+ * The Ninebrains logo: the mark (a 3x3 grid of nine squares, the central one larger: one central
+ * brain plus eight arm brains) followed by the wordmark, in a 350x70 box. Every shape is a fill,
+ * so the root <svg> paints with `fill`; the group turns stroke off because the root sets it too.
  */
 export function LogoShapes() {
   return (
-    <>
-      <g fill="none" strokeWidth={3} strokeLinecap="round">
-        {ARM_ANGLES.map((angle) => (
-          <path
-            key={angle}
-            transform={`rotate(${angle} 35 35)`}
-            d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5"
-          />
-        ))}
-      </g>
-      <g strokeWidth={0}>
-        {ARM_ANGLES.map((angle) => (
-          <circle key={angle} transform={`rotate(${angle} 35 35)`} cx={36.4} cy={5} r={3.4} />
-        ))}
-        <circle cx={35} cy={35} r={11.8} />
-        <text
-          x={82}
-          y={51}
-          fontSize={46}
-          fontWeight={600}
-          letterSpacing={-1}
-          fontFamily="'Inter Variable', Inter, system-ui, sans-serif"
-        >
-          ninebrains
-        </text>
-      </g>
-    </>
+    <g strokeWidth={0}>
+      {ARM_CELLS.map(({ dx, dy }) => (
+        <rect
+          key={`${dx},${dy}`}
+          x={35 + dx * GAP - ARM / 2}
+          y={35 + dy * GAP - ARM / 2}
+          width={ARM}
+          height={ARM}
+          rx={RADIUS}
+        />
+      ))}
+      <rect x={35 - CORE / 2} y={35 - CORE / 2} width={CORE} height={CORE} rx={RADIUS} />
+      <text
+        x={82}
+        y={51}
+        fontSize={46}
+        fontWeight={600}
+        letterSpacing={-1}
+        fontFamily="'Inter Variable', Inter, system-ui, sans-serif"
+      >
+        ninebrains
+      </text>
+    </g>
   );
 }
 
