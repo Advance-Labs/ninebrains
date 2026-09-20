@@ -2,14 +2,24 @@
 title: Models
 description: >-
   How Ninebrains routes lanes and subagents to models: the always-on subagent-model lever, the
-  optional API-key profiles behind a build flag, and what SEC-39 and SEC-41 protect against.
+  optional API-key profiles (off by default), the read-only Agents panel, and what SEC-39 and
+  SEC-41 protect against.
 ---
 
 Routing picks which model does the work for a lane or its subagents. There are two separate
 levers. Lever A is always on and stays on your own Claude login. Lever B is optional, needs your
-own API key, and may not be visible in your build yet.
+own API key, and is off by default — a setting you turn on yourself in Settings → Models.
 
 ![Settings → Models, with the subagent-model note and the profiles list](../screenshots/routing-models-1440.png)
+
+## Agents panel
+
+The top of Settings → Models is a read-only "Agents" panel: for each CLI (Claude Code, Codex),
+whether it's installed and where, and for each role (worker, subagent, reviewer) which auth mode
+it would run under right now — your subscription, a named API-key profile and its tier, or
+blocked with a reason. Worker and subagent are the tier default a lane gets when it names no
+profile of its own; reviewer is exact, since there's one pin rather than a per-lane choice. There
+is no control here, only visibility: it spawns nothing new and reads no credential file.
 
 ## Lever A: subagent model
 
@@ -32,11 +42,14 @@ Set it in the lane header's model badge, or when you add a lane.
 
 ## Lever B: model profiles (Settings → Models)
 
-Lever B lets a lane run on your own API key instead of your subscription login. It lives behind a
-build flag and is **off in release builds until a decision is made**. If you don't see a Model
-profiles section in Settings → Models, this build has it off.
+Lever B lets a lane run on your own API key instead of your subscription login. It ships in every
+build, but stays **off by default**: a "Model profiles" toggle in Settings → Models, next to a
+warning that turning it on bills real API calls to you. Turning it on by itself changes nothing —
+every lane and reviewer still runs on your subscription until you also add a profile and point a
+lane at it. Turn it off again at any point and every profile is ignored again, immediately, even
+one still configured on a lane.
 
-![Settings → Models with profiles turned off](../screenshots/routing-models-disabled-1440.png)
+![Settings → Models with the Model profiles toggle off](../screenshots/routing-models-disabled-1440.png)
 
 ### Profile kinds
 
@@ -104,8 +117,10 @@ missing, disabled, has no key, or is unhealthy, the review is **blocked**, not p
 retried on your subscription or a cheaper tier. Clear the picker to go back to the subscription
 default.
 
-The picker is part of Lever B, so it only appears in builds where model profiles are on; it is
-hidden and ignored in release builds, where reviewers always run on the subscription.
+The picker appears once you have at least one profile, whether or not the Model profiles toggle
+is on. While that toggle is off, though, any pin sits there unused: it's read live on every
+review, and folds to "no pin" until you turn the toggle on, so reviewers keep running on the
+subscription until you do.
 
 ## SEC-39, in plain words
 

@@ -19,6 +19,14 @@ code map, see [Architecture](architecture.md).
 | `pnpm run check` | Format check, lint, typecheck, licence gate, then tests. Stops at the first failure |
 | `pnpm run licenses` | The licence gate on its own |
 | `pnpm run doctor` | Reports problems with your machine's setup |
+| `pnpm brand` | Regenerates every brand asset (mark, favicon, packaged icons) from `tooling/brand/glyph.mjs` |
+| `pnpm brand --check` | Fails if a generated brand asset is out of date. Run in CI's merge gate |
+
+## Brand assets
+
+Ninebrains is black and white: see `docs/brand/README.md` at the root of the repository for the
+mark's geometry, the monochrome colour rules, and what `pnpm brand` regenerates. Change the glyph
+and the in-app logo component together; both are named there.
 
 ## Test projects
 

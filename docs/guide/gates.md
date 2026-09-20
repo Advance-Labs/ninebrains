@@ -143,8 +143,10 @@ afterwards, whatever the result.
 The reply must be a single JSON object of the form `{ pass, issues[] }`. A reply of `pass: false`
 with no issues counts as malformed, because it gives the worker nothing to fix.
 
-In this build the reviewer is always Claude Code, whichever agent did the work. A reviewer from a
-different provider is not available yet.
+In this build the reviewer always runs on Claude Code, whichever agent did the work. A reviewer
+from a different provider is not available yet, but which model backs that Claude Code run can be
+pinned to one of your own model profiles instead of your subscription; see
+[Reviewer model](models.md#reviewer-model-optional-pin) in the Models guide.
 
 ### fact-check
 
