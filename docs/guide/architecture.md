@@ -56,6 +56,7 @@ lane = worktree + terminal (claude | codex) + editor + browser
 | Stand-in CLI for tests | `tooling/fake-agent/` |
 | Licence gate | `tooling/scripts/check-licenses.mjs` |
 | This documentation site | `apps/docs/` (content in `docs/guide/`) |
+| The landing page (`ninebrains.runs-on.dev`) | `apps/site/`: a static, framework-free page with a hand-written WebGL intro |
 
 Each package and feature folder has a README with its API, wiring notes and the decisions made
 while building it.
