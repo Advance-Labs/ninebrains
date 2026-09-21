@@ -63,6 +63,7 @@ import {
 } from '#services/session-lifecycle/api';
 import { createSessionLifecycle } from '#services/session-lifecycle/node';
 import { TuiAgentStates } from './agent-state';
+import { ensureKnowledgeContext } from './ensure-context-file';
 import { spillLargePrompt, type PromptSpillResult } from './prompt-spill';
 import type { TuiAgentsRuntimeDeps, TuiSessionConfig } from './types';
 import { createUsageLimitDetector } from './usage-limit-detector';
@@ -486,6 +487,31 @@ export class TuiAgentsRuntime {
 
     const provider = providerResult.data;
     const isResuming = config.intent === 'resume';
+
+    // Best-effort context mirror: providers that read knowledge.md/AGENTS.md (e.g.
+    // freebuff, codebuff) get the repo's CLAUDE.md context seeded on first launch.
+    // Runs before the command is built so the file exists when the CLI starts.
+    if (config.input.cwd) {
+      try {
+        const result = await ensureKnowledgeContext({
+          providerId: config.input.providerId,
+          workspacePath: config.input.cwd,
+        });
+        if (result === 'written') {
+          this.deps.logger.debug('Seeded knowledge.md context file', {
+            conversationId: config.input.conversationId,
+            providerId: config.input.providerId,
+            workspacePath: config.input.cwd,
+          });
+        }
+      } catch (error) {
+        this.deps.logger.debug('Failed to seed knowledge.md context file', {
+          conversationId: config.input.conversationId,
+          providerId: config.input.providerId,
+          error: String(error),
+        });
+      }
+    }
     const resumeState =
       isResuming ||
       this.currentResumeState(config.input.conversationId)?.outcome === 'fresh-fallback'

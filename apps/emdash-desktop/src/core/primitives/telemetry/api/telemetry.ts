@@ -163,6 +163,7 @@ export type TelemetryEventProperties = {
 
   mcp_server_added: { source: 'catalog' | 'custom' };
   mcp_server_removed: EmptyProps;
+  mcp_seeded_from_claude: { count: number };
 
   skill_installed: { source?: string };
   skill_uninstalled: EmptyProps;

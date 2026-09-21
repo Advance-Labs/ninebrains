@@ -479,6 +479,16 @@ export function copilotMcpAdapter(
 }
 
 /**
+ * Codebuff/Freebuff adapter — passthrough to the standard `.agents/mcp.json`
+ * file the CLIs load globally from `~/.agents/mcp.json` (and per-project from
+ * `cwd/.agents/mcp.json`). stdio, streamable HTTP, and SSH transports are
+ * supported natively; the canonical `mcpServers` JSON key is used verbatim.
+ */
+export function codebuffMcpAdapter(configPath = '.agents/mcp.json') {
+  return passthroughMcpAdapter(configPath);
+}
+
+/**
  * Droid (Factory AI) adapter — passthrough, uses mcpServers JSON key.
  * Write: ~/.factory/mcp.json; legacy read: old Droid/Factory config paths.
  */

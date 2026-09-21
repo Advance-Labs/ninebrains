@@ -4,6 +4,7 @@ import {
 } from '@emdash/core/services/agent-plugins/api/plugins';
 import {
   buildStandardCommand,
+  codebuffMcpAdapter,
   npmDependency,
 } from '@emdash/core/services/agent-plugins/api/plugins/helpers';
 import { icon } from './icon';
@@ -18,6 +19,11 @@ export const plugin = definePlugin(
   },
   {
     hostDependency: npmDependency({ id: 'codebuff', package: 'codebuff' }),
+    mcp: {
+      kind: 'supported',
+      scope: 'global',
+      supportedTransports: ['stdio', 'http'],
+    },
     prompt: {
       kind: 'argv',
       flag: '',
@@ -36,4 +42,5 @@ export const provider = registerPluginBehavior(plugin, {
         initialPromptFlag: '',
       }),
   },
+  mcp: codebuffMcpAdapter(),
 });

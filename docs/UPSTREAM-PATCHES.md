@@ -598,3 +598,19 @@ sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENAB
 |---|---|---|
 | `src/core/features/conversations/api/browser/conversation-manager.ts` | The TUI connector remembers the last size the pane requested; `handleTuiSessionListChanged` calls `reconcileSize` for running sessions, which re-sends that size once per (`startedAt`, target) when the runtime reports a different `cols`/`rows` | A task created from the Create Task modal mounts its terminal while the worktree provisions, so the pane's resize reaches `tuiAgents.resize` before the PTY exists and is dropped as `not-found`. The agent then spawns at the seeded size, which ignores the ContextBar inset and custom fonts, and draws truncated until a task switch remounts the pane |
 | `src/core/features/conversations/browser/conversation-manager.test.ts` | Regression test: a dropped resize is replayed once, and never again once sizes match | Covers the race without a live runtime |
+
+## 34. Freebuff and Codebuff get MCP servers and project context (`emdash/freebuff-connectors-9scgv`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/agent-plugins/api/plugins/helpers/mcp.ts` | New `codebuffMcpAdapter`, a `passthroughMcpAdapter('.agents/mcp.json')` | Both CLIs load MCP servers globally from `~/.agents/mcp.json` in the standard `mcpServers` shape |
+| `packages/core/src/services/agent-plugins/api/plugins/helpers/mcp.test.ts` | Write, merge, read and remove tests for the adapter | Covers the file path and key |
+| `packages/plugins/src/agents/impl/freebuff/index.ts`, `packages/plugins/src/agents/impl/codebuff/index.ts` | `mcp` capability (`global`, stdio and http) and the adapter as behavior | Freebuff and Codebuff show up as MCP targets instead of unsupported |
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.ts` | Before building the command, best-effort `ensureKnowledgeContext` for the provider's cwd | Freebuff and Codebuff read `knowledge.md` and `AGENTS.md` but not `CLAUDE.md`; a missing `knowledge.md` is seeded from `CLAUDE.md` (else `AGENTS.md`), never overwriting one. `/knowledge.md` is first added to the repo's `info/exclude` (common dir for linked worktrees, resolved by reading `.git` and `commondir`, no `git` spawn) so agents cannot commit the generated copy; written with default permissions |
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | Seeds for freebuff, does not seed for claude | Guards the provider gate |
+| `src/core/features/mcp/browser/components/useMcps.ts`, `McpToolbar.tsx`, `src/core/features/mcp/contributions/browser/McpPanel.tsx` | "Seed from Claude" toolbar button: adds freebuff and codebuff to every Claude-synced server, enabled when either CLI is installed | One click reuses the Claude MCP setup; strictly additive, so codex or opencode assignments stay |
+| `src/core/features/mcp/browser/mcp-slice.browser.test.tsx` | Button renders, gates on `canSeedFromClaude`, calls the handler | UI coverage |
+| `src/core/primitives/telemetry/api/telemetry.ts` | `mcp_seeded_from_claude: { count }` event | Typed telemetry map requires it |
+| `agents/integrations/mcp.md`, `agents/integrations/providers.md` | Document the adapter, the seed button and the `knowledge.md` seed | Agent docs match behavior |
+
+New Ninebrains-only files: `src/core/features/mcp/browser/seed-mcp.ts` (+ test), `packages/core/src/runtimes/tui-agents/node/runtime/ensure-context-file.ts` (+ test), `packages/plugins/src/agents/impl/{freebuff,codebuff}/index.test.ts`.

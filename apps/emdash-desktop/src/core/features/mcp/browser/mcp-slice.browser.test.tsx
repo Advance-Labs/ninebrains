@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMcpClient } from '@core/features/mcp/api/browser/client';
 import { seedSliceWire } from '@core/primitives/wire/browser/testing';
 import { mcpContract, mcpDomain } from '../api';
+import { McpToolbar } from './components/McpToolbar';
 import {
   resetInstalledMcpServersLiveModelForTests,
   useInstalledMcpServersLiveModel,
@@ -69,6 +70,53 @@ describe('mcp slice through the wire seam', () => {
 
     const listed = await client.listForAgent({ host: LOCAL_HOST_REF, providerId: 'claude' });
     expect(listed).toEqual(ok({ servers: [fakeServer('for-agent')] }));
+  });
+
+  it('renders the Seed from Claude button gated on a seedable provider', async () => {
+    const onSeed = vi.fn();
+    await act(async () => {
+      root.render(
+        <McpToolbar
+          search=""
+          onSearchChange={() => undefined}
+          onRefresh={() => undefined}
+          isRefreshing={false}
+          onAddCustom={() => undefined}
+          onSeedFromClaude={onSeed}
+          isSeeding={false}
+          canSeedFromClaude={false}
+        />
+      );
+    });
+
+    const seedButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Seed from Claude')
+    );
+    expect(seedButton).toBeDefined();
+    expect((seedButton as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => {
+      root.render(
+        <McpToolbar
+          search=""
+          onSearchChange={() => undefined}
+          onRefresh={() => undefined}
+          isRefreshing={false}
+          onAddCustom={() => undefined}
+          onSeedFromClaude={onSeed}
+          isSeeding={false}
+          canSeedFromClaude={true}
+        />
+      );
+    });
+    const enabled = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Seed from Claude')
+    ) as HTMLButtonElement;
+    expect(enabled.disabled).toBe(false);
+    await act(async () => {
+      enabled.click();
+    });
+    expect(onSeed).toHaveBeenCalledTimes(1);
   });
 
   it('streams live-model updates into the slice hook', async () => {
