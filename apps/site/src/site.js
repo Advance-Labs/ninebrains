@@ -1,185 +1,381 @@
 /**
- * Page orchestration: run the intro if it is welcome, reveal content as it scrolls, and wire up
- * the two tablists (the feature rail and the install tabs), the copy buttons, and the download
- * tab's client-side fetch of the latest GitHub release.
+ * Page orchestration for the one-screen landing page.
  *
- * The content never depends on the intro finishing, and none of the interactive parts below are
- * required for the page to be readable: if a fetch fails, or JS never runs, the markup already
- * shows the overview panel and the terminal install command.
+ * One clock drives everything a scene shows: the rail's progress bar, the demo window's timeline
+ * (`data-at` / `data-off` / `data-swap` marks in the HTML) and the nine cubes in the WebGL stage.
+ * The clock pauses while the pointer or focus is on the rail or the demo, while the verify sheet
+ * is open, and while the tab is hidden, so nothing moves on without the reader.
+ *
+ * None of it gates the content. Without JS the page shows the overview and the install command;
+ * without WebGL the stage stays a CSS gradient; with reduced motion every demo shows its final
+ * frame, nothing auto-advances and scene changes are instant cuts.
  */
-import { runIntro } from './intro.js';
+import { createStage } from './stage.js';
 
 const RELEASES_API = 'https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest';
 const RELEASES_PAGE = 'https://github.com/Advance-Labs/ninebrains/releases/latest';
 const CACHE_KEY = 'ninebrains:latest-release';
+/** A click or key on the rail holds auto-advance off for this long. */
+const MANUAL_HOLD = 30_000;
+const STATES = ['idle', 'run', 'pass', 'fail', 'warn'];
 
-const canvas = document.getElementById('intro');
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mobileQuery = window.matchMedia('(max-width: 899px)');
 
-/** Reveals everything currently on screen, and watches for the rest. */
-function watchReveals() {
-  const items = [...document.querySelectorAll('[data-reveal]')];
-  const showAll = () => {
-    for (const item of items) item.classList.add('in');
-  };
-  if (reduced || !('IntersectionObserver' in window)) {
-    showAll();
-    return;
-  }
-  document.body.classList.add('reveals');
-  setTimeout(showAll, 4000);
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const delay = Number(entry.target.dataset.delay ?? 0) * 90;
-        setTimeout(() => entry.target.classList.add('in'), delay);
-        observer.unobserve(entry.target);
-      }
-    },
-    { rootMargin: '0px 0px -12% 0px', threshold: 0.08 }
-  );
-  for (const item of items) observer.observe(item);
+// --- the scene clock --------------------------------------------------------------------------
+
+const rail = document.querySelector('.rail');
+const tabs = [...rail.querySelectorAll('[role="tab"]')];
+const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')));
+const durations = tabs.map((tab) => Number(tab.dataset.duration) || 10);
+
+const clock = {
+  index: 0,
+  /** Scene time already banked before the current run of unpaused time. */
+  banked: 0,
+  since: performance.now(),
+  paused: false,
+  manualUntil: 0,
+};
+const pauseReasons = new Set();
+
+function sceneTime(now = performance.now()) {
+  if (reduced) return durations[clock.index] - 0.001;
+  return clock.banked + (clock.paused ? 0 : (now - clock.since) / 1000);
 }
 
-function ready() {
-  document.body.classList.add('ready');
-  watchReveals();
+function setPaused(reason, on) {
+  if (on) pauseReasons.add(reason);
+  else pauseReasons.delete(reason);
+  const paused = pauseReasons.size > 0;
+  if (paused === clock.paused) return;
+  const now = performance.now();
+  if (paused) clock.banked = sceneTime(now);
+  clock.since = now;
+  clock.paused = paused;
+  rail.dataset.paused = String(paused);
 }
 
-function runPageIntro() {
-  if (reduced || !window.WebGLRenderingContext) {
-    document.body.classList.add('no-intro');
-    ready();
-    return;
+function restartClock() {
+  clock.banked = 0;
+  clock.since = performance.now();
+}
+
+// --- the timeline marks inside each demo ------------------------------------------------------
+
+/** Per panel, the marked elements, parsed once. */
+const marks = panels.map((panel) => {
+  const list = [];
+  for (const el of panel.querySelectorAll('[data-at], [data-off], [data-swap]')) {
+    const at = el.dataset.at === undefined ? null : Number(el.dataset.at);
+    const off = el.dataset.off === undefined ? null : Number(el.dataset.off);
+    const swap = el.dataset.swap ?? null;
+    const swapAt = swap ? Number(el.dataset.swapAt ?? el.dataset.at ?? 0) : null;
+    const base = swap ? (STATES.find((state) => el.classList.contains(state)) ?? null) : null;
+    list.push({ el, at, off, swap, swapAt, base, state: '' });
   }
+  const clocks = [...panel.querySelectorAll('[data-clock]')];
+  return { list, clocks, lastClock: '' };
+});
+
+function applyMarks(index, t) {
+  const panel = panels[index];
+  const set = marks[index];
+  panel.style.setProperty('--t', t.toFixed(3));
+  panel.style.setProperty('--tp', Math.min(t / durations[index], 1).toFixed(4));
+  for (const mark of set.list) {
+    const on = mark.at === null || t >= mark.at;
+    const off = mark.off !== null && t >= mark.off;
+    const swapped = mark.swap !== null && t >= mark.swapAt;
+    const state = `${on ? 1 : 0}${off ? 1 : 0}${swapped ? 1 : 0}`;
+    if (state === mark.state) continue;
+    mark.state = state;
+    if (mark.at !== null) mark.el.classList.toggle('on', on);
+    mark.el.classList.toggle('off', off);
+    if (mark.swap !== null) {
+      mark.el.classList.toggle('sw', swapped);
+      if (mark.base) mark.el.classList.toggle(mark.base, !swapped);
+      if (STATES.includes(mark.swap)) mark.el.classList.toggle(mark.swap, swapped);
+    }
+  }
+  const seconds = Math.floor(t);
+  const text = `00:${String(seconds).padStart(2, '0')}`;
+  if (text !== set.lastClock) {
+    set.lastClock = text;
+    for (const el of set.clocks) el.textContent = text;
+  }
+}
+
+// --- demo windows scale to fit ----------------------------------------------------------------
+
+function fitWindows() {
+  const mobile = mobileQuery.matches;
+  for (const fit of document.querySelectorAll('[data-fit]')) {
+    const win = fit.querySelector('.win');
+    if (!win) continue;
+    const w = fit.clientWidth;
+    const h = fit.clientHeight;
+    if (!w || !h) continue;
+    const mini = win.classList.contains('win-mini');
+    if (mobile && !mini) {
+      // Flat and full width: a fixed 500px-wide layout scaled to the column, as tall as fits.
+      const s = w / 500;
+      fit.style.setProperty('--s', s.toFixed(4));
+      win.style.setProperty('--win-h', `${Math.max(240, Math.floor(h / s))}px`);
+    } else {
+      const baseW = mini ? 560 : 800;
+      const baseH = mini ? 330 : 500;
+      // The tilt makes the projected pane a little larger than its box; leave room for it.
+      const s = Math.min(w / baseW, h / baseH) * (mini ? 0.96 : 0.95);
+      fit.style.setProperty('--s', s.toFixed(4));
+    }
+  }
+}
+
+// --- the stage --------------------------------------------------------------------------------
+
+let stage = null;
+
+function activeSlotRect() {
+  const slot = panels[clock.index].querySelector('[data-slot]');
+  if (!slot) return null;
+  const box = slot.getBoundingClientRect();
+  return { x: box.left, y: box.top, w: box.width, h: box.height };
+}
+
+function syncStage({ instant = false } = {}) {
+  if (!stage) return;
+  const dim = mobileQuery.matches && clock.index === 0 ? 0.45 : 1;
+  stage.setScene(clock.index, activeSlotRect(), { instant: instant || reduced, dim });
+}
+
+function initStage() {
+  const canvas = document.getElementById('scene');
   try {
-    const skip = runIntro({ canvas, onDone: ready });
-    for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
-      window.addEventListener(event, () => skip(), { once: true, passive: true });
-    }
+    stage = createStage(canvas, {
+      reduced,
+      sceneTime: () => sceneTime(),
+      scene: () => clock.index,
+    });
   } catch {
-    document.body.classList.add('no-intro');
-    ready();
+    stage = null;
   }
+  if (!stage) return;
+  syncStage({ instant: true });
+  stage.intro();
+  requestAnimationFrame(() => canvas.classList.add('live'));
 }
 
-/**
- * A small, accessible tablist: click or arrow-key between `[role="tab"]` buttons inside
- * `container`, show the matching `[role="tabpanel"]` (matched by `aria-controls` -> id), and keep
- * one tab in the natural tab order (roving tabindex). `onSelect` fires after each activation,
- * including the initial one, so callers can lazily load a panel's content.
- */
-function tablist(container, { orientation = 'horizontal', onSelect } = {}) {
-  const tabs = [...container.querySelectorAll('[role="tab"]')];
-  if (tabs.length === 0) return { select: () => {} };
+// --- the rail ---------------------------------------------------------------------------------
 
-  function panelFor(tab) {
-    const id = tab.getAttribute('aria-controls');
-    return id ? document.getElementById(id) : null;
+function select(index, { user = false, focus = false } = {}) {
+  const changed = index !== clock.index;
+  tabs.forEach((tab, i) => {
+    const active = i === index;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+    panels[i].hidden = !active;
+    if (!active) tab.style.removeProperty('--p');
+  });
+  if (focus) tabs[index].focus();
+  if (user) clock.manualUntil = performance.now() + MANUAL_HOLD;
+  clock.index = index;
+  restartClock();
+  // Restart the demo's own CSS animations (entry push, typing) from the top.
+  if (changed) {
+    for (const mark of marks[index].list) mark.state = '';
   }
+  applyMarks(index, sceneTime());
+  requestAnimationFrame(() => {
+    fitWindows();
+    syncStage();
+  });
+}
 
-  function select(tab, { focus = false } = {}) {
-    for (const t of tabs) {
-      const active = t === tab;
-      t.setAttribute('aria-selected', String(active));
-      t.tabIndex = active ? 0 : -1;
-      const panel = panelFor(t);
-      if (panel) panel.hidden = !active;
-    }
-    if (focus) tab.focus();
-    onSelect?.(tab);
-  }
-
-  container.addEventListener('click', (event) => {
+function initRail() {
+  rail.addEventListener('click', (event) => {
     const tab = event.target.closest('[role="tab"]');
-    if (tab && tabs.includes(tab)) select(tab);
+    if (tab) select(tabs.indexOf(tab), { user: true });
   });
-
-  const forward = orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight';
-  const backward = orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft';
-
-  container.addEventListener('keydown', (event) => {
+  rail.addEventListener('keydown', (event) => {
     const current = event.target.closest('[role="tab"]');
-    if (!current || !tabs.includes(current)) return;
+    if (!current) return;
     const index = tabs.indexOf(current);
-    let next = null;
-    if (event.key === forward) next = tabs[(index + 1) % tabs.length];
-    else if (event.key === backward) next = tabs[(index - 1 + tabs.length) % tabs.length];
-    else if (event.key === 'Home') next = tabs[0];
-    else if (event.key === 'End') next = tabs[tabs.length - 1];
-    if (!next) return;
+    const vertical = !mobileQuery.matches;
+    const next = vertical ? 'ArrowDown' : 'ArrowRight';
+    const prev = vertical ? 'ArrowUp' : 'ArrowLeft';
+    let target = null;
+    if (event.key === next || event.key === 'ArrowDown') target = (index + 1) % tabs.length;
+    else if (event.key === prev || event.key === 'ArrowUp')
+      target = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') target = 0;
+    else if (event.key === 'End') target = tabs.length - 1;
+    else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      select(index, { user: true });
+      return;
+    }
+    if (target === null) return;
     event.preventDefault();
-    select(next, { focus: true });
+    select(target, { user: true, focus: true });
   });
 
-  return { select, tabs };
-}
+  const hoverables = [rail, ...document.querySelectorAll('.win-fit')];
+  for (const el of hoverables) {
+    el.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse') setPaused('hover', true);
+    });
+    el.addEventListener('pointerleave', () => setPaused('hover', false));
+  }
+  rail.addEventListener('focusin', () => setPaused('focus', true));
+  rail.addEventListener('focusout', (event) => {
+    if (!rail.contains(event.relatedTarget)) setPaused('focus', false);
+  });
+  document.addEventListener('visibilitychange', () => setPaused('hidden', document.hidden));
 
-function initFeatureRail() {
-  const rail = document.querySelector('.rail');
-  if (!rail) return;
-  tablist(rail, {
-    orientation: 'vertical',
-    // On narrow screens the rail is a horizontal chip row that scrolls; keep the chosen chip in
-    // view. On desktop the rail never overflows, so this is a no-op there.
-    onSelect: (tab) => {
-      if (rail.scrollWidth <= rail.clientWidth) return;
-      const tabBox = tab.getBoundingClientRect();
-      const railBox = rail.getBoundingClientRect();
-      const left =
-        rail.scrollLeft + tabBox.left - railBox.left - (rail.clientWidth - tabBox.width) / 2;
-      rail.scrollTo({ left, behavior: reduced ? 'auto' : 'smooth' });
+  // Swipe the stage on a phone to move between scenes.
+  const stageEl = document.querySelector('.stage');
+  let startX = null;
+  let startY = 0;
+  stageEl.addEventListener(
+    'touchstart',
+    (event) => {
+      if (event.target.closest('.cmd code, .install-tabs')) return;
+      startX = event.touches[0].clientX;
+      startY = event.touches[0].clientY;
     },
-  });
+    { passive: true }
+  );
+  stageEl.addEventListener(
+    'touchend',
+    (event) => {
+      if (startX === null) return;
+      const dx = event.changedTouches[0].clientX - startX;
+      const dy = event.changedTouches[0].clientY - startY;
+      startX = null;
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      const step = dx < 0 ? 1 : -1;
+      select((clock.index + step + tabs.length) % tabs.length, { user: true });
+    },
+    { passive: true }
+  );
 }
+
+function tick(now) {
+  const t = sceneTime(now);
+  const duration = durations[clock.index];
+  if (!reduced && t >= duration) {
+    if (now >= clock.manualUntil) {
+      select((clock.index + 1) % tabs.length);
+    } else {
+      // Held on a scene the reader picked: loop it.
+      for (const mark of marks[clock.index].list) mark.state = '';
+      restartClock();
+    }
+  } else {
+    applyMarks(clock.index, t);
+    tabs[clock.index].style.setProperty('--p', Math.min(t / duration, 1).toFixed(4));
+  }
+  requestAnimationFrame(tick);
+}
+
+// --- pointer parallax -------------------------------------------------------------------------
+
+function initParallax() {
+  if (reduced) return;
+  const root = document.documentElement;
+  let frame = 0;
+  window.addEventListener(
+    'pointermove',
+    (event) => {
+      if (event.pointerType !== 'mouse') return;
+      const x = (event.clientX / window.innerWidth) * 2 - 1;
+      const y = (event.clientY / window.innerHeight) * 2 - 1;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        root.style.setProperty('--px', x.toFixed(3));
+        root.style.setProperty('--py', y.toFixed(3));
+        stage?.setPointer(x, y);
+      });
+    },
+    { passive: true }
+  );
+}
+
+// --- install tabs, copy, downloads ------------------------------------------------------------
 
 function osHint() {
   const platform = `${navigator.userAgentData?.platform ?? navigator.platform ?? ''} ${navigator.userAgent ?? ''}`;
   return /win/i.test(platform) ? 'windows' : 'terminal';
 }
 
-function initInstallTabs(onPanelShown) {
+function initInstallTabs(onShown) {
   const container = document.querySelector('.install-tabs');
-  if (!container) return null;
+  const installTabs = [...container.querySelectorAll('[role="tab"]')];
   const hint = container.querySelector('[data-install-hint]');
 
-  const { select, tabs } = tablist(container, {
-    orientation: 'horizontal',
-    onSelect: (tab) => {
-      const kind = tab.dataset.install;
-      if (hint) {
-        hint.textContent =
-          kind === 'windows' ? 'Windows' : kind === 'download' ? 'all platforms' : 'macOS · Linux';
-      }
-      if (kind === 'download') loadDownloads();
-      // A hidden panel measures as zero wide, so re-check the fade once it is visible.
-      onPanelShown?.();
-    },
+  function pick(tab, { focus = false } = {}) {
+    for (const t of installTabs) {
+      const active = t === tab;
+      t.setAttribute('aria-selected', String(active));
+      t.tabIndex = active ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !active;
+    }
+    if (focus) tab.focus();
+    const kind = tab.dataset.install;
+    if (hint) {
+      hint.textContent =
+        kind === 'windows' ? 'Windows' : kind === 'download' ? 'Every platform' : 'macOS, Linux';
+    }
+    if (kind === 'download') loadDownloads();
+    onShown?.();
+  }
+
+  container.addEventListener('click', (event) => {
+    const tab = event.target.closest('[role="tab"]');
+    if (tab) pick(tab);
+  });
+  container.addEventListener('keydown', (event) => {
+    const current = event.target.closest('[role="tab"]');
+    if (!current) return;
+    const index = installTabs.indexOf(current);
+    let next = null;
+    if (event.key === 'ArrowRight') next = installTabs[(index + 1) % installTabs.length];
+    else if (event.key === 'ArrowLeft')
+      next = installTabs[(index - 1 + installTabs.length) % installTabs.length];
+    if (!next) return;
+    event.preventDefault();
+    pick(next, { focus: true });
   });
 
-  const preferred = tabs.find((tab) => tab.dataset.install === osHint());
-  if (preferred) select(preferred);
-  return { select, tabs };
+  const preferred = installTabs.find((tab) => tab.dataset.install === osHint());
+  if (preferred) pick(preferred);
+
+  // The app links to /#download: open the overview on the Download tab.
+  const openDownload = () => {
+    if (location.hash !== '#download') return;
+    select(0, { user: true });
+    pick(installTabs.find((tab) => tab.dataset.install === 'download'));
+  };
+  window.addEventListener('hashchange', openDownload);
+  openDownload();
 }
 
 function initCopyButtons() {
   for (const button of document.querySelectorAll('[data-copy]')) {
     button.addEventListener('click', async () => {
       const code = button.closest('.cmd')?.querySelector('code');
-      // The formatter may wrap the command across lines in the HTML; copy it as the one line
-      // the page shows.
+      // The formatter may wrap the command in the HTML; copy the one line the page shows.
       const text = code?.textContent?.replace(/\s+/g, ' ').trim();
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
       } catch {
-        // Clipboard API can be unavailable (insecure context, permissions); fall back silently,
-        // the command is still selectable text.
+        // No clipboard (insecure context, permissions): the command is still selectable text.
         return;
       }
       const original = button.textContent;
-      button.textContent = '✓ copied';
+      button.textContent = '✓ Copied';
       button.dataset.copied = 'true';
       setTimeout(() => {
         button.textContent = original;
@@ -189,10 +385,7 @@ function initCopyButtons() {
   }
 }
 
-/**
- * Marks a command that is wider than its box, so CSS can fade its right edge as a scroll cue, and
- * drops the fade once it is scrolled to the end.
- */
+/** Fades a command's right edge while part of it is scrolled out of view. */
 function initCommandFades() {
   const codes = [...document.querySelectorAll('.cmd code')];
   const update = (code) => {
@@ -202,15 +395,8 @@ function initCommandFades() {
   const updateAll = () => {
     for (const code of codes) update(code);
   };
-  for (const code of codes) {
-    code.addEventListener('scroll', () => update(code), { passive: true });
-  }
-  if ('ResizeObserver' in window) {
-    const observer = new ResizeObserver(updateAll);
-    for (const code of codes) observer.observe(code);
-  } else {
-    window.addEventListener('resize', updateAll);
-  }
+  for (const code of codes) code.addEventListener('scroll', () => update(code), { passive: true });
+  new ResizeObserver(updateAll).observe(document.body);
   updateAll();
   return updateAll;
 }
@@ -230,11 +416,11 @@ function isGithubReleaseAsset(url) {
 
 /** Maps a release asset's file name to a short OS label and sort position. */
 function describeAsset(name) {
-  if (/mac-arm64\.dmg$/.test(name)) return { os: 'macOS · Apple Silicon', order: 0 };
-  if (/mac-x64\.dmg$/.test(name)) return { os: 'macOS · Intel', order: 1 };
+  if (/mac-arm64\.dmg$/.test(name)) return { os: 'macOS Apple Silicon', order: 0 };
+  if (/mac-x64\.dmg$/.test(name)) return { os: 'macOS Intel', order: 1 };
   if (/win-x64\.exe$/.test(name)) return { os: 'Windows x64', order: 2 };
-  if (/linux-x86_64\.AppImage$/.test(name)) return { os: 'Linux x86_64', order: 3 };
-  if (/linux-amd64\.deb$/.test(name)) return { os: 'Linux (.deb)', order: 4 };
+  if (/linux-x86_64\.AppImage$/.test(name)) return { os: 'Linux AppImage', order: 3 };
+  if (/linux-amd64\.deb$/.test(name)) return { os: 'Linux .deb', order: 4 };
   return null;
 }
 
@@ -249,15 +435,6 @@ async function loadDownloads() {
   const versionLabel = document.querySelector('[data-downloads-version]');
   if (!root || !status) return;
 
-  const fallback = () => {
-    status.textContent = "Couldn't load release assets automatically.";
-    const link = document.createElement('a');
-    link.href = RELEASES_PAGE;
-    link.textContent = 'See every download on GitHub';
-    link.className = 'install-note';
-    root.append(link);
-  };
-
   try {
     let release = readCache();
     if (!release) {
@@ -270,7 +447,11 @@ async function loadDownloads() {
     }
     renderDownloads(release, root, status, versionLabel);
   } catch {
-    fallback();
+    status.textContent = "Couldn't load the release files. ";
+    const link = document.createElement('a');
+    link.href = RELEASES_PAGE;
+    link.textContent = 'See every download on GitHub';
+    status.append(link);
   }
 }
 
@@ -287,7 +468,7 @@ function writeCache(release) {
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(release));
   } catch {
-    // Private browsing or a full quota; the fetch already worked, so this is not fatal.
+    // Private browsing or a full quota; the fetch already worked.
   }
 }
 
@@ -299,7 +480,7 @@ function renderDownloads(release, root, status, versionLabel) {
     .sort((a, b) => a.meta.order - b.meta.order);
 
   if (rows.length === 0) {
-    status.textContent = "This release doesn't have installer assets yet.";
+    status.textContent = "This release doesn't have installer files yet.";
     return;
   }
 
@@ -309,6 +490,7 @@ function renderDownloads(release, root, status, versionLabel) {
     const a = document.createElement('a');
     a.className = 'dl-button';
     a.href = asset.browser_download_url;
+    a.title = asset.name;
     const os = document.createElement('span');
     os.className = 'dl-os';
     os.textContent = meta.os;
@@ -322,29 +504,84 @@ function renderDownloads(release, root, status, versionLabel) {
 
   if (versionLabel) {
     const version = typeof release.tag_name === 'string' ? release.tag_name.replace(/^v/, '') : '';
-    versionLabel.textContent = version ? `Ninebrains ${version} · ` : '';
+    versionLabel.textContent = version ? `Ninebrains ${version}. ` : '';
   }
 
   const sums = assets.find(
     (asset) => asset.name === 'SHA256SUMS' && isGithubReleaseAsset(asset.browser_download_url)
   );
-  if (sums) {
-    const note = root.parentElement?.querySelector('.install-note');
-    if (note) {
-      const link = document.createElement('a');
-      link.href = sums.browser_download_url;
-      link.textContent = 'SHA256SUMS';
-      note.append(' · ', link);
-    }
+  const note = root.parentElement?.querySelector('.install-note');
+  if (sums && note) {
+    const link = document.createElement('a');
+    link.href = sums.browser_download_url;
+    link.textContent = 'SHA256SUMS';
+    note.append(' ', link);
   }
 }
 
+// --- the verify sheet -------------------------------------------------------------------------
+
+function initSheets() {
+  for (const opener of document.querySelectorAll('[data-open]')) {
+    const dialog = document.getElementById(opener.dataset.open);
+    if (!(dialog instanceof HTMLDialogElement)) continue;
+    opener.addEventListener('click', () => {
+      dialog.showModal();
+      setPaused('sheet', true);
+    });
+    dialog.addEventListener('close', () => {
+      setPaused('sheet', false);
+      opener.focus();
+    });
+    // A click on the backdrop (outside the sheet's box) closes it.
+    dialog.addEventListener('click', (event) => {
+      if (event.target !== dialog) return;
+      const box = dialog.getBoundingClientRect();
+      const inside =
+        event.clientX >= box.left &&
+        event.clientX <= box.right &&
+        event.clientY >= box.top &&
+        event.clientY <= box.bottom;
+      if (!inside) dialog.close();
+    });
+    // showModal makes the rest of the page inert; keep Tab cycling inside the sheet as well.
+    dialog.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      const focusables = [...dialog.querySelectorAll('a[href], button')];
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+  }
+}
+
+// --- go ---------------------------------------------------------------------------------------
+
 function main() {
-  runPageIntro();
-  initFeatureRail();
+  initRail();
   const refreshFades = initCommandFades();
   initInstallTabs(refreshFades);
   initCopyButtons();
+  initSheets();
+  initParallax();
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(() => {
+      fitWindows();
+      syncStage({ instant: true });
+    });
+    observer.observe(document.querySelector('.stage'));
+  }
+  fitWindows();
+  applyMarks(clock.index, sceneTime());
+  initStage();
+  requestAnimationFrame(tick);
 }
 
 main();

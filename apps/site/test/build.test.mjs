@@ -65,8 +65,64 @@ test('each copy button copies exactly the one-line command it sits next to', () 
   ]);
 });
 
-test('the lanes visual is decoration only, hidden from assistive tech', () => {
-  assert.match(flat, /<div class="lanes" aria-hidden="true">/);
+test('the demo windows and cube slots are decoration only, hidden from assistive tech', () => {
+  const fits = [...flat.matchAll(/<div class="win-fit[^"]*"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(fits.length, 7, 'one demo window per scene');
+  for (const tag of fits) assert.match(tag, /aria-hidden="true"/, `not hidden: ${tag}`);
+  const slots = [...flat.matchAll(/<div class="cube-slot"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(slots.length, 7, 'one cube slot per scene');
+  for (const tag of slots) assert.match(tag, /aria-hidden="true"/);
+});
+
+test('the page is one screen: the root never scrolls', () => {
+  const css = readFileSync(join(DIST, 'styles.css'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(css, /html, body \{[^}]*height: 100dvh;[^}]*overflow: hidden;/);
+  // The two height tiers that drop the lede, then the works-with row.
+  assert.match(css, /@media \(max-height: 760px\)/);
+  assert.match(css, /@media \(max-height: 640px\)/);
+});
+
+test('each rail tab carries an icon, a caption and a scene length for auto-advance', () => {
+  const tabs = [...flat.matchAll(/<button[^>]*role="tab"[^>]*id="tab-\d\d"[\s\S]*?<\/button>/g)];
+  assert.equal(tabs.length, 7);
+  for (const [tab] of tabs) {
+    assert.match(tab, /<svg class="rail-icon"/);
+    assert.match(tab, /class="rail-caption">[^<]+</);
+    const seconds = Number(tab.match(/data-duration="(\d+)"/)?.[1]);
+    assert.ok(seconds >= 8 && seconds <= 14, `scene length out of range: ${seconds}`);
+  }
+});
+
+test('every timeline mark in a demo lands inside its scene', () => {
+  const lengths = Object.fromEntries(
+    [...flat.matchAll(/id="tab-(\d\d)"[^>]*data-duration="(\d+)"/g)].map((m) => [m[1], +m[2]])
+  );
+  assert.equal(Object.keys(lengths).length, 7);
+  for (const [num, length] of Object.entries(lengths)) {
+    const panel = html.match(new RegExp(`id="panel-${num}"[\\s\\S]*?(?=id="panel-|</main>)`));
+    assert.ok(panel, `panel-${num} not found`);
+    for (const m of panel[0].matchAll(/data-(?:at|off|swap-at)="([^"]+)"/g)) {
+      const t = Number(m[1]);
+      assert.ok(Number.isFinite(t) && t >= 0 && t < length, `panel-${num}: mark ${m[1]}`);
+    }
+  }
+});
+
+test('the verify sheet is a real dialog with the checks spelled out', () => {
+  assert.match(flat, /data-open="verify"/);
+  const sheet = flat.match(/<dialog[^>]*id="verify"[\s\S]*?<\/dialog>/)?.[0] ?? '';
+  assert.ok(sheet, 'no verify dialog');
+  assert.match(sheet, /aria-labelledby="verify-title"/);
+  assert.match(sheet, /gh attestation verify/);
+  assert.match(sheet, /Gatekeeper/);
+  assert.match(sheet, /SmartScreen/);
+  assert.match(sheet, /verify-download/);
+});
+
+test('ships the stage script and keeps it dependency-free', () => {
+  const stage = readFileSync(join(DIST, 'stage.js'), 'utf8');
+  assert.match(stage, /getContext\('webgl2'/);
+  assert.doesNotMatch(stage, /^import /m, 'the stage must not import anything');
 });
 
 test('says plainly that builds are unsigned, and how that is checked', () => {
@@ -119,6 +175,7 @@ test('copy buttons sit next to a command, not floating free', () => {
 test('no em dashes in site copy', () => {
   // The header/title's own separator ("Ninebrains — run ...") is the one place an em dash is
   // structural chrome, not copy; everything else in <main> must be free of them.
-  const main = html.match(/<main>[\s\S]*<\/main>/)?.[0] ?? '';
-  assert.ok(!main.includes('—'), 'an em dash slipped into the page copy');
+  const body = html.match(/<body>[\s\S]*<\/body>/)?.[0] ?? '';
+  assert.ok(body.length > 0, 'no body found');
+  assert.ok(!body.includes('—'), 'an em dash slipped into the page copy');
 });
