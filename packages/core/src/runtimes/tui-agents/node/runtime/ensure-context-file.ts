@@ -1,5 +1,5 @@
-import { readFile, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 export const KNOWLEDGE_CONTEXT_FILE_NAME = 'knowledge.md';
 
@@ -18,6 +18,8 @@ export type KnowledgeContextIo = {
   readFile: (filePath: string) => Promise<string | null>;
   exists: (filePath: string) => Promise<boolean>;
   writeFile: (filePath: string, contents: string) => Promise<void>;
+  /** Appends to a file, creating it and its parent directory when absent. */
+  appendFile: (filePath: string, contents: string) => Promise<void>;
 };
 
 export const nodeKnowledgeContextIo: KnowledgeContextIo = {
@@ -37,7 +39,11 @@ export const nodeKnowledgeContextIo: KnowledgeContextIo = {
     }
   },
   writeFile(filePath, contents) {
-    return writeFile(filePath, contents, { mode: 0o600 });
+    return writeFile(filePath, contents);
+  },
+  async appendFile(filePath, contents) {
+    await mkdir(dirname(filePath), { recursive: true });
+    await appendFile(filePath, contents);
   },
 };
 
@@ -87,10 +93,58 @@ ${source.content.trimEnd()}
 `;
 }
 
+/** Anchored so only the worktree-root file is ignored, not nested `knowledge.md` files. */
+const EXCLUDE_PATTERN = `/${KNOWLEDGE_CONTEXT_FILE_NAME}`;
+
+/**
+ * Path of the `info/exclude` file git reads for `workspacePath`, or null outside a repo. A linked
+ * worktree's `.git` is a `gitdir:` file, and git reads `info/exclude` from the shared common dir
+ * named by that gitdir's `commondir` file, not from the per-worktree gitdir. Resolved with plain
+ * reads so seeding never spawns `git`.
+ */
+export async function resolveGitExcludePath(
+  io: KnowledgeContextIo,
+  workspacePath: string
+): Promise<string | null> {
+  const dotGit = join(workspacePath, '.git');
+  // readFile returns null for a directory, so a non-null read means a linked worktree.
+  const gitFile = await io.readFile(dotGit);
+  if (gitFile === null) {
+    return (await io.exists(dotGit)) ? join(dotGit, 'info', 'exclude') : null;
+  }
+  const match = /^gitdir:\s*(.+)$/mu.exec(gitFile);
+  if (!match) return null;
+  const gitDir = resolve(workspacePath, match[1]!.trim());
+  const commonDir = (await io.readFile(join(gitDir, 'commondir')))?.trim();
+  const root = commonDir
+    ? isAbsolute(commonDir)
+      ? commonDir
+      : resolve(gitDir, commonDir)
+    : gitDir;
+  return join(root, 'info', 'exclude');
+}
+
+/**
+ * Keeps the seeded file out of `git add -A` so agents do not commit a generated copy of the
+ * repo's context. `info/exclude` is local to the clone and never committed. Idempotent.
+ */
+async function excludeFromGit(io: KnowledgeContextIo, workspacePath: string): Promise<void> {
+  const excludePath = await resolveGitExcludePath(io, workspacePath);
+  if (!excludePath) return;
+  const current = (await io.readFile(excludePath)) ?? '';
+  if (current.split(/\r?\n/u).some((line) => line.trim() === EXCLUDE_PATTERN)) return;
+  const separator = current === '' || current.endsWith('\n') ? '' : '\n';
+  await io.appendFile(
+    excludePath,
+    `${separator}# Seeded by Emdash for Freebuff/Codebuff context\n${EXCLUDE_PATTERN}\n`
+  );
+}
+
 /**
  * Best-effort seed of `knowledge.md` for CLI providers that read it from the
  * project directory. Never overwrites an existing file; skips providers that do
- * not consume this file; falls back from CLAUDE.md to AGENTS.md for the seed.
+ * not consume this file; falls back from CLAUDE.md to AGENTS.md for the seed. A written file is
+ * added to the repo's `info/exclude`.
  */
 export async function ensureKnowledgeContext({
   providerId,
@@ -104,6 +158,8 @@ export async function ensureKnowledgeContext({
   const source = await firstExistingSource(io, workspacePath);
   if (!source) return 'no-source';
   try {
+    // Exclude first: if this fails, no file exists that an agent could commit.
+    await excludeFromGit(io, workspacePath);
     await io.writeFile(
       target,
       renderKnowledgeContext(source, `Seeded by Emdash for ${providerId} on ${now()}.`)

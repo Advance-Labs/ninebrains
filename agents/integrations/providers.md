@@ -112,7 +112,8 @@ you select an OrcaRouter model from the OpenCode model picker.
   the home-rooted file (the global `~/.agents/mcp.json` tier). Both providers read `knowledge.md`
   and `AGENTS.md` for context but not `CLAUDE.md`; the `tui-agents` runtime seeds a worktree-local
   `knowledge.md` from repo `CLAUDE.md` (falling back to `AGENTS.md`) on first launch, never
-  overwriting an existing file.
+  overwriting an existing file. Before writing it adds `/knowledge.md` to the repo's
+  `info/exclude` (the common dir for linked worktrees), so agents cannot commit the generated copy.
 
 ## Adding Or Changing A Provider
 
