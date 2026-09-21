@@ -309,12 +309,19 @@ jobs:
 
       - name: Write release notes
         run: |
+          # The install steps and docs links live in .github/release-notes/install.md so people can
+          # open an unsigned build without digging through docs/RELEASING.md. Canary installs as
+          # "Ninebrains Canary" and names its files Ninebrains-Canary-<version>-*.
+          if [ "$CHANNEL" = canary ]; then product='Ninebrains Canary'; else product='Ninebrains'; fi
+          file_prefix="${product// /-}-$VERSION"
           {
             if [ "$CHANNEL" = canary ]; then
               echo "**Canary build.** A prerelease with its own app identity (Ninebrains Canary) and data directory. Expect rough edges."
               echo
             fi
-            echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn; see [RELEASING.md](https://github.com/$GH_REPO/blob/$GITHUB_SHA/docs/RELEASING.md) before installing."
+            echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn. The steps to open it are under **How to install** below. Full docs: [docs.advancelabs.dev/ninebrains](https://docs.advancelabs.dev/ninebrains/)."
+            echo
+            sed -e "s/{{PRODUCT}}/$product/g" -e "s/{{FILE_PREFIX}}/$file_prefix/g" .github/release-notes/install.md
             echo
             echo "## Changes"
             echo

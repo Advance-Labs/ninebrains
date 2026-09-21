@@ -56,7 +56,9 @@ Only Lucas publishes. Nothing is public until the draft is published.
    - `CHANGELOG.md` has no section for the version.
 3. **Review the draft** at **Releases**. Look for:
    - five installers, plus `SHA256SUMS` and `SHA256SUMS.json`;
-   - notes that start with the changelog section, then the sums and the unsigned warning;
+   - notes that open with the unsigned warning, then the install steps and docs links from
+     `.github/release-notes/install.md`, then the changelog section and the sums. When the steps in
+     [Opening an unsigned build](#opening-an-unsigned-build) change, change that file too;
    - the run summary line "Draft v0.1.0 is ready for review", which appears only after the draft
      was re-downloaded and re-verified;
    - a check on at least one real machine: download the installer, verify it (below), install it and
