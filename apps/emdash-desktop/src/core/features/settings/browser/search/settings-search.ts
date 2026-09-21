@@ -51,6 +51,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
     description: 'App version and updates.',
     keywords: ['update', 'upgrade', 'restart', 'release'],
   },
+  // Ninebrains: release check (features/release-check).
+  {
+    id: 'check-for-new-versions',
+    label: 'Check for new versions',
+    tab: 'general',
+    description: 'Ask GitHub whether a newer Ninebrains release is out.',
+    keywords: ['update', 'upgrade', 'release', 'version', 'download'],
+  },
   {
     id: 'privacy-telemetry',
     label: 'Privacy & Telemetry',

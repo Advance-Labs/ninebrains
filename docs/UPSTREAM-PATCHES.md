@@ -561,3 +561,21 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 | File | Change | Why |
 |---|---|---|
 | `src/core/features/projects/browser/components/pr-view/pr-row.tsx` | The `RelativeTime` and `PrDiffStat` spans get `transition-opacity group-hover:opacity-0` (and `shrink-0` on the time) | The "Review in Task" button is absolutely positioned over the row's right edge and fades in on hover, but the timestamp and `+N -N` diff stat stayed visible under its translucent `secondary` background, so the three overlapped. Same hover swap as `pr-entry.tsx` and the tab items |
+
+## 30. "New version available" notice, not auto-update (`feat/update-notice`)
+
+New slice `src/core/features/release-check/` (contract, node service and controller, browser store,
+sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENABLED` stays `false`
+(SEC-36). The check is opt-in because SEC-38 allows no unprompted traffic on first run. See
+`docs/RELEASING.md` → Update notice.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/manifests/shared/domain-contracts.ts`, `src/core/manifests/node/controllers.ts` | `releaseCheck` domain and controller; `DesktopControllerContext.releaseCheckHost` (app version, `app.isPackaged`, `IS_CANARY`) | Registers the new Wire slice the usual way. The controller starts the service and disposes it with its scope |
+| `src/main/bootstrap/boot/wiring.ts` | Passes `releaseCheckHost` from `appOperations.getAppVersion`, `app.isPackaged` and `IS_CANARY` | Keeps Electron out of the slice so it stays unit-testable |
+| `src/core/manifests/shared/settings-contributions.ts` | `ninebrains.releaseCheck` setting (`autoCheck` default `false`, `dismissedVersion`) | The "Check for new versions" switch and the per-version dismissal, persisted in main |
+| `src/core/manifests/browser/app-scoped-stores.ts` | Registers `releaseCheckAppStoreContributions` | App-scoped store mirroring main's status over the event stream |
+| `src/core/features/settings/browser/pages/general-settings-page.tsx` | The **App** section always renders and holds `ReleaseCheckCard`; `UpdateCard` and `TelemetryCard` keep their fork-flag guards | Upstream's section only appeared with the updater or telemetry on, both off here |
+| `src/core/features/settings/browser/search/settings-search.ts` | `check-for-new-versions` search entry | Settings search finds the new switch; the upstream `version` entry stays hidden with the updater |
+| `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | Renders `ReleaseNotice` at the top of the sidebar footer | The dismissible "Ninebrains X.Y.Z is out" notice |
+| `README.md` | Install section gains the one-line installer and an **Updating** section; "Nothing phones home" names the opt-in check | Users need a way to update now that the app can tell them a release is out |

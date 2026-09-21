@@ -2,7 +2,9 @@
 
 Ninebrains ships **unsigned**. macOS builds are ad-hoc signed and not notarized, and Windows builds
 carry no Authenticode signature. The integrity guarantee comes from the `SHA256SUMS` published with
-every release (THREAT-MODEL SEC-37). Auto-update stays off until signing lands (SEC-36).
+every release (THREAT-MODEL SEC-37). Auto-update stays off until signing lands (SEC-36). From 0.2.0
+the app can *tell* users a new release is out (opt-in, see [Update notice](#update-notice)); users
+update with the one-line installer or a manual download.
 
 - Workflow: `.github/workflows/release.yml` (manual only, from `main` or `release/*`)
 - Gate: `ci-ok` green on the exact commit (`tooling/scripts/require-green.mjs`), plus e2e in the run
@@ -55,7 +57,8 @@ Only Lucas publishes. Nothing is public until the draft is published.
    - the version input differs from `package.json`;
    - `CHANGELOG.md` has no section for the version.
 3. **Review the draft** at **Releases**. Look for:
-   - five installers, plus `SHA256SUMS` and `SHA256SUMS.json`;
+   - seven installers (a `.dmg` and a `.zip` for each Mac arch, the Windows `.exe`, the `.AppImage`
+     and the `.deb`), plus `SHA256SUMS` and `SHA256SUMS.json`;
    - notes that open with the unsigned warning, then the install steps and docs links from
      `.github/release-notes/install.md`, then the changelog section and the sums. When the steps in
      [Opening an unsigned build](#opening-an-unsigned-build) change, change that file too;
@@ -95,8 +98,10 @@ Fix a shipped release without shipping everything that has landed on `main` sinc
 ## Rolling back
 
 There is no auto-update, so nothing reaches users on its own. Rolling back means stopping new
-downloads of a bad build and shipping a good one. **Never move or reuse a tag**; the workflow
-refuses a published version, and a changed tag breaks everyone's checksums.
+downloads of a bad build and shipping a good one. The [update notice](#update-notice) and the
+one-line installer both follow **Latest**, so step 1 below also stops them pointing at a bad build.
+**Never move or reuse a tag**; the workflow refuses a published version, and a changed tag breaks
+everyone's checksums.
 
 - **Still a draft:** delete the draft on the Releases page. Drafts create no tag.
 - **Published and bad:**
@@ -118,7 +123,7 @@ refuses a published version, and a changed tag breaks everyone's checksums.
 | `preflight` | ubuntu-latest | `contents: read`, `checks: read` | Refuses refs other than `main`/`release/*` and commits without a green `ci-ok`; checks the version input against `package.json`; resolves the canary version; pulls the notes from `CHANGELOG.md`; runs the SEC-36/SEC-37 node tests |
 | `e2e` | ubuntu-22.04 | `contents: read` | `e2e.yml`: the built app under xvfb with the fake agent. The draft is not created unless it passes |
 | `build` ×3 | macos-14, windows-2022, ubuntu-22.04 | `contents: read` | `pnpm run build`, then `build.ts` in local mode; `verify-mac.ts` on macOS; uploads installers as workflow artifacts |
-| `attest` | ubuntu-latest | `id-token`, `attestations: write` | Build-provenance attestations. Skipped while the repo is private (see below) |
+| `attest` | ubuntu-latest | `id-token`, `attestations: write` | Build-provenance attestations. Runs because the repo is public; a private repo would skip it (see below) |
 | `release` | ubuntu-latest | `contents: write` | Writes and verifies `SHA256SUMS`, creates or reuses the draft, uploads with `--clobber`, deletes stale assets, then re-downloads the draft and re-verifies |
 
 Only the `release` job can write to the repo, and it runs no project code beyond `checksums.mjs`. The
@@ -300,14 +305,47 @@ The reasons:
 - **The platform checks need signatures.** electron-updater on macOS (Squirrel.Mac) only installs an
   update signed by the same identity as the running app. On Windows, the publisher check that
   electron-updater runs has nothing to compare against when the app is unsigned.
-- **The feed is unreachable anyway.** The repo is private, so the GitHub provider cannot read it
-  without a token.
+
+The repo is public now, so the GitHub provider could read a feed without a token. That removed a
+practical obstacle, not a reason: the two points above still hold. What the app does instead is the
+[update notice](#update-notice), which reads one public API endpoint and never installs anything.
 
 Turning it on is one change that happens after signing:
 1. Restore a `github` provider for `Advance-Labs/ninebrains` in both builder configs.
 2. Set `UPDATES_ENABLED` to `true`.
 3. Update the SEC-36 test to allow exactly that provider.
 4. Check electron-updater's signature verification on both OSes before the first update ships.
+
+## Update notice
+
+Code: `apps/emdash-desktop/src/core/features/release-check/`. It is not the updater: it never
+imports electron-updater, and `UPDATES_ENABLED` stays `false`.
+
+- **What it does.** Main sends one unauthenticated `GET
+  https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest` (10 s timeout, no cookies,
+  no token), reads `tag_name`, and compares it with the running version by SemVer precedence, so
+  `0.3.0` is newer than `0.3.0-rc.1`. Drafts, prereleases and tags that are not SemVer count as "no
+  update". The release link is built from the version, never taken from the response.
+- **When.** Only when the user turns on **Settings → General → Check for new versions**
+  (`ninebrains.releaseCheck.autoCheck`, default `false`): 30 s after startup, then every 12 h,
+  counting any attempt, and only in packaged builds. **Check now** runs one check on demand, at
+  most one request a minute. Canary builds never check: `releases/latest` never returns a
+  prerelease, and a canary user moves to a newer canary by hand.
+- **Why off by default.** SEC-38 says a first run makes no network request the user did not start.
+  An automatic check on by default would break that, so it waits for the user.
+- **Failures are silent.** Offline, the 60 requests an hour GitHub allows anonymous callers (403 or
+  429), any other non-2xx, or a bad body: nothing pops up, the last good answer is kept, and
+  Settings shows one plain line about the latest attempt.
+- **What the user sees.** A notice at the bottom of the left sidebar, which they can close for that
+  version (`dismissedVersion`); a newer release shows it again. Settings → General shows **Download
+  Ninebrains X.Y.Z** (opens `https://ninebrains.runs-on.dev/#download`), the installer one-liner for
+  their OS with a copy button, and **What's new** (the GitHub release page).
+- **0.1.0 has none of this.** 0.2.0 is the first build that can show the notice, so 0.1.0 users
+  update by hand once.
+
+Publishing a release is what makes the notice fire, for users who turned it on: **Latest** is what
+they are told about. Mark a bad release as a prerelease (see [Rolling back](#rolling-back)) and the
+notice stops pointing at it.
 
 ## Versioning
 
@@ -347,8 +385,9 @@ which is deleted afterwards, so the copied `release/mac-*/Ninebrains.app` failed
 affected. After the fix, a re-package (`--targets dir`) passes both `codesign --verify --deep
 --strict` and `verify-mac.ts`.
 
-Not verified locally: the x64 mac, Windows and Linux builds (they need their runners), and the
-workflow itself (it has never been dispatched).
+Not verified locally: the x64 mac, Windows and Linux builds (they need their runners). The workflow
+itself was first dispatched for v0.1.0 on 2026-09-21: run 35555471292 passed every job, attest
+included, and the published release has all seven installers and both sums files.
 
 ## Threat-model coverage
 
@@ -358,7 +397,7 @@ workflow itself (it has never been dispatched).
 | SEC-37: `SHA256SUMS` as an asset and in the release notes | Met. |
 | SEC-37 test: the workflow re-verifies sums before publishing | Met, twice: before upload, and again after re-downloading the draft. Publishing stays a human step after both. |
 | SEC-37: CI builds from a tag | **Deviation.** Dispatch-only, by decision (Actions minutes, and publishing is Lucas's call). The draft is pinned to the built commit, and publishing creates the tag at that commit, so the tag and the bytes still match. |
-| SEC-37: provenance attestations | **Partial.** The `attest` job exists but GitHub only offers attestations on public repos or Enterprise Cloud. It turns on automatically when the repo goes public, or with repo variable `NINEBRAINS_ATTEST=true`. |
+| SEC-37: provenance attestations | Met. The repo is public, so the `attest` job runs on every release (it passed for v0.1.0). On a private repo it would skip unless repo variable `NINEBRAINS_ATTEST=true` is set on Enterprise Cloud. |
 | SEC-37: README documents `shasum -a 256 -c` and `gh attestation verify` | Met. The commands are here; the root README's Download section tells readers to check every download against the release's `SHA256SUMS` and attestation, and links to this file. |
 | R8 (accepted): unsigned, checksums and attestations only | Unchanged. |
 

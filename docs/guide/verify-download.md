@@ -5,11 +5,11 @@ description: >-
   Gatekeeper, Windows SmartScreen or a Linux AppImage prompt.
 ---
 
-v0.1 builds are **not code-signed**. Your protection is the checksum: check it before you open
-anything. Only use files from the project's GitHub Releases page.
+Ninebrains builds are **not code-signed** yet. Your protection is the checksum: check it before
+you open anything. Only use files from the project's GitHub Releases page.
 
-Unsigned builds do not update themselves. To update, download the new release and check it the
-same way.
+Unsigned builds do not update themselves. To update, run the one-line installer again, or download
+the new release and check it the same way. See [Updating](#updating).
 
 ## Release files
 
@@ -61,7 +61,7 @@ with the GitHub CLI:
 gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebrains
 ```
 
-Attestations are not produced while the repository is private.
+Releases from 0.1.0 on carry an attestation, made by the release workflow in this repository.
 
 ## Open an unsigned build
 
@@ -111,3 +111,59 @@ Debian or Ubuntu package:
 ```bash
 sudo apt install ./Ninebrains-*-linux-amd64.deb
 ```
+
+## Updating
+
+Ninebrains never downloads or installs an update by itself. An unsigned app that replaced itself
+from the network would run whatever the release feed served, with nothing to check it against, so
+in-app updates stay off until builds are signed.
+
+### Hear about a new release
+
+Turn on **Settings → General → Check for new versions** (0.2.0 and later). Once after startup and
+every 12 hours, the app sends one request to `api.github.com` for the latest release, with no
+account or token. If a newer version exists, a notice appears at the bottom of the left sidebar;
+close it and it stays closed until the next release. Settings → General shows a **Download** button
+(it opens [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download) in your browser), the
+installer line for your OS with a copy button, and a link to the release notes.
+
+The setting is off by default, so a fresh install makes no request you did not ask for. **Check
+now** on the same page runs one check whenever you press it. Canary builds never check. 0.1.0 has
+no notice at all; update it by hand once.
+
+### Update in one line
+
+The same line that installs Ninebrains updates it.
+
+macOS and Linux:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://ninebrains.runs-on.dev/install.ps1 | iex
+```
+
+Quit Ninebrains first. Your projects, settings and history live in the app's data folder, which
+the installer does not touch.
+
+**What the installer checks.** It downloads the installer for your OS and CPU, and the
+`SHA256SUMS` file, from the same GitHub release, and refuses to continue if the file does not
+match its line in `SHA256SUMS`. On macOS it also checks the app bundle's signature and bundle ID
+before replacing the installed app.
+
+**What that does not prove.** The checksum and the file come from the same release. It catches a
+corrupted or swapped download, not a compromised release: someone who could publish a release
+could publish matching sums. The build attestation closes more of that gap. With the GitHub CLI
+installed and logged in, the installer also runs `gh attestation verify` for you; pass
+`--require-attestation` to make that step mandatory. To check a file yourself:
+
+```bash
+gh attestation verify Ninebrains-0.2.0-mac-arm64.zip --repo Advance-Labs/ninebrains
+```
+
+Piping a script into a shell trusts that script. To read it first, open the URL in a browser, or
+download it, read it, then run it.

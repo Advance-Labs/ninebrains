@@ -1,3 +1,21 @@
+## Install or update in one line
+
+The installer picks the right file for your machine, downloads it from the latest release on this
+repository, checks it against that release's `SHA256SUMS`, and installs it. Run it again to update.
+It installs the latest stable release, not canary builds.
+
+```sh
+# macOS and Linux
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://ninebrains.runs-on.dev/install.ps1 | iex
+```
+
+Prefer to do it by hand? Follow the steps below.
+
 ## How to install
 
 **1. Check the download.** Compare your file against the `SHA256SUMS` block at the bottom of this
@@ -45,6 +63,16 @@ sudo apt install ./{{FILE_PREFIX}}-linux-amd64.deb
 ```
 
 Stuck? See [Troubleshooting](https://docs.advancelabs.dev/ninebrains/troubleshooting/).
+
+## Updating
+
+{{PRODUCT}} does not update itself: an unsigned app should not replace its own code from the
+network. To update, quit the app and run the one-line installer above again, or download the new
+files from this page and install them over the old version. Your projects and settings are kept.
+
+From 0.2.0 on, **Settings → General → Check for new versions** (off by default) tells you when a
+new release is out, and shows the download link and the installer line to copy. Nothing is
+downloaded or installed for you. 0.1.0 has no such notice.
 
 ## Documentation
 
