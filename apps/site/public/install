@@ -1,0 +1,532 @@
+#!/bin/sh
+# Ninebrains installer and updater for macOS and Linux.
+#
+#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --help
+#
+# Run it again to update. It downloads one release from
+# https://github.com/Advance-Labs/ninebrains/releases, checks the file against that release's
+# SHA256SUMS, and only then installs it. Nothing runs as root unless you pass --deb.
+#
+# The whole script is one function called on the last line, so a download cut off halfway runs
+# nothing. Source: apps/site/public/install in https://github.com/Advance-Labs/ninebrains.
+
+REPO='Advance-Labs/ninebrains'
+API_LATEST="https://api.github.com/repos/$REPO/releases/latest"
+WEB_LATEST="https://github.com/$REPO/releases/latest"
+DOWNLOAD_BASE="https://github.com/$REPO/releases/download"
+SIGNER_WORKFLOW="$REPO/.github/workflows/release.yml"
+BUNDLE_ID='dev.advancelabs.ninebrains'
+SITE='https://ninebrains.runs-on.dev'
+SOURCE_DOCS='https://docs.advancelabs.dev/ninebrains/install-from-source/'
+VERIFY_DOCS='https://docs.advancelabs.dev/ninebrains/verify-download/'
+
+say() { printf 'ninebrains: %s\n' "$*"; }
+warn() { printf 'ninebrains: warning: %s\n' "$*" >&2; }
+die() {
+  printf 'ninebrains: error: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  cat <<EOF
+Install or update Ninebrains on macOS or Linux.
+
+Usage: install [options]
+       curl --proto '=https' --tlsv1.2 -fsSL $SITE/install | sh -s -- [options]
+
+Options:
+  --version X.Y.Z        Install this release instead of the latest (env NINEBRAINS_VERSION).
+  --dir PATH             Install into PATH (env NINEBRAINS_INSTALL_DIR).
+                           macOS: the folder that gets Ninebrains.app
+                                  (default /Applications if writable, else ~/Applications).
+                           Linux: the folder that gets Ninebrains.AppImage and a 'ninebrains'
+                                  link (default ~/.local/bin).
+  --deb                  Linux: install the .deb with 'sudo apt install' instead of the AppImage.
+  --force                Reinstall the same version, and on macOS replace the app while it runs.
+  --dry-run              Resolve the release and print what would happen; download nothing big.
+  --require-attestation  Fail unless GitHub build provenance is verified (needs gh, signed in).
+  --no-attestation       Skip the provenance check even when gh is available.
+  -h, --help             Show this help.
+
+Every download is checked against the release's SHA256SUMS. That catches a corrupted or swapped
+file; it cannot catch a compromised release, since both come from the same place. With the
+GitHub CLI signed in, the installer also runs 'gh attestation verify' to check the file was built
+by $SIGNER_WORKFLOW. More: $VERIFY_DOCS
+EOF
+}
+
+# --- helpers -------------------------------------------------------------------------------------
+
+# curl with the same transport rules everywhere: https only (redirects too), TLS 1.2+, fail on HTTP
+# errors, retry transient failures.
+fetch() {
+  curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --connect-timeout 20 -o "$2" "$1"
+}
+
+# The large download: same rules, with a progress bar when someone is watching.
+fetch_big() {
+  if [ -t 2 ]; then
+    curl --proto '=https' --tlsv1.2 -fL --retry 3 --connect-timeout 20 --progress-bar -o "$2" "$1"
+  else
+    fetch "$1" "$2"
+  fi
+}
+
+valid_version() {
+  case $1 in
+    '' | *[!0-9A-Za-z.-]*) return 1 ;;
+  esac
+  printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "this installer needs '$1', which is not on PATH"
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  else
+    die "need sha256sum or shasum to check the download"
+  fi
+}
+
+lower() { printf '%s' "$1" | tr 'ABCDEF' 'abcdef'; }
+
+# 0 when $1 sorts before $2 by major.minor.patch.
+version_lt() {
+  [ "$1" != "$2" ] || return 1
+  first=$(printf '%s\n%s\n' "${1%%-*}" "${2%%-*}" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
+  [ "$first" = "${1%%-*}" ] && [ "${1%%-*}" != "${2%%-*}" ]
+}
+
+can_prompt() { (exec </dev/tty) 2>/dev/null; }
+
+plist_get() {
+  /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null
+}
+
+cleanup() {
+  # A swap interrupted between its two renames: put the old app back.
+  if [ -n "$SWAP_ASIDE" ] && [ -e "$SWAP_ASIDE" ] && [ ! -e "$SWAP_TARGET" ]; then
+    mv "$SWAP_ASIDE" "$SWAP_TARGET" && warn "restored the previous app at $SWAP_TARGET"
+  fi
+  if [ -n "$STAGE" ]; then rm -rf "$STAGE"; fi
+  if [ -n "$TMPD" ]; then rm -rf "$TMPD"; fi
+}
+
+# --- release resolution --------------------------------------------------------------------------
+
+# Prints the latest release's version (no leading v). Tries the API first; when that fails (it
+# allows 60 unauthenticated requests an hour) it reads the redirect of the releases/latest page.
+latest_version() {
+  tag=''
+  if fetch "$API_LATEST" "$TMPD/latest.json" 2>/dev/null; then
+    tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TMPD/latest.json" |
+      head -n 1)
+  fi
+  if [ -z "$tag" ]; then
+    warn "GitHub API unavailable (rate limit or network); reading the releases/latest redirect"
+    if curl --proto '=https' --tlsv1.2 -fsSI --retry 3 --connect-timeout 20 "$WEB_LATEST" \
+      >"$TMPD/latest.head" 2>/dev/null; then
+      tag=$(tr -d '\r' <"$TMPD/latest.head" |
+        sed -n 's#^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]: https://github\.com/Advance-Labs/ninebrains/releases/tag/\([^[:space:]]*\)$#\1#p' |
+        head -n 1)
+    fi
+  fi
+  [ -n "$tag" ] || die "could not find the latest release. Check your connection, or pass --version X.Y.Z"
+  case $tag in
+    v*) tag=${tag#v} ;;
+    *) die "unexpected release tag '$tag'" ;;
+  esac
+  valid_version "$tag" || die "unexpected release tag 'v$tag'"
+  printf '%s\n' "$tag"
+}
+
+# Prints the expected SHA-256 of $2 from the SHA256SUMS file $1. Exactly one line must name it.
+expected_sum() {
+  matches=$(awk -v f="$2" '$2 == f { print $1 }' "$1")
+  count=$(printf '%s' "$matches" | grep -c . || true)
+  [ "$count" -eq 1 ] || die "SHA256SUMS has $count entries for $2 (need exactly 1); not installing"
+  printf '%s\n' "$matches" | grep -Eq '^[0-9a-fA-F]{64}$' || die "SHA256SUMS entry for $2 is malformed"
+  lower "$matches"
+}
+
+verify_sum() {
+  actual=$(lower "$(sha256_of "$1")")
+  if [ "$actual" != "$2" ]; then
+    die "checksum mismatch for $(basename "$1")
+  expected $2
+  got      $actual
+The download is not the file the release published. Nothing was installed."
+  fi
+  say "checksum ok ($actual)"
+}
+
+# Sets PROVENANCE to what was verified. Dies when verification was attempted and failed, or when
+# it was required and could not run.
+verify_provenance() {
+  if [ "$NO_ATTEST" = 1 ]; then
+    [ "$REQUIRE_ATTEST" = 0 ] || die "--no-attestation and --require-attestation conflict"
+    PROVENANCE='not checked (--no-attestation)'
+    return 0
+  fi
+  if command -v gh >/dev/null 2>&1 && gh attestation --help >/dev/null 2>&1 &&
+    gh auth status >/dev/null 2>&1; then
+    say "checking build provenance with gh attestation verify"
+    if gh attestation verify "$1" --repo "$REPO" --signer-workflow "$SIGNER_WORKFLOW" \
+      >"$TMPD/attest.log" 2>&1; then
+      PROVENANCE="verified: built by $SIGNER_WORKFLOW (gh attestation verify)"
+      return 0
+    fi
+    cat "$TMPD/attest.log" >&2
+    die "gh attestation verify failed for $(basename "$1"); not installing. Pass --no-attestation to rely on the checksum alone."
+  fi
+  if [ "$REQUIRE_ATTEST" = 1 ]; then
+    die "--require-attestation needs the GitHub CLI (gh) installed and signed in (gh auth login)"
+  fi
+  PROVENANCE='not checked (install the GitHub CLI and run gh auth login to check it)'
+}
+
+# --- macOS ---------------------------------------------------------------------------------------
+
+mac_plan() {
+  if [ -n "$DIR" ]; then
+    APP_DIR=$DIR
+  elif [ -d /Applications/Ninebrains.app ] || [ -L /Applications/Ninebrains.app ]; then
+    APP_DIR=/Applications
+  elif [ -d "$HOME/Applications/Ninebrains.app" ]; then
+    APP_DIR="$HOME/Applications"
+  elif [ -w /Applications ]; then
+    APP_DIR=/Applications
+  else
+    APP_DIR="$HOME/Applications"
+  fi
+  TARGET="$APP_DIR/Ninebrains.app"
+
+  [ ! -L "$TARGET" ] || die "$TARGET is a symlink; refusing to replace it. Remove it and rerun."
+  OLD_VERSION=''
+  if [ -e "$TARGET" ]; then
+    [ -d "$TARGET" ] || die "$TARGET exists and is not an app bundle; refusing to replace it"
+    old_id=$(plist_get "$TARGET" CFBundleIdentifier || true)
+    [ "$old_id" = "$BUNDLE_ID" ] ||
+      die "$TARGET has bundle id '${old_id:-unreadable}', not $BUNDLE_ID; refusing to replace it"
+    OLD_VERSION=$(plist_get "$TARGET" CFBundleShortVersionString || true)
+    if [ -e "$APP_DIR" ] && [ ! -w "$APP_DIR" ]; then
+      die "Ninebrains is installed in $APP_DIR, which you cannot write to. This installer never uses sudo: rerun as the user who owns it, or pass --dir ~/Applications."
+    fi
+  fi
+}
+
+mac_wait_for_quit() {
+  while pgrep -x Ninebrains >/dev/null 2>&1; do
+    if [ "$DRY_RUN" = 1 ]; then
+      say "Ninebrains is running; a real run would ask you to quit it (or pass --force)"
+      return 0
+    fi
+    if [ "$FORCE" = 1 ]; then
+      warn "Ninebrains is running; replacing it anyway (--force). Restart it to use the new version."
+      return 0
+    fi
+    can_prompt ||
+      die "Ninebrains is running. Quit it and run this again, or pass --force to replace it while it runs."
+    printf 'ninebrains: Ninebrains is running. Quit it, then press Enter (or type q to cancel): ' >/dev/tty
+    answer=''
+    IFS= read -r answer </dev/tty || die "cancelled"
+    case $answer in
+      q | Q) die "cancelled; nothing was changed" ;;
+    esac
+  done
+}
+
+mac_install() {
+  zip=$1
+  mkdir -p "$APP_DIR" || die "cannot create $APP_DIR"
+  STAGE=$(mktemp -d "$APP_DIR/.ninebrains-install.XXXXXX") || die "cannot write to $APP_DIR"
+  ditto -x -k "$zip" "$STAGE/new" || die "could not unpack $(basename "$zip")"
+  new="$STAGE/new/Ninebrains.app"
+  [ -d "$new" ] && [ ! -L "$new" ] || die "the zip does not contain Ninebrains.app"
+
+  new_id=$(plist_get "$new" CFBundleIdentifier || true)
+  [ "$new_id" = "$BUNDLE_ID" ] || die "downloaded app has bundle id '$new_id', expected $BUNDLE_ID"
+  new_version=$(plist_get "$new" CFBundleShortVersionString || true)
+  [ "$new_version" = "$VERSION" ] ||
+    die "downloaded app reports version '$new_version', expected $VERSION"
+  codesign --verify --deep --strict "$new" 2>"$STAGE/codesign.log" || {
+    cat "$STAGE/codesign.log" >&2
+    die "codesign --verify failed: the app bundle is damaged or was modified after it was built"
+  }
+  say "code signature intact (codesign --verify --deep --strict)"
+
+  # Swap by rename on the same volume, keeping the old app aside until the new one is in place.
+  SWAP_TARGET=$TARGET
+  if [ -e "$TARGET" ]; then
+    SWAP_ASIDE="$STAGE/previous.app"
+    mv "$TARGET" "$SWAP_ASIDE" || {
+      SWAP_ASIDE=''
+      die "could not move the old app aside"
+    }
+  fi
+  if ! mv "$new" "$TARGET"; then
+    if [ -n "$SWAP_ASIDE" ]; then mv "$SWAP_ASIDE" "$TARGET" && SWAP_ASIDE=''; fi
+    die "could not move the new app into $APP_DIR; the previous app was left in place"
+  fi
+  SWAP_ASIDE=''
+}
+
+# --- Linux ---------------------------------------------------------------------------------------
+
+linux_plan() {
+  if [ "$DEB" = 1 ]; then
+    TARGET='(apt package)'
+    return 0
+  fi
+  BIN_DIR=${DIR:-$HOME/.local/bin}
+  TARGET="$BIN_DIR/Ninebrains.AppImage"
+  DESKTOP_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/applications/ninebrains.desktop"
+  [ ! -L "$TARGET" ] || die "$TARGET is a symlink; refusing to replace it. Remove it and rerun."
+  OLD_VERSION=''
+  if [ -f "$TARGET" ] && [ -f "$DESKTOP_FILE" ]; then
+    OLD_VERSION=$(sed -n 's/^X-AppImage-Version=//p' "$DESKTOP_FILE" | head -n 1)
+  fi
+}
+
+linux_install_appimage() {
+  file=$1
+  magic=$(od -An -tx1 -N4 "$file" | tr -d ' \n')
+  [ "$magic" = 7f454c46 ] || die "the download is not an ELF executable; not installing"
+  mkdir -p "$BIN_DIR" || die "cannot create $BIN_DIR"
+  STAGE=$(mktemp "$BIN_DIR/.Ninebrains.AppImage.XXXXXX") || die "cannot write to $BIN_DIR"
+  cp "$file" "$STAGE"
+  chmod 755 "$STAGE"
+  # rename(2) is atomic: a running copy keeps its old file, the next launch gets the new one.
+  mv -f "$STAGE" "$TARGET" || die "could not install $TARGET"
+  STAGE=''
+
+  link="$BIN_DIR/ninebrains"
+  if [ -L "$link" ] || [ ! -e "$link" ]; then
+    ln -sf Ninebrains.AppImage "$link"
+  else
+    warn "$link exists and is not a link; left it alone"
+  fi
+
+  case $TARGET in
+    *[\"\`\$\\]*)
+      warn "install path has characters a .desktop file cannot hold; skipped the menu entry"
+      ;;
+    *)
+      mkdir -p "$(dirname "$DESKTOP_FILE")"
+      cat >"$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Ninebrains
+Comment=Run coding agents in parallel, each in its own worktree
+Exec="$TARGET" %U
+Terminal=false
+Categories=Development;
+StartupWMClass=Ninebrains
+X-AppImage-Version=$VERSION
+EOF
+      ;;
+  esac
+}
+
+linux_install_deb() {
+  command -v apt >/dev/null 2>&1 || die "--deb needs apt (Debian or Ubuntu)"
+  chmod 644 "$1"
+  chmod 755 "$TMPD"
+  say "running: sudo apt install $1"
+  sudo apt install -y "$1" || die "apt install failed"
+}
+
+# --- main ----------------------------------------------------------------------------------------
+
+main() {
+  set -eu
+  VERSION=${NINEBRAINS_VERSION:-}
+  DIR=${NINEBRAINS_INSTALL_DIR:-}
+  DRY_RUN=0
+  FORCE=0
+  DEB=0
+  REQUIRE_ATTEST=0
+  NO_ATTEST=0
+  TMPD=''
+  STAGE=''
+  SWAP_ASIDE=''
+  SWAP_TARGET=''
+  PROVENANCE=''
+  OLD_VERSION=''
+
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --version)
+        [ $# -ge 2 ] || die "--version needs a value, like --version 0.2.0"
+        VERSION=$2
+        shift
+        ;;
+      --version=*) VERSION=${1#*=} ;;
+      --dir)
+        [ $# -ge 2 ] || die "--dir needs a path"
+        DIR=$2
+        shift
+        ;;
+      --dir=*) DIR=${1#*=} ;;
+      --dry-run) DRY_RUN=1 ;;
+      --force) FORCE=1 ;;
+      --deb) DEB=1 ;;
+      --require-attestation) REQUIRE_ATTEST=1 ;;
+      --no-attestation) NO_ATTEST=1 ;;
+      -h | --help)
+        usage
+        return 0
+        ;;
+      *) die "unknown option '$1' (see --help)" ;;
+    esac
+    shift
+  done
+
+  if [ -n "$VERSION" ]; then
+    VERSION=${VERSION#v}
+    valid_version "$VERSION" || die "invalid version '$VERSION'; expected X.Y.Z or X.Y.Z-suffix"
+  fi
+  if [ -n "$DIR" ]; then
+    case $DIR in
+      /*) ;;
+      *) DIR="$(pwd)/$DIR" ;;
+    esac
+  fi
+  [ "$NO_ATTEST" = 0 ] || [ "$REQUIRE_ATTEST" = 0 ] ||
+    die "--no-attestation and --require-attestation conflict"
+
+  for tool in curl uname awk sed grep tr od mktemp; do need "$tool"; done
+
+  os=$(uname -s)
+  case $os in
+    Darwin)
+      [ "$DEB" = 0 ] || die "--deb is for Linux"
+      need pgrep
+      if [ "$DRY_RUN" = 0 ]; then for tool in ditto codesign; do need "$tool"; done; fi
+      # hw.optional.arm64 is 1 on Apple silicon even inside a Rosetta shell, where uname -m lies.
+      if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" = 1 ]; then
+        arch=arm64
+      else
+        arch=x64
+      fi
+      platform="macOS $arch"
+      ;;
+    Linux)
+      case $(uname -m) in
+        x86_64 | amd64) arch=x64 ;;
+        *)
+          die "there is no Ninebrains build for Linux $(uname -m) yet. Build it from source: $SOURCE_DOCS"
+          ;;
+      esac
+      [ -z "$DIR" ] || [ "$DEB" = 0 ] || die "--dir does not apply to --deb"
+      platform='Linux x86_64'
+      ;;
+    MINGW* | MSYS* | CYGWIN*)
+      die "on Windows, run this in PowerShell instead: irm $SITE/install.ps1 | iex"
+      ;;
+    *) die "no Ninebrains build for $os. See $SITE" ;;
+  esac
+
+  TMPD=$(mktemp -d) || die "cannot create a temporary folder"
+  trap cleanup EXIT
+  trap 'cleanup; exit 130' INT
+  trap 'cleanup; exit 143' TERM
+
+  if [ -z "$VERSION" ]; then
+    VERSION=$(latest_version)
+  fi
+
+  case $os in
+    Darwin)
+      asset="Ninebrains-$VERSION-mac-$arch.zip"
+      mac_plan
+      ;;
+    Linux)
+      if [ "$DEB" = 1 ]; then
+        asset="Ninebrains-$VERSION-linux-amd64.deb"
+      else
+        asset="Ninebrains-$VERSION-linux-x86_64.AppImage"
+      fi
+      linux_plan
+      ;;
+  esac
+  base="$DOWNLOAD_BASE/v$VERSION"
+
+  say "platform  $platform"
+  say "release   v$VERSION"
+  say "file      $base/$asset"
+  say "install   $TARGET"
+  if [ -n "$OLD_VERSION" ]; then say "installed $OLD_VERSION"; fi
+
+  if [ "$OLD_VERSION" = "$VERSION" ] && [ "$FORCE" = 0 ]; then
+    say "Ninebrains $VERSION is already installed at $TARGET. Nothing to do (--force reinstalls)."
+    return 0
+  fi
+  if [ "$os" = Darwin ]; then mac_wait_for_quit; fi
+
+  fetch "$base/SHA256SUMS" "$TMPD/SHA256SUMS" ||
+    die "could not download SHA256SUMS for v$VERSION. Does that release exist? $WEB_LATEST"
+  expected=$(expected_sum "$TMPD/SHA256SUMS" "$asset")
+  say "expected  sha256 $expected"
+
+  if [ "$DRY_RUN" = 1 ]; then
+    say "dry run: would download $asset, check it against SHA256SUMS, then install it to $TARGET"
+    return 0
+  fi
+
+  say "downloading $asset"
+  fetch_big "$base/$asset" "$TMPD/$asset" || die "download failed: $base/$asset"
+  verify_sum "$TMPD/$asset" "$expected"
+  verify_provenance "$TMPD/$asset"
+
+  case $os in
+    Darwin) mac_install "$TMPD/$asset" ;;
+    Linux)
+      if [ "$DEB" = 1 ]; then
+        linux_install_deb "$TMPD/$asset"
+      else
+        linux_install_appimage "$TMPD/$asset"
+      fi
+      ;;
+  esac
+
+  if [ -z "$OLD_VERSION" ]; then
+    say "Installed Ninebrains $VERSION at $TARGET"
+  elif [ "$OLD_VERSION" = "$VERSION" ]; then
+    say "Reinstalled Ninebrains $VERSION at $TARGET"
+  elif version_lt "$VERSION" "$OLD_VERSION"; then
+    say "Downgraded Ninebrains $OLD_VERSION -> $VERSION at $TARGET"
+  else
+    say "Updated Ninebrains $OLD_VERSION -> $VERSION at $TARGET"
+  fi
+
+  say "verified  sha256 matches the release's SHA256SUMS (catches a corrupted or swapped file,"
+  say "          not a compromised release)"
+  say "provenance $PROVENANCE"
+  case $os in
+    Darwin)
+      say "signature ad-hoc only: not Developer ID signed or notarized. On first launch after an"
+      say "          install or update macOS may ask for access to 'Ninebrains Safe Storage' in your"
+      say "          keychain; click Always Allow. More: $VERIFY_DOCS"
+      say "Open it:  open \"$TARGET\""
+      ;;
+    Linux)
+      if [ "$DEB" = 0 ]; then
+        case ":$PATH:" in
+          *":$BIN_DIR:"*) say "Run it:   ninebrains" ;;
+          *) say "Run it:   $TARGET   ($BIN_DIR is not on your PATH; add it to run 'ninebrains')" ;;
+        esac
+        say "AppImages need FUSE 2 (libfuse2). If it does not start, see $SITE"
+      fi
+      ;;
+  esac
+  say "To update later, run the same command again."
+}
+
+main "$@"

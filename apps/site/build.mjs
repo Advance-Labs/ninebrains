@@ -6,16 +6,20 @@
  *   node build.mjs --watch   # rebuild on change, for `pnpm dev`
  *
  * No bundler and no framework: the page is one HTML file, one stylesheet and two scripts, and the
- * 3D intro is hand-written WebGL. The whole build is a file copy on purpose.
+ * 3D intro is hand-written WebGL. `public/` (the install scripts) is copied to the site root as-is.
+ * The whole build is a file copy on purpose.
  */
 import { cpSync, existsSync, mkdirSync, rmSync, watch } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '../..');
 const SRC = join(HERE, 'src');
-const DIST = join(HERE, 'dist');
+/** Files served as-is at the site root, like the installers at `/install` and `/install.ps1`. */
+const PUBLIC = join(HERE, 'public');
+/** `SITE_DIST` lets a test build into its own folder without racing the other build test. */
+const DIST = process.env.SITE_DIST ? resolve(process.env.SITE_DIST) : join(HERE, 'dist');
 
 /** Repo assets the page renders, copied to `dist/assets/<name>`. */
 const SHARED = {
@@ -31,6 +35,7 @@ function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(join(DIST, 'assets'), { recursive: true });
   cpSync(SRC, DIST, { recursive: true });
+  if (existsSync(PUBLIC)) cpSync(PUBLIC, DIST, { recursive: true });
 
   for (const [name, from] of Object.entries(SHARED)) {
     const source = join(REPO, from);
@@ -44,7 +49,7 @@ build();
 
 if (process.argv.includes('--watch')) {
   let queued = null;
-  watch(SRC, { recursive: true }, () => {
+  const rebuild = () => {
     clearTimeout(queued);
     queued = setTimeout(() => {
       try {
@@ -53,6 +58,8 @@ if (process.argv.includes('--watch')) {
         console.error(`site: ${error.message}`);
       }
     }, 80);
-  });
-  console.log('site: watching src/');
+  };
+  watch(SRC, { recursive: true }, rebuild);
+  if (existsSync(PUBLIC)) watch(PUBLIC, { recursive: true }, rebuild);
+  console.log('site: watching src/ and public/');
 }
