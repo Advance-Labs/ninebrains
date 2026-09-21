@@ -154,5 +154,10 @@
   "engines": {
     "node": ">=24.0.0",
     "pnpm": ">=10.28.0"
+  },
+  "nx": {
+    "implicitDependencies": [
+      "@ninebrains/brain-mcp"
+    ]
   }
 }
