@@ -537,3 +537,11 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 | File | Change | Why |
 |---|---|---|
 | `src/core/features/tasks/contributions/browser/task-config/initial-conversation-section.tsx` | `usePromptFileDrop` handlers move from the wrapper around the agent selector, toggles and composer onto a plain `div` around `ChatComposer` alone; the wrapper's `bg-accent/10 ring-2 ring-accent/50 ring-inset` drag class and the unused `cn` import are removed | Dragging a file into the Create Task modal drew a square ring around the whole block, cutting across the agent selector and the composer's rounded corners. Section 3 made `accent` near-white, so the ring read as a white highlight spilling over the other controls. The composer already draws its own rounded drag state (`composerShell({ dragActive })`), so it is now the only highlight. Drops on the selector or toggles no longer insert a path; drop on the prompt box |
+
+## 27. Agent status uses `thinking-orbs` (`feat/thinking-orbs`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/ui/src/react/components/agent-status/agent-status.tsx` | `working` renders `<ThinkingOrb state="working" size={20}>` and `awaiting-input` renders `state="breathing"`, both `aria-hidden` inside the existing labelled `role="img"` wrapper; theme pinned from `THEME_MANIFEST` polarity via `useOrbTheme()` because the app themes with `.emdark`/`.emlight`, which the orb's `auto` mode cannot see. `idle`, `completed` and `error` keep their static glyphs | Advance Labs standard agent-status indicator (advance-labs `DESIGN.md`, "Agent status"). "Busy" and "needs you" become distinct shapes (orbiting cluster vs closed ring) at list-row size. One component, so every sidebar, tab, palette and automation row changes together |
+| `packages/ui/src/react/components/agent-status/agent-status.css.ts` | Hand-rolled nine-dot shimmer keyframes, dot styles and the awaiting-input diamond styles removed | Dead once the orb replaces them; reduced motion is now handled by the library's static frame |
+| `packages/ui/package.json`, `pnpm-lock.yaml` | `thinking-orbs@^0.3.1` added (MIT, zero dependencies, React >=18 peer) | Runtime dependency of the change above |
