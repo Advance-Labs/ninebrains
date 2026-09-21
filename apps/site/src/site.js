@@ -10,6 +10,7 @@
  * without WebGL the stage stays a CSS gradient; with reduced motion every demo shows its final
  * frame, nothing auto-advances and scene changes are instant cuts.
  */
+import { safeRect } from './layout.js';
 import { createStage } from './stage.js';
 
 const RELEASES_API = 'https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest';
@@ -20,15 +21,25 @@ const MANUAL_HOLD = 30_000;
 const STATES = ['idle', 'run', 'pass', 'fail', 'warn'];
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** `?debug=bounds` exposes the scene clock and the stage's drawn boxes to the overlap audit. */
+const debug = new URLSearchParams(location.search).get('debug') === 'bounds';
+/** How long a loop's fade to and from its entry frame takes, each way. */
+const LOOP_FADE_MS = 220;
 const mobileQuery = window.matchMedia('(max-width: 899px)');
 const phoneQuery = window.matchMedia('(max-width: 480px)');
 
 // --- the scene clock --------------------------------------------------------------------------
 
 const rail = document.querySelector('.rail');
+const stageEl = document.querySelector('.stage');
 const tabs = [...rail.querySelectorAll('[role="tab"]')];
 const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')));
 const durations = tabs.map((tab) => Number(tab.dataset.duration) || 10);
+/**
+ * Where each scene's clock starts: a frame with its demo already populated, so a scene never
+ * opens on an empty window. Loops come back here too.
+ */
+const entries = tabs.map((tab) => Number(tab.dataset.entry) || 0);
 
 const clock = {
   index: 0,
@@ -58,8 +69,14 @@ function setPaused(reason, on) {
 }
 
 function restartClock() {
-  clock.banked = 0;
+  clock.banked = entries[clock.index];
   clock.since = performance.now();
+}
+
+/** How far through its run (entry frame to end) the active scene is, 0 to 1. */
+function progress(t) {
+  const entry = entries[clock.index];
+  return Math.min(Math.max((t - entry) / (durations[clock.index] - entry), 0), 1);
 }
 
 // --- the timeline marks inside each demo ------------------------------------------------------
@@ -145,17 +162,16 @@ function fitWindows() {
 
 let stage = null;
 
-function activeSlotRect() {
-  const slot = panels[clock.index].querySelector('[data-slot]');
-  if (!slot) return null;
-  const box = slot.getBoundingClientRect();
-  return { x: box.left, y: box.top, w: box.width, h: box.height };
-}
-
 function syncStage({ instant = false } = {}) {
   if (!stage) return;
-  const dim = mobileQuery.matches && clock.index === 0 ? 0.45 : 1;
-  stage.setScene(clock.index, activeSlotRect(), { instant: instant || reduced, dim });
+  const rect = safeRect(panels[clock.index], {
+    mobile: mobileQuery.matches,
+    aspect: stage.aspect(clock.index),
+    // Hang the cubes from the top-left, in line with the copy; only the overview's mark column
+    // on a desktop keeps them centred.
+    anchorTo: clock.index === 0 && !mobileQuery.matches ? 'center' : 'start',
+  });
+  stage.setScene(clock.index, rect, { instant: instant || reduced });
 }
 
 function initStage() {
@@ -165,6 +181,8 @@ function initStage() {
       reduced,
       sceneTime: () => sceneTime(),
       scene: () => clock.index,
+      durations,
+      debug,
     });
   } catch {
     stage = null;
@@ -172,6 +190,8 @@ function initStage() {
   if (!stage) return;
   syncStage({ instant: true });
   stage.intro();
+  // Text reflows once the web fonts land; re-measure the safe rectangle then.
+  document.fonts?.ready.then(() => syncStage({ instant: true }));
   requestAnimationFrame(() => canvas.classList.add('live'));
 }
 
@@ -192,6 +212,7 @@ function select(index, { user = false, focus = false } = {}) {
   restartClock();
   // Restart the demo's own CSS animations (entry push, typing) from the top.
   if (changed) {
+    stageEl.dataset.switched = '';
     for (const mark of marks[index].list) mark.state = '';
   }
   applyMarks(index, sceneTime());
@@ -243,7 +264,6 @@ function initRail() {
   document.addEventListener('visibilitychange', () => setPaused('hidden', document.hidden));
 
   // Swipe the stage on a phone to move between scenes.
-  const stageEl = document.querySelector('.stage');
   let startX = null;
   let startY = 0;
   stageEl.addEventListener(
@@ -270,20 +290,40 @@ function initRail() {
   );
 }
 
+/** A held scene loops: its window fades down, jumps back to the entry frame and fades up. */
+let looping = 0;
+
+function loopScene() {
+  const panel = panels[clock.index];
+  const index = clock.index;
+  looping = performance.now();
+  setPaused('loop', true);
+  panel.classList.add('is-looping');
+  setTimeout(() => {
+    if (clock.index === index) {
+      for (const mark of marks[index].list) mark.state = '';
+      restartClock();
+      applyMarks(index, sceneTime());
+    }
+    panel.classList.remove('is-looping');
+    setPaused('loop', false);
+    looping = 0;
+  }, LOOP_FADE_MS);
+}
+
 function tick(now) {
   const t = sceneTime(now);
   const duration = durations[clock.index];
   if (!reduced && t >= duration) {
     if (now >= clock.manualUntil) {
       select((clock.index + 1) % tabs.length);
-    } else {
+    } else if (!looping) {
       // Held on a scene the reader picked: loop it.
-      for (const mark of marks[clock.index].list) mark.state = '';
-      restartClock();
+      loopScene();
     }
   } else {
     applyMarks(clock.index, t);
-    tabs[clock.index].style.setProperty('--p', Math.min(t / duration, 1).toFixed(4));
+    tabs[clock.index].style.setProperty('--p', progress(t).toFixed(4));
   }
   requestAnimationFrame(tick);
 }
@@ -593,4 +633,35 @@ function main() {
   requestAnimationFrame(tick);
 }
 
+/**
+ * The overlap audit's handle (apps/site/test/overlap-audit.mjs), only with `?debug=bounds`:
+ * jump any scene to any moment, optionally as a live scene change, and read what the stage drew.
+ */
+function initDebug() {
+  if (!debug) return;
+  window.__dbg = {
+    stage: () => stage,
+    durations,
+    entries,
+    seek(index, t, { transition = false } = {}) {
+      clock.manualUntil = performance.now() + 1e9;
+      setPaused('debug', true);
+      if (index !== clock.index) select(index, { user: true });
+      clock.banked = t;
+      clock.since = performance.now();
+      for (const mark of marks[index].list) mark.state = '';
+      applyMarks(index, t);
+      fitWindows();
+      if (!transition) {
+        stage?.debugSettle();
+        syncStage({ instant: true });
+      }
+    },
+    play() {
+      setPaused('debug', false);
+    },
+  };
+}
+
+initDebug();
 main();

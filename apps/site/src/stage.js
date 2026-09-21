@@ -8,14 +8,17 @@
  *      grain, a vignette and a sparse salt-and-pepper grade.
  *   2. Dust. A few thousand silver points drifting off the limb, positioned entirely in the vertex
  *      shader from `gl_VertexID`, so there is no particle buffer at all.
- *   3. The nine cubes. The Ninebrains mark, as nine lit boxes that stay on stage for the whole
- *      visit. Every scene gives them an arrangement and a camera, animated on the scene's clock
- *      (Lanes: four panes; The Brain: a hub and spokes; Gates: a conveyor through a frame; and so
- *      on). Changing scene tweens every cube, the camera and the on-screen slot over 900ms.
+ *   3. The diorama. The Ninebrains mark as nine lit boxes that stay on stage for the whole visit,
+ *      standing on a floor (a pool of light, a fading grid, a soft contact shadow per cube). Every
+ *      scene gives them an arrangement and a camera, animated on the scene's clock (Lanes: four
+ *      panes; The Brain: a hub and spokes; Gates: a conveyor through a frame; and so on).
  *
- * The cubes are drawn into the active panel's `[data-slot]` box with a lens shift: the projection
- * is squeezed and moved in clip space onto that box, so the arrangement sits exactly in the layout
- * without a second canvas and without clipping at the box edge.
+ * The page never lets the cubes near its text: layout.js measures a safe rectangle for the active
+ * panel and the stage frames the scene into it. Each scene's whole timeline (every cube, wire and
+ * floor corner, at the drift and parallax extremes) is measured once, and a lens (a clip-space
+ * scale and shift) fits that extent inside the rectangle, so nothing can project outside it; a
+ * scissor on the rectangle backs that up. Changing scene is a dissolve, never a flight: the old
+ * arrangement shrinks away where it stands, then the new one assembles in its own rectangle.
  *
  * Budget: devicePixelRatio is capped at 1.5 and the backing store at 2.2M pixels; the loop stops
  * while the tab is hidden; under reduced motion it draws one still frame per change and nothing
@@ -25,8 +28,18 @@
 const TAU = Math.PI * 2;
 const SPACING = 1.78;
 const CORE = 20 / 13;
-const SWITCH_MS = 900;
-const INTRO_MS = 1150;
+/** A scene change: the old arrangement shrinks away, then the new one assembles, cube by cube. */
+const OUT_MS = 240;
+const IN_MS = 380;
+const STAGGER = 28;
+/** The opening: the nine open out of the core into the mark. */
+const INTRO_MS = 1100;
+/** Head room inside the safe rectangle, on top of the measured extent. */
+const FIT_MARGIN = 0.94;
+const FOV = 0.62;
+/** The most the idle drift plus pointer parallax ever turn the camera (see `view`). */
+const DRIFT_YAW = 0.04 + 0.07;
+const DRIFT_PITCH = 0.025 + 0.045;
 const MAX_PIXELS = 2.2e6;
 /** The still frame (seconds into each scene) shown when motion is reduced. */
 const POSTER = [5, 8, 10, 6.2, 10.6, 6, 7.4];
@@ -254,6 +267,36 @@ const LINE_FS = `#version 300 es
   in vec4 vColor;
   out vec4 outColor;
   void main() { outColor = vColor; }
+`;
+
+/** A flat disc on the floor plane with a soft edge: the light pool and the contact shadows. */
+const DISC_VS = `#version 300 es
+  precision highp float;
+  uniform mat4 uProj;
+  uniform mat4 uView;
+  uniform vec4 uLens;
+  uniform vec3 uCenter;
+  uniform vec2 uRadius;
+  out vec2 vUv;
+  void main() {
+    vec2 c = vec2(float((gl_VertexID & 1) * 2 - 1), float((gl_VertexID >> 1) * 2 - 1));
+    vUv = c;
+    vec4 clip = uProj * uView * vec4(uCenter + vec3(c.x * uRadius.x, 0.0, c.y * uRadius.y), 1.0);
+    clip.xy = clip.xy * uLens.xy + uLens.zw * clip.w;
+    gl_Position = clip;
+  }
+`;
+
+const DISC_FS = `#version 300 es
+  precision mediump float;
+  uniform vec4 uColor;
+  uniform float uSoft;
+  in vec2 vUv;
+  out vec4 outColor;
+  void main() {
+    float a = 1.0 - smoothstep(uSoft, 1.0, length(vUv));
+    outColor = vec4(uColor.rgb, uColor.a * a * a);
+  }
 `;
 
 // --- small math -------------------------------------------------------------------------------
@@ -531,7 +574,7 @@ const SCENES = [
     const sparks = [hidden(), hidden(), hidden()];
     ring.forEach((i, k) => {
       const angle = (k / 8) * TAU + t * 0.12;
-      const p = [Math.cos(angle) * 2.7, -0.95, Math.sin(angle) * 2.7];
+      const p = [Math.cos(angle) * 2.3, -0.95, Math.sin(angle) * 2.3];
       const at = dispatch[k];
       const lit = at === undefined ? 0 : ramp(t, at, 0.35);
       const done = k === 1 ? ramp(t, 8.4, 0.4) : 0;
@@ -560,7 +603,7 @@ const SCENES = [
     const conveyor = [0, 1, 2, 3, 5, 6, 7];
     const speed = 3.5;
     // Waiting cubes queue up to the left of the frame and shuffle forward as each one leaves.
-    const front = -2.2;
+    const front = -1.8;
     const hit = -front / speed;
     const moved = launches.reduce((sum, at) => sum + ramp(t, at, 0.5), 0);
     const cubes = new Array(9);
@@ -572,15 +615,15 @@ const SCENES = [
       let tint = [1, 1, 1, 0];
       let passAt = launches[k] + hit;
       if (u < 0) {
-        x = front - 1.0 * Math.max(k - moved, 0);
+        x = front - 0.8 * Math.max(k - moved, 0);
       } else if (k === 2) {
         // The one that fails: reaches the frame, is thrown back, waits, and tries again.
         if (u < hit) x = front + speed * u;
-        else if (u < hit + 0.5) x = -1.8 * easeOut((u - hit) / 0.5);
-        else if (u < hit + 1.05) x = -1.8;
-        else x = -1.8 + speed * (u - hit - 1.05);
+        else if (u < hit + 0.5) x = -1.5 * easeOut((u - hit) / 0.5);
+        else if (u < hit + 1.05) x = -1.5;
+        else x = -1.5 + speed * (u - hit - 1.05);
         const failAt = launches[k] + hit;
-        passAt = failAt + 1.05 + 1.8 / speed;
+        passAt = failAt + 1.05 + 1.5 / speed;
         if (t >= failAt && t < passAt) {
           tint = tinted('fail', 0.9);
           frameFail = Math.max(frameFail, flash(t, failAt, 1.2));
@@ -592,8 +635,9 @@ const SCENES = [
         tint = tinted('pass', 0.85 * flash(t, passAt, 1.1));
         framePass = Math.max(framePass, flash(t, passAt, 2.2));
       }
-      const size = 0.9 * smooth(-5.6, -4.4, x) * (1 - smooth(4.2, 5.4, x));
       const waiting = u < 0 ? 0.55 : 1;
+      // Waiting cubes are a little smaller, so the queue packs tight; three show at a time.
+      const size = (u < 0 ? 0.7 : 0.9) * smooth(-4.3, -3.5, x) * (1 - smooth(2.7, 3.6, x));
       cubes[i] = actor([x, 0, 0], size, {
         tint,
         b: waiting,
@@ -605,21 +649,21 @@ const SCENES = [
       r: [0.3, t * 0.8, 0],
       b: 0.9 + 0.5 * framePass,
     });
-    cubes[8] = actor([4.6, -1.15, 0.6], 0.42, { b: 0.3, r: [0, t * 0.5, 0] });
+    cubes[8] = actor([2.6, -0.3, 1.3], 0.42, { b: 0.3, r: [0, t * 0.5, 0] });
     const ink = frameFail > 0.02 ? [...STATE.fail, 0.3 + 0.6 * frameFail] : null;
     const color =
       ink ?? (framePass > 0.02 ? [...STATE.pass, 0.3 + 0.6 * framePass] : [1, 1, 1, 0.45]);
     const lines = wireBox([0, 0, 0], [0.06, 1.15, 1.15], color);
     lines.push([
-      [-5.4, -0.5, 0],
-      [5.4, -0.5, 0],
+      [-4.2, -0.5, 0],
+      [3.7, -0.5, 0],
       [1, 1, 1, 0.12],
     ]);
     return {
       cubes,
       sparks: [hidden(), hidden(), hidden()],
       lines,
-      cam: { yaw: -0.78, pitch: 0.3, target: [0, 0.2, 0], radius: 4.3 },
+      cam: { yaw: -0.98, pitch: 0.32, target: [0, 0.2, 0], radius: 4.3 },
     };
   },
 
@@ -650,7 +694,7 @@ const SCENES = [
       [7, 8],
     ];
     const cycle = new Set([0, 1, 4, 6, 8]);
-    const pos = nodes.map(([c, y]) => [(c - 2) * 2.1, y, 0]);
+    const pos = nodes.map(([c, y]) => [(c - 2) * 1.8, y, 0]);
     const inCycle = t >= 4.4 && t < 7.4;
     const cubes = nodes.map(([c], i) => {
       const grow = easeOut(clamp01((t - 0.2 - i * 0.16) / 0.45));
@@ -696,7 +740,7 @@ const SCENES = [
     ];
     for (let bundle = 0; bundle < 3; bundle++) {
       const on = bundle === 0 ? ramp(t, 3.4, 0.5) : 0;
-      const center = [(bundle - 1) * 2.9, 0.35 * on, 0];
+      const center = [(bundle - 1) * 2.55, 0.35 * on, 0];
       const angle = t * 0.35 + bundle * 1.3;
       const spread = 1 + 0.15 * on;
       local.forEach(([x, y, z], k) => {
@@ -764,61 +808,7 @@ const SCENES = [
   },
 ];
 
-function blendActor(from, to, k) {
-  return {
-    p: from.p.map((v, i) => lerp(v, to.p[i], k)),
-    s: from.s.map((v, i) => lerp(v, to.s[i], k)),
-    r: from.r.map((v, i) => lerp(v, to.r[i], k)),
-    b: lerp(from.b, to.b, k),
-    tint: from.tint.map((v, i) => lerp(v, to.tint[i], k)),
-    a: lerp(from.a, to.a, k),
-  };
-}
-
-function blendCam(from, to, k) {
-  return {
-    yaw: lerp(from.yaw, to.yaw, k),
-    pitch: lerp(from.pitch, to.pitch, k),
-    target: from.target.map((v, i) => lerp(v, to.target[i], k)),
-    radius: lerp(from.radius, to.radius, k),
-  };
-}
-
-function blendRect(from, to, k) {
-  return {
-    x: lerp(from.x, to.x, k),
-    y: lerp(from.y, to.y, k),
-    w: lerp(from.w, to.w, k),
-    h: lerp(from.h, to.h, k),
-    dim: lerp(from.dim, to.dim, k),
-  };
-}
-
-/** Where the cubes fall in from during the intro: a deterministic ring out in the dark. */
-function introFrom() {
-  let seed = 9;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) % 4294967296;
-    return seed / 4294967296;
-  };
-  return Array.from({ length: 9 }, (_, i) => {
-    const angle = random() * TAU;
-    const distance = 7 + random() * 6;
-    const core = i === 4;
-    return {
-      from: actor(
-        core
-          ? [0, 0, -14]
-          : [Math.cos(angle) * distance, Math.sin(angle) * distance, -6 - random() * 10],
-        core ? CORE : 1,
-        { r: [random() * TAU, random() * TAU, 0], a: 0 }
-      ),
-      delay: core ? 0 : 120 + random() * 270,
-    };
-  });
-}
-
-// --- the renderer -----------------------------------------------------------------------------
+// --- shader plumbing -----------------------------------------------------------------------------
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -876,7 +866,163 @@ const PALETTES = {
   },
 };
 
-export function createStage(canvas, { reduced, sceneTime, scene }) {
+/** The floor each scene stands on: a pool of light, a fading grid and a soft shadow per cube. */
+const GROUND = {
+  dark: { pool: [1, 1, 1, 0.07], grid: 0.24, shadow: [0, 0, 0, 0.85] },
+  light: { pool: [0, 0, 0, 0.045], grid: 0.22, shadow: [0, 0, 0, 0.28] },
+};
+
+// --- framing: every scene fits its whole timeline into the safe rectangle ----------------------
+
+const PROJ = perspective(FOV, 1, 0.1, 200);
+
+/** The view for a scene camera, turned by `dyaw` / `dpitch` of drift and parallax. */
+function camera(cam, dyaw = 0, dpitch = 0) {
+  const yaw = cam.yaw + dyaw;
+  const pitch = cam.pitch + dpitch;
+  const distance = cam.radius / (Math.tan(FOV / 2) * 0.95) + cam.radius * 0.35;
+  const matrix = mul(
+    mul(translate(0, 0, -distance), mul(rotX(pitch), rotY(yaw))),
+    translate(-cam.target[0], -cam.target[1], -cam.target[2])
+  );
+  const cp = Math.cos(pitch);
+  const eye = [
+    cam.target[0] - distance * cp * Math.sin(yaw),
+    cam.target[1] + distance * Math.sin(pitch),
+    cam.target[2] + distance * cp * Math.cos(yaw),
+  ];
+  return { matrix, eye, proj: PROJ, vp: mul(PROJ, matrix) };
+}
+
+/** Normalised device coordinates of a world point (before the lens). */
+function ndc(vp, p) {
+  const w = vp[3] * p[0] + vp[7] * p[1] + vp[11] * p[2] + vp[15];
+  return [
+    (vp[0] * p[0] + vp[4] * p[1] + vp[8] * p[2] + vp[12]) / w,
+    (vp[1] * p[0] + vp[5] * p[1] + vp[9] * p[2] + vp[13]) / w,
+  ];
+}
+
+const drawn = (a) => a.a > 0.01 && a.s[0] * a.s[1] * a.s[2] > 1e-5;
+
+/** The eight world-space corners of an actor. */
+function corners(a) {
+  const r = euler3(a.r);
+  const out = [];
+  for (const sx of [-0.5, 0.5])
+    for (const sy of [-0.5, 0.5])
+      for (const sz of [-0.5, 0.5]) {
+        const l = [sx * a.s[0], sy * a.s[1], sz * a.s[2]];
+        out.push([0, 1, 2].map((i) => a.p[i] + r[i] * l[0] + r[3 + i] * l[1] + r[6 + i] * l[2]));
+      }
+  return out;
+}
+
+/**
+ * Walks a scene's whole timeline once and returns what the camera will ever show: the extent in
+ * device coordinates (with the drift and parallax extremes folded in) and the floor under it.
+ */
+function measureScene(index, duration) {
+  const samples = [];
+  let floorY = Infinity;
+  const xz = [Infinity, -Infinity, Infinity, -Infinity];
+  for (let t = 0; t <= duration + 1e-6; t += 0.1) {
+    const pose = SCENES[index](t);
+    const points = [];
+    for (const a of [...pose.cubes, ...pose.sparks]) {
+      if (!drawn(a)) continue;
+      for (const c of corners(a)) {
+        points.push(c);
+        floorY = Math.min(floorY, c[1]);
+        xz[0] = Math.min(xz[0], c[0]);
+        xz[1] = Math.max(xz[1], c[0]);
+        xz[2] = Math.min(xz[2], c[2]);
+        xz[3] = Math.max(xz[3], c[2]);
+      }
+    }
+    for (const [from, to] of pose.lines) points.push(from, to);
+    samples.push({ cam: pose.cam, points });
+  }
+  const margin = 0.4;
+  const floor = {
+    y: floorY - 0.02,
+    x0: xz[0] - margin,
+    x1: xz[1] + margin,
+    z0: xz[2] - margin,
+    z1: xz[3] + margin,
+  };
+  const floorCorners = [
+    [floor.x0, floor.y, floor.z0],
+    [floor.x1, floor.y, floor.z0],
+    [floor.x0, floor.y, floor.z1],
+    [floor.x1, floor.y, floor.z1],
+  ];
+  const box = [Infinity, -Infinity, Infinity, -Infinity];
+  for (const { cam, points } of samples) {
+    for (const dy of [-1, 1]) {
+      for (const dp of [-1, 1]) {
+        const { vp } = camera(cam, dy * DRIFT_YAW, dp * DRIFT_PITCH);
+        for (const p of [...points, ...floorCorners]) {
+          const [x, y] = ndc(vp, p);
+          box[0] = Math.min(box[0], x);
+          box[1] = Math.max(box[1], x);
+          box[2] = Math.min(box[2], y);
+          box[3] = Math.max(box[3], y);
+        }
+      }
+    }
+  }
+  return { box, floor, grid: floorGrid(floor) };
+}
+
+/** Grid lines across the floor, cut into short pieces so each can fade towards the rim. */
+function floorGrid(floor) {
+  const step = SPACING / 2;
+  const cx = (floor.x0 + floor.x1) / 2;
+  const cz = (floor.z0 + floor.z1) / 2;
+  const hx = (floor.x1 - floor.x0) / 2;
+  const hz = (floor.z1 - floor.z0) / 2;
+  const fade = (x, z) => 1 - smooth(0.35, 1, Math.hypot((x - cx) / hx, (z - cz) / hz));
+  const segments = [];
+  const pieces = 10;
+  const run = (a, b) => {
+    for (let i = 0; i < pieces; i++) {
+      const p = a.map((v, k) => lerp(v, b[k], i / pieces));
+      const q = a.map((v, k) => lerp(v, b[k], (i + 1) / pieces));
+      const w = Math.min(fade(p[0], p[2]), fade(q[0], q[2]));
+      if (w > 0.01) segments.push([p, q, w]);
+    }
+  };
+  for (let x = cx - Math.floor(hx / step) * step; x <= floor.x1 + 1e-6; x += step) {
+    run([x, floor.y, floor.z0], [x, floor.y, floor.z1]);
+  }
+  for (let z = cz - Math.floor(hz / step) * step; z <= floor.z1 + 1e-6; z += step) {
+    run([floor.x0, floor.y, z], [floor.x1, floor.y, z]);
+  }
+  return segments;
+}
+
+/**
+ * The lens that maps a scene's device-coordinate extent onto `rect` (CSS px) in a W x H viewport,
+ * as a clip-space scale and shift: clip.xy = clip.xy * lens.xy + lens.zw * clip.w.
+ */
+function lensFor(box, rect, W, H) {
+  const k = Math.min(rect.w / (box[1] - box[0]), rect.h / (box[3] - box[2])) * FIT_MARGIN;
+  const mx = (box[0] + box[1]) / 2;
+  const my = (box[2] + box[3]) / 2;
+  const lx = (2 * k) / W;
+  const ly = (2 * k) / H;
+  return [
+    lx,
+    ly,
+    (2 * (rect.x + rect.w / 2)) / W - 1 - mx * lx,
+    1 - (2 * (rect.y + rect.h / 2)) / H - my * ly,
+  ];
+}
+
+// --- the renderer -----------------------------------------------------------------------------
+
+export function createStage(canvas, { reduced, sceneTime, scene, durations, debug = false }) {
   const gl = canvas.getContext('webgl2', {
     antialias: true,
     alpha: false,
@@ -888,6 +1034,7 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
   const dust = program(gl, DUST_VS, DUST_FS);
   const cube = program(gl, CUBE_VS, CUBE_FS);
   const line = program(gl, LINE_VS, LINE_FS);
+  const disc = program(gl, DISC_VS, DISC_FS);
 
   const emptyVao = gl.createVertexArray();
 
@@ -926,13 +1073,19 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
   let frame = 0;
   let running = false;
 
-  /** The live scene target, and the frozen snapshot we are tweening away from. */
-  let targetRect = { x: 0, y: 0, w: 1, h: 1, dim: 1 };
-  let transition = null;
+  /** Per scene, measured once: what its timeline ever shows, and its floor. */
+  const measured = [];
+  const sceneBounds = (index) =>
+    (measured[index] ??= measureScene(index, durations?.[index] ?? 14));
+
+  /** Where the live scene draws (null: nowhere), and the dissolve in progress, if any. */
+  let target = { rect: null, dim: 1 };
+  let phase = null;
   let intro = null;
-  let lastDrawn = null;
   let lastIndex = -1;
   let lastT = 0;
+  /** Only filled in with `?debug=bounds`: what the last frame drew, for the overlap audit. */
+  let debugFrame = null;
 
   function resize() {
     const w = window.innerWidth;
@@ -990,99 +1143,124 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
     return lightQuery.matches ? PALETTES.light : PALETTES.dark;
   }
 
-  function poseAt(index, t) {
-    return SCENES[index](t);
-  }
-
-  function currentPose(now) {
+  /**
+   * What to draw this frame: one scene, in one rectangle, with a per-cube size factor. Scene
+   * changes never move a cube between rectangles: the old arrangement shrinks away where it
+   * stands, then the new one assembles in its own place.
+   */
+  function currentLayer(now) {
     const index = scene();
     // Under reduced motion each scene holds one representative frame instead of its last.
     const t = reduced ? POSTER[index] : sceneTime();
-    // A scene that loops back to its start eases into it like a scene change, cube by cube,
-    // instead of every actor popping back to its first position at once.
-    if (index === lastIndex && t + 0.5 < lastT && lastDrawn && !transition) {
-      transition = { start: now, from: { ...lastDrawn, rect: targetRect } };
+    // A scene that loops back to its entry frame dissolves out and back in, never to blank.
+    if (!reduced && index === lastIndex && t + 0.5 < lastT && target.rect && !phase) {
+      phase = { kind: 'out', start: now, from: { index, t: lastT, ...target } };
+    }
+    if (phase?.kind === 'out') {
+      const k = (now - phase.start) / OUT_MS;
+      if (k < 1) {
+        const { from } = phase;
+        return {
+          index: from.index,
+          t: from.t,
+          rect: from.rect,
+          dim: from.dim,
+          grow: (i) => 1 - easeInOut(clamp01(k * 1.25 - (i % 5) * 0.05)),
+        };
+      }
+      phase = { kind: 'in', start: phase.start + OUT_MS };
     }
     lastIndex = index;
     lastT = t;
-    const live = poseAt(index, t);
-    const rect = targetRect;
-    let cubes = live.cubes;
-    let sparks = live.sparks;
-    let cam = live.cam;
-    let lens = rect;
-    let lines = live.lines.map((l) => [l[0], l[1], l[2], 1]);
-
-    if (transition) {
-      const elapsed = now - transition.start;
-      const k = easeInOut(clamp01(elapsed / SWITCH_MS));
-      cubes = cubes.map((to, i) => {
-        const local = easeInOut(clamp01((elapsed - i * 22) / (SWITCH_MS - 9 * 22)));
-        return blendActor(transition.from.cubes[i], to, local);
-      });
-      sparks = sparks.map((to, i) => blendActor(transition.from.sparks[i], to, k));
-      cam = blendCam(transition.from.cam, cam, k);
-      lens = blendRect(transition.from.rect, rect, k);
-      lines = [
-        ...transition.from.lines.map((l) => [l[0], l[1], l[2], l[3] * (1 - k)]),
-        ...lines.map((l) => [l[0], l[1], l[2], l[3] * k]),
-      ];
-      if (elapsed >= SWITCH_MS) transition = null;
+    if (!target.rect) return null;
+    let grow = () => 1;
+    if (phase?.kind === 'in') {
+      const elapsed = now - phase.start;
+      grow = (i) => easeOut(clamp01((elapsed - i * STAGGER) / IN_MS));
+      if (elapsed > IN_MS + 9 * STAGGER) phase = null;
     }
+    return { index, t, rect: target.rect, dim: target.dim, grow };
+  }
 
+  /** The actors of a layer, after the dissolve and the opening burst are applied. */
+  function actorsFor(layer, pose, now) {
+    const list = [...pose.cubes, ...pose.sparks];
+    let center = [0, 0, 0];
+    let burst = null;
     if (intro) {
       const elapsed = now - intro.start;
-      cubes = cubes.map((to, i) => {
-        const { from, delay } = intro.cubes[i];
-        const k = easeOut(clamp01((elapsed - delay) / INTRO_MS));
-        const blended = blendActor(from, to, k);
-        blended.a = to.a * Math.min(k * 1.6, 1);
-        return blended;
-      });
-      // The camera opens out as the mark forms, the way a shot does.
-      const open = easeInOut(clamp01(elapsed / (INTRO_MS + 300)));
-      cam = { ...cam, radius: cam.radius * (0.72 + 0.28 * open), yaw: cam.yaw - 0.5 * (1 - open) };
-      if (elapsed > INTRO_MS + 420) intro = null;
+      if (elapsed > INTRO_MS + 400) intro = null;
+      else {
+        burst = (i) =>
+          easeOut(clamp01((elapsed - (i === 4 ? 0 : 90 + ((i * 53) % 260))) / INTRO_MS));
+        const shown = pose.cubes.filter(drawn);
+        center = [0, 1, 2].map((k) => shown.reduce((sum, a) => sum + a.p[k], 0) / shown.length);
+      }
     }
-
-    return { cubes, sparks, cam, rect: lens, lines };
+    return list.map((a, i) => {
+      let f = layer.grow(i);
+      let p = a.p;
+      let r = a.r;
+      if (burst) {
+        // The nine open out of the core into the mark, turning as they go.
+        const k = burst(i);
+        f *= k;
+        p = a.p.map((v, j) => lerp(center[j], v, k));
+        r = [a.r[0] + (1 - k) * 1.6, a.r[1] + (1 - k) * 2.4, a.r[2]];
+      }
+      return { ...a, p, r, s: a.s.map((v) => v * f), a: a.a * Math.min(1, f * 1.6) };
+    });
   }
 
   function view(cam, time) {
     const drift = reduced ? 0 : 1;
-    const yaw = cam.yaw + drift * (0.04 * Math.sin(time * 0.21) + smoothPointer[0] * 0.07);
-    const pitch = cam.pitch + drift * (0.025 * Math.sin(time * 0.17) + smoothPointer[1] * 0.045);
-    const fov = 0.62;
-    const aspect = Math.max(targetAspect(), 0.2);
-    const half = Math.tan(fov / 2);
-    const fit = Math.min(half, half * aspect);
-    const distance = cam.radius / (fit * 0.95) + cam.radius * 0.35;
-    const matrix = mul(
-      mul(translate(0, 0, -distance), mul(rotX(pitch), rotY(yaw))),
-      translate(-cam.target[0], -cam.target[1], -cam.target[2])
+    return camera(
+      cam,
+      drift * (0.04 * Math.sin(time * 0.21) + smoothPointer[0] * 0.07),
+      drift * (0.025 * Math.sin(time * 0.17) + smoothPointer[1] * 0.045)
     );
-    // Eye position in world space, for the rim light.
-    const cp = Math.cos(pitch);
-    const eye = [
-      cam.target[0] - distance * cp * Math.sin(yaw),
-      cam.target[1] + distance * Math.sin(pitch),
-      cam.target[2] + distance * cp * Math.cos(yaw),
-    ];
-    return { matrix, eye, proj: perspective(fov, aspect, 0.1, 200) };
   }
 
-  let aspectNow = 1;
-  function targetAspect() {
-    return aspectNow;
+  function drawLines(lines, cam, lens, colors, visible) {
+    if (lines.length === 0) return;
+    const data = new Float32Array(lines.length * 14);
+    let o = 0;
+    for (const [from, to, color] of lines) {
+      const ink = color[0] === 1 && color[1] === 1 && color[2] === 1;
+      const rgb = ink ? colors.lineInk : color;
+      const alpha = (color[3] ?? 1) * visible;
+      for (const p of [from, to]) {
+        data.set([p[0], p[1], p[2], rgb[0], rgb[1], rgb[2], alpha], o);
+        o += 7;
+      }
+    }
+    gl.useProgram(line.p);
+    gl.bindVertexArray(lineVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    gl.uniformMatrix4fv(line.u.uProj, false, cam.proj);
+    gl.uniformMatrix4fv(line.u.uView, false, cam.matrix);
+    gl.uniform4fv(line.u.uLens, lens);
+    gl.drawArrays(gl.LINES, 0, lines.length * 2);
+  }
+
+  function drawDisc(cam, lens, center, radius, color, soft) {
+    gl.uniform3fv(disc.u.uCenter, center);
+    gl.uniform2fv(disc.u.uRadius, radius);
+    gl.uniform4fv(disc.u.uColor, color);
+    gl.uniform1f(disc.u.uSoft, soft);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
   function draw(now) {
     resize();
     const colors = palette();
+    const ground = lightQuery.matches ? GROUND.light : GROUND.dark;
     const time = (now - born) / 1000;
     const frames = reduced ? 1200 : time * 60;
     smoothPointer = smoothPointer.map((v, i) => v + (pointer[i] - v) * 0.06);
 
+    gl.disable(gl.SCISSOR_TEST);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -1124,73 +1302,110 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
     gl.uniform1f(dust.u.uDustAlpha, colors.dustAlpha);
     gl.drawArrays(gl.POINTS, 0, g.count);
 
-    // 3. cubes
-    const pose = currentPose(now);
-    lastDrawn = pose;
-    const rect = pose.rect;
-    const visible = clamp01((Math.min(rect.w, rect.h) - 40) / 80) * rect.dim;
-    if (visible > 0.01) {
-      aspectNow = rect.w / Math.max(rect.h, 1);
-      const cam = view(pose.cam, time);
-      const lens = [
-        rect.w / width,
-        rect.h / height,
-        ((rect.x + rect.w / 2) / width) * 2 - 1,
-        1 - ((rect.y + rect.h / 2) / height) * 2,
-      ];
-      gl.enable(gl.DEPTH_TEST);
-      gl.clear(gl.DEPTH_BUFFER_BIT);
-
-      gl.useProgram(cube.p);
-      gl.bindVertexArray(cubeVao);
-      gl.uniformMatrix4fv(cube.u.uProj, false, cam.proj);
-      gl.uniformMatrix4fv(cube.u.uView, false, cam.matrix);
-      gl.uniform4fv(cube.u.uLens, lens);
-      gl.uniform3fv(cube.u.uEye, cam.eye);
-      gl.uniform3fv(cube.u.uLo, colors.lo);
-      gl.uniform3fv(cube.u.uHi, colors.hi);
-      gl.uniform3fv(cube.u.uEdgeInk, colors.edgeInk);
-      gl.uniform3fv(cube.u.uBg, colors.base);
-      for (const a of [...pose.cubes, ...pose.sparks]) {
-        const alpha = a.a * visible;
-        if (alpha <= 0.01 || a.s[0] * a.s[1] * a.s[2] <= 1e-5) continue;
-        gl.uniformMatrix3fv(cube.u.uRot, false, euler3(a.r));
-        gl.uniform3fv(cube.u.uPos, a.p);
-        gl.uniform3fv(
-          cube.u.uSize,
-          a.s.map((v) => Math.max(v, 1e-3))
-        );
-        gl.uniform1f(cube.u.uBright, a.b * (0.55 + 0.45 * rect.dim));
-        gl.uniform1f(cube.u.uAlpha, alpha);
-        gl.uniform4fv(cube.u.uTint, a.tint);
-        gl.drawArrays(gl.TRIANGLES, 0, 36);
-      }
-
-      if (pose.lines.length > 0) {
-        const data = new Float32Array(pose.lines.length * 14);
-        let o = 0;
-        for (const [from, to, color, weight] of pose.lines) {
-          const ink = color.length === 4 && color[0] === 1 && color[1] === 1 && color[2] === 1;
-          const rgb = ink ? colors.lineInk : color;
-          const alpha = (color[3] ?? 1) * weight * visible;
-          for (const p of [from, to]) {
-            data.set([p[0], p[1], p[2], rgb[0], rgb[1], rgb[2], alpha], o);
-            o += 7;
-          }
-        }
-        gl.useProgram(line.p);
-        gl.bindVertexArray(lineVao);
-        gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-        gl.uniformMatrix4fv(line.u.uProj, false, cam.proj);
-        gl.uniformMatrix4fv(line.u.uView, false, cam.matrix);
-        gl.uniform4fv(line.u.uLens, lens);
-        gl.depthMask(false);
-        gl.drawArrays(gl.LINES, 0, pose.lines.length * 2);
-        gl.depthMask(true);
-      }
-    }
+    // 3. the diorama: floor, shadows, cubes and wires, framed into the safe rectangle
+    const layer = currentLayer(now);
+    debugFrame = null;
+    if (layer) drawLayer(layer, now, time, colors, ground);
+    gl.disable(gl.SCISSOR_TEST);
     gl.bindVertexArray(null);
+  }
+
+  function drawLayer(layer, now, time, colors, ground) {
+    const { rect, dim } = layer;
+    const pose = SCENES[layer.index](layer.t);
+    const bounds = sceneBounds(layer.index);
+    const lens = lensFor(bounds.box, rect, width, height);
+    const cam = view(pose.cam, time);
+    const actors = actorsFor(layer, pose, now);
+    const cubes = actors.slice(0, 9);
+    // How present the whole arrangement is (for the floor and wires during a dissolve).
+    const present = cubes.reduce((sum, a) => sum + Math.min(1, a.a), 0) / 9;
+
+    // Belt and braces: nothing can draw outside the rectangle, even between timeline samples.
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(
+      Math.floor(rect.x * dpr),
+      Math.floor((height - rect.y - rect.h) * dpr),
+      Math.ceil(rect.w * dpr),
+      Math.ceil(rect.h * dpr)
+    );
+    gl.enable(gl.DEPTH_TEST);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.depthMask(false);
+
+    // The floor: a pool of light, a grid that fades out, and a contact shadow under each cube.
+    const { floor } = bounds;
+    const floorAlpha = present * dim;
+    gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(disc.p);
+    gl.bindVertexArray(emptyVao);
+    gl.uniformMatrix4fv(disc.u.uProj, false, cam.proj);
+    gl.uniformMatrix4fv(disc.u.uView, false, cam.matrix);
+    gl.uniform4fv(disc.u.uLens, lens);
+    const mid = [(floor.x0 + floor.x1) / 2, floor.y, (floor.z0 + floor.z1) / 2];
+    const half = [(floor.x1 - floor.x0) / 2, (floor.z1 - floor.z0) / 2];
+    drawDisc(cam, lens, mid, half, [...ground.pool.slice(0, 3), ground.pool[3] * floorAlpha], 0);
+    drawLines(
+      bounds.grid.map(([a, b, w]) => [a, b, [1, 1, 1, ground.grid * w]]),
+      cam,
+      lens,
+      colors,
+      floorAlpha
+    );
+    gl.useProgram(disc.p);
+    gl.bindVertexArray(emptyVao);
+    for (const a of actors) {
+      if (!drawn(a)) continue;
+      const bottom = a.p[1] - Math.max(a.s[1], a.s[0] * 0.5) * 0.5;
+      const lift = bottom - floor.y;
+      const contact = clamp01(1 - lift / 1.4);
+      if (contact <= 0.02) continue;
+      const spread = 0.62 + 0.25 * clamp01(lift / 1.4);
+      const radius = [a.s[0] * spread + 0.08, a.s[2] * spread + a.s[0] * 0.2 + 0.08];
+      const alpha = ground.shadow[3] * contact * Math.min(1, a.a) * dim;
+      drawDisc(
+        cam,
+        lens,
+        [a.p[0], floor.y, a.p[2]],
+        radius,
+        [...ground.shadow.slice(0, 3), alpha],
+        0.25
+      );
+    }
+
+    // The cubes.
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.useProgram(cube.p);
+    gl.bindVertexArray(cubeVao);
+    gl.uniformMatrix4fv(cube.u.uProj, false, cam.proj);
+    gl.uniformMatrix4fv(cube.u.uView, false, cam.matrix);
+    gl.uniform4fv(cube.u.uLens, lens);
+    gl.uniform3fv(cube.u.uEye, cam.eye);
+    gl.uniform3fv(cube.u.uLo, colors.lo);
+    gl.uniform3fv(cube.u.uHi, colors.hi);
+    gl.uniform3fv(cube.u.uEdgeInk, colors.edgeInk);
+    gl.uniform3fv(cube.u.uBg, colors.base);
+    for (const a of actors) {
+      if (!drawn(a)) continue;
+      gl.uniformMatrix3fv(cube.u.uRot, false, euler3(a.r));
+      gl.uniform3fv(cube.u.uPos, a.p);
+      gl.uniform3fv(
+        cube.u.uSize,
+        a.s.map((v) => Math.max(v, 1e-3))
+      );
+      gl.uniform1f(cube.u.uBright, a.b * (0.55 + 0.45 * dim));
+      gl.uniform1f(cube.u.uAlpha, a.a);
+      gl.uniform4fv(cube.u.uTint, a.tint);
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
+    }
+
+    // The scene's own wires.
+    gl.depthMask(false);
+    drawLines(pose.lines, cam, lens, colors, present * dim);
+    gl.depthMask(true);
+
+    if (debug) debugFrame = { actors, lines: pose.lines, bounds, cam, lens, rect, present };
   }
 
   function loop(now) {
@@ -1238,34 +1453,103 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
   start();
 
   return {
+    index: -1,
+    /**
+     * Point the stage at a scene and the rectangle it may use (null: none). A new scene dissolves
+     * in unless `instant`; a new rectangle for the same scene (a resize) applies at once.
+     */
     setScene(index, rect, { instant = false, dim = 1 } = {}) {
-      const next = rect ? { ...rect, dim } : { ...targetRect, w: 0, h: 0, dim };
       const changed = index !== this.index;
+      const previous = { index: this.index, t: lastT, ...target };
       this.index = index;
-      if (changed && !instant && lastDrawn) {
-        transition = {
-          start: performance.now(),
-          from: {
-            cubes: lastDrawn.cubes,
-            sparks: lastDrawn.sparks,
-            cam: lastDrawn.cam,
-            rect: lastDrawn.rect,
-            lines: lastDrawn.lines,
-          },
-        };
-      } else if (instant) {
-        transition = null;
+      target = { rect, dim };
+      if (instant || reduced) {
+        if (changed) phase = null;
+      } else if (changed) {
+        phase =
+          previous.rect && previous.index >= 0
+            ? { kind: 'out', start: performance.now(), from: previous }
+            : { kind: 'in', start: performance.now() };
       }
-      targetRect = next;
       still();
+    },
+    /** A scene's on-screen width:height over its whole timeline, for choosing its rectangle. */
+    aspect(index) {
+      const b = sceneBounds(index).box;
+      return (b[1] - b[0]) / (b[3] - b[2]);
     },
     setPointer(x, y) {
       pointer = [x, y];
     },
     intro() {
       if (reduced) return;
-      intro = { start: performance.now(), cubes: introFrom() };
+      intro = { start: performance.now() };
     },
-    index: -1,
+    /** `?debug=bounds` only: every drawn item's on-screen box (CSS px), clipped to the rectangle. */
+    debugBounds() {
+      const f = debugFrame;
+      if (!f) return [];
+      const vp = mul(f.cam.proj, f.cam.matrix);
+      const project = (p) => {
+        const [x, y] = ndc(vp, p);
+        const nx = x * f.lens[0] + f.lens[2];
+        const ny = y * f.lens[1] + f.lens[3];
+        return [((nx + 1) / 2) * width, ((1 - ny) / 2) * height];
+      };
+      const r = f.rect;
+      const box = (points, name) => {
+        const xs = points.map((p) => p[0]);
+        const ys = points.map((p) => p[1]);
+        const [u0, u1, v0, v1] = [
+          Math.min(...xs),
+          Math.max(...xs),
+          Math.min(...ys),
+          Math.max(...ys),
+        ];
+        const x0 = Math.max(u0, r.x);
+        const y0 = Math.max(v0, r.y);
+        const x1 = Math.min(u1, r.x + r.w);
+        const y1 = Math.min(v1, r.y + r.h);
+        if (x1 <= x0 || y1 <= y0) return null;
+        // `cut` is how far the framing let it run past the rectangle (the scissor hides that part).
+        const cut = Math.max(r.x - u0, r.y - v0, u1 - (r.x + r.w), v1 - (r.y + r.h), 0);
+        return { name, x: x0, y: y0, w: x1 - x0, h: y1 - y0, cut };
+      };
+      const out = [];
+      f.actors.forEach((a, i) => {
+        if (!drawn(a)) return;
+        const b = box(corners(a).map(project), i < 9 ? `cube${i}` : `spark${i - 9}`);
+        if (b) out.push(b);
+      });
+      const wires = f.lines.filter((l) => (l[2][3] ?? 1) * f.present > 0.05);
+      if (wires.length > 0) {
+        const b = box(
+          wires.flatMap(([a, c]) => [project(a), project(c)]),
+          'wires'
+        );
+        if (b) out.push(b);
+      }
+      if (f.present > 0.05) {
+        const fl = f.bounds.floor;
+        const b = box(
+          [
+            [fl.x0, fl.y, fl.z0],
+            [fl.x1, fl.y, fl.z0],
+            [fl.x0, fl.y, fl.z1],
+            [fl.x1, fl.y, fl.z1],
+          ].map(project),
+          'floor'
+        );
+        if (b) out.push(b);
+      }
+      return out;
+    },
+    /** `?debug=bounds` only: forget any dissolve or intro, so a sample shows the settled scene. */
+    debugSettle() {
+      phase = null;
+      intro = null;
+      lastIndex = -1;
+      lastT = 0;
+    },
   };
 }

@@ -179,3 +179,31 @@ test('no em dashes in site copy', () => {
   assert.ok(body.length > 0, 'no body found');
   assert.ok(!body.includes('—'), 'an em dash slipped into the page copy');
 });
+
+test('every scene opens on a populated entry frame inside its run', () => {
+  const tabs = [
+    ...flat.matchAll(/id="tab-(\d\d)"[^>]*data-entry="([^"]+)"[^>]*data-duration="(\d+)"/g),
+  ];
+  assert.equal(tabs.length, 7, 'every rail tab needs data-entry before data-duration');
+  for (const [, num, entry, duration] of tabs) {
+    const t = Number(entry);
+    assert.ok(t > 0 && t < Number(duration) / 3, `tab-${num}: entry ${entry} out of range`);
+  }
+});
+
+test('phones read a short version of each feature, four lines at most', () => {
+  const shorts = [...flat.matchAll(/<span class="copy-short" ?>([^<]+)<\/span/g)].map((m) => m[1]);
+  assert.equal(shorts.length, 6, 'one short copy per feature');
+  for (const text of shorts) assert.ok(text.length <= 140, `too long for four lines: ${text}`);
+  assert.equal([...flat.matchAll(/<span class="copy-full" ?>/g)].length, 6);
+});
+
+test('the cubes are framed into a measured safe area, and the audit hook stays opt-in', () => {
+  const site = readFileSync(join(DIST, 'site.js'), 'utf8');
+  const layout = readFileSync(join(DIST, 'layout.js'), 'utf8');
+  assert.match(site, /import \{ safeRect \} from '\.\/layout\.js'/);
+  assert.match(layout, /export function safeRect/);
+  // window.__dbg exists only with ?debug=bounds, for test/overlap-audit.mjs.
+  assert.match(site, /get\('debug'\) === 'bounds'/);
+  assert.match(site, /if \(!debug\) return;\s+window\.__dbg =/);
+});

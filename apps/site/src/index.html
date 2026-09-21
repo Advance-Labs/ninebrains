@@ -93,6 +93,7 @@
           aria-selected="true"
           tabindex="0"
           data-panel="00"
+          data-entry="2"
           data-duration="11"
         >
           <span class="rail-num">00</span>
@@ -119,6 +120,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="01"
+          data-entry="2.2"
           data-duration="11"
         >
           <span class="rail-num">01</span>
@@ -140,6 +142,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="02"
+          data-entry="2.6"
           data-duration="12"
         >
           <span class="rail-num">02</span>
@@ -162,6 +165,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="03"
+          data-entry="2.1"
           data-duration="13"
         >
           <span class="rail-num">03</span>
@@ -182,6 +186,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="04"
+          data-entry="1.5"
           data-duration="13"
         >
           <span class="rail-num">04</span>
@@ -204,6 +209,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="05"
+          data-entry="1.5"
           data-duration="11"
         >
           <span class="rail-num">05</span>
@@ -223,6 +229,7 @@
           aria-selected="false"
           tabindex="-1"
           data-panel="06"
+          data-entry="1.5"
           data-duration="13"
         >
           <span class="rail-num">06</span>
@@ -447,9 +454,15 @@
             <p class="kicker"><span>01</span> Lanes</p>
             <h2>Every agent gets its own world.</h2>
             <p class="feature-copy">
-              Its own git worktree and branch, terminal, editor and browser. Four lanes to a tab, as
-              many tabs as you want. They cannot touch each other's files, so nothing merges by
-              accident.
+              <span class="copy-full"
+                >Its own git worktree and branch, terminal, editor and browser. Four lanes to a tab,
+                as many tabs as you want. They cannot touch each other's files, so nothing merges by
+                accident.</span
+              >
+              <span class="copy-short"
+                >Its own git worktree, branch, terminal, editor and browser. Lanes cannot touch each
+                other's files, so nothing merges by accident.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
@@ -574,9 +587,15 @@
             <p class="kicker"><span>02</span> The Brain</p>
             <h2>One plan, handed out as it unblocks.</h2>
             <p class="feature-copy">
-              The Brain turns a brief into a graph of jobs with dependencies, plus a mailbox the
-              lanes can talk through. A job goes to whichever lane is idle, the moment everything it
-              depends on is done.
+              <span class="copy-full"
+                >The Brain turns a brief into a graph of jobs with dependencies, plus a mailbox the
+                lanes can talk through. A job goes to whichever lane is idle, the moment everything
+                it depends on is done.</span
+              >
+              <span class="copy-short"
+                >The Brain turns a brief into a graph of jobs and hands each one to an idle lane the
+                moment its dependencies are done.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
@@ -676,11 +695,23 @@
                   </svg>
                   <div class="queue">
                     <p class="queue-head">Queue</p>
-                    <p class="t" data-at="4.4"><b>j1</b> index-content <span>→ lane 2</span></p>
-                    <p class="t" data-at="6.2"><b>j2</b> search-ui <span>→ lane 1</span></p>
-                    <p class="t" data-at="8.8"><b>j3</b> search-api <span>→ lane 3</span></p>
-                    <p class="t" data-at="9.4"><b>j4</b> search-docs <span>→ lane 4</span></p>
-                    <p class="t dim" data-at="9.6">
+                    <p class="t" data-at="2.3">
+                      <b>j1</b> index-content <span data-off="4.4">queued</span
+                      ><span data-at="4.4">→ lane 2</span>
+                    </p>
+                    <p class="t" data-at="2.5">
+                      <b>j2</b> search-ui <span data-off="6.2">queued</span
+                      ><span data-at="6.2">→ lane 1</span>
+                    </p>
+                    <p class="t" data-at="2.7">
+                      <b>j3</b> search-api <span data-off="8.8">queued</span
+                      ><span data-at="8.8">→ lane 3</span>
+                    </p>
+                    <p class="t" data-at="2.9">
+                      <b>j4</b> search-docs <span data-off="9.4">queued</span
+                      ><span data-at="9.4">→ lane 4</span>
+                    </p>
+                    <p class="t dim" data-at="3.1">
                       <b>j5</b> review <span>waits on j2 to j4</span>
                     </p>
                   </div>
@@ -719,9 +750,15 @@
             <p class="kicker"><span>03</span> Verification gates</p>
             <h2>No agent grades its own work.</h2>
             <p class="feature-copy">
-              When a lane says it is done, a second run has to prove it: the tests, screenshots at
-              three widths, a read-only reviewer. A failed gate sends the evidence back, up to three
-              attempts, then blocks the job and tells you.
+              <span class="copy-full"
+                >When a lane says it is done, a second run has to prove it: the tests, screenshots
+                at three widths, a read-only reviewer. A failed gate sends the evidence back, up to
+                three attempts, then blocks the job and tells you.</span
+              >
+              <span class="copy-short"
+                >When a lane says it is done, a second run proves it: tests, screenshots at three
+                widths, a read-only reviewer. Up to three attempts.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
@@ -840,8 +877,14 @@
             <p class="kicker"><span>04</span> Planner</p>
             <h2>Draw the plan. Run the plan.</h2>
             <p class="feature-copy">
-              Jobs are nodes, dependencies are edges. Run plan compiles the canvas into Brain jobs,
-              idempotently, and refuses a graph with a cycle in it.
+              <span class="copy-full"
+                >Jobs are nodes, dependencies are edges. Run plan compiles the canvas into Brain
+                jobs, idempotently, and refuses a graph with a cycle in it.</span
+              >
+              <span class="copy-short"
+                >Jobs are nodes, dependencies are edges. Run plan compiles the canvas into Brain
+                jobs and refuses a graph with a cycle.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
@@ -973,8 +1016,14 @@
             <p class="kicker"><span>05</span> Packs</p>
             <h2>Bundles for the work, off until you need them.</h2>
             <p class="feature-copy">
-              Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO and
-              research. A project that has not turned a pack on gets nothing from it.
+              <span class="copy-full"
+                >Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO
+                and research. A project that has not turned a pack on gets nothing from it.</span
+              >
+              <span class="copy-short"
+                >Per-project bundles of lane roles, skills, MCP servers and gates. A project gets
+                nothing from a pack it has not turned on.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
@@ -1069,9 +1118,15 @@
             <p class="kicker"><span>06</span> Freebuff fallback</p>
             <h2>A usage limit does not end the lane.</h2>
             <p class="feature-copy">
-              When Claude Code or Codex hits its usage limit mid-task, the conversation offers to
-              continue in Freebuff, free, in the same worktree. One click opens it and copies a
-              handoff note.
+              <span class="copy-full"
+                >When Claude Code or Codex hits its usage limit mid-task, the conversation offers to
+                continue in Freebuff, free, in the same worktree. One click opens it and copies a
+                handoff note.</span
+              >
+              <span class="copy-short"
+                >When Claude Code or Codex hits its usage limit, one click continues the lane in
+                Freebuff, free, in the same worktree.</span
+              >
             </p>
             <div class="cube-slot" data-slot aria-hidden="true"></div>
           </div>
