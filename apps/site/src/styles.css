@@ -2372,7 +2372,13 @@ h1 {
   }
   .shots {
     order: -1;
-    grid-template-columns: 1.35fr 1fr 0.5fr;
+    grid-template-columns: 1.2fr 1fr 0.42fr;
+  }
+  .shots .pg {
+    aspect-ratio: 16 / 8;
+  }
+  .shots .shot-390 .pg {
+    aspect-ratio: 9 / 9;
   }
   .verdict {
     display: none;

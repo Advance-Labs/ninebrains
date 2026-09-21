@@ -478,8 +478,9 @@
                     <p class="t type" data-at="0.6" style="--n: 34">
                       &gt; Build the search box for the docs
                     </p>
-                    <p class="t" data-at="2">⏺ <b>Read</b>(src/components/Header.tsx)</p>
-                    <p class="t dim" data-at="2.3">&nbsp; ⎿ Read 88 lines</p>
+                    <p class="t" data-at="2">
+                      ⏺ <b>Read</b>(src/components/Header.tsx) <span class="dim">88 lines</span>
+                    </p>
                     <p class="t" data-at="3.4">⏺ <b>Edit</b>(src/search/SearchBox.tsx)</p>
                     <p class="t" data-at="3.8">
                       &nbsp; ⎿ <span class="add">+42</span> <span class="del">-3</span>
@@ -499,8 +500,9 @@
                     <p class="t type" data-at="0.8" style="--n: 36">
                       &gt; index every page in src/content
                     </p>
-                    <p class="t" data-at="2.2">• Ran <b>rg --files src/content</b></p>
-                    <p class="t dim" data-at="2.5">&nbsp; └ 128 files</p>
+                    <p class="t" data-at="2.2">
+                      • Ran <b>rg --files src/content</b> <span class="dim">128</span>
+                    </p>
                     <p class="t" data-at="3.6">• Edited scripts/build-index.ts</p>
                     <p class="t" data-at="3.9">&nbsp; └ <span class="add">+88</span></p>
                     <p class="t" data-at="5.2">• Ran <b>node scripts/build-index.ts</b></p>
@@ -1183,7 +1185,7 @@
         <p class="sheet-kicker">Before you open it</p>
         <h2 id="verify-title">Unsigned build: why, and how to verify</h2>
         <p>
-          v0.1 builds are not code-signed, so macOS Gatekeeper and Windows SmartScreen warn you
+          Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen warn you
           before you open one. Unsigned builds also do not auto-update.
         </p>
         <p>
@@ -1204,7 +1206,7 @@ gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebra
         </p>
       </div>
       <form method="dialog">
-        <button type="submit" class="sheet-close">Close</button>
+        <button type="submit" class="sheet-close" autofocus>Close</button>
       </form>
     </dialog>
 
