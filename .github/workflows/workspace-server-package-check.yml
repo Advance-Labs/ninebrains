@@ -33,7 +33,7 @@ jobs:
           key: workspace-server-node-linux-x64-${{ hashFiles('.nvmrc') }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
