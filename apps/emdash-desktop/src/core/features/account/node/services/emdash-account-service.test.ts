@@ -401,7 +401,7 @@ describe('EmdashAccountService', () => {
       const error = unwrapError(await service.linkProviderAccount());
       expect(error).toMatchObject({
         type: 'session_expired',
-        message: 'Your Emdash session expired. Sign in again to connect GitHub.',
+        message: 'Your Ninebrains session expired. Sign in again to connect GitHub.',
       });
       expect(mockCredClear).toHaveBeenCalled();
       expect(mockKvSet).toHaveBeenCalledWith(

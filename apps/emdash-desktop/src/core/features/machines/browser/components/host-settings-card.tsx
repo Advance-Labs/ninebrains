@@ -3,6 +3,7 @@ import { SettingsCard } from '@emdash/ui/react/patterns';
 import { Field, Input, Separator, Switch, Textarea, toast } from '@emdash/ui/react/primitives';
 import { observer } from 'mobx-react-lite';
 import { useEffect, useState } from 'react';
+import { BRAND_NAME, BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 import { detectPlatformContext } from '@core/primitives/keybindings/api';
 import { getMachinesStore } from '../../contributions/app-stores';
 import { useHostSettings } from '../use-host-settings';
@@ -93,7 +94,7 @@ export const HostSettingsCard = observer(function HostSettingsCard({
         <Field.Label>Host defaults</Field.Label>
         <Field.Description>
           Machine-level defaults applied to workspaces on this host. Stored in the host&apos;s
-          emdash data directory; edits made to the file directly show up here live.
+          {BRAND_NAME} data directory; edits made to the file directly show up here live.
         </Field.Description>
       </Field.Root>
       <div className="mt-4 flex flex-col gap-4">
@@ -128,7 +129,7 @@ export const HostSettingsCard = observer(function HostSettingsCard({
             override it per project.
           </Field.Description>
           <Input
-            placeholder="~/emdash/worktrees"
+            placeholder={`~/${BRAND_SLUG}/worktrees`}
             value={worktreeRoot}
             disabled={disabled}
             onFocus={() => setEditing('worktreeRoot')}

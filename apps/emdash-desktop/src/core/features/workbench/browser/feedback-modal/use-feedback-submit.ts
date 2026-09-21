@@ -1,5 +1,6 @@
 import { useToast } from '@emdash/ui/react/primitives';
 import { useCallback, useState } from 'react';
+import { PRODUCT_NAME } from '@core/primitives/app-identity/api/app-identity';
 import { getHostClient } from '@core/primitives/desktop-host/browser/host-client';
 import { log } from '@core/primitives/logging/browser/logger';
 import { FEEDBACK_EMAIL_SCHEMA } from './schemas/feedback-email';
@@ -62,7 +63,7 @@ export function buildFeedbackContent({
 
   const trimmedAppVersion = appVersion?.trim();
   if (trimmedAppVersion) {
-    metadataLines.push(`Emdash Version: ${trimmedAppVersion}`);
+    metadataLines.push(`${PRODUCT_NAME} Version: ${trimmedAppVersion}`);
   }
 
   const trimmedPlatformDisplayName = platformDisplayName?.trim();

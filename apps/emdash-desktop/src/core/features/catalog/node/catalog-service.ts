@@ -14,6 +14,7 @@ import {
 } from '@emdash/core/primitives/skills/api';
 import { log } from '@emdash/shared/logger';
 import { app } from 'electron';
+import { BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 import { catalogData } from '@core/primitives/mcp/api';
 import bundledCatalog from './bundled-catalog.json';
 
@@ -76,7 +77,7 @@ function httpsGet(
     }
     const req = https.get(
       url,
-      { headers: { 'User-Agent': 'emdash-catalog', Accept: 'application/json' } },
+      { headers: { 'User-Agent': `${BRAND_SLUG}-catalog`, Accept: 'application/json' } },
       (res) => {
         if (res.statusCode === 301 || res.statusCode === 302) {
           const location = res.headers.location;

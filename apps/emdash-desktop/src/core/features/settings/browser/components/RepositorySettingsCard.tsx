@@ -2,6 +2,7 @@ import { SettingsCard } from '@emdash/ui/react/patterns';
 import { Input, SeparatedList, Switch } from '@emdash/ui/react/primitives';
 import React from 'react';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
+import { BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 import { normalizeBranchPrefix } from '@core/primitives/tasks/api';
 import { ResetToDefaultButton } from './ResetToDefaultButton';
 import { SettingRow } from './SettingRow';
@@ -42,7 +43,7 @@ const RepositorySettingsCard: React.FC = () => {
             />
             <ResetToDefaultButton
               visible={isProjectFieldOverridden('branchPrefix')}
-              defaultLabel="emdash"
+              defaultLabel={BRAND_SLUG}
               onReset={() => resetProjectField('branchPrefix')}
               disabled={projectBusy}
             />

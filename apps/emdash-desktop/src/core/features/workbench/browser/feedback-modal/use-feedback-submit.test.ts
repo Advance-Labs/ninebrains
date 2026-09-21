@@ -15,7 +15,7 @@ describe('buildFeedbackContent', () => {
     expect(content).toContain('Great app');
     expect(content).toContain('Contact: person@example.com');
     expect(content).toContain('GitHub: Octo Cat (@octocat)');
-    expect(content).toContain('Emdash Version: 1.2.3');
+    expect(content).toContain('Ninebrains Version: 1.2.3');
     expect(content).toContain('Platform: macOS 15.5 (arm64)');
   });
 

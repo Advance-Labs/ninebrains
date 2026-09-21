@@ -1,4 +1,5 @@
 import type { SerializedError } from '@emdash/shared';
+import { BRAND_NAME } from '@core/primitives/app-identity/api/app-identity';
 
 export type AccountInitializeError = AccountSessionPersistenceError;
 
@@ -77,8 +78,7 @@ export type AccountProviderTokenPersistenceError = {
   cause?: SerializedError;
 };
 
-export const SESSION_EXPIRED_MESSAGE =
-  'Your Emdash session expired. Sign in again to connect GitHub.';
+export const SESSION_EXPIRED_MESSAGE = `Your ${BRAND_NAME} session expired. Sign in again to connect GitHub.`;
 
 export function unknownErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
