@@ -231,6 +231,43 @@ jobs:
             --reporter="$GITHUB_WORKSPACE/tooling/scripts/vitest-flaky-reporter.mjs" \
             "${args[@]}"
 
+  # The landing page's overlap audit (apps/site/test/overlap-audit.mjs): nothing on the page may
+  # collide, clip or scroll, at the sizes that break first. Reuses the desktop app's Playwright
+  # Chromium; WebGL runs on SwiftShader. Only when @ninebrains/site is affected.
+  site-overlap:
+    name: site-overlap
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/ci-setup
+        with:
+          nx-cache-key: site-overlap
+
+      - name: Is the site affected?
+        id: affected
+        env:
+          PROJECT: '@ninebrains/site'
+        run: node tooling/scripts/nx-affected.mjs "$PROJECT"
+
+      - name: Cache Playwright browsers
+        if: steps.affected.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium headless shell
+        if: steps.affected.outputs.run == 'true'
+        run: pnpm --dir apps/emdash-desktop exec playwright install --with-deps chromium-headless-shell
+
+      - name: Overlap audit
+        if: steps.affected.outputs.run == 'true'
+        run: pnpm --filter @ninebrains/site audit:overlap -- --ci
+
   pr-hygiene:
     name: pr-hygiene
     if: github.event_name == 'pull_request'
@@ -309,7 +346,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [static, test-node, test-browser, pr-hygiene, e2e]
+    needs: [static, test-node, test-browser, site-overlap, pr-hygiene, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -327,7 +364,7 @@ jobs:
             (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')) ||
             (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
         run: |
-          required=static,test-node,test-browser
+          required=static,test-node,test-browser,site-overlap
           optional=
           if [ "$IS_PR" = true ]; then required="$required,pr-hygiene"; else optional="pr-hygiene"; fi
           if [ "$E2E_REQUESTED" = true ]; then required="$required,e2e"; else optional="${optional:+$optional,}e2e"; fi
