@@ -144,6 +144,28 @@
         });
       }
     }
+    // Demo rows cut off at the bottom of the window's body (terminals scroll, so they are exempt).
+    // Phones are exempt too: there each demo deliberately shows a cropped, focused part of itself.
+    const body = mobile() ? null : win?.querySelector('.win-body');
+    if (body) {
+      const rows = body.querySelectorAll(
+        '.drawer > *, .attempts > *, .shots > *, .packs > *, .pk-launch > *, .lanes4 > *, .brain-lanes > *, .queue > *'
+      );
+      for (const el of rows) {
+        if (!rectOf(el) || el.getAnimations().some((a) => a.playState === 'running')) continue;
+        let top = 0;
+        for (let e = el; e && e !== body; e = e.offsetParent) top += e.offsetTop;
+        const past = top + el.offsetHeight - body.clientHeight;
+        if (past > 1) {
+          out.push({
+            el: `.${el.className.split(' ')[0] || el.tagName.toLowerCase()}`,
+            text: `cut by the window: ${el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30)}`,
+            ox: 0,
+            oy: past,
+          });
+        }
+      }
+    }
     // The install command: whole at 1280 and wider; narrower, it scrolls under a fade.
     for (const code of panel.querySelectorAll('.install-panel:not([hidden]) .cmd code')) {
       const ox = code.scrollWidth - code.clientWidth;
