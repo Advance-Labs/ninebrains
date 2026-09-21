@@ -32,11 +32,29 @@ const CORE = 20 / 13;
 const OUT_MS = 240;
 const IN_MS = 380;
 const STAGGER = 28;
-/** The opening: the nine open out of the core into the mark. */
-const INTRO_MS = 1100;
+/**
+ * The opening (see `intro()` below). The page paints a static mark first; once this stage can
+ * draw, nine cubes fall out of the dark into that mark's exact footprint, hold, then fly into
+ * their places in the live scene. The short version (a repeat visit, a deep link) starts from the
+ * settled mark and only flies.
+ */
+/** The mark's own spacing (glyph.mjs: 21 between centres, 13 per arm square). */
+const MARK_GAP = 21 / 13;
+const FALL_MS = 760;
+const FALL_STAGGER = 45;
+/** The last arm starts its fall after the core and seven staggered arms. */
+const FALL_END = 90 + 7 * FALL_STAGGER + FALL_MS;
+const HOLD_MS = 180;
+const FLIGHT_MS = { full: 680, short: 560 };
+/** In the flight, the edge cubes leave this much after the core, the corners twice that. */
+const FLIGHT_RIPPLE = 30;
+/** Camera radii: close for the fall (so depth reads), far for the flat mark (near orthographic). */
+const R_FALL = 9;
+const R_MARK = 40;
 /** Head room inside the safe rectangle, on top of the measured extent. */
 const FIT_MARGIN = 0.94;
 const FOV = 0.62;
+const FOCAL = 1 / Math.tan(FOV / 2);
 /** The most the idle drift plus pointer parallax ever turn the camera (see `view`). */
 const DRIFT_YAW = 0.04 + 0.07;
 const DRIFT_PITCH = 0.025 + 0.045;
@@ -222,6 +240,7 @@ const CUBE_FS = `#version 300 es
   uniform vec3 uHi;
   uniform vec3 uEdgeInk;
   uniform vec3 uBg;
+  uniform float uRound;
   in vec3 vNormal;
   in vec3 vWorld;
   in vec3 vLocal;
@@ -242,7 +261,16 @@ const CUBE_FS = `#version 300 es
     color = mix(color, uTint.rgb * (0.55 + 0.6 * lambert) + rim * 0.5, uTint.a);
     color += max(uBright - 1.0, 0.0) * 0.6;
     color = mix(uBg, color, clamp(0.16 + 0.84 * uBright, 0.0, 1.0));
-    outColor = vec4(color, uAlpha);
+    float alpha = uAlpha;
+    // While a cube stands in for the flat mark, its outline takes the mark's rounded corners.
+    if (uRound > 0.0) {
+      vec2 q = abs(vLocal.xy) * uSize.xy - (uSize.xy * 0.5 - ${(2 / 13).toFixed(4)});
+      float d = length(max(q, 0.0)) - ${(2 / 13).toFixed(4)};
+      float aa = fwidth(d);
+      if (d > aa) discard;
+      alpha *= 1.0 - uRound * smoothstep(-aa, aa, d);
+    }
+    outColor = vec4(color, alpha);
   }
 `;
 
@@ -297,6 +325,14 @@ const DISC_FS = `#version 300 es
     float a = 1.0 - smoothstep(uSoft, 1.0, length(vUv));
     outColor = vec4(uColor.rgb, uColor.a * a * a);
   }
+`;
+
+/** A flat wash over the field: the page's own background, fading out as the opening ends. */
+const VEIL_FS = `#version 300 es
+  precision mediump float;
+  uniform vec4 uColor;
+  out vec4 outColor;
+  void main() { outColor = uColor; }
 `;
 
 // --- small math -------------------------------------------------------------------------------
@@ -850,6 +886,12 @@ const PALETTES = {
     hi: [0.82, 0.82, 0.84],
     edgeInk: [1, 1, 1],
     lineInk: [1, 1, 1],
+    // The opening: the page background (#000) and the mark's ink (#fafafa), divided by the lit
+    // front face's shading factor so a fully tinted cube face prints exactly that ink.
+    veil: [0, 0, 0],
+    ink: [0.98 / 1.01, 0.98 / 1.01, 0.98 / 1.01],
+    /** How much ink a falling cube already carries: none on black, where lit cubes read. */
+    fallInk: 0,
   },
   light: {
     base: [0.98, 0.98, 0.98],
@@ -863,6 +905,10 @@ const PALETTES = {
     hi: [1, 1, 1],
     edgeInk: [0.12, 0.12, 0.13],
     lineInk: [0, 0, 0],
+    veil: [0.98, 0.98, 0.98],
+    ink: [0.039 / 1.01, 0.039 / 1.01, 0.039 / 1.01],
+    // Light cubes on a white veil barely read, so they fall already half inked.
+    fallInk: 0.5,
   },
 };
 
@@ -876,11 +922,14 @@ const GROUND = {
 
 const PROJ = perspective(FOV, 1, 0.1, 200);
 
+/** How far the camera stands from its target for a scene radius. */
+const distanceFor = (radius) => radius / (Math.tan(FOV / 2) * 0.95) + radius * 0.35;
+
 /** The view for a scene camera, turned by `dyaw` / `dpitch` of drift and parallax. */
 function camera(cam, dyaw = 0, dpitch = 0) {
   const yaw = cam.yaw + dyaw;
   const pitch = cam.pitch + dpitch;
-  const distance = cam.radius / (Math.tan(FOV / 2) * 0.95) + cam.radius * 0.35;
+  const distance = distanceFor(cam.radius);
   const matrix = mul(
     mul(translate(0, 0, -distance), mul(rotX(pitch), rotY(yaw))),
     translate(-cam.target[0], -cam.target[1], -cam.target[2])
@@ -1020,6 +1069,46 @@ function lensFor(box, rect, W, H) {
   ];
 }
 
+/**
+ * A lens that draws the camera's target at (cx, cy) CSS px with `px` CSS px per world unit on the
+ * plane through the target, facing the camera. A point there lands at distance `D` in view space,
+ * so it projects to FOCAL * u / D in device coordinates; the lens scales that back to pixels.
+ */
+function lensAt(px, D, cx, cy, W, H) {
+  const k = (px * D) / FOCAL;
+  return [(2 * k) / W, (2 * k) / H, (2 * cx) / W - 1, 1 - (2 * cy) / H];
+}
+
+/** Cube `i` as the flat mark: glyph spacing, front faces all on the z = 0 plane. */
+function markActor(i) {
+  const s = i === 4 ? CORE : 1;
+  return actor([((i % 3) - 1) * MARK_GAP, (1 - Math.floor(i / 3)) * MARK_GAP, -s / 2], s);
+}
+
+/** Where each cube falls in from, how it spins, and when it starts. Seeded: the same every load. */
+function fallPlan() {
+  let v = 9;
+  const rnd = () => (v = (v * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const ranks = [0, 1, 2, 3, 4, 5, 6, 7];
+  for (let i = ranks.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [ranks[i], ranks[j]] = [ranks[j], ranks[i]];
+  }
+  let arm = 0;
+  return Array.from({ length: 9 }, (_, i) => {
+    const spin = [(rnd() - 0.5) * 5, (rnd() - 0.5) * 6];
+    // The core comes straight up out of the dark; the arms arrive from a ring around it.
+    if (i === 4) return { from: [0, 0, -14], spin, delay: 0 };
+    // One arm per eighth of the ring (jittered), and each next arrival from across the ring.
+    const angle = ((((ranks[arm] * 3) % 8) + 0.5 + (rnd() - 0.5) * 0.7) / 8) * TAU + 0.4;
+    const reach = 15 + rnd() * 10;
+    const from = [Math.cos(angle) * reach, Math.sin(angle) * reach, -8 - rnd() * 12];
+    return { from, spin, delay: 90 + ranks[arm++] * FALL_STAGGER };
+  });
+}
+
+const lerp3 = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
+
 // --- the renderer -----------------------------------------------------------------------------
 
 export function createStage(canvas, { reduced, sceneTime, scene, durations, debug = false }) {
@@ -1035,6 +1124,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   const cube = program(gl, CUBE_VS, CUBE_FS);
   const line = program(gl, LINE_VS, LINE_FS);
   const disc = program(gl, DISC_VS, DISC_FS);
+  const veil = program(gl, FIELD_VS, VEIL_FS);
 
   const emptyVao = gl.createVertexArray();
 
@@ -1081,6 +1171,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   /** Where the live scene draws (null: nowhere), and the dissolve in progress, if any. */
   let target = { rect: null, dim: 1 };
   let phase = null;
+  /** The opening in progress, if any (see `intro()`). */
   let intro = null;
   let lastIndex = -1;
   let lastT = 0;
@@ -1182,43 +1273,170 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     return { index, t, rect: target.rect, dim: target.dim, grow };
   }
 
-  /** The actors of a layer, after the dissolve and the opening burst are applied. */
-  function actorsFor(layer, pose, now) {
-    const list = [...pose.cubes, ...pose.sparks];
-    let center = [0, 0, 0];
-    let burst = null;
-    if (intro) {
-      const elapsed = now - intro.start;
-      if (elapsed > INTRO_MS + 400) intro = null;
-      else {
-        burst = (i) =>
-          easeOut(clamp01((elapsed - (i === 4 ? 0 : 90 + ((i * 53) % 260))) / INTRO_MS));
-        const shown = pose.cubes.filter(drawn);
-        center = [0, 1, 2].map((k) => shown.reduce((sum, a) => sum + a.p[k], 0) / shown.length);
-      }
-    }
-    return list.map((a, i) => {
-      let f = layer.grow(i);
-      let p = a.p;
-      let r = a.r;
-      if (burst) {
-        // The nine open out of the core into the mark, turning as they go.
-        const k = burst(i);
-        f *= k;
-        p = a.p.map((v, j) => lerp(center[j], v, k));
-        r = [a.r[0] + (1 - k) * 1.6, a.r[1] + (1 - k) * 2.4, a.r[2]];
-      }
-      return { ...a, p, r, s: a.s.map((v) => v * f), a: a.a * Math.min(1, f * 1.6) };
+  /** The actors of a layer, after the dissolve is applied. */
+  function actorsFor(layer, pose) {
+    return [...pose.cubes, ...pose.sparks].map((a, i) => {
+      const f = layer.grow(i);
+      return { ...a, s: a.s.map((v) => v * f), a: a.a * Math.min(1, f * 1.6) };
     });
   }
 
+  /** The camera's idle drift plus pointer parallax, as extra yaw and pitch. */
+  function drift(time) {
+    if (reduced) return [0, 0];
+    return [
+      0.04 * Math.sin(time * 0.21) + smoothPointer[0] * 0.07,
+      0.025 * Math.sin(time * 0.17) + smoothPointer[1] * 0.045,
+    ];
+  }
+
   function view(cam, time) {
-    const drift = reduced ? 0 : 1;
-    return camera(
-      cam,
-      drift * (0.04 * Math.sin(time * 0.21) + smoothPointer[0] * 0.07),
-      drift * (0.025 * Math.sin(time * 0.17) + smoothPointer[1] * 0.045)
+    return camera(cam, ...drift(time));
+  }
+
+  /**
+   * One frame of the opening: the camera, lens and actors to draw instead of the scene's own, how
+   * much of the page background still veils the field, and how present the floor is. Its last
+   * frame is the scene's settled frame: same camera (drift included), same lens, same actors.
+   */
+  function introFrame(now, time, layer, pose, bounds, colors) {
+    const it = intro;
+    // The first frame after `intro()` only warms the pipeline; the clock starts on the next one.
+    if (it.start === null && it.warm) it.start = now;
+    it.warm = true;
+    const elapsed = it.start === null ? 0 : now - it.start;
+    const full = it.mode === 'full';
+    const px0 = (it.mark.w / 70) * 13;
+    const cx0 = it.mark.x + it.mark.w / 2;
+    const cy0 = it.mark.y + it.mark.h / 2;
+    const flightStart = full ? FALL_END + HOLD_MS : 0;
+    const flightMs = FLIGHT_MS[it.mode];
+    const ink = colors.ink;
+    const list = [...pose.cubes, ...pose.sparks];
+    it.elapsed = elapsed;
+    it.flightStart = flightStart;
+
+    if (elapsed < flightStart) {
+      // The fall: the camera pulls back and squares up while the mark plane keeps its size, so
+      // cubes come up out of depth and the arrangement flattens into the logo as it lands.
+      const s = easeInOut(clamp01(elapsed / FALL_END));
+      const radius = R_FALL * (R_MARK / R_FALL) ** s;
+      const cam = camera({
+        yaw: -0.55 * (1 - s),
+        pitch: 0.42 * (1 - s),
+        target: [0, 0, 0],
+        radius,
+      });
+      const actors = list.map((a, i) => {
+        if (i >= 9) return hidden();
+        const plan = it.plan[i];
+        const local = clamp01((elapsed - plan.delay) / FALL_MS);
+        const k = easeOut(local);
+        const m = markActor(i);
+        return {
+          ...m,
+          p: lerp3(plan.from, m.p, k),
+          r: [plan.spin[0] * (1 - k), plan.spin[1] * (1 - k), 0],
+          // Each one locks into the flat ink of the mark as it lands.
+          tint: [...ink, lerp(colors.fallInk, 1, smooth(0.72, 1, local))],
+          round: smooth(0.72, 1, local),
+          a: Math.min(1, k * 1.6),
+        };
+      });
+      return {
+        cam,
+        lens: lensAt(px0, distanceFor(radius), cx0, cy0, width, height),
+        actors,
+        veil: 1,
+        floor: 0,
+        done: false,
+      };
+    }
+
+    const u = clamp01((elapsed - flightStart) / flightMs);
+    const e = easeInOut(u);
+    const veilOut = full
+      ? 1 - smooth(flightStart - 140, flightStart + 520, elapsed)
+      : 1 - smooth(0, 420, elapsed);
+    if (!layer.rect) {
+      // No room for the scene at this size: the mark just shrinks away where it stands.
+      const cam = camera({ yaw: 0, pitch: 0, target: [0, 0, 0], radius: R_MARK });
+      const actors = list.map((a, i) => {
+        if (i >= 9) return hidden();
+        const m = markActor(i);
+        return { ...m, s: m.s.map((v) => v * (1 - e)), tint: [...ink, 1], round: 1, a: 1 - e };
+      });
+      const lens = lensAt(px0, distanceFor(R_MARK), cx0, cy0, width, height);
+      return { cam, lens, actors, veil: veilOut, floor: 0, done: u >= 1 };
+    }
+
+    // The flight: camera, scale and centre all travel from the flat mark to the scene's own.
+    const [dyaw, dpitch] = drift(time);
+    const end = pose.cam;
+    const lensEnd = lensFor(bounds.box, layer.rect, width, height);
+    const pxEnd = (((lensEnd[0] * width) / 2) * FOCAL) / distanceFor(end.radius);
+    const radius = R_MARK * (end.radius / R_MARK) ** e;
+    const cam = camera({
+      yaw: lerp(0, end.yaw + dyaw, e),
+      pitch: lerp(0, end.pitch + dpitch, e),
+      target: end.target.map((v) => v * e),
+      radius,
+    });
+    const lens = lensAt(
+      px0 * (pxEnd / px0) ** e,
+      distanceFor(radius),
+      lerp(cx0, ((lensEnd[2] + 1) / 2) * width, e),
+      lerp(cy0, ((1 - lensEnd[3]) / 2) * height, e),
+      width,
+      height
     );
+    const actors = list.map((a, i) => {
+      if (i >= 9) return { ...a, s: a.s.map((v) => v * e), a: a.a * e };
+      const ring = i === 4 ? 0 : i % 2 === 1 ? 1 : 2;
+      const k = easeInOut(
+        clamp01((u * flightMs - ring * FLIGHT_RIPPLE) / (flightMs - 2 * FLIGHT_RIPPLE))
+      );
+      const m = markActor(i);
+      // The flat ink gives way to the scene's own light early, so the cubes gain depth as they go.
+      const lit = smooth(0, 0.6, k);
+      return {
+        p: lerp3(m.p, a.p, k),
+        s: lerp3(m.s, a.s, k),
+        r: lerp3(m.r, a.r, k),
+        b: lerp(m.b, a.b, k),
+        tint: [...lerp3(ink, a.tint.slice(0, 3), lit), lerp(1, a.tint[3], lit)],
+        round: 1 - smooth(0, 0.3, k),
+        a: lerp(1, a.a, k),
+      };
+    });
+    return { cam, lens, actors, veil: veilOut, floor: smooth(0.5, 1, e), done: u >= 1 };
+  }
+
+  /** Drops the opening and tells the page, which uncovers itself. */
+  function endIntro() {
+    const it = intro;
+    intro = null;
+    it?.hooks.done?.();
+  }
+
+  /** Fires the opening's cues whose moment has come, and ends it after its last frame. */
+  function introCues() {
+    const it = intro;
+    if (!it || it.start === null) return;
+    const cue = (name, at) => {
+      if (it.fired.has(name) || it.elapsed < at) return;
+      it.fired.add(name);
+      it.hooks[name]?.();
+    };
+    cue('start', 0);
+    if (it.mode === 'full') cue('land', FALL_END);
+    // Never on the start frame itself: the page must be styled hidden for a frame to fade from.
+    const late = it.revealLate ? FLIGHT_MS[it.mode] * 0.5 : -80;
+    cue('reveal', Math.max(1, it.flightStart + late));
+    if (it.finished && intro === it) {
+      intro = null;
+      it.hooks.done?.();
+    }
   }
 
   function drawLines(lines, cam, lens, colors, visible) {
@@ -1303,39 +1521,59 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.drawArrays(gl.POINTS, 0, g.count);
 
     // 3. the diorama: floor, shadows, cubes and wires, framed into the safe rectangle
-    const layer = currentLayer(now);
+    let layer = currentLayer(now);
+    // The opening draws even where the scene has no rectangle (it shrinks away there instead).
+    if (!layer && intro) layer = { index: scene(), t: lastT, rect: null, dim: 1, grow: () => 1 };
     debugFrame = null;
-    if (layer) drawLayer(layer, now, time, colors, ground);
+    if (layer) {
+      const pose = SCENES[layer.index](layer.t);
+      const bounds = sceneBounds(layer.index);
+      const opening = intro ? introFrame(now, time, layer, pose, bounds, colors) : null;
+      if (opening && opening.veil > 0.001) {
+        gl.useProgram(veil.p);
+        gl.bindVertexArray(emptyVao);
+        gl.uniform4f(veil.u.uColor, ...colors.veil, opening.veil);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      if (opening?.done) intro.finished = true;
+      // The opening's last frame is the settled scene, so from here the scene draws itself.
+      drawLayer(layer, pose, bounds, opening?.done ? null : opening, time, colors, ground);
+    }
     gl.disable(gl.SCISSOR_TEST);
     gl.bindVertexArray(null);
+    introCues();
   }
 
-  function drawLayer(layer, now, time, colors, ground) {
+  function drawLayer(layer, pose, bounds, opening, time, colors, ground) {
     const { rect, dim } = layer;
-    const pose = SCENES[layer.index](layer.t);
-    const bounds = sceneBounds(layer.index);
-    const lens = lensFor(bounds.box, rect, width, height);
-    const cam = view(pose.cam, time);
-    const actors = actorsFor(layer, pose, now);
+    if (!rect && !opening) return;
+    const lens = opening ? opening.lens : lensFor(bounds.box, rect, width, height);
+    const cam = opening ? opening.cam : view(pose.cam, time);
+    const actors = opening ? opening.actors : actorsFor(layer, pose);
     const cubes = actors.slice(0, 9);
+    const floorIn = opening ? opening.floor : 1;
     // How present the whole arrangement is (for the floor and wires during a dissolve).
-    const present = cubes.reduce((sum, a) => sum + Math.min(1, a.a), 0) / 9;
+    const present = (cubes.reduce((sum, a) => sum + Math.min(1, a.a), 0) / 9) * floorIn;
 
     // Belt and braces: nothing can draw outside the rectangle, even between timeline samples.
-    gl.enable(gl.SCISSOR_TEST);
-    gl.scissor(
-      Math.floor(rect.x * dpr),
-      Math.floor((height - rect.y - rect.h) * dpr),
-      Math.ceil(rect.w * dpr),
-      Math.ceil(rect.h * dpr)
-    );
+    // The opening flies in from the middle of the screen, so it alone draws unclipped.
+    if (opening) gl.disable(gl.SCISSOR_TEST);
+    else {
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(
+        Math.floor(rect.x * dpr),
+        Math.floor((height - rect.y - rect.h) * dpr),
+        Math.ceil(rect.w * dpr),
+        Math.ceil(rect.h * dpr)
+      );
+    }
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.depthMask(false);
 
     // The floor: a pool of light, a grid that fades out, and a contact shadow under each cube.
     const { floor } = bounds;
-    const floorAlpha = present * dim;
+    const floorAlpha = rect ? present * dim : 0;
     gl.disable(gl.DEPTH_TEST);
     gl.useProgram(disc.p);
     gl.bindVertexArray(emptyVao);
@@ -1359,10 +1597,10 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
       const bottom = a.p[1] - Math.max(a.s[1], a.s[0] * 0.5) * 0.5;
       const lift = bottom - floor.y;
       const contact = clamp01(1 - lift / 1.4);
-      if (contact <= 0.02) continue;
+      if (contact <= 0.02 || !rect) continue;
       const spread = 0.62 + 0.25 * clamp01(lift / 1.4);
       const radius = [a.s[0] * spread + 0.08, a.s[2] * spread + a.s[0] * 0.2 + 0.08];
-      const alpha = ground.shadow[3] * contact * Math.min(1, a.a) * dim;
+      const alpha = ground.shadow[3] * contact * Math.min(1, a.a) * dim * floorIn;
       drawDisc(
         cam,
         lens,
@@ -1397,6 +1635,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
       gl.uniform1f(cube.u.uBright, a.b * (0.55 + 0.45 * dim));
       gl.uniform1f(cube.u.uAlpha, a.a);
       gl.uniform4fv(cube.u.uTint, a.tint);
+      gl.uniform1f(cube.u.uRound, a.round ?? 0);
       gl.drawArrays(gl.TRIANGLES, 0, 36);
     }
 
@@ -1405,7 +1644,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     drawLines(pose.lines, cam, lens, colors, present * dim);
     gl.depthMask(true);
 
-    if (debug) debugFrame = { actors, lines: pose.lines, bounds, cam, lens, rect, present };
+    if (debug && rect) debugFrame = { actors, lines: pose.lines, bounds, cam, lens, rect, present };
   }
 
   function loop(now) {
@@ -1415,6 +1654,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     } catch {
       running = false;
       canvas.classList.remove('live');
+      endIntro();
       return;
     }
     frame = requestAnimationFrame(loop);
@@ -1447,6 +1687,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     event.preventDefault();
     stop();
     canvas.classList.remove('live');
+    endIntro();
   });
 
   resize();
@@ -1481,9 +1722,33 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     setPointer(x, y) {
       pointer = [x, y];
     },
-    intro() {
-      if (reduced) return;
-      intro = { start: performance.now() };
+    /**
+     * Plays the opening. `mark` is the static mark's box (CSS px) that the cubes settle into and
+     * leave from; `mode` is 'full' (fall, hold, flight) or 'short' (flight only). `hooks` run on
+     * the frame each moment is drawn: start, land (full only), reveal, done. `revealLate` holds the
+     * reveal until the cubes are halfway home, for layouts where they fly across the copy. Returns false when
+     * there is nothing to play (reduced motion, or the loop is not running).
+     */
+    intro({ mark, mode = 'full', revealLate = false, hooks = {} }) {
+      if (reduced || !running) return false;
+      intro = {
+        mark,
+        mode,
+        revealLate,
+        hooks,
+        plan: fallPlan(),
+        start: null,
+        warm: false,
+        elapsed: 0,
+        flightStart: 0,
+        fired: new Set(),
+        finished: false,
+      };
+      return true;
+    },
+    /** Ends the opening at once: the next frame is the settled scene. */
+    skipIntro() {
+      intro = null;
     },
     /** `?debug=bounds` only: every drawn item's on-screen box (CSS px), clipped to the rectangle. */
     debugBounds() {

@@ -37,6 +37,47 @@
       name="twitter:image"
       content="https://ninebrains.runs-on.dev/assets/ninebrains-banner.png"
     />
+    <!--
+      The loading mark, painted before any script or font: it covers the page until site.js hands
+      it to the stage. If that never happens, the animation hides it by 3.5s; without JS, at once.
+    -->
+    <style>
+      #intro {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: grid;
+        place-items: center;
+        background: #000;
+        color: #fafafa;
+        animation: intro-out 0.4s 3.1s forwards;
+      }
+      #intro svg {
+        display: block;
+        width: clamp(96px, 12vmin, 120px);
+        height: auto;
+        fill: currentColor;
+      }
+      @media (prefers-color-scheme: light) {
+        #intro {
+          background: #fafafa;
+          color: #0a0a0a;
+        }
+      }
+      @keyframes intro-out {
+        to {
+          opacity: 0;
+          visibility: hidden;
+        }
+      }
+    </style>
+    <noscript
+      ><style>
+        #intro {
+          display: none;
+        }
+      </style></noscript
+    >
     <link rel="stylesheet" href="/styles.css" />
     <script type="application/ld+json">
       {
@@ -61,6 +102,19 @@
     </script>
   </head>
   <body>
+    <div id="intro" aria-hidden="true">
+      <svg viewBox="0 0 70 70" focusable="false">
+        <rect x="7.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="7.5" y="28.5" width="13" height="13" rx="2" />
+        <rect x="7.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="28.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="28.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="7.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="28.5" width="13" height="13" rx="2" />
+        <rect x="49.5" y="49.5" width="13" height="13" rx="2" />
+        <rect x="25" y="25" width="20" height="20" rx="2" />
+      </svg>
+    </div>
     <a class="skip" href="#stage">Skip to content</a>
     <canvas id="scene" aria-hidden="true"></canvas>
     <div class="scanlines" aria-hidden="true"></div>
@@ -254,7 +308,12 @@
         >
           <div class="text">
             <p class="eyebrow">Free and open source for macOS, Windows and Linux</p>
-            <h1>Nine agents.<br />One repo.<br />No collisions.</h1>
+            <h1>
+              <span class="ln">Nine agents.</span><br /><span class="ln">One repo.</span><br /><span
+                class="ln"
+                >No collisions.</span
+              >
+            </h1>
             <p class="lede">
               Claude Code, Codex and Freebuff side by side, each in its own git worktree. A central
               Brain hands out the work. Verification gates prove it before it counts as done.

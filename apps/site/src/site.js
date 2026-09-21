@@ -9,6 +9,11 @@
  * None of it gates the content. Without JS the page shows the overview and the install command;
  * without WebGL the stage stays a CSS gradient; with reduced motion every demo shows its final
  * frame, nothing auto-advances and scene changes are instant cuts.
+ *
+ * The opening (`playIntro`) is decoration on top: the HTML paints a static mark over the page
+ * before any script runs, and this file hands it to the stage, which drops nine cubes into that
+ * exact mark and flies them to the overview while the copy comes up. Any input skips it; without
+ * WebGL, or on any error, the mark is simply removed; CSS hides it by 3.5s whatever happens.
  */
 import { safeRect } from './layout.js';
 import { createStage } from './stage.js';
@@ -189,10 +194,117 @@ function initStage() {
   }
   if (!stage) return;
   syncStage({ instant: true });
-  stage.intro();
   // Text reflows once the web fonts land; re-measure the safe rectangle then.
   document.fonts?.ready.then(() => syncStage({ instant: true }));
   requestAnimationFrame(() => canvas.classList.add('live'));
+}
+
+// --- the opening ------------------------------------------------------------------------------
+
+const INTRO_SEEN = 'ninebrains:intro-seen';
+/**
+ * Too late to start (ms since navigation): the static mark's CSS failsafe starts hiding it at
+ * 3.1s, and an opening that began after this would outlast it.
+ */
+const INTRO_LATEST = 2500;
+const root = document.documentElement;
+const introEl = document.getElementById('intro');
+/** While the opening plays: ends it at its settled frame (a skip, the last frame, an error). */
+let introEnd = null;
+
+/** 'full' on a first visit, 'short' after that or on a deep link, 'fade' for reduced motion. */
+function introMode() {
+  if (!introEl || debug || performance.now() > INTRO_LATEST) return null;
+  if (reduced) return 'fade';
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem(INTRO_SEEN) === '1';
+    sessionStorage.setItem(INTRO_SEEN, '1');
+  } catch {
+    // No storage (private mode, blocked): every visit counts as the first.
+  }
+  return seen || location.hash ? 'short' : 'full';
+}
+
+/** How long the copy's reveal can still run after the cubes land (its longest delay plus fade). */
+const REVEAL_TAIL = 1000;
+let revealTail = 0;
+
+function removeIntro({ settle = false } = {}) {
+  introEl?.remove();
+  clearTimeout(revealTail);
+  const clear = () => root.classList.remove('intro', 'intro-reveal', 'intro-short');
+  // Landing on its own, the copy finishes easing in; a skip or a failure shows it at once.
+  if (settle && root.classList.contains('intro-reveal'))
+    revealTail = setTimeout(clear, REVEAL_TAIL);
+  else clear();
+}
+
+function playIntro() {
+  const mode = introMode();
+  if (!mode) return removeIntro();
+  if (mode === 'fade') {
+    // The reduced-motion CSS clamps every transition to 1ms, so this crossfade is scripted.
+    const fade = introEl.animate?.([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 200,
+      fill: 'forwards',
+    });
+    if (fade) fade.finished.then(removeIntro, removeIntro);
+    else removeIntro();
+    return;
+  }
+  const box = introEl.querySelector('svg')?.getBoundingClientRect();
+  if (!stage || !box || box.width < 1) return removeIntro();
+
+  const canvas = document.getElementById('scene');
+  const skips = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+  let safety = 0;
+  const finish = (settle = false) => {
+    if (introEnd !== finish) return;
+    introEnd = null;
+    clearTimeout(safety);
+    for (const type of skips) window.removeEventListener(type, skip, true);
+    window.removeEventListener('resize', skip);
+    stage?.skipIntro();
+    canvas.style.transition = '';
+    removeIntro({ settle });
+    // The copy was measured with its lines still rising; measure the settled page.
+    syncStage({ instant: true });
+  };
+  const skip = () => finish(false);
+  introEnd = finish;
+  // Under the opaque mark the stage can come up at once; the hand-off needs it already there.
+  canvas.style.transition = 'none';
+  canvas.classList.add('live');
+  const started = stage.intro({
+    mark: { x: box.left, y: box.top, w: box.width, h: box.height },
+    mode,
+    // Stacked layouts send the cubes up across the headline; let them pass before it comes up.
+    revealLate: mobileQuery.matches,
+    hooks: {
+      start() {
+        if (performance.now() > INTRO_LATEST + 500) return skip();
+        // The overview's demo starts from its entry frame as it comes into view.
+        for (const mark of marks[clock.index].list) mark.state = '';
+        restartClock();
+        root.classList.add('intro');
+        root.classList.toggle('intro-short', mode === 'short');
+        introEl.classList.add(mode === 'full' ? 'is-ghost' : 'is-handoff');
+      },
+      land() {
+        introEl.classList.add('is-landed');
+      },
+      reveal() {
+        root.classList.add('intro-reveal');
+      },
+      done: () => finish(true),
+    },
+  });
+  if (!started) return skip();
+  for (const type of skips) window.addEventListener(type, skip, { capture: true, passive: true });
+  window.addEventListener('resize', skip);
+  // If frames stop coming (a hidden tab, a stalled GPU), never leave the page covered.
+  safety = setTimeout(skip, 4500);
 }
 
 // --- the rail ---------------------------------------------------------------------------------
@@ -630,6 +742,7 @@ function main() {
   fitWindows();
   applyMarks(clock.index, sceneTime());
   initStage();
+  playIntro();
   requestAnimationFrame(tick);
 }
 
@@ -663,5 +776,12 @@ function initDebug() {
   };
 }
 
-initDebug();
-main();
+try {
+  initDebug();
+  main();
+} catch (error) {
+  // Whatever broke, the page underneath is complete: uncover it.
+  introEnd?.();
+  removeIntro();
+  throw error;
+}

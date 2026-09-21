@@ -56,6 +56,9 @@
       const r = rectOf(el);
       if (r) items.push({ name, el, kind: 'dom', ...r });
     };
+    // The loading mark covers the whole page while it is up, so it collides with everything; with
+    // `?debug=bounds` site.js removes it at once, and a leftover one is a finding.
+    add('intro', document.getElementById('intro'));
     add('header', document.querySelector('body > .nav'));
     add(mobile() ? 'bottombar' : 'rail', document.querySelector('.rail'));
     document.querySelectorAll('.rail [role="tab"]').forEach((tab, i) => {
