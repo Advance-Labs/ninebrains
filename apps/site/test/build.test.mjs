@@ -46,6 +46,10 @@ test('every image has alt text', () => {
   }
 });
 
-test('states the pre-release position rather than overclaiming', () => {
-  assert.match(flat, /Pre-release/);
+test('offers the release, and says plainly that builds are unsigned', () => {
+  // v0.1.0 shipped, so "pre-release, being built" became false. Unsigned is still true and is
+  // the part a downloader needs before they open the app.
+  assert.match(flat, /href="https:\/\/github\.com\/Advance-Labs\/ninebrains\/releases\/latest"/);
+  assert.match(flat, /not yet code-signed/);
+  assert.match(flat, /"softwareVersion": "0\.1\.0"/);
 });

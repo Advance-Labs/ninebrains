@@ -55,7 +55,7 @@ Ninebrains is a fork of [Emdash](https://github.com/generalaction/emdash) by Gen
 also get its worktrees, terminals, Monaco editor, diffs, pull requests, issue integrations, MCP
 servers, skills and automations.
 
-> **Status:** pre-release. v0.1 is being built in the open, and builds are not yet code-signed.
+> **Status:** [v0.1.0](https://github.com/Advance-Labs/ninebrains/releases/latest) is out for macOS, Windows and Linux. It is an early release, and builds are not yet code-signed.
 
 ## Features
 
@@ -135,11 +135,25 @@ Start a lane from a pack role. Its prompt, agent and model preferences fill in a
 
 ### Download
 
-Builds for macOS, Windows and Linux will be on
-[GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases). v0.1 builds are **not
-code-signed**; macOS Gatekeeper and Windows SmartScreen will warn you, and unsigned builds do not
-auto-update. Check every download against the release's `SHA256SUMS` file and build attestation
-before you open it. [docs/RELEASING.md](docs/RELEASING.md) has the exact commands.
+Get the latest build from [GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases/latest):
+
+| OS | File |
+|---|---|
+| macOS, Apple Silicon | `Ninebrains-0.1.0-mac-arm64.dmg` |
+| macOS, Intel | `Ninebrains-0.1.0-mac-x64.dmg` |
+| Windows | `Ninebrains-0.1.0-win-x64.exe` |
+| Linux | `Ninebrains-0.1.0-linux-x86_64.AppImage` or `…-linux-amd64.deb` |
+
+v0.1 builds are **not code-signed**. macOS Gatekeeper and Windows SmartScreen will warn you, and
+unsigned builds do not auto-update. Check every download against the release's `SHA256SUMS` file
+and build attestation before you open it:
+
+```bash
+shasum -a 256 -c SHA256SUMS --ignore-missing
+gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebrains
+```
+
+[docs/RELEASING.md](docs/RELEASING.md) covers Windows and Linux, and how to open an unsigned app.
 
 ### Build from source
 
