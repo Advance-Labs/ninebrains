@@ -396,7 +396,7 @@ Ninebrains-only files below), so the feature itself landed entirely inside files
 `src/core/features/packs/**`, `packages/brain-core/**`, `packages/brain-mcp/**`,
 `src/core/features/planner/**`, `src/renderer/tests/browser/planner-screenshots.test.tsx`,
 `docs/screenshots/planner-*.png`,
-`.github/workflows/release.yml`, `docs/RELEASING.md`, `scripts/release/checksums.mjs`,
+`.github/workflows/release.yml`, `.github/release-notes/install.md`, `docs/RELEASING.md`, `scripts/release/checksums.mjs`,
 `scripts/release/checksums.test.mjs`, `scripts/release/release-config.test.mjs`,
 `scripts/release/lib/signing.ts`, `src/core/features/gates/**` (beyond `capabilities/`),
 `src/main/host/ninebrains/**`, `src/renderer/tests/browser/gates-screenshots.test.tsx`,
@@ -480,3 +480,32 @@ assertion loosened in either.
 | File | Change | Why |
 |---|---|---|
 | `packages/ui/src/react/primitives/switch/switch.css.ts` | Unchecked track gets a `border-1` outline (`border-2` on hover) and a `foreground-muted` thumb; checked track and border use `primary-button-background` (`-hover` on hover) and the thumb uses `primary-button-foreground` instead of `foreground` | Section 3 made `accent.9` near-white in dark mode, but the thumb stayed on `foreground` (`#ededed`), so a checked switch rendered as a blank white pill app-wide. The off state had a transparent border on a surface close to the card and read as nothing. Pairing the thumb with the track's own contrast token keeps it legible in every theme, Solarized included |
+
+## 22. Rebrand leftovers: branch prefix and copy (W8 `emdash/bud-fixes-carog`)
+
+Follow-up to section 3. New task branches were still named `emdash/<task>` (and their worktree
+folders `emdash-<task>`) because the project settings default said `'emdash'`. User-visible strings
+now go through two channel-independent constants. `PRODUCT_NAME` / `APP_NAME_LOWER` gain a
+"Canary" suffix, which would have given canary users `ninebrains-canary/` branches.
+
+| File | What | Why |
+|---|---|---|
+| `src/core/primitives/app-identity/api/app-identity.ts` | `BRAND_NAME = 'Ninebrains'`, `BRAND_SLUG = 'ninebrains'` added | One place for the brand in copy and generated names, same on every channel |
+| `src/core/features/projects/contributions/settings.ts`, `src/core/features/settings/browser/components/RepositorySettingsCard.tsx` | Default `branchPrefix` `'emdash'` → `BRAND_SLUG`; the reset-to-default label follows | Task branches were `emdash/<task>`. Defaults resolve live, so installs without a stored prefix switch on upgrade |
+| `packages/core/src/runtimes/automations/node/scheduling/scheduler.ts` | Automation run name `emdash-<id>` → `ninebrains-<id>` | That name becomes the run's branch. Literal, because packages cannot import the desktop identity module |
+| `src/core/features/settings/browser/components/AccountTab.tsx`, `github-connect-modal.tsx`, `src/core/features/settings/browser/search/settings-search.ts`, `src/core/features/account/node/account-errors.ts`, `src/core/features/workbench/browser/onboarding/sign-in-step.tsx` | "Emdash account" / "Sign in to Emdash" copy → `BRAND_NAME` | Hidden behind `HOSTED_ACCOUNT_ENABLED` today, but must not say Emdash if it returns. Test: `src/core/features/account/node/services/emdash-account-service.test.ts` |
+| `src/core/features/settings/browser/agents-page/InstallationOverrideCard.tsx`, `src/core/features/machines/browser/components/host-settings-card.tsx`, `src/core/features/dev-perf/contributions/commands.ts` | "emdash's ability", "emdash data directory", `~/emdash/worktrees` placeholder, "every emdash process" → brand constants | User-visible copy. The placeholder now matches the real default worktree root |
+| `src/core/features/workbench/browser/feedback-modal/use-feedback-submit.ts` | Report metadata `Emdash Version:` → `${PRODUCT_NAME} Version:` | Issue reports named the wrong app. Test: `use-feedback-submit.test.ts` |
+| `src/main/host/file-logger.ts`, `src/main/host/dev-perf/controller-operations.ts`, `src/main/lib/logger.ts`, `src/core/features/catalog/node/catalog-service.ts` | `emdash.log`, `emdash-diagnostics.log`, `emdash-trace-*.json`, logger name `emdash-main`, User-Agent `emdash-catalog` → `BRAND_SLUG` | File names users attach to bug reports, and the name we send to the catalog host |
+| `packages/core/src/workspace-server/versions/index.ts`, `packages/core/src/workspace-server/versions/versions.test.ts` | "update the Emdash app" → "Ninebrains app" | Remote-host upgrade message named the wrong app |
+| `packages/plugins/src/integrations/impl/notion/index.ts` | Notion token help "you want Emdash to access" → Ninebrains | User-visible help text |
+
+Left as `emdash` on purpose, because renaming breaks existing users or data: `.emdash.json`,
+`EMDASH_*` env vars, secret keys (`emdash-*-token`), database, localStorage and IPC names,
+`emdash-file://` and other URI schemes, the tmux `emdash-` prefix, the browser partition,
+`TERM_PROGRAM`, the ACP `clientInfo` name, the legacy Emdash importer copy, and the Apache-2.0
+attribution.
+
+Release notes: `.github/workflows/release.yml` (Ninebrains-only) renders the new
+`.github/release-notes/install.md` into every release, so the Gatekeeper, SmartScreen and Linux
+steps and the docs links are on the release page instead of only in `docs/RELEASING.md`.
