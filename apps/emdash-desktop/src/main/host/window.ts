@@ -51,6 +51,10 @@ export function createMainWindow(): BrowserWindow {
       // Allow using <webview> in renderer for in‑app browser pane.
       // The webview runs in a separate process; nodeIntegration remains disabled.
       webviewTag: true,
+      // Enables Chromium's built-in PDF viewer for the editor's PDF preview.
+      // Electron's only internal plugin is the PDF viewer; third-party plugins
+      // are not supported, so this does not widen the plugin surface further.
+      plugins: true,
       // app.getAppPath() is stable regardless of which output chunk this module
       // lands in after code splitting. Preload is built to out/preload/index.mjs.
       preload: join(app.getAppPath(), 'out', 'preload', 'index.mjs'),

@@ -3,6 +3,9 @@ import type { ManagedFileKind } from '../../../browser/renderers/types';
 /** Raster image extensions — rendered with <img>, not Monaco. */
 export const RASTER_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp']);
 
+/** PDF extensions — rendered with Chromium's built-in PDF viewer. */
+export const PDF_EXTS = new Set(['pdf']);
+
 /** HTML extensions — rendered with the HTML preview iframe. */
 export const HTML_EXTS = new Set(['html', 'htm']);
 
@@ -22,7 +25,6 @@ export const BINARY_EXTS = new Set([
   'bz2',
   '7z',
   'rar',
-  'pdf',
   'db',
   'sqlite',
   'sqlite3',
@@ -63,6 +65,7 @@ export function getFileKind(filePath: string): Exclude<ManagedFileKind, 'too-lar
   if (ext === 'csv') return 'csv';
   if (ext === 'md' || ext === 'mdx') return 'markdown';
   if (HTML_EXTS.has(ext)) return 'html';
+  if (PDF_EXTS.has(ext)) return 'pdf';
   if (BINARY_EXTS.has(ext)) return 'binary';
   return 'text';
 }
@@ -80,7 +83,7 @@ export function isMonacoBackedKind(kind: ManagedFileKind): boolean {
 /** True for files the diff viewer must not load into Monaco. */
 export function isBinaryForDiff(filePath: string): boolean {
   const kind = getFileKind(filePath);
-  return kind === 'binary' || kind === 'image' || kind === 'svg';
+  return kind === 'binary' || kind === 'pdf' || kind === 'image' || kind === 'svg';
 }
 
 /** True for files the diff viewer renders as an `<img>` preview instead of text. */

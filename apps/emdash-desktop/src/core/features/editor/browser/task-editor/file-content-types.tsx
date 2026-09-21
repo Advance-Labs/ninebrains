@@ -16,11 +16,12 @@ import { observer } from 'mobx-react-lite';
 import { useEffect, useState, type ComponentType } from 'react';
 import type { FileTabResource } from '@core/features/editor/api/browser/task-editor/stores/file-tab-resource';
 import { HtmlRenderer } from '@core/features/editor/contributions/browser/renderers/html-renderer';
-import { readImageFile } from '@core/features/files/api/browser/file-content';
+import { readFileBlob, readImageFile } from '@core/features/files/api/browser/file-content';
 import { BinaryRenderer } from '../renderers/binary-renderer';
 import { CsvRenderer } from '../renderers/csv-renderer';
 import { ImageRenderer } from '../renderers/image-renderer';
 import { MarkdownEditorRenderer } from '../renderers/markdown-renderer';
+import { PdfRenderer } from '../renderers/pdf-renderer';
 import { SvgRenderer } from '../renderers/svg-renderer';
 import type { ManagedFileKind } from '../renderers/types';
 
@@ -100,6 +101,58 @@ const ImagePreview = observer(function ImagePreview({ tab }: { tab: FileTabResou
   return <ImageRenderer file={{ path: tab.path, content: state.dataUrl }} />;
 });
 
+/**
+ * Largest PDF loaded into the viewer. The whole file is held in renderer memory
+ * as one Blob, so this bounds the cost of opening a huge scan or book.
+ */
+const PDF_MAX_BYTES = 50 * 1024 * 1024;
+
+/** PDFs also bypass the text stack: bytes are read into a Blob for the viewer. */
+const PdfPreview = observer(function PdfPreview({ tab }: { tab: FileTabResource }) {
+  const [state, setState] = useState<
+    { kind: 'loading' } | { kind: 'ready'; blob: Blob } | { kind: 'too-large' } | { kind: 'error' }
+  >({ kind: 'loading' });
+  const ref = tab.ref;
+
+  useEffect(() => {
+    if (!ref) {
+      setState({ kind: 'error' });
+      return;
+    }
+    let cancelled = false;
+    setState({ kind: 'loading' });
+    void readFileBlob(ref, { maxBytes: PDF_MAX_BYTES, mimeType: 'application/pdf' })
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.success) setState({ kind: 'error' });
+        else if (result.data.truncated) setState({ kind: 'too-large' });
+        else setState({ kind: 'ready', blob: result.data.blob });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ kind: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ref]);
+
+  if (state.kind === 'loading') {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spinner size="sm" />
+      </div>
+    );
+  }
+  if (state.kind !== 'ready') {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-foreground-passive">
+        {state.kind === 'too-large' ? 'PDF too large to preview' : 'Could not load PDF'}
+      </div>
+    );
+  }
+  return <PdfRenderer file={{ path: tab.path, blob: state.blob }} />;
+});
+
 function BinaryPreview({ tab }: { tab: FileTabResource }) {
   return <BinaryRenderer file={tab} />;
 }
@@ -114,5 +167,6 @@ export const FILE_CONTENT_TYPES: Record<
   html: { editable: true, Preview: HtmlPreview },
   svg: { editable: true, Preview: SvgPreview },
   image: { editable: false, Preview: ImagePreview },
+  pdf: { editable: false, Preview: PdfPreview },
   binary: { editable: false, Preview: BinaryPreview },
 };

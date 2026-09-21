@@ -522,3 +522,12 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 | File | Change | Why |
 |---|---|---|
 | `package.json` | `nx.implicitDependencies: ["@ninebrains/brain-mcp"]` | The app runs `packages/brain-mcp/dist` in its build (copied to `out/main/brain-mcp`) and in `brain/node/unattended.test.ts`, but never declared the package, so `^build` skipped it. In any checkout where brain-mcp had not been built (a fresh worktree, a clean clone) the pre-push hook's `nx affected -t test` failed that test with the job ending `failed` instead of `verifying`. An implicit dependency avoids a lockfile change |
+
+## 25. PDF preview in the file editor (`feat/editor-pdf-viewer`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/editor/api/browser/renderers/fileKind.ts`, `src/core/features/editor/browser/renderers/types.ts` | New `'pdf'` file kind (`PDF_EXTS`); `pdf` leaves `BINARY_EXTS`; `isBinaryForDiff` still treats it as binary | PDFs opened as "Binary file — no preview available". The text diff must still not load them into Monaco. Test: `src/core/features/editor/browser/renderers/fileKind.test.ts` |
+| `src/core/features/files/api/browser/file-content.ts` | New `readFileBlob(ref, { maxBytes, mimeType })` | `readBytes` defaults to a 200 KB cap, which truncates nearly every real PDF. A Blob plus object URL avoids a base64 data URL several MB long |
+| `src/core/features/editor/browser/task-editor/file-content-types.tsx`, `src/core/features/editor/browser/renderers/pdf-renderer.tsx` (new) | `PdfPreview` reads up to `PDF_MAX_BYTES` (50 MB) and renders an iframe on a revoked-on-unmount `blob:` URL; distinct "too large" and "could not load" states | In-editor PDF viewing with Chromium's viewer (zoom, search, thumbnails, print) |
+| `src/main/host/window.ts` | Main window `webPreferences.plugins: true` | Electron's built-in PDF viewer is an internal plugin and stays off without it. It is Electron's only plugin; `<webview>` guests keep their own prefs, so the in-app browser is unchanged |
