@@ -45,7 +45,11 @@ export const PrRow = memo(function PrRow({
               <Tooltip.Content>Open PR on GitHub</Tooltip.Content>
             </Tooltip.Root>
           </div>
-          <RelativeTime value={pr.createdAt} className="text-xs text-foreground-passive" compact />
+          <RelativeTime
+            value={pr.createdAt}
+            className="shrink-0 text-xs text-foreground-passive transition-opacity group-hover:opacity-0"
+            compact
+          />
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <PrMergeLine pr={pr} className="flex-1" />
@@ -72,7 +76,10 @@ function PrDiffStat({ pr }: { pr: PullRequest }) {
   if (pr.additions == null && pr.deletions == null) return null;
 
   return (
-    <span className="shrink-0 text-xs tabular-nums" aria-label="Pull request diff lines">
+    <span
+      className="shrink-0 text-xs tabular-nums transition-opacity group-hover:opacity-0"
+      aria-label="Pull request diff lines"
+    >
       <span className="text-foreground-success">+{formatDiffLineCount(pr.additions ?? 0)}</span>{' '}
       <span className="text-foreground-error">-{formatDiffLineCount(pr.deletions ?? 0)}</span>
     </span>
