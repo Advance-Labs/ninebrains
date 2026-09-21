@@ -555,3 +555,9 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 | `packages/core/src/runtimes/tui-agents/node/runtime/runtime.ts` | `onData` feeds the detector; the notice is held in a `usageLimits` map and merged by `syncSessionState`; cleared on respawn (`onProcess`), eviction (`usage-limit` step) and dispose | `onStateChange` rewrites the whole session cell per chunk, so the runtime owns the flag. Read-only on output: no PTY writes, env or spawn change |
 | `src/core/features/conversations/api/browser/conversation-manager.ts` | Observable `usageLimits` map synced from the TUI session list | Renderer state for the banner |
 | `src/core/features/conversations/browser/usage-limit-banner.tsx` (new), `conversations-panel.tsx` | Warning banner over the terminal: "Continue in Freebuff" copies a handoff note (task name, notice, read `git status`/`git diff`) and opens a Freebuff conversation in the same worktree; "Install Freebuff" when it is missing; dismissible per detection | Freebuff is free and already a registered provider, but `pty-only` (no prompt argument), so the handoff goes by clipboard |
+
+## 29. PR list hover action no longer covers the row metadata (`emdash/pr-ui-fix-ze8gw`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/projects/browser/components/pr-view/pr-row.tsx` | The `RelativeTime` and `PrDiffStat` spans get `transition-opacity group-hover:opacity-0` (and `shrink-0` on the time) | The "Review in Task" button is absolutely positioned over the row's right edge and fades in on hover, but the timestamp and `+N -N` diff stat stayed visible under its translucent `secondary` background, so the three overlapped. Same hover swap as `pr-entry.tsx` and the tab items |
