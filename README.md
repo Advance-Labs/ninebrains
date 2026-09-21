@@ -79,7 +79,8 @@ servers, skills and automations.
 - **Unattended runs.** `claude -p` and experimental `codex exec` runs, with per-run budgets, a
   sandbox, a minimal environment and a STOP switch that ends every run in under 5 seconds.
 - **Nothing phones home.** Telemetry is off, with no endpoint built in. No hosted account. No
-  update feed until builds are signed.
+  auto-update until builds are signed. An optional **Check for new versions** setting (off by
+  default) asks GitHub whether a newer release is out, and only tells you.
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
 with a morning digest, a video pack, signed builds and auto-update.
@@ -133,6 +134,26 @@ Start a lane from a pack role. Its prompt, agent and model preferences fill in a
 
 ## Install
 
+### One line
+
+Installs Ninebrains, or updates an existing install. The script picks the file for your OS and
+CPU, downloads it from GitHub Releases, and checks it against the release's `SHA256SUMS` before
+installing anything. With the GitHub CLI signed in it also verifies the build attestation, and
+installs nothing if that fails.
+
+```bash
+# macOS and Linux
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://ninebrains.runs-on.dev/install.ps1 | iex
+```
+
+Read the script first if you like: open the same URL in a browser. What the checksum check does
+and does not prove is in [Verify a download](docs/guide/verify-download.md#updating).
+
 ### Download
 
 Get the latest build from [GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases/latest):
@@ -154,6 +175,28 @@ gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebra
 ```
 
 [docs/RELEASING.md](docs/RELEASING.md) covers Windows and Linux, and how to open an unsigned app.
+
+### Updating
+
+Ninebrains does not update itself. To update, run the one-line installer again, or download the new
+build from [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download). Your projects,
+settings and history stay where they are.
+
+- **Linux `.deb` installs:** update with `curl ... | sh -s -- --deb` (runs `sudo apt install`). The
+  plain line installs the AppImage into `~/.local/bin` instead.
+- **Running app:** macOS prompts you to quit it; Windows stops unless you pass `-Force`; the Linux
+  AppImage is swapped in place, so restart it afterwards.
+- **Windows** always installs for the current user. An all-users install makes the script stop
+  with a message, unless you pass `-Force`.
+- **Options** go after `sh -s --` (for example `--require-attestation`), or on Windows use
+  `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation`,
+  because `irm ... | iex` takes no arguments. All options:
+  [Verify a download → Installer options](docs/guide/verify-download.md#installer-options).
+
+From 0.2.0 on, the app can tell you when a new release is out: turn on **Settings → General →
+Check for new versions**, or press **Check now** there. It is off by default, because it is a
+request to `api.github.com` you did not otherwise make. 0.1.0 builds have no notice; update them by
+hand once.
 
 ### Build from source
 

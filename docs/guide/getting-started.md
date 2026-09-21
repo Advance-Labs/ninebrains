@@ -17,15 +17,51 @@ plan or key charges. Ninebrains makes no claim about which quota its runs draw f
 
 ## Install
 
+### In one line
+
+On macOS or Linux, in a terminal:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://ninebrains.runs-on.dev/install.ps1 | iex
+```
+
+The script picks the file for your OS and CPU (the `.zip` on macOS, the AppImage into
+`~/.local/bin` on Linux x86_64, the x64 installer for the current user on Windows), downloads it
+from GitHub Releases, checks it against the release's `SHA256SUMS`, and installs it. Run the same
+line again later to update. Options such as `--deb` or `--require-attestation`, and what the
+checks prove, are in [Verify a download → Updating](verify-download.md#updating).
+
 ### From a release
 
 Download the build for your OS from
+[ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download) or
 [GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases).
 
-v0.1 builds are **not code-signed**. Before you open one, check it against the release's
+Builds are **not code-signed** yet. Before you open one, check it against the release's
 `SHA256SUMS` file. [Verify and open a download](verify-download.md) gives the commands, and
-explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScreen. Unsigned
-builds do not update themselves; download new releases by hand.
+explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScreen.
+
+### Updating
+
+Ninebrains does not update itself: unsigned builds cannot be updated safely from inside the app.
+Update with the one-line installer above, or download the new build and install it over the old
+one. If you installed the `.deb`, update with
+`curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
+(it runs `sudo apt install`); the plain line would add an AppImage instead. On macOS the installer
+asks you to quit Ninebrains first; on Windows, quit it before you run the line.
+[Verify a download → Updating](verify-download.md#updating) has the details.
+
+To hear about new releases, turn on **Settings → General → Check for new versions**. Once after
+startup and every 12 hours, the app asks GitHub for the latest release. When there is a newer one,
+a notice appears at the bottom of the left sidebar, and Settings → General shows a download button
+and the installer line to copy. Nothing is downloaded or installed for you. The setting is off by
+default; **Check now** on the same page works either way. Versions before 0.2.0 do not have it.
 
 ### From source
 

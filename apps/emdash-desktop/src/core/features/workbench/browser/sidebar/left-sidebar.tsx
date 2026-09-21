@@ -2,6 +2,7 @@ import { Clock, FolderInput, MessageSquareShare, Settings } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { automationsViewDef } from '@core/features/automations/contributions/views';
+import { ReleaseNotice } from '@core/features/release-check/contributions/browser/release-notice';
 import { settingsViewDef } from '@core/features/settings/contributions/views';
 import { openExternal } from '@core/primitives/desktop-host/browser/host-client';
 import { BoundShortcut } from '@core/primitives/keybindings/browser/shortcut';
@@ -69,6 +70,8 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
+          {/* Ninebrains: "a new version is out" (features/release-check). */}
+          <ReleaseNotice />
           <SidebarMenu>
             <SidebarSearchTrigger />
             <SidebarMenuButton
