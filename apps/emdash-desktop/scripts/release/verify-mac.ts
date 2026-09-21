@@ -13,11 +13,18 @@ if (process.platform !== 'darwin') {
 const { values } = parseArgs({
   options: {
     'expected-team-id': { type: 'string' },
+    // Set when the build had notarization credentials: fail unless every app carries a stapled
+    // ticket and Gatekeeper accepts it as a notarized Developer ID app.
+    'expect-notarized': { type: 'boolean', default: false },
   },
   strict: true,
 });
 
 const expectedTeamId = values['expected-team-id'];
+const expectNotarized = values['expect-notarized'];
+if (expectNotarized && !expectedTeamId) {
+  fail('--expect-notarized needs --expected-team-id: a notarized app must be Developer ID signed');
+}
 
 const appBundles = readdirSync(RELEASE_DIR)
   .filter((d) => d.startsWith('mac'))
@@ -98,6 +105,17 @@ for (const appDir of appBundles) {
       fail(`TeamIdentifier mismatch (got '${tid}', expected '${expectedTeamId}')`);
     }
     info(`TeamIdentifier: ${tid}`);
+  }
+
+  if (expectNotarized) {
+    // stapler: the notarization ticket is attached, so first launch works offline too.
+    exec(`xcrun stapler validate "${appDir}"`, { echo: true });
+    // spctl: what Gatekeeper decides for a quarantined download of this exact bundle.
+    const assessment = exec(`spctl --assess --type execute --verbose=4 "${appDir}" 2>&1`);
+    info(assessment.trim());
+    if (!assessment.includes('source=Notarized Developer ID')) {
+      fail(`Gatekeeper does not accept ${appDir} as a notarized Developer ID app`);
+    }
   }
 
   verified++;

@@ -69,6 +69,16 @@ Do this only after the checksum matches.
 
 ### macOS
 
+The one-line installer skips this whole section. It checks the checksum for you, and macOS shows
+no warning for an app it installs. That is not a bypass: macOS only quarantines files a browser or
+mail app downloads, and the installer downloads with `curl`.
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+For a `.dmg` you downloaded in a browser:
+
 - **macOS 14 and earlier:** right-click (or Control-click) the app, choose **Open**, then **Open**
   again.
 - **macOS 15 and later:** try to open the app once. Then go to **System Settings → Privacy &

@@ -196,7 +196,14 @@ above matches, and only for a file you downloaded from `github.com/Advance-Labs/
 
 ### macOS Gatekeeper
 
-The first launch says the app "can't be opened because Apple cannot check it for malicious software".
+The one-line installer (`apps/site/public/install`) never meets Gatekeeper. macOS only sets
+`com.apple.quarantine` on files a quarantine-aware app (a browser, Mail, AirDrop) writes, and
+`curl` and `ditto` are not. So the app it installs is never quarantined, and nothing needs
+stripping. That is why the installer contains no `xattr` call, and `install.test.mjs` keeps it
+that way. It checks SHA256SUMS, bundle id, version and `codesign --verify` instead, plus provenance
+when `gh` is signed in. This is the path to point people at until notarization lands.
+
+For a browser-downloaded `.dmg`, the first launch says the app "can't be opened because Apple cannot check it for malicious software".
 
 - **macOS 14 and earlier:** in Finder, right-click (or Control-click) `Ninebrains.app` → **Open** →
   **Open**. You only need to do this once.
@@ -259,14 +266,21 @@ be signed can't ship unsigned by accident.
 3. Add repository **secrets**:
    - `CSC_LINK`: the base64-encoded `.p12`.
    - `CSC_KEY_PASSWORD`: the password for the `.p12`.
-   - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` (from appleid.apple.com) and `APPLE_TEAM_ID`.
-
-   `APPLE_API_KEY`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER` (an App Store Connect API key) also
-   work, but would need adding to the workflow's Package step env.
+   - `APPLE_TEAM_ID`: the 10-character Team ID. The verify step needs it whenever `CSC_LINK` is set.
+   - Notarization, one of:
+     - **App Store Connect API key (preferred):** `APPLE_API_KEY_P8` (the text of the
+       `AuthKey_XXXX.p8` file), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`. The workflow writes the
+       key to the runner's temp dir and sets `APPLE_API_KEY` to that path, which is what
+       electron-builder expects.
+     - **Apple ID:** `APPLE_ID` and `APPLE_APP_SPECIFIC_PASSWORD` (from appleid.apple.com).
 4. With `CSC_LINK` set, electron-builder signs with the real identity instead of `-`, keeps hardened
    runtime on, and notarizes through `notarytool` once a complete Apple credential set is present.
-   Add `--expected-team-id <TEAMID>` to the workflow's `verify-mac.ts` step so CI checks the
-   identity actually used.
+   The verify step then passes `--expected-team-id`, plus `--expect-notarized` when notarization
+   credentials exist. That checks `Authority=Developer ID Application`, the team, a stapled ticket
+   (`xcrun stapler validate`) and `spctl --assess` reporting `source=Notarized Developer ID`.
+
+The whole rollout, including enrollment, costs and what changes for users, is in
+[SIGNING.md](SIGNING.md).
 
 ### Windows: Azure Artifact Signing (about USD 10/mo)
 

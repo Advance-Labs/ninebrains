@@ -187,6 +187,22 @@ jobs:
         shell: bash
         run: pnpm run build
 
+      # Notarizing with an App Store Connect API key (recommended over an Apple ID: no 2FA, not tied
+      # to a person). electron-builder wants APPLE_API_KEY as a path to the .p8, so the secret
+      # APPLE_API_KEY_P8 (the file's text) is written to the runner's temp dir first. Skipped, and
+      # APPLE_API_KEY left unset, while the secret is empty.
+      - name: Write App Store Connect API key
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          if [ -z "${APPLE_API_KEY_P8// /}" ]; then echo "No APPLE_API_KEY_P8; skipping"; exit 0; fi
+          key="$RUNNER_TEMP/AuthKey.p8"
+          (umask 077 && printf '%s\n' "$APPLE_API_KEY_P8" > "$key")
+          grep -q 'BEGIN PRIVATE KEY' "$key" || { echo "::error::APPLE_API_KEY_P8 is not a .p8 key"; exit 1; }
+          echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
+
       # No --release-id: build.ts runs in local mode and never talks to GitHub. Signing env is
       # empty until the secrets exist; scripts/release/lib/signing.ts then packages unsigned
       # (ad-hoc on macOS). Setting the secrets switches signing on with no workflow change.
@@ -201,6 +217,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # APPLE_API_KEY (the .p8 path) comes from $GITHUB_ENV above; listing it here would blank it.
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -214,10 +233,27 @@ jobs:
           node --experimental-strip-types scripts/release/build.ts \
             --platform "$PLATFORM" --arch "$ARCH" --channel "$CHANNEL" --config "$config"
 
+      # Unsigned: arch, bundle id and an internally consistent signature. With a certificate it also
+      # checks the Developer ID team, and with notarization credentials a stapled ticket that
+      # Gatekeeper accepts, so a half-configured signing setup cannot ship a build that still warns.
       - name: Verify macOS bundles (arch, bundle id, signature)
         if: runner.os == 'macOS'
         working-directory: apps/emdash-desktop
-        run: node --experimental-strip-types scripts/release/verify-mac.ts
+        env:
+          SIGNED: ${{ secrets.CSC_LINK != '' }}
+          NOTARIZED: ${{ secrets.APPLE_ID != '' || secrets.APPLE_API_KEY_P8 != '' }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          args=()
+          if [ "$SIGNED" = true ]; then
+            if [ -z "$APPLE_TEAM_ID" ]; then
+              echo "::error::CSC_LINK is set but APPLE_TEAM_ID is not; it is needed to check the signing team"
+              exit 1
+            fi
+            args+=(--expected-team-id "$APPLE_TEAM_ID")
+            if [ "$NOTARIZED" = true ]; then args+=(--expect-notarized); fi
+          fi
+          node --experimental-strip-types scripts/release/verify-mac.ts "${args[@]}"
 
       # Stable files are Ninebrains-<version>-…, canary files Ninebrains-Canary-<version>-….
       - name: Stage installers
@@ -321,7 +357,11 @@ jobs:
             fi
             echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn. The steps to open it are under **How to install** below. Full docs: [docs.advancelabs.dev/ninebrains](https://docs.advancelabs.dev/ninebrains/)."
             echo
-            sed -e "s/{{PRODUCT}}/$product/g" -e "s/{{FILE_PREFIX}}/$file_prefix/g" .github/release-notes/install.md
+            # The one-line installer only installs stable, so canary notes drop the stable-only block.
+            if [ "$CHANNEL" = canary ]; then only='/<!-- stable-only -->/,/<!-- \/stable-only -->/d'
+            else only='/<!-- \/\{0,1\}stable-only -->/d'; fi
+            sed -e "$only" -e "s/{{PRODUCT}}/$product/g" -e "s/{{FILE_PREFIX}}/$file_prefix/g" \
+              .github/release-notes/install.md
             echo
             echo "## Changes"
             echo

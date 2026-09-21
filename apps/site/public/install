@@ -549,6 +549,9 @@ main() {
     Darwin)
       if [ "$SIGNATURE" = adhoc ]; then
         say "signature ad-hoc: internally consistent, but not Developer ID signed or notarized."
+        say "          macOS shows no Gatekeeper warning for it: macOS only quarantines files a"
+        say "          browser or mail app downloads, and this installer downloaded it with curl."
+        say "          The checks above stand in for Apple's; nothing was switched off."
         say "          On first launch after an install or update macOS may ask for access to"
         say "          'Ninebrains Safe Storage' in your keychain; click Always Allow."
         say "          More: $VERIFY_DOCS"

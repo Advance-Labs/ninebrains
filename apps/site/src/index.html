@@ -307,7 +307,9 @@
                   >
                   <button type="button" class="copy" data-copy>Copy</button>
                 </div>
-                <p class="install-note">Installs or updates. Checks the SHA256 first.</p>
+                <p class="install-note">
+                  Installs or updates. Checks the SHA256 first. No Gatekeeper warning on macOS.
+                </p>
               </div>
 
               <div
@@ -1199,8 +1201,14 @@
         <p class="sheet-kicker">Before you open it</p>
         <h2 id="verify-title">Unsigned build: why, and how to verify</h2>
         <p>
-          Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen warn you
-          before you open one. Unsigned builds also do not auto-update.
+          Builds are not code-signed yet, so a <code>.dmg</code> or <code>.exe</code> you download
+          in a browser makes macOS Gatekeeper or Windows SmartScreen warn you before it opens.
+          Unsigned builds also do not auto-update.
+        </p>
+        <p>
+          On macOS the Terminal installer avoids the warning without switching anything off: macOS
+          only quarantines files a browser or mail app downloads, and the installer downloads with
+          <code>curl</code>. Apple and Microsoft signing is on its way.
         </p>
         <p>
           The installer downloads the release's <code>SHA256SUMS</code> file and checks the artifact
