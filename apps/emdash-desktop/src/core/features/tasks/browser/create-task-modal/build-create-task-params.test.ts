@@ -45,6 +45,17 @@ describe('buildInitialConversation', () => {
     );
   });
 
+  it('names the first conversation after the task', () => {
+    const state = makeInitialConversationState(agent('claude'), false);
+    expect(buildInitialConversation(state, '  fix-login-bug ')?.title).toBe('fix-login-bug');
+  });
+
+  it('falls back to the numbered default title without a task name', () => {
+    const state = makeInitialConversationState(agent('claude'), false);
+    expect(buildInitialConversation(state)?.title).toBe('Claude (1)');
+    expect(buildInitialConversation(state, '   ')?.title).toBe('Claude (1)');
+  });
+
   it('builds an ACP initial queue from prompt and stashed mention contexts', () => {
     const conversation = buildInitialConversation(
       makeInitialConversationState(agent('claude'), false, {
