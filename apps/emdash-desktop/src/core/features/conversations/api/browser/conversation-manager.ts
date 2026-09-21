@@ -41,6 +41,7 @@ export type ConversationInitialSizeResolver = (
 
 export class ConversationManagerStore implements Disposable {
   private _initialSizeResolver: ConversationInitialSizeResolver | null = null;
+  private readonly tuiConnectors = new Map<string, TuiAgentsConnector>();
   private offAgentStatusChanged: (() => void) | null = null;
   private offTuiSessionState: (() => void) | null = null;
   private offAcpSessionState: (() => void) | null = null;
@@ -236,6 +237,9 @@ export class ConversationManagerStore implements Disposable {
       for (const [conversationId, session] of Object.entries(list)) {
         if (session.status === 'starting' || session.status === 'running') {
           this.activeTuiSessionIds.add(conversationId);
+        }
+        if (session.status === 'running') {
+          this.tuiConnectors.get(conversationId)?.reconcileSize(session);
         }
         // Compare by detection time so a replayed snapshot doesn't churn observers.
         const usageLimit = session.usageLimit;
@@ -455,6 +459,7 @@ export class ConversationManagerStore implements Disposable {
         conversationId,
       });
       session?.destroy();
+      this.tuiConnectors.delete(conversationId);
     } catch (err) {
       runInAction(() => {
         this.conversations.set(conversationId, store);
@@ -533,13 +538,17 @@ export class ConversationManagerStore implements Disposable {
     const handlers = makeFileLinkHandlers(conversation.projectId, conversation.taskId, {
       target: 'right',
     });
-    const connector =
-      conversation.type === 'acp'
-        ? createNoopConnector()
-        : createTuiAgentsConnector(conversation.id, () => {
-            const state = this.hostAccess?.state;
-            return !state ? 0 : state.kind === 'ready' ? state.hostGeneration : undefined;
-          });
+    let connector: FrontendPtyConnector;
+    if (conversation.type === 'acp') {
+      connector = createNoopConnector();
+    } else {
+      const tuiConnector = createTuiAgentsConnector(conversation.id, () => {
+        const state = this.hostAccess?.state;
+        return !state ? 0 : state.kind === 'ready' ? state.hostGeneration : undefined;
+      });
+      this.tuiConnectors.set(conversation.id, tuiConnector);
+      connector = tuiConnector;
+    }
     return new PtySession(
       makePtySessionId(conversation.projectId, conversation.taskId, conversation.id),
       undefined,
@@ -566,15 +575,34 @@ function createNoopConnector(): FrontendPtyConnector {
   };
 }
 
+type TuiAgentsConnector = FrontendPtyConnector & {
+  /**
+   * Re-sends the pane's last requested size when the running PTY reports a
+   * different one. A resize issued before the PTY spawns (e.g. a freshly
+   * created task whose terminal mounts while its worktree is provisioning) is
+   * rejected as not-found by the runtime, leaving the agent drawing at its
+   * spawn size until something else resizes it.
+   */
+  reconcileSize(session: { cols: number; rows: number; startedAt: number }): void;
+};
+
 function createTuiAgentsConnector(
   conversationId: string,
   generation: () => number | undefined
-): FrontendPtyConnector {
+): TuiAgentsConnector {
   let logBinding: ReplicaLog | null = null;
+  let requestedSize: { cols: number; rows: number } | null = null;
+  // One corrective resend per (spawn, target size) so a runtime that keeps
+  // rejecting the resize is not hammered on every session-list update.
+  let lastReconcileKey: string | null = null;
   let clientPromise: ReturnType<typeof getConversationsClient> | null = null;
   const client = () => {
     clientPromise ??= getConversationsClient();
     return clientPromise;
+  };
+  const resize = (cols: number, rows: number) => {
+    requestedSize = { cols, rows };
+    void client().then((runtime) => runtime.tui.resize({ conversationId, cols, rows }));
   };
   return {
     async connect(terminal: Terminal) {
@@ -609,8 +637,15 @@ function createTuiAgentsConnector(
           });
         });
     },
-    resize(cols: number, rows: number) {
-      void client().then((runtime) => runtime.tui.resize({ conversationId, cols, rows }));
+    resize,
+    reconcileSize(session) {
+      const target = requestedSize;
+      if (!target) return;
+      if (session.cols === target.cols && session.rows === target.rows) return;
+      const key = `${session.startedAt}:${target.cols}x${target.rows}`;
+      if (key === lastReconcileKey) return;
+      lastReconcileKey = key;
+      resize(target.cols, target.rows);
     },
   };
 }
