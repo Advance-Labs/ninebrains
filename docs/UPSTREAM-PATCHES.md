@@ -585,3 +585,9 @@ sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENAB
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.1.0 → 0.2.0 | Written by `pnpm run release:prepare 0.2.0`; `release.yml` refuses a version that does not match |
+
+## 32. Signed macOS builds must be notarized to pass verification (`emdash/release-system-id7ap`)
+
+| File | Change | Why |
+|---|---|---|
+| `scripts/release/verify-mac.ts` | New `--expect-notarized` flag (requires `--expected-team-id`): per app bundle, `xcrun stapler validate` and `spctl --assess --type execute` must report `source=Notarized Developer ID` | The release workflow passes it once `CSC_LINK` and notarization credentials exist, so a half-configured signing setup fails the build instead of shipping a release that still warns in Gatekeeper. Unsigned builds run exactly as before. Rollout: `docs/SIGNING.md` |

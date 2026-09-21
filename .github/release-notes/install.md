@@ -30,6 +30,17 @@ downloaded from this page. More detail, including every step below:
 
 ### macOS
 
+<!-- stable-only -->
+**Easiest: the one-line installer.** It downloads the build for your Mac, checks it against
+`SHA256SUMS` for you, and installs it into Applications. macOS shows no "unidentified developer"
+warning, because only files a browser or mail app downloads get quarantined. Run it again to update.
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+```
+
+**Or download the disk image.**
+<!-- /stable-only -->
 Download the `.dmg` for your Mac: `mac-arm64` for Apple silicon (M1 and later), `mac-x64` for
 Intel. Open it and drag **{{PRODUCT}}** into **Applications**. The first launch says the app "can't
 be opened because Apple cannot check it for malicious software". Pick one of these:
