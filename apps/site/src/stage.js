@@ -215,13 +215,17 @@ const CUBE_VS = `#version 300 es
   uniform vec3 uPos;
   uniform vec3 uSize;
   uniform vec4 uLens;
+  uniform float uPad;
   out vec3 vNormal;
   out vec3 vWorld;
   out vec3 vLocal;
   void main() {
-    vec3 world = uPos + uRot * (aPos * uSize);
+    // Standing in for the flat mark, the face is drawn a little oversize and the fragment shader
+    // cuts the true outline with analytic antialiasing, the way the SVG's edges are drawn.
+    vec3 size = uSize + vec3(uPad, uPad, 0.0);
+    vec3 world = uPos + uRot * (aPos * size);
     vWorld = world;
-    vLocal = aPos;
+    vLocal = aPos * size / uSize;
     vNormal = normalize(uRot * (aNormal / uSize));
     vec4 clip = uProj * uView * vec4(world, 1.0);
     clip.xy = clip.xy * uLens.xy + uLens.zw * clip.w;
@@ -264,11 +268,15 @@ const CUBE_FS = `#version 300 es
     float alpha = uAlpha;
     // While a cube stands in for the flat mark, its outline takes the mark's rounded corners.
     if (uRound > 0.0) {
-      vec2 q = abs(vLocal.xy) * uSize.xy - (uSize.xy * 0.5 - ${(2 / 13).toFixed(4)});
-      float d = length(max(q, 0.0)) - ${(2 / 13).toFixed(4)};
-      float aa = fwidth(d);
+      float r = ${(2 / 13).toFixed(4)} * uRound;
+      vec2 q = abs(vLocal.xy) * uSize.xy - (uSize.xy * 0.5 - r);
+      float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+      float aa = 0.5 * fwidth(d);
       if (d > aa) discard;
-      alpha *= 1.0 - uRound * smoothstep(-aa, aa, d);
+      // Box-filter coverage of the edge across this pixel, as a 2D rasteriser computes it.
+      alpha *= clamp(0.5 - d / (2.0 * aa), 0.0, 1.0);
+      // ...and its flat ink, unlit: no shading, rim or bevel left to tell it from the SVG.
+      color = mix(color, uTint.rgb * 1.01, uRound);
     }
     outColor = vec4(color, alpha);
   }
@@ -1340,6 +1348,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
           // Each one locks into the flat ink of the mark as it lands.
           tint: [...ink, lerp(colors.fallInk, 1, smooth(0.72, 1, local))],
           round: smooth(0.72, 1, local),
+          pad: local > 0.72 ? 2 / px0 : 0,
           a: Math.min(1, k * 1.6),
         };
       });
@@ -1364,7 +1373,8 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
       const actors = list.map((a, i) => {
         if (i >= 9) return hidden();
         const m = markActor(i);
-        return { ...m, s: m.s.map((v) => v * (1 - e)), tint: [...ink, 1], round: 1, a: 1 - e };
+        const flat = { tint: [...ink, 1], round: 1, pad: 2 / px0 };
+        return { ...m, ...flat, s: m.s.map((v) => v * (1 - e)), a: 1 - e };
       });
       const lens = lensAt(px0, distanceFor(R_MARK), cx0, cy0, width, height);
       return { cam, lens, actors, veil: veilOut, floor: 0, done: u >= 1 };
@@ -1406,6 +1416,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
         b: lerp(m.b, a.b, k),
         tint: [...lerp3(ink, a.tint.slice(0, 3), lit), lerp(1, a.tint[3], lit)],
         round: 1 - smooth(0, 0.3, k),
+        pad: k < 0.3 ? 2 / px0 : 0,
         a: lerp(1, a.a, k),
       };
     });
@@ -1430,6 +1441,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     };
     cue('start', 0);
     if (it.mode === 'full') cue('land', FALL_END);
+    if (it.mode === 'full') cue('lift', it.flightStart);
     // Never on the start frame itself: the page must be styled hidden for a frame to fade from.
     const late = it.revealLate ? FLIGHT_MS[it.mode] * 0.5 : -80;
     cue('reveal', Math.max(1, it.flightStart + late));
@@ -1636,6 +1648,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
       gl.uniform1f(cube.u.uAlpha, a.a);
       gl.uniform4fv(cube.u.uTint, a.tint);
       gl.uniform1f(cube.u.uRound, a.round ?? 0);
+      gl.uniform1f(cube.u.uPad, a.pad ?? 0);
       gl.drawArrays(gl.TRIANGLES, 0, 36);
     }
 
@@ -1725,9 +1738,10 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     /**
      * Plays the opening. `mark` is the static mark's box (CSS px) that the cubes settle into and
      * leave from; `mode` is 'full' (fall, hold, flight) or 'short' (flight only). `hooks` run on
-     * the frame each moment is drawn: start, land (full only), reveal, done. `revealLate` holds the
-     * reveal until the cubes are halfway home, for layouts where they fly across the copy. Returns false when
-     * there is nothing to play (reduced motion, or the loop is not running).
+     * the frame each moment is drawn: start, land and lift (full only), reveal, done.
+     * `revealLate` holds the reveal until the cubes are halfway home, for layouts where they fly
+     * across the copy. Returns false when there is nothing to play (reduced motion, or the loop
+     * is not running).
      */
     intro({ mark, mode = 'full', revealLate = false, hooks = {} }) {
       if (reduced || !running) return false;

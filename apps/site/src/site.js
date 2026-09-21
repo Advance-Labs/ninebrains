@@ -13,7 +13,7 @@
  * The opening (`playIntro`) is decoration on top: the HTML paints a static mark over the page
  * before any script runs, and this file hands it to the stage, which drops nine cubes into that
  * exact mark and flies them to the overview while the copy comes up. Any input skips it; without
- * WebGL, or on any error, the mark is simply removed; CSS hides it by 3.5s whatever happens.
+ * WebGL, or on any error, the mark is simply removed; if no script arrives, CSS hides it by 2.5s.
  */
 import { safeRect } from './layout.js';
 import { createStage } from './stage.js';
@@ -203,10 +203,12 @@ function initStage() {
 
 const INTRO_SEEN = 'ninebrains:intro-seen';
 /**
- * Too late to start (ms since navigation): the static mark's CSS failsafe starts hiding it at
- * 3.1s, and an opening that began after this would outlast it.
+ * Too late to start (ms since navigation): the static mark's CSS failsafe (for no JS, or JS that
+ * never arrives) starts hiding it at 2.2s; an opening can only take over before that.
  */
-const INTRO_LATEST = 2500;
+const INTRO_LATEST = 1800;
+/** Once the script has the mark, a slower failsafe of its own, in case it stalls halfway. */
+const INTRO_STALL = 'intro-gone 0.3s 3.6s forwards';
 const root = document.documentElement;
 const introEl = document.getElementById('intro');
 /** While the opening plays: ends it at its settled frame (a skip, the last frame, an error). */
@@ -230,6 +232,19 @@ function introMode() {
 const REVEAL_TAIL = 1000;
 let revealTail = 0;
 
+/** A CSS-px box snapped to the device-pixel grid the way the browser paints a replaced element. */
+function snapped(b) {
+  const r = window.devicePixelRatio || 1;
+  const x = Math.round(b.left * r) / r;
+  const y = Math.round(b.top * r) / r;
+  return {
+    x,
+    y,
+    w: Math.round((b.left + b.width) * r) / r - x,
+    h: Math.round((b.top + b.height) * r) / r - y,
+  };
+}
+
 function removeIntro({ settle = false } = {}) {
   introEl?.remove();
   clearTimeout(revealTail);
@@ -243,6 +258,8 @@ function removeIntro({ settle = false } = {}) {
 function playIntro() {
   const mode = introMode();
   if (!mode) return removeIntro();
+  // The script is here: the no-JS failsafe gives way to this one's own.
+  introEl.style.animation = INTRO_STALL;
   if (mode === 'fade') {
     // The reduced-motion CSS clamps every transition to 1ms, so this crossfade is scripted.
     const fade = introEl.animate?.([{ opacity: 1 }, { opacity: 0 }], {
@@ -277,7 +294,8 @@ function playIntro() {
   canvas.style.transition = 'none';
   canvas.classList.add('live');
   const started = stage.intro({
-    mark: { x: box.left, y: box.top, w: box.width, h: box.height },
+    // Where the browser actually paints the SVG: it snaps the box to whole device pixels.
+    mark: snapped(box),
     mode,
     // Stacked layouts send the cubes up across the headline; let them pass before it comes up.
     revealLate: mobileQuery.matches,
@@ -293,6 +311,9 @@ function playIntro() {
       },
       land() {
         introEl.classList.add('is-landed');
+      },
+      lift() {
+        introEl.classList.add('is-lifted');
       },
       reveal() {
         root.classList.add('intro-reveal');
