@@ -6,6 +6,42 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-21
+
+When Claude Code or Codex runs out of usage mid-task, the conversation now offers to carry on in
+Freebuff, free, in the same worktree, with a handoff note on your clipboard. Installing and
+updating is one line:
+
+- macOS and Linux: `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh`
+- Windows: `irm https://ninebrains.runs-on.dev/install.ps1 | iex`
+
+The installer checks the download against this release's `SHA256SUMS` and, when `gh` is signed in,
+verifies its build provenance before installing. Run the same line again to update.
+
+The app can also tell you when a new release is out: turn on Settings, General, "Check for new
+versions". It is off by default because Ninebrains makes no network request you did not ask for.
+0.1.0 has no such check, so this is the last release you need to find by hand. Builds are still
+unsigned; see "Read this before you install" under 0.1.0.
+
+### Features
+
+- **updates:** tell users when a new Ninebrains release is out (#44) (a889e54)
+- **site:** single-screen landing page with install tabs and live feature demos (#42) (aea4b41)
+- **site:** one-line installer that also updates (#43) (fc9cfd3)
+- **conversations:** offer Freebuff when an agent hits its usage limit (#41) (7f6be7e)
+- **ui:** show agent status with thinking-orbs (#40) (dcf3d45)
+- **editor:** preview PDFs with Chromium's built-in viewer (#38) (2406c27)
+- **tasks:** name the first conversation after its task (#31) (8649c66)
+- **site:** offer the v0.1.0 download now that it exists (#27) (a094f61)
+
+### Fixes
+
+- **projects:** hide PR row metadata behind the hover action (#45) (6ff417b)
+- **tasks:** keep the prompt drop highlight on the composer (#39) (2d88ca9)
+- **desktop:** build brain-mcp before the app's tests and build (#32) (fa4b62f)
+- **brand:** default branches to ninebrains/ and put install steps in release notes (#29) (f2a1391)
+- **ui:** make switches legible under the monochrome accent (#28) (5ceebae)
+
 ## [0.1.0] - 2026-09-21
 
 The first public build of Ninebrains. It runs Claude Code and OpenAI Codex agents in parallel, each
