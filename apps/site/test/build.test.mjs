@@ -207,3 +207,25 @@ test('the cubes are framed into a measured safe area, and the audit hook stays o
   assert.match(site, /get\('debug'\) === 'bounds'/);
   assert.match(site, /if \(!debug\) return;\s+window\.__dbg =/);
 });
+
+test('the loading mark paints before any script and can never strand the page', () => {
+  const head = html.slice(0, html.indexOf('</head>'));
+  const style = head.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+  assert.ok(style.includes('#intro'), 'no inline critical style for the loading mark');
+  assert.ok(style.replace(/\s+/g, ' ').length < 2048, 'inline critical CSS over 2 KB');
+  // The failsafe: an animation that hides it by 3.5s, and nothing at all without JS.
+  const failsafe = style
+    .replace(/\s+/g, ' ')
+    .match(/animation: intro-out ([\d.]+)s ([\d.]+)s forwards/);
+  assert.ok(failsafe, 'no CSS failsafe on the loading mark');
+  assert.ok(Number(failsafe[1]) + Number(failsafe[2]) <= 3.5);
+  assert.match(head, /<noscript\s*><style>\s*#intro \{\s*display: none;/);
+  // The first thing in the body, drawn inline (the <symbol> sprite comes too late in the page).
+  const body = html.slice(html.indexOf('<body>'));
+  assert.match(body, /^<body>\s*<div id="intro" aria-hidden="true">\s*<svg viewBox="0 0 70 70"/);
+  const mark = body.match(/<div id="intro"[\s\S]*?<\/div>/)[0];
+  assert.equal((mark.match(/<rect /g) ?? []).length, 9);
+  // The overlap audit's page never shows it.
+  const site = readFileSync(join(DIST, 'site.js'), 'utf8');
+  assert.match(site, /if \(!introEl \|\| debug \|\|/);
+});
