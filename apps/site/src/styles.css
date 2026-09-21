@@ -166,6 +166,7 @@ code {
   pointer-events: none;
   background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px);
   opacity: 0.22;
+  transition: opacity 600ms var(--ease);
 }
 @media (prefers-color-scheme: light) {
   .scanlines {
@@ -2669,4 +2670,123 @@ h1 {
     --px: 0;
     --py: 0;
   }
+}
+
+/* --- the opening (site.js playIntro, stage.js intro) --------------------------------------- */
+
+/* The static mark is painted by the inline style in index.html. Once the stage takes over, the
+   mark's own background goes (the stage veils its field in the same colour) and the page waits,
+   laid out but unseen, for the reveal: the chrome fades with the veil, the headline's lines rise
+   one after another, then the lede, the install block and the rest. A repeat visit runs the same
+   sequence at a little under half the spacing. */
+html.intro #intro {
+  background: transparent;
+}
+@keyframes intro-gone {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+#intro svg {
+  transition: opacity 280ms var(--ease);
+}
+/* Full: the mark dims to a ghost the cubes fall into, comes back over them once they have
+   landed on it, and hands over only as they lift off, so the swap happens in motion. */
+#intro.is-ghost svg {
+  opacity: 0.14;
+}
+#intro.is-landed svg {
+  opacity: 1;
+  transition-duration: 120ms;
+}
+/* Short: the cubes start on the mark and it hands over as they begin to move. */
+#intro.is-lifted svg,
+#intro.is-handoff svg {
+  opacity: 0;
+  transition-duration: 160ms;
+}
+
+h1 .ln {
+  display: inline-block;
+}
+
+.nav,
+.rail,
+footer {
+  --d: 60ms;
+}
+h1 .ln:nth-child(1) {
+  --d: 70ms;
+}
+h1 .ln:nth-child(3) {
+  --d: 140ms;
+}
+h1 .ln:nth-child(5) {
+  --d: 210ms;
+}
+.panel-overview .side {
+  --d: 250ms;
+}
+.panel-overview .lede {
+  --d: 290ms;
+}
+.panel-overview .install {
+  --d: 360ms;
+}
+.panel-overview .works-with,
+.panel-overview .stats {
+  --d: 430ms;
+}
+
+/* Only the reveal is eased: hiding happens in the same frame the mark hands over, unseen. */
+html.intro-reveal
+  :is(
+    .nav,
+    .rail,
+    footer,
+    .panel:not([hidden]) :is(.eyebrow, .lede, .install, .works-with, .stats, .side),
+    h1 .ln
+  ) {
+  transition:
+    opacity var(--rd, 480ms) var(--out) calc(var(--d, 0ms) * var(--k, 1)),
+    translate 640ms var(--out) calc(var(--d, 0ms) * var(--k, 1));
+}
+html.intro-short {
+  --k: 0.45;
+  --rd: 360ms;
+}
+html.intro:not(.intro-reveal)
+  :is(
+    .nav,
+    .rail,
+    footer,
+    .panel:not([hidden]) :is(.eyebrow, .lede, .install, .works-with, .stats, .side),
+    h1 .ln
+  ) {
+  opacity: 0;
+  /* If the script stalls halfway, the page still shows. */
+  animation: intro-show 1ms 3.6s forwards;
+}
+/* The scanlines stay off until the opening is over: they would stripe the cubes standing in for
+   the flat mark, and the swap from the SVG would show. They fade back in as it ends. */
+html.intro .scanlines {
+  opacity: 0;
+  transition: none;
+}
+html.intro:not(.intro-reveal) h1 .ln {
+  translate: 0 0.32em;
+}
+@keyframes intro-show {
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+/* The overview's window plays its entry push as it is revealed, not unseen under the mark. */
+html.intro:not(.intro-reveal) .panel:not([hidden]) .win {
+  animation: none;
+}
+html.intro-reveal .panel:not([hidden]) .win {
+  animation-delay: calc(250ms * var(--k, 1));
 }
