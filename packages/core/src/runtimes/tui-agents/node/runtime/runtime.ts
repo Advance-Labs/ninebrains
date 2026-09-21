@@ -16,6 +16,7 @@ import type {
   TuiSessionState,
   TuiStartOutcome,
   TuiStartError,
+  TuiUsageLimit,
 } from '#runtimes/tui-agents/api';
 import { persistedTuiAgentStartInputSchema } from '#runtimes/tui-agents/api';
 import { TuiHookPipeline } from '#runtimes/tui-agents/node/hooks/hook-pipeline';
@@ -64,6 +65,7 @@ import { createSessionLifecycle } from '#services/session-lifecycle/node';
 import { TuiAgentStates } from './agent-state';
 import { spillLargePrompt, type PromptSpillResult } from './prompt-spill';
 import type { TuiAgentsRuntimeDeps, TuiSessionConfig } from './types';
+import { createUsageLimitDetector } from './usage-limit-detector';
 
 const RESUME_FALLBACK_WINDOW_MS = 3_000;
 const RESPAWN_DELAY_MS = 500;
@@ -104,6 +106,11 @@ export class TuiAgentsRuntime {
   private tmuxActivity = new Map<string, number>();
   private readonly unexpectedRespawns = new Map<string, number>();
   private readonly promptSpills = new Map<string, PromptSpillResult>();
+  /**
+   * The provider's usage-limit notice per conversation. Held here, not in the sessions
+   * cell, because every output chunk rewrites that cell whole; `syncSessionState` merges it.
+   */
+  private readonly usageLimits = new Map<string, TuiUsageLimit>();
   /**
    * The session's tmux side can outlive the pty client; output inside tmux is
    * invisible to the activity tracker, so `busy` keeps such sessions alive for
@@ -212,6 +219,12 @@ export class TuiAgentsRuntime {
           name: 'config',
           run: (key) => {
             this.configs.delete(key);
+          },
+        },
+        {
+          name: 'usage-limit',
+          run: (key) => {
+            this.usageLimits.delete(key);
           },
         },
         {
@@ -460,6 +473,7 @@ export class TuiAgentsRuntime {
     this.sessions.clear();
     this.logs.clear();
     this.configs.clear();
+    this.usageLimits.clear();
   }
 
   private async spawnInto(
@@ -544,6 +558,9 @@ export class TuiAgentsRuntime {
     if (!this.isCurrentGeneration(config.input.conversationId, generation)) {
       return this.cancelledSpawn(config.input.conversationId);
     }
+    const usageLimitDetector = createUsageLimitDetector(config.input.providerId, () =>
+      this.clock.now()
+    );
     let pty: PtySession;
     try {
       pty = await this.registry.create(
@@ -562,10 +579,16 @@ export class TuiAgentsRuntime {
             // Reattaching a surviving process never enters spawnInto.
             if (this.isCurrentGeneration(config.input.conversationId, generation)) {
               session.output.reseed();
+              // A new process has its own quota state; the old notice no longer applies.
+              this.usageLimits.delete(config.input.conversationId);
             }
           },
-          onData: () => {
+          onData: (chunk) => {
             this.lifecycle.recordOutput(config.input.conversationId);
+            if (!this.isCurrentGeneration(config.input.conversationId, generation)) return;
+            // PtySession calls onStateChange right after onData, which publishes this.
+            const usageLimit = usageLimitDetector.push(chunk);
+            if (usageLimit) this.usageLimits.set(config.input.conversationId, usageLimit);
           },
           onExit: (info) => {
             if (!this.isCurrentGeneration(config.input.conversationId, generation)) return;
@@ -843,6 +866,10 @@ export class TuiAgentsRuntime {
   private syncSessionState(state: TuiSessionState): void {
     const activity = this.lifecycle.activity(state.conversationId);
     const next: TuiSessionState = { ...state };
+    const usageLimit = this.usageLimits.get(state.conversationId);
+    if (usageLimit) {
+      next.usageLimit = usageLimit;
+    }
     if (activity.lastInputAt !== null) {
       next.lastInputAt = activity.lastInputAt;
     }

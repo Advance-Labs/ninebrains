@@ -72,6 +72,16 @@ export const tuiSessionResumeStateSchema = z.object({
 
 export type TuiSessionResumeState = z.infer<typeof tuiSessionResumeStateSchema>;
 
+/** A provider's own "you've hit your usage limit" notice, seen in the session's PTY output. */
+export const tuiUsageLimitSchema = z.object({
+  /** The matched notice, ANSI-stripped, as the provider printed it. */
+  message: z.string(),
+  /** Unix ms timestamp when the notice was detected. */
+  detectedAt: z.number().int(),
+});
+
+export type TuiUsageLimit = z.infer<typeof tuiUsageLimitSchema>;
+
 export const tuiSessionStateSchema = z.object({
   conversationId: z.string(),
   providerId: z.string().optional(),
@@ -89,6 +99,8 @@ export const tuiSessionStateSchema = z.object({
   startedAt: z.number().int(),
   lastInputAt: z.number().int().optional(),
   lastOutputAt: z.number().int().optional(),
+  /** Set once the provider reports a usage limit; cleared when the process respawns. */
+  usageLimit: tuiUsageLimitSchema.optional(),
   exit: z
     .object({
       exitCode: z.number().int().nullable(),

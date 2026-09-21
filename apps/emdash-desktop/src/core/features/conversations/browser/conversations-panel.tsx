@@ -24,6 +24,7 @@ import {
   activeConversationResource,
   activeConversationId as getActiveConversationId,
 } from './pane-selectors';
+import { UsageLimitBanner } from './usage-limit-banner';
 
 export const ConversationsPanel = observer(function ConversationsPanel() {
   const { projectId, taskId } = useTaskViewContext();
@@ -54,6 +55,9 @@ export const ConversationsPanel = observer(function ConversationsPanel() {
     ? (conversations.sessions.get(activeConversation.data.id) ?? null)
     : null;
   const activeSessionId = activeSession?.sessionId ?? null;
+  const activeUsageLimit = activeConversation
+    ? conversations.usageLimits.get(activeConversation.data.id)
+    : undefined;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalContainerRef = useRef<HTMLDivElement>(null);
@@ -175,6 +179,16 @@ export const ConversationsPanel = observer(function ConversationsPanel() {
                       workspaceId={workspaceId}
                     />
                   </div>
+                  {activeConversation && activeUsageLimit && !disabledReason && (
+                    <UsageLimitBanner
+                      projectId={projectId}
+                      taskId={taskId}
+                      conversation={activeConversation}
+                      manager={conversations}
+                      usageLimit={activeUsageLimit}
+                      connectionId={remoteConnectionId ?? undefined}
+                    />
+                  )}
                   {disabledReason && (
                     <div
                       className="absolute inset-x-2 top-2 z-20 rounded-md border bg-background/95 px-2 py-1 text-center text-xs text-foreground-muted shadow-sm"

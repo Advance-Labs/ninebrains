@@ -1,6 +1,6 @@
 import type { SerializedHostRef } from '@emdash/core/primitives/host/api';
 import type { SessionSummary } from '@emdash/core/runtimes/acp/api/client';
-import type { TuiSessionList } from '@emdash/core/runtimes/tui-agents/api';
+import type { TuiSessionList, TuiUsageLimit } from '@emdash/core/runtimes/tui-agents/api';
 import { createScope, type Disposable } from '@emdash/shared/concurrency';
 import { ReplicaLog } from '@emdash/wire/live';
 import { observe, remote } from '@emdash/wire/state';
@@ -58,6 +58,8 @@ export class ConversationManagerStore implements Disposable {
   /** Session layer keyed by conversation id — created alongside data, connected lazily. */
   sessions = observable.map<string, PtySession>();
   activeTuiSessionIds = observable.set<string>();
+  /** Provider usage-limit notices seen in live TUI sessions, keyed by conversation id. */
+  usageLimits = observable.map<string, TuiUsageLimit>();
   activeAcpSessionIds = observable.set<string>();
 
   constructor(
@@ -73,6 +75,7 @@ export class ConversationManagerStore implements Disposable {
         conversations: observable,
         sessions: observable,
         activeTuiSessionIds: observable,
+        usageLimits: observable,
         activeAcpSessionIds: observable,
         _hasObservedTuiSessions: observable,
         _hasObservedAcpSessions: observable,
@@ -234,6 +237,16 @@ export class ConversationManagerStore implements Disposable {
         if (session.status === 'starting' || session.status === 'running') {
           this.activeTuiSessionIds.add(conversationId);
         }
+        // Compare by detection time so a replayed snapshot doesn't churn observers.
+        const usageLimit = session.usageLimit;
+        if (!usageLimit) {
+          this.usageLimits.delete(conversationId);
+        } else if (this.usageLimits.get(conversationId)?.detectedAt !== usageLimit.detectedAt) {
+          this.usageLimits.set(conversationId, usageLimit);
+        }
+      }
+      for (const conversationId of [...this.usageLimits.keys()]) {
+        if (!(conversationId in list)) this.usageLimits.delete(conversationId);
       }
     });
   }
