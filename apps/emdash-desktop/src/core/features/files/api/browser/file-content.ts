@@ -61,6 +61,33 @@ export async function readImageFile(ref: HostFileRef) {
   };
 }
 
+/**
+ * Reads a file's bytes into a Blob for viewers that stream from an object URL
+ * (e.g. PDFs). `maxBytes` raises the FS layer's small default read cap.
+ */
+export async function readFileBlob(
+  ref: HostFileRef,
+  options: { maxBytes: number; mimeType?: string }
+) {
+  const client = await getFilesClient();
+  const result = await client.fs.readBytes({
+    uri: encodeResourceUri(ref),
+    options: { maxBytes: options.maxBytes },
+  });
+  if (!result.success) return result;
+  const bytes = await result.data.bytes();
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return {
+    success: true as const,
+    data: {
+      blob: new Blob([buffer], { type: options.mimeType ?? result.data.meta.mimeType }),
+      size: result.data.meta.totalSize,
+      truncated: result.data.meta.truncated,
+    },
+  };
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
