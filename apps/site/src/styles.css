@@ -25,6 +25,8 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --gutter: clamp(20px, 5vw, 64px);
   --rhythm: clamp(72px, 11vh, 140px);
+  /* Nav, hero, facts and footer all line up on one 1240px column. */
+  --edge: max(var(--gutter), calc((100% - 1240px) / 2));
 }
 
 @media (prefers-color-scheme: light) {
@@ -47,6 +49,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* Stops body's own `overflow-x` below from propagating to the viewport, where `clip` would be
+     treated as `hidden`. */
+  overflow-x: clip;
 }
 
 body {
@@ -57,7 +62,9 @@ body {
   font-size: 17px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`: the hero glow bleeds past the viewport on purpose, and `hidden` would
+     still let a scroll-into-view nudge the page sideways. */
+  overflow-x: clip;
 }
 
 /* The nine-square motif, tiled far back. It is the mark, so the page is branded even when
@@ -92,7 +99,7 @@ body::before {
 <rect x='28.5' y='49.5' width='13' height='13' rx='2'/><rect x='49.5' y='7.5' width='13' height='13' rx='2'/>\
 <rect x='49.5' y='28.5' width='13' height='13' rx='2'/><rect x='49.5' y='49.5' width='13' height='13' rx='2'/>\
 <rect x='25' y='25' width='20' height='20' rx='2'/></g></svg>");
-    opacity: 0.03;
+    opacity: 0.022;
   }
 }
 
@@ -158,6 +165,11 @@ a {
   color: inherit;
 }
 
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+
 code {
   font-family: var(--mono);
 }
@@ -213,7 +225,7 @@ body.reveals .reveal {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px var(--gutter);
+  padding: 18px var(--edge);
   backdrop-filter: blur(14px);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   border-bottom: 1px solid var(--hairline);
@@ -255,11 +267,13 @@ main {
   display: block;
 }
 
+/* Top-aligned, not centred: panels differ in height, and centring would make the rail jump every
+   time a tab changes. */
 .hero {
   min-height: calc(100svh - 61px);
   display: flex;
-  align-items: center;
-  padding: clamp(28px, 5vh, 56px) var(--gutter);
+  align-items: flex-start;
+  padding: clamp(40px, 12vh, 120px) var(--gutter) clamp(40px, 8vh, 88px);
 }
 
 .hero-inner {
@@ -348,7 +362,8 @@ main {
 }
 
 .eyebrow {
-  margin: 0 0 20px;
+  margin: -2px 0 20px;
+  text-wrap: balance;
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -386,6 +401,7 @@ h1 {
   letter-spacing: -0.03em;
   font-weight: 600;
   max-width: 640px;
+  text-wrap: balance;
 }
 
 .feature-copy {
@@ -409,40 +425,57 @@ h1 {
   padding: 16px 18px;
   font-family: var(--mono);
   font-size: 13px;
-  line-height: 1.75;
+  line-height: 1.6;
   overflow-x: auto;
   color: #c9c9c9;
 }
 
 @media (prefers-color-scheme: light) {
   .demo pre {
-    color: #3a3a3a;
+    color: #2a2a2a;
+  }
+}
+
+/* The command types itself out (`--n` is its length in characters, set on the <code>), then each
+   output row fades in. Rows are inline-block so the newline already in the <pre> ends the row:
+   `display: block` plus that newline would render an empty line between every row. */
+.demo .typed {
+  display: inline-block;
+  vertical-align: bottom;
+  overflow: hidden;
+  white-space: pre;
+  width: 0;
+  animation: type calc(var(--n, 30) * 22ms) steps(var(--n, 30), end) 120ms forwards;
+}
+
+@keyframes type {
+  to {
+    width: calc(var(--n, 30) * 1ch);
   }
 }
 
 .demo .ln {
-  display: block;
+  --typed: calc(var(--n, 30) * 22ms + 260ms);
+  display: inline-block;
   opacity: 0;
   transform: translateY(3px);
-  animation: line-in 320ms ease forwards;
-}
-.demo pre > code > .ln:nth-child(1) {
-  animation-delay: 60ms;
-}
-.demo pre > code > .ln:nth-child(2) {
-  animation-delay: 220ms;
+  animation: line-in 280ms ease forwards;
+  animation-delay: var(--typed);
 }
 .demo pre > code > .ln:nth-child(3) {
-  animation-delay: 380ms;
+  animation-delay: calc(var(--typed) + 150ms);
 }
 .demo pre > code > .ln:nth-child(4) {
-  animation-delay: 540ms;
+  animation-delay: calc(var(--typed) + 300ms);
 }
 .demo pre > code > .ln:nth-child(5) {
-  animation-delay: 700ms;
+  animation-delay: calc(var(--typed) + 450ms);
 }
 .demo pre > code > .ln:nth-child(6) {
-  animation-delay: 860ms;
+  animation-delay: calc(var(--typed) + 600ms);
+}
+.demo pre > code > .ln:nth-child(7) {
+  animation-delay: calc(var(--typed) + 750ms);
 }
 
 @keyframes line-in {
@@ -528,8 +561,16 @@ h1 {
   white-space: nowrap;
   font-size: 13px;
   padding: 10px 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   border: none;
+}
+.cmd code::-webkit-scrollbar {
+  display: none;
+}
+/* site.js sets `data-overflow` while part of the command is scrolled out of view on the right. */
+.cmd code[data-overflow='true'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
 }
 
 .copy {
@@ -684,9 +725,7 @@ h1 {
 /* --- facts --------------------------------------------------------------------------------- */
 
 .facts {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: var(--rhythm) var(--gutter) 0;
+  padding: var(--rhythm) var(--edge) 0;
 }
 
 .facts dl {
@@ -775,7 +814,7 @@ h1 {
 
 footer {
   border-top: 1px solid var(--hairline);
-  padding: 40px var(--gutter);
+  padding: 40px var(--edge);
   display: flex;
   flex-wrap: wrap;
   gap: 18px 34px;
@@ -804,6 +843,197 @@ footer nav a:hover {
 footer p {
   margin: 0;
   width: 100%;
+}
+
+/* --- the lanes mock: four panes of one tab, beside the headline on wide screens --------------- */
+
+/* Monochrome like the rest of the page. The dots are the only colour, and they only mean state:
+   green passed a gate, red failed one, white is still working. */
+.lanes {
+  display: none;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.9);
+}
+
+.lanes-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+.lanes-tab {
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+.lanes-tab.is-on {
+  color: var(--fg);
+  background: var(--panel-2);
+}
+.lanes-count {
+  margin-left: auto;
+}
+
+.lanes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hairline);
+}
+
+.lane {
+  background: var(--panel);
+  padding: 11px 12px 13px;
+  min-width: 0;
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+.lane-agent {
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+}
+.lane-branch {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg);
+}
+.dot.pass {
+  background: var(--pass);
+}
+.dot.fail {
+  background: var(--fail);
+}
+.dot.working {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.lane-ln {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  animation: line-in 420ms ease forwards;
+}
+.lane-ln:nth-of-type(2) {
+  animation-delay: 160ms;
+}
+.lane-ln:nth-of-type(3) {
+  animation-delay: 320ms;
+}
+.lane-ln:nth-of-type(4) {
+  animation-delay: 480ms;
+}
+.lane:nth-child(2) .lane-ln {
+  animation-delay: 240ms;
+}
+.lane:nth-child(3) .lane-ln {
+  animation-delay: 480ms;
+}
+.lane:nth-child(4) .lane-ln {
+  animation-delay: 720ms;
+}
+.lane-live {
+  color: var(--fg);
+}
+
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 11px;
+  margin-left: 3px;
+  vertical-align: -1px;
+  background: var(--fg);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .lanes {
+    box-shadow: 0 30px 70px -40px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* Wide: the overview puts the lanes mock beside the headline and lets the install line run the
+   full width underneath, so the curl command fits on one line; feature panels sit copy beside
+   demo instead of stacking. */
+@media (min-width: 1200px) {
+  .panel[data-panel='00'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 33vw, 470px);
+    column-gap: clamp(32px, 4vw, 64px);
+    align-items: center;
+  }
+  .panel[data-panel='00'][hidden] {
+    display: none;
+  }
+  .panel[data-panel='00'] > .install,
+  .panel[data-panel='00'] > .works-with {
+    grid-column: 1 / -1;
+  }
+  .lanes {
+    display: block;
+  }
+  .panel:not([data-panel='00']) {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(32px, 4vw, 64px);
+    align-items: start;
+  }
+  .panel:not([data-panel='00'])[hidden] {
+    display: none;
+  }
+  .feature-text .kicker {
+    margin-top: 4px;
+  }
+  .panel .demo {
+    max-width: none;
+  }
+  /* Short demos would otherwise read as a stub next to the copy. */
+  .panel .demo pre {
+    min-height: 184px;
+  }
+  .panel[data-panel='00'] > .install {
+    max-width: none;
+  }
+
+  .feature-copy {
+    margin-bottom: 0;
+  }
 }
 
 /* --- narrow: rail becomes a horizontal chip row ---------------------------------------------- */
@@ -846,6 +1076,10 @@ footer p {
 @media (max-width: 460px) {
   .nav nav {
     gap: 16px;
+  }
+  .demo pre {
+    font-size: 12px;
+    padding: 14px 14px;
   }
   .facts dl {
     grid-template-columns: 1fr;
@@ -895,5 +1129,15 @@ footer p {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+  .demo .typed {
+    animation: none;
+    width: auto;
+  }
+  .lane-ln,
+  .dot.working,
+  .caret {
+    animation: none;
+    opacity: 1;
   }
 }

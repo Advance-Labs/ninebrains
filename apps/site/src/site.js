@@ -119,7 +119,19 @@ function tablist(container, { orientation = 'horizontal', onSelect } = {}) {
 function initFeatureRail() {
   const rail = document.querySelector('.rail');
   if (!rail) return;
-  tablist(rail, { orientation: 'vertical' });
+  tablist(rail, {
+    orientation: 'vertical',
+    // On narrow screens the rail is a horizontal chip row that scrolls; keep the chosen chip in
+    // view. On desktop the rail never overflows, so this is a no-op there.
+    onSelect: (tab) => {
+      if (rail.scrollWidth <= rail.clientWidth) return;
+      const tabBox = tab.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      const left =
+        rail.scrollLeft + tabBox.left - railBox.left - (rail.clientWidth - tabBox.width) / 2;
+      rail.scrollTo({ left, behavior: reduced ? 'auto' : 'smooth' });
+    },
+  });
 }
 
 function osHint() {
@@ -127,7 +139,7 @@ function osHint() {
   return /win/i.test(platform) ? 'windows' : 'terminal';
 }
 
-function initInstallTabs() {
+function initInstallTabs(onPanelShown) {
   const container = document.querySelector('.install-tabs');
   if (!container) return null;
   const hint = container.querySelector('[data-install-hint]');
@@ -141,6 +153,8 @@ function initInstallTabs() {
           kind === 'windows' ? 'Windows' : kind === 'download' ? 'all platforms' : 'macOS · Linux';
       }
       if (kind === 'download') loadDownloads();
+      // A hidden panel measures as zero wide, so re-check the fade once it is visible.
+      onPanelShown?.();
     },
   });
 
@@ -153,7 +167,9 @@ function initCopyButtons() {
   for (const button of document.querySelectorAll('[data-copy]')) {
     button.addEventListener('click', async () => {
       const code = button.closest('.cmd')?.querySelector('code');
-      const text = code?.textContent?.trim();
+      // The formatter may wrap the command across lines in the HTML; copy it as the one line
+      // the page shows.
+      const text = code?.textContent?.replace(/\s+/g, ' ').trim();
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
@@ -171,6 +187,32 @@ function initCopyButtons() {
       }, 1800);
     });
   }
+}
+
+/**
+ * Marks a command that is wider than its box, so CSS can fade its right edge as a scroll cue, and
+ * drops the fade once it is scrolled to the end.
+ */
+function initCommandFades() {
+  const codes = [...document.querySelectorAll('.cmd code')];
+  const update = (code) => {
+    const hidden = code.scrollWidth - code.clientWidth - code.scrollLeft;
+    code.dataset.overflow = String(hidden > 1);
+  };
+  const updateAll = () => {
+    for (const code of codes) update(code);
+  };
+  for (const code of codes) {
+    code.addEventListener('scroll', () => update(code), { passive: true });
+  }
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(updateAll);
+    for (const code of codes) observer.observe(code);
+  } else {
+    window.addEventListener('resize', updateAll);
+  }
+  updateAll();
+  return updateAll;
 }
 
 /** Only ever link to files GitHub itself is serving for this release. */
@@ -300,7 +342,8 @@ function renderDownloads(release, root, status, versionLabel) {
 function main() {
   runPageIntro();
   initFeatureRail();
-  initInstallTabs();
+  const refreshFades = initCommandFades();
+  initInstallTabs(refreshFades);
   initCopyButtons();
 }
 

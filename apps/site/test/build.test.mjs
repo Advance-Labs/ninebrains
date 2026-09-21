@@ -54,6 +54,21 @@ test('points at the install scripts and offers a direct download fallback', () =
   assert.match(flat, /href="https:\/\/github\.com\/Advance-Labs\/ninebrains\/releases\/latest"/);
 });
 
+test('each copy button copies exactly the one-line command it sits next to', () => {
+  // site.js copies the <code> text with whitespace collapsed, since the formatter may wrap it.
+  const commands = [...html.matchAll(/<div class="cmd">[\s\S]*?<code[^>]*>([\s\S]*?)<\/code/g)].map(
+    (m) => m[1].replace(/\s+/g, ' ').trim()
+  );
+  assert.deepEqual(commands, [
+    "curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh",
+    'irm https://ninebrains.runs-on.dev/install.ps1 | iex',
+  ]);
+});
+
+test('the lanes visual is decoration only, hidden from assistive tech', () => {
+  assert.match(flat, /<div class="lanes" aria-hidden="true">/);
+});
+
 test('says plainly that builds are unsigned, and how that is checked', () => {
   assert.match(flat, /not code-signed/);
   assert.match(flat, /SHA256SUMS/);
