@@ -106,6 +106,13 @@ you select an OrcaRouter model from the OpenCode model picker.
   synchronizes standard stdio and HTTP MCP definitions in `~/.prime/agent/settings.json`. ACP
   sessions receive those definitions through `session/new`, and Prime exposes them to the model
   through its pre-imported `mcp` Python program.
+- Codebuff and Freebuff load MCP servers from `.agents/mcp.json`, which the CLI reads globally from
+  the home directory and per-project from the workspace. Emdash writes them through the
+  `codebuffMcpAdapter` (`packages/core/src/services/agent-plugins/api/plugins/helpers/mcp.ts`) into
+  the home-rooted file (the global `~/.agents/mcp.json` tier). Both providers read `knowledge.md`
+  and `AGENTS.md` for context but not `CLAUDE.md`; the `tui-agents` runtime seeds a worktree-local
+  `knowledge.md` from repo `CLAUDE.md` (falling back to `AGENTS.md`) on first launch, never
+  overwriting an existing file.
 
 ## Adding Or Changing A Provider
 

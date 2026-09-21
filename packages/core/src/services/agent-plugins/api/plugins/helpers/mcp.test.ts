@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { PluginFs } from '#primitives/plugin-fs/api';
 import {
   ampMcpAdapter,
+  codebuffMcpAdapter,
   codexMcpAdapter,
   createMcpAdapter,
   crushMcpAdapter,
@@ -332,6 +333,70 @@ describe('ampMcpAdapter', () => {
     const legacy = JSON.parse((await fs.read('.amp/config.json'))!) as Record<string, unknown>;
     expect(canonical['amp.mcpServers']).toEqual({});
     expect(legacy.mcpServers).toEqual({});
+  });
+});
+
+// ── Codebuff/Freebuff adapter ───────────────────────────────────────────────
+
+describe('codebuffMcpAdapter', () => {
+  const adapter = codebuffMcpAdapter();
+
+  it('writes servers to ~/.agents/mcp.json under the canonical mcpServers key', async () => {
+    const fs = createMemoryFs();
+
+    await adapter.writeServers(fs, [
+      { name: 'notionApi', command: 'npx', args: ['-y', '@notionhq/notion-mcp-server'] },
+      { name: 'docs', url: 'https://example.com/mcp', type: 'http' },
+    ]);
+
+    const raw = await fs.read('.agents/mcp.json');
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!) as Record<string, unknown>;
+    expect(parsed.mcpServers).toEqual({
+      notionApi: { command: 'npx', args: ['-y', '@notionhq/notion-mcp-server'] },
+      docs: { url: 'https://example.com/mcp', type: 'http' },
+    });
+  });
+
+  it('preserves unrelated top-level keys and replaces the mcpServers map (manager merges first)', async () => {
+    const fs = createMemoryFs({
+      '.agents/mcp.json': jsonFile({
+        marker: 'keep',
+        mcpServers: { existing: { command: 'existing-server' } },
+      }),
+    });
+
+    await adapter.writeServers(fs, [{ name: 'added', command: 'npx' }]);
+
+    const parsed = JSON.parse((await fs.read('.agents/mcp.json'))!) as Record<string, unknown>;
+    expect(parsed.marker).toBe('keep');
+    expect(parsed.mcpServers).toEqual({
+      added: { command: 'npx' },
+    });
+  });
+
+  it('readServers returns [] when the file is absent and parses existing servers', async () => {
+    const empty = createMemoryFs();
+    expect(await adapter.readServers(empty)).toEqual([]);
+
+    const fs = createMemoryFs({
+      '.agents/mcp.json': jsonFile({ mcpServers: { github: { command: 'gh' } } }),
+    });
+    await expect(adapter.readServers(fs)).resolves.toEqual([{ name: 'github', command: 'gh' }]);
+  });
+
+  it('removeServer removes only the named server', async () => {
+    const fs = createMemoryFs({
+      '.agents/mcp.json': jsonFile({
+        mcpServers: { keep: { command: 'x' }, gone: { command: 'y' } },
+      }),
+    });
+
+    await adapter.removeServer(fs, 'gone');
+
+    const parsed = JSON.parse((await fs.read('.agents/mcp.json'))!) as Record<string, unknown>;
+    expect((parsed.mcpServers as Record<string, unknown>).gone).toBeUndefined();
+    expect((parsed.mcpServers as Record<string, unknown>).keep).toBeDefined();
   });
 });
 

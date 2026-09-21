@@ -23,6 +23,9 @@ export function McpPanel({ host, header }: McpPanelProps) {
       onRefresh={mcp.refresh}
       isRefreshing={mcp.isRefreshing}
       onAddCustom={() => setDrawerMode({ type: 'add-custom' })}
+      onSeedFromClaude={mcp.seedFromClaude}
+      isSeeding={mcp.isSeeding}
+      canSeedFromClaude={mcp.canSeedFromClaude}
     />
   );
 

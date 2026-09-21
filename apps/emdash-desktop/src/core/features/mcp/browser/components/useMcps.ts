@@ -9,6 +9,7 @@ import { getCatalogClient } from '@core/features/catalog/api/browser/client';
 import { getMcpClient } from '@core/features/mcp/api/browser/client';
 import { captureTelemetry } from '@core/primitives/telemetry/browser/telemetry-client';
 import { useInstalledMcpServersLiveModel } from '../live-model-hooks';
+import { seedCliOverridesForClaude, SEED_TARGET_PROVIDERS } from '../seed-mcp';
 
 const MCP_CATALOG_QUERY_KEY = ['mcp', 'catalog'] as const;
 
@@ -110,6 +111,45 @@ export function useMcps(host: HostRef) {
 
   const refresh = useCallback(() => refreshMutation.mutate(), [refreshMutation]);
 
+  // ── Seed from Claude ─────────────────────────────────────────────────
+
+  const canSeedFromClaude = useMemo(
+    () =>
+      providers.some(
+        (provider) =>
+          (SEED_TARGET_PROVIDERS as readonly string[]).includes(provider.id) && provider.installed
+      ),
+    [providers]
+  );
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const targets = seedCliOverridesForClaude(installed ?? []);
+      if (targets.length === 0) return 0;
+      for (const server of targets) {
+        await saveServer(server);
+      }
+      return targets.length;
+    },
+    onSuccess: (count) => {
+      if (count === 0) {
+        toast.success('Nothing to seed', {
+          description: 'Add a server synced with Claude first, then seed it here.',
+        });
+        return;
+      }
+      captureTelemetry('mcp_seeded_from_claude', { count });
+      toast.success(`${count} server${count === 1 ? '' : 's'} seeded for Freebuff and Codebuff`);
+    },
+    onError: (error) => {
+      toast.error('Failed to seed servers for Freebuff and Codebuff', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    },
+  });
+
+  const seedFromClaude = useCallback(() => seedMutation.mutate(), [seedMutation]);
+
   return {
     installed,
     catalog,
@@ -120,6 +160,9 @@ export function useMcps(host: HostRef) {
     removeServer,
     refresh,
     reload,
+    seedFromClaude,
+    isSeeding: seedMutation.isPending,
+    canSeedFromClaude,
   };
 }
 

@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ok } from '@emdash/shared';
 import { noopLogger } from '@emdash/shared/logger';
 import { createManualClock, type ManualClock } from '@emdash/shared/testing';
@@ -777,6 +780,41 @@ describe('TuiAgentsRuntime', () => {
     expect(spawner.processes[0]!.killCount).toBeGreaterThan(0);
     await vi.waitFor(() => expect(intents.snapshot()).toEqual([]));
     expectNoSessionResidue('conversation-1', leakContainers(runtime));
+  });
+
+  it('seeds knowledge.md from CLAUDE.md when a context-consuming provider starts', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'emdash-tui-context-'));
+    try {
+      await writeFile(join(workspace, 'CLAUDE.md'), '# Claude agent context\nline two\n');
+      const { runtime } = createRuntime();
+
+      await runtime.startSession(
+        startInput({ providerId: 'freebuff', cwd: workspace, conversationId: 'freebuff-1' })
+      );
+      await runtime.stopSession('freebuff-1');
+      await runtime.dispose();
+
+      const knowledge = await readFile(join(workspace, 'knowledge.md'), 'utf8');
+      expect(knowledge).toContain('# Project knowledge');
+      expect(knowledge).toContain('# Claude agent context');
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('does not seed knowledge.md for providers that read CLAUDE.md natively', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'emdash-tui-context-'));
+    try {
+      await writeFile(join(workspace, 'CLAUDE.md'), '# context');
+      const { runtime } = createRuntime();
+
+      await runtime.startSession(startInput({ cwd: workspace }));
+
+      await expect(readFile(join(workspace, 'knowledge.md'), 'utf8')).rejects.toThrow();
+      await runtime.dispose();
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 });
 

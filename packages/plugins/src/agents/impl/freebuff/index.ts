@@ -4,6 +4,7 @@ import {
 } from '@emdash/core/services/agent-plugins/api/plugins';
 import {
   buildStandardCommand,
+  codebuffMcpAdapter,
   npmDependency,
 } from '@emdash/core/services/agent-plugins/api/plugins/helpers';
 import { icon } from './icon';
@@ -18,6 +19,11 @@ export const plugin = definePlugin(
   },
   {
     hostDependency: npmDependency({ id: 'freebuff', package: 'freebuff' }),
+    mcp: {
+      kind: 'supported',
+      scope: 'global',
+      supportedTransports: ['stdio', 'http'],
+    },
     prompt: {
       // The freebuff CLI takes no prompt positional/flag (its only positional is
       // the `login` command); prompts are entered manually in the interactive TUI.
@@ -34,4 +40,5 @@ export const provider = registerPluginBehavior(plugin, {
   prompt: {
     buildCommand: (ctx) => buildStandardCommand(ctx, {}),
   },
+  mcp: codebuffMcpAdapter(),
 });
