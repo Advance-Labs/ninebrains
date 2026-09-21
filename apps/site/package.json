@@ -13,7 +13,8 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "typecheck": "echo \"site: plain HTML, CSS and JS; nothing to typecheck\"",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "audit:overlap": "node test/overlap-audit.mjs"
   },
   "devDependencies": {
     "oxfmt": "^0.51.0",

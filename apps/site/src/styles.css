@@ -47,6 +47,8 @@
   --gutter: clamp(16px, 3vw, 44px);
   --nav-h: clamp(48px, 7vh, 64px);
   --foot-h: 34px;
+  --rail-w: clamp(170px, 15vw, 224px);
+  --main-gap: clamp(20px, 3vw, 48px);
   /* The one sizing unit: whichever of width or height is tighter. */
   --u: min(1vw, 1.6vh);
 }
@@ -253,8 +255,8 @@ footer nav {
 
 main {
   display: grid;
-  grid-template-columns: clamp(170px, 15vw, 224px) minmax(0, 1fr);
-  gap: clamp(20px, 3vw, 48px);
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  gap: var(--main-gap);
   padding: 0 var(--gutter);
   min-height: 0;
 }
@@ -492,6 +494,9 @@ h1 {
   text-wrap: balance;
 }
 
+.feature-copy .copy-short {
+  display: none;
+}
 .feature-copy {
   margin: clamp(10px, 2vh, 18px) 0 0;
   max-width: 40ch;
@@ -800,6 +805,29 @@ h1 {
     opacity: 1;
     translate: 0 0 0;
   }
+}
+
+/* A scene change: the copy and the window wait for the old cubes to dissolve where they stood,
+   then come up with the new ones. (Only after the first change, so the headline paints at once.) */
+.stage[data-switched] .panel:not([hidden]) .text {
+  animation: text-in 420ms var(--out) 240ms both;
+}
+.stage[data-switched] .panel:not([hidden]) .win {
+  animation-delay: 240ms;
+}
+@keyframes text-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* A held scene loops back to its entry frame through a quick dip, never through an empty pane. */
+.win-body {
+  transition: opacity 220ms var(--ease);
+}
+.panel.is-looping .win-body {
+  opacity: 0.12;
 }
 
 .win-mini {
@@ -1230,6 +1258,9 @@ h1 {
   line-height: 1.55;
   white-space: nowrap;
   overflow: hidden;
+}
+.bl .t {
+  white-space: normal;
 }
 .bl .t[data-at='0'] {
   display: block;
@@ -2143,32 +2174,39 @@ h1 {
   }
 }
 
-/* Wide desktop: the cubes are the stage, not a diagram. A feature's slot is a large region under
-   the copy that runs in behind the tilted window's left edge, so the arrangement and the window
-   read as one composition in depth. The overview gets room for the whole install line. */
+/* Wide desktop: a feature's cubes stand on their own floor under the copy, beside the tilted
+   window. The slot is only a starting box: it runs on towards the window, and layout.js cuts it
+   back to a safe rectangle clear of the copy, the window, the footer and the viewport edge. The
+   overview's install line fits whole in its own column: smaller mono, no prompt glyph. */
 @media (min-width: 1181px) {
   .panel:not(.panel-overview) .cube-slot {
-    position: absolute;
-    left: -4%;
-    width: 56%;
-    top: 34%;
-    bottom: 0;
+    margin-right: -60%;
     pointer-events: none;
   }
-  .panel:not(.panel-overview) .win-fit {
-    z-index: 1;
-  }
   .panel-overview {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   }
   .panel-overview .install {
-    position: relative;
-    z-index: 1;
-    max-width: none;
-    width: min(740px, calc(100% + 170px));
+    max-width: 680px;
+  }
+  .panel-overview .cmd {
+    gap: 8px;
+    padding-left: 12px;
+  }
+  .panel-overview .cmd .copy {
+    padding: 8px 12px;
+  }
+  .panel-overview .cmd-prompt {
+    display: none;
   }
   .panel-overview .cmd code {
-    font-size: 11.5px;
+    font-size: 11px;
+    letter-spacing: -0.01em;
+  }
+}
+@media (min-width: 1181px) and (max-width: 1365px) {
+  .panel-overview .cmd code {
+    font-size: 10.5px;
   }
 }
 
@@ -2218,6 +2256,13 @@ h1 {
   }
 }
 
+/* The footer's tagline stops fitting beside its links a little above 900px: drop it whole. */
+@media (max-width: 1000px) {
+  footer p {
+    display: none;
+  }
+}
+
 /* --- mobile: a stack, with the rail as a bottom segmented control ------------------------- */
 
 @media (max-width: 899px) {
@@ -2262,7 +2307,8 @@ h1 {
     display: none;
   }
   .rail button {
-    flex: 0 0 38px;
+    flex: 0 1 38px;
+    min-width: 30px;
     height: 40px;
     display: flex;
     align-items: center;
@@ -2275,7 +2321,7 @@ h1 {
       background 200ms;
   }
   .rail button[aria-selected='true'] {
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     background: color-mix(in srgb, var(--fg) 9%, transparent);
     padding: 0 12px;
   }
@@ -2318,13 +2364,20 @@ h1 {
   .panel h2 {
     font-size: clamp(22px, 6.4vw, 30px);
   }
+  /* Phones and tablets read the short version of each feature's copy: four lines at most. */
   .feature-copy {
     margin-top: 8px;
     font-size: 14px;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  .feature-copy .copy-full {
+    display: none;
+  }
+  .feature-copy .copy-short {
+    display: inline;
   }
   .win-fit {
     flex: 1 1 auto;
@@ -2340,17 +2393,16 @@ h1 {
     display: none;
   }
 
-  /* Overview on a phone: the mark sits behind the headline; the mini window steps aside. */
+  /* Overview on a phone: the mark gets its own row above the headline, as tall as the spare
+     height allows (layout.js drops it when that is too little); the mini window steps aside. */
   .panel-overview .text {
-    flex: 1;
-    position: relative;
+    flex: none;
   }
   .panel-overview .side {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 48%;
-    height: 44%;
+    order: -1;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 180px;
     pointer-events: none;
   }
   .side .cube-slot {
@@ -2361,9 +2413,6 @@ h1 {
   }
   h1 {
     font-size: clamp(34px, min(11vw, 6.6vh), 58px);
-  }
-  .eyebrow {
-    max-width: 60%;
   }
   .install {
     margin-top: clamp(14px, 3vh, 30px);
@@ -2574,6 +2623,9 @@ h1 {
   .panel-overview .lede {
     display: none;
   }
+  .panel-overview .side {
+    display: none;
+  }
   .works-with {
     display: none;
   }
@@ -2602,6 +2654,9 @@ h1 {
     display: none;
   }
   .caret {
+    animation: none;
+  }
+  .stage[data-switched] .panel:not([hidden]) .text {
     animation: none;
   }
   .win {
