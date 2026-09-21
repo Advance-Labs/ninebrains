@@ -22,6 +22,42 @@ const AZURE_PROFILE_VARS = [
   'NINEBRAINS_AZURE_PUBLISHER',
 ] as const;
 
+// Every signing variable electron-builder (or its notarize/Azure signers) reads straight from
+// process.env, bypassing the config this file resolves.
+export const SIGNING_ENV_VARS = [
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'CSC_INSTALLER_LINK',
+  'CSC_INSTALLER_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  ...APPLE_ID_VARS,
+  ...APPLE_API_KEY_VARS,
+  ...AZURE_AUTH_VARS,
+  ...AZURE_PROFILE_VARS,
+] as const;
+
+/**
+ * Deletes signing variables that are set but blank, and returns their names.
+ *
+ * `${{ secrets.X }}` for an unset secret gives the step an EMPTY STRING, not an absent variable.
+ * resolveMacSigning() already reads blank as absent, but electron-builder checks `CSC_LINK != null`
+ * on process.env itself: it takes `''` as a certificate path, resolves it against the cwd, and
+ * fails the mac build with "<deploy dir> not a file" while trying to import a directory into a
+ * keychain. Run this before electron-builder so an unset secret means unset everywhere.
+ */
+export function scrubBlankSigningEnv(env: Env): string[] {
+  const removed: string[] = [];
+  for (const name of SIGNING_ENV_VARS) {
+    if (name in env && !present(env, name)) {
+      delete env[name];
+      removed.push(name);
+    }
+  }
+  return removed;
+}
+
 function present(env: Env, name: string): boolean {
   return (env[name] ?? '').trim() !== '';
 }

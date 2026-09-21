@@ -2,7 +2,7 @@
 // only import types from electron-builder, which Node's type stripping erases)
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { resolveMacSigning, resolveWinSigning } from './lib/signing.ts';
+import { resolveMacSigning, resolveWinSigning, scrubBlankSigningEnv } from './lib/signing.ts';
 
 const configs = {
   stable: (await import('../../electron-builder.config.ts')).default,
@@ -73,6 +73,32 @@ describe('signing is switched by env only', () => {
     };
     assert.equal(resolveMacSigning(env).identity, '-');
     assert.equal(resolveWinSigning(env).azureSignOptions, undefined);
+  });
+
+  it('blank signing vars are removed from the env electron-builder reads, real ones are kept', () => {
+    // The v0.1.0 mac build failed here: CSC_LINK='' passed resolveMacSigning (ad-hoc) but
+    // electron-builder read process.env.CSC_LINK itself and tried to import the cwd as a cert.
+    const env = {
+      CSC_LINK: '',
+      CSC_KEY_PASSWORD: '',
+      APPLE_ID: '  ',
+      AZURE_TENANT_ID: '',
+      WIN_CSC_LINK: 'win.pfx',
+      PATH: '/usr/bin',
+      HOME: '',
+    };
+    const removed = scrubBlankSigningEnv(env);
+    assert.deepEqual(removed.sort(), [
+      'APPLE_ID',
+      'AZURE_TENANT_ID',
+      'CSC_KEY_PASSWORD',
+      'CSC_LINK',
+    ]);
+    assert.equal('CSC_LINK' in env, false);
+    assert.equal(env.WIN_CSC_LINK, 'win.pfx');
+    // Only signing vars are touched, even when blank.
+    assert.equal(env.PATH, '/usr/bin');
+    assert.equal(env.HOME, '');
   });
 
   it('the committed configs match the no-env defaults in this test environment', () => {
