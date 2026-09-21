@@ -614,3 +614,10 @@ sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENAB
 | `agents/integrations/mcp.md`, `agents/integrations/providers.md` | Document the adapter, the seed button and the `knowledge.md` seed | Agent docs match behavior |
 
 New Ninebrains-only files: `src/core/features/mcp/browser/seed-mcp.ts` (+ test), `packages/core/src/runtimes/tui-agents/node/runtime/ensure-context-file.ts` (+ test), `packages/plugins/src/agents/impl/{freebuff,codebuff}/index.test.ts`.
+
+## 35. Option+drag text selection in TUIs that capture the mouse (`emdash/drag-copy-freebuff-s8xer`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/terminals/api/browser/pty/pty.ts` | Enable macOS `macOptionClickForcesSelection` so Option+drag forces a text selection even while the TUI runs its own mouse capture | Terminal TUIs (htop, lazygit, vim) grab the mouse, so plain drag selects nothing; Option+drag restores selection without breaking TUI mouse handling (#44) |
+| `src/core/features/settings/browser/agents-page/AgentSignInModal.tsx` | Add the same Option+drag affordance hint when an agent sign-in modal hosts a TUI preview | Keeps the selection behavior consistent where a terminal renders inside the modal |
