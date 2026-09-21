@@ -1095,12 +1095,20 @@
               </div>
               <div class="win-body freebuff">
                 <div class="fb-term fb-claude" data-off="5.4">
-                  <p class="t dim">✻ Claude Code · job j3 search-api</p>
-                  <p class="t">⏺ <b>Edit</b>(src/server/search.ts)</p>
-                  <p class="t">&nbsp; ⎿ <span class="add">+61</span> <span class="del">-4</span></p>
-                  <p class="t" data-at="0.6">⏺ <b>Bash</b>(pnpm test server)</p>
-                  <p class="t pass" data-at="1.4">&nbsp; ⎿ 18 passed</p>
-                  <p class="t" data-at="2">
+                  <p class="t dim" data-at="0.1">✻ Claude Code · job j3 search-api</p>
+                  <p class="t type" data-at="0.3" style="--n: 36">
+                    &gt; add /api/search backed by the index
+                  </p>
+                  <p class="t" data-at="0.9">
+                    ⏺ <b>Read</b>(src/server/routes.ts) <span class="dim">64 lines</span>
+                  </p>
+                  <p class="t" data-at="1.2">⏺ <b>Write</b>(src/server/search.ts)</p>
+                  <p class="t" data-at="1.4">
+                    &nbsp; ⎿ <span class="add">+61</span> <span class="del">-4</span>
+                  </p>
+                  <p class="t" data-at="1.7">⏺ <b>Bash</b>(pnpm test server)</p>
+                  <p class="t pass" data-at="2">&nbsp; ⎿ 18 passed</p>
+                  <p class="t" data-at="2.2">
                     ⏺ Now wiring the route into the router<i class="caret" data-off="2.6"></i>
                   </p>
                   <p class="t warn" data-at="2.6">⎿ 5-hour limit reached ∙ resets 7pm</p>
@@ -1123,25 +1131,31 @@
                 </div>
                 <div class="fb-term fb-free" data-at="5.4">
                   <p class="t dim">freebuff · same worktree, lanes/c9ba2b08</p>
-                  <p class="t paste" data-at="6.6">
+                  <p class="t paste" data-at="6.2">
                     &gt; I'm continuing a task that claude was working on in this worktree until it
                     hit its usage limit ("5-hour limit reached ∙ resets 7pm").
                   </p>
-                  <p class="t paste" data-at="6.6">&nbsp; The task: search-api.</p>
-                  <p class="t paste" data-at="6.6">
+                  <p class="t paste" data-at="6.2">&nbsp; The task: search-api.</p>
+                  <p class="t paste" data-at="6.2">
                     &nbsp; Start by reading `git status` and `git diff` to see what has been done so
                     far, then carry on from there.
                   </p>
-                  <p class="t" data-at="8">▸ git status: 2 files changed</p>
-                  <p class="t" data-at="8.8">
-                    ▸ git diff src/server/search.ts <span class="add">+61</span>
+                  <p class="t" data-at="7">▸ <b>Bash</b> git status --short</p>
+                  <p class="t dim" data-at="7.3">&nbsp; M src/server/search.ts</p>
+                  <p class="t" data-at="7.8">
+                    ▸ <b>Read</b> src/server/search.ts <span class="add">+61</span>
+                    <span class="del">-4</span>
                   </p>
-                  <p class="t" data-at="9.8">▸ wiring GET /api/search into the router</p>
-                  <p class="t pass" data-at="11">
-                    ✓ route added, running tests<i class="caret"></i>
+                  <p class="t" data-at="8.5">▸ <b>Edit</b> src/server/router.ts</p>
+                  <p class="t add" data-at="8.8">&nbsp; + import { search } from './search';</p>
+                  <p class="t add" data-at="9">&nbsp; + router.get('/api/search', search);</p>
+                  <p class="t" data-at="9.8">▸ <b>Bash</b> pnpm test server</p>
+                  <p class="t pass" data-at="10.8">&nbsp; ✓ 20 passed</p>
+                  <p class="t pass" data-at="11.6">
+                    ✓ /api/search is wired in; handing j3 back to verifying<i class="caret"></i>
                   </p>
                 </div>
-                <div class="toast" data-at="5.6" data-off="9.4">
+                <div class="toast" data-at="5.6" data-off="8.4">
                   <i class="ti ok">✓</i>
                   <div>
                     <p>

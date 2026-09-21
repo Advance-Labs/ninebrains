@@ -1072,6 +1072,12 @@ h1 {
   display: block;
   visibility: hidden;
 }
+/* Terminals grow like terminals: a line takes space only once it is printed, and site.js keeps
+   the pane scrolled to the newest line when there are more than fit. */
+.term .t[data-at]:not(.on),
+.fb-term .t[data-at]:not(.on) {
+  display: none;
+}
 .win .on:not([data-swap]) {
   animation: pop 320ms var(--out) both;
 }
@@ -1900,6 +1906,7 @@ h1 {
 .fb-term {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   padding: 14px 16px;
   font-family: var(--mono);
   font-size: 13px;
@@ -2133,6 +2140,35 @@ h1 {
   }
   .rail-caption {
     display: none;
+  }
+}
+
+/* Wide desktop: the cubes are the stage, not a diagram. A feature's slot is a large region under
+   the copy that runs in behind the tilted window's left edge, so the arrangement and the window
+   read as one composition in depth. The overview gets room for the whole install line. */
+@media (min-width: 1181px) {
+  .panel:not(.panel-overview) .cube-slot {
+    position: absolute;
+    left: -4%;
+    width: 56%;
+    top: 34%;
+    bottom: 0;
+    pointer-events: none;
+  }
+  .panel:not(.panel-overview) .win-fit {
+    z-index: 1;
+  }
+  .panel-overview {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+  .panel-overview .install {
+    position: relative;
+    z-index: 1;
+    max-width: none;
+    width: min(740px, calc(100% + 170px));
+  }
+  .panel-overview .cmd code {
+    font-size: 11.5px;
   }
 }
 
@@ -2420,6 +2456,117 @@ h1 {
   }
   .fb-term .paste {
     max-width: none;
+  }
+}
+
+/* Phones: a 340px internal width, so the scale stays near 1 and no demo text drops below 11px.
+   Each scene shows a cropped, focused part of itself rather than all of it, shrunk. */
+@media (max-width: 480px) {
+  .win {
+    width: 340px;
+    font-size: 13px;
+  }
+  .win .chip,
+  .win .gate,
+  .win-status,
+  .lane-head span,
+  .lane-head em,
+  .check span,
+  .pn-k,
+  .pk-row span,
+  .queue span,
+  .queue-head,
+  .shot,
+  .module p,
+  .win-live {
+    font-size: 11.5px;
+  }
+  .win-status span:not(:first-child):not([data-clock]) {
+    display: none;
+  }
+  .win-status span[data-at],
+  .win-status span[data-off] {
+    display: inline-flex;
+  }
+  .win-status .off,
+  .win-status [data-at]:not(.on) {
+    display: none !important;
+  }
+  .win-sub {
+    display: none;
+  }
+  .lanes4 {
+    grid-template-columns: 1fr;
+  }
+  .lanes4 .lane:nth-child(n + 3) {
+    display: none;
+  }
+  .lanes4 .term {
+    font-size: 12.5px;
+  }
+  .lanes4 .lane-head span {
+    display: none;
+  }
+  .drawer-term,
+  .queue {
+    font-size: 12.5px;
+  }
+  .drawer-term .t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gates {
+    padding: 10px;
+    gap: 10px;
+  }
+  .shots {
+    grid-template-columns: 1.2fr 1fr 0.5fr;
+  }
+  .check span {
+    display: none;
+  }
+  .evidence {
+    white-space: normal;
+  }
+  /* Planner: the cycle's middle, full size, with the toast over it. */
+  .pl-edges,
+  .planner .module,
+  .planner .pnode,
+  .planner .note,
+  .planner .pl-cycle,
+  .planner .cursor {
+    zoom: 1;
+    translate: -206px -50px;
+  }
+  .toast {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+  .pk-lede {
+    display: none;
+  }
+  .pack {
+    grid-template-columns: 1fr;
+  }
+  .pack .pk-row:nth-of-type(n + 4) {
+    display: none;
+  }
+  .pk-grid .pack:nth-child(3) {
+    display: none;
+  }
+  .pk-launch {
+    font-size: 12px;
+  }
+  .banner {
+    flex-wrap: wrap;
+  }
+  .banner .bt {
+    flex-basis: calc(100% - 30px);
+  }
+  .fb-term {
+    padding: 12px;
+    font-size: 12.5px;
   }
 }
 

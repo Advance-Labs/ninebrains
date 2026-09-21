@@ -21,6 +21,7 @@ const STATES = ['idle', 'run', 'pass', 'fail', 'warn'];
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const mobileQuery = window.matchMedia('(max-width: 899px)');
+const phoneQuery = window.matchMedia('(max-width: 480px)');
 
 // --- the scene clock --------------------------------------------------------------------------
 
@@ -75,7 +76,8 @@ const marks = panels.map((panel) => {
     list.push({ el, at, off, swap, swapAt, base, state: '' });
   }
   const clocks = [...panel.querySelectorAll('[data-clock]')];
-  return { list, clocks, lastClock: '' };
+  const terminals = [...panel.querySelectorAll('.term, .fb-term')];
+  return { list, clocks, terminals, lastClock: '' };
 });
 
 function applyMarks(index, t) {
@@ -83,6 +85,7 @@ function applyMarks(index, t) {
   const set = marks[index];
   panel.style.setProperty('--t', t.toFixed(3));
   panel.style.setProperty('--tp', Math.min(t / durations[index], 1).toFixed(4));
+  let printed = false;
   for (const mark of set.list) {
     const on = mark.at === null || t >= mark.at;
     const off = mark.off !== null && t >= mark.off;
@@ -90,6 +93,7 @@ function applyMarks(index, t) {
     const state = `${on ? 1 : 0}${off ? 1 : 0}${swapped ? 1 : 0}`;
     if (state === mark.state) continue;
     mark.state = state;
+    printed = true;
     if (mark.at !== null) mark.el.classList.toggle('on', on);
     mark.el.classList.toggle('off', off);
     if (mark.swap !== null) {
@@ -97,6 +101,10 @@ function applyMarks(index, t) {
       if (mark.base) mark.el.classList.toggle(mark.base, !swapped);
       if (STATES.includes(mark.swap)) mark.el.classList.toggle(mark.swap, swapped);
     }
+  }
+  // Keep each terminal on its newest line, the way a real one scrolls.
+  if (printed) {
+    for (const term of set.terminals) term.scrollTop = term.scrollHeight;
   }
   const seconds = Math.floor(t);
   const text = `00:${String(seconds).padStart(2, '0')}`;
@@ -118,8 +126,9 @@ function fitWindows() {
     if (!w || !h) continue;
     const mini = win.classList.contains('win-mini');
     if (mobile && !mini) {
-      // Flat and full width: a fixed 500px-wide layout scaled to the column, as tall as fits.
-      const s = w / 500;
+      // Flat and full width: a fixed-width layout scaled to the column, as tall as fits. Phones
+      // get the narrower 340px layout so the scale stays near 1 and text stays readable.
+      const s = w / (phoneQuery.matches ? 340 : 500);
       fit.style.setProperty('--s', s.toFixed(4));
       win.style.setProperty('--win-h', `${Math.max(240, Math.floor(h / s))}px`);
     } else {

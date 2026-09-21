@@ -170,7 +170,8 @@ const DUST_FS = `#version 300 es
   in float vAlpha;
   in float vShade;
   out vec4 outColor;
-  void main() { outColor = vec4(uSilver, vAlpha * vShade * 0.72); }
+  uniform float uDustAlpha;
+  void main() { outColor = vec4(uSilver, vAlpha * vShade * uDustAlpha); }
 `;
 
 const CUBE_VS = `#version 300 es
@@ -500,7 +501,7 @@ const SCENES = [
         const k = parked++;
         cubes.push(
           actor([-1.6 + k * 0.8, -2.08 + 0.05 * Math.sin(t * 2 + k), 0.2], 0.4, {
-            b: 0.2,
+            b: 0.34,
             r: [0, t * 0.4 + k, 0],
           })
         );
@@ -535,7 +536,7 @@ const SCENES = [
       const lit = at === undefined ? 0 : ramp(t, at, 0.35);
       const done = k === 1 ? ramp(t, 8.4, 0.4) : 0;
       cubes[i] = actor(p, 0.62, {
-        b: 0.3 + 0.7 * lit,
+        b: 0.42 + 0.58 * lit,
         r: [0, -angle, 0],
         tint: done > 0 ? tinted('pass', 0.55 * done) : tinted('run', 0.35 * lit),
       });
@@ -604,7 +605,7 @@ const SCENES = [
       r: [0.3, t * 0.8, 0],
       b: 0.9 + 0.5 * framePass,
     });
-    cubes[8] = actor([4.6, -1.15, 0.6], 0.42, { b: 0.2, r: [0, t * 0.5, 0] });
+    cubes[8] = actor([4.6, -1.15, 0.6], 0.42, { b: 0.3, r: [0, t * 0.5, 0] });
     const ink = frameFail > 0.02 ? [...STATE.fail, 0.3 + 0.6 * frameFail] : null;
     const color =
       ink ?? (framePass > 0.02 ? [...STATE.pass, 0.3 + 0.6 * framePass] : [1, 1, 1, 0.45]);
@@ -703,7 +704,7 @@ const SCENES = [
         const rz = (-x * Math.sin(angle) + z * Math.cos(angle)) * spread;
         cubes[bundle * 3 + k] = actor([center[0] + rx, center[1] + y * spread, rz], 0.76, {
           r: [0, angle, 0],
-          b: 0.3 + 0.75 * on,
+          b: 0.4 + 0.65 * on,
           tint: tinted('pass', 0.5 * flash(t, 3.4, 1.4) * on),
         });
       });
@@ -727,7 +728,8 @@ const SCENES = [
     cubes[3] = actor(a, 1.25, {
       r: [0.15, 0.5 + t * 0.5 * (1 - dimA), 0],
       b: (0.95 + 0.1 * Math.sin(t * 3)) * (1 - 0.72 * dimA),
-      tint: tinted('warn', 0.75 * ramp(t, 2.6, 0.3) * (1 - 0.4 * ramp(t, 6, 1.5))),
+      // The limit is a state, so it flashes amber, then the cube settles to plain dark grey.
+      tint: tinted('warn', 0.85 * ramp(t, 2.6, 0.15) * flash(t, 2.75, 1.3)),
     });
     const litB = ramp(t, 6.2, 0.5);
     cubes[5] = actor(b, 1.25, {
@@ -737,7 +739,7 @@ const SCENES = [
     });
     const small = [0, 1, 2, 4, 6, 7, 8];
     small.forEach((i, k) => {
-      cubes[i] = actor([-2.4 + k * 0.8, -1.25, -2.2], 0.4, { b: 0.2, r: [0, t * 0.3 + k, 0] });
+      cubes[i] = actor([-2.4 + k * 0.8, -1.25, -2.2], 0.4, { b: 0.3, r: [0, t * 0.3 + k, 0] });
     });
     const sparks = [hidden(), hidden(), hidden()];
     const from = [a[0] + 0.3, a[1] + 0.2, 0];
@@ -757,7 +759,7 @@ const SCENES = [
       cubes,
       sparks,
       lines,
-      cam: { yaw: 0.26, pitch: 0.18, target: [0, -0.1, 0], radius: 3.4 },
+      cam: { yaw: 0.26, pitch: 0.18, target: [0.9, -0.1, 0], radius: 3.6 },
     };
   },
 ];
@@ -853,6 +855,7 @@ const PALETTES = {
     mid: [0.34, 0.34, 0.35],
     far: [0.12, 0.12, 0.125],
     silver: [0.9, 0.9, 0.93],
+    dustAlpha: 0.72,
     lo: [0.035, 0.035, 0.04],
     hi: [0.82, 0.82, 0.84],
     edgeInk: [1, 1, 1],
@@ -861,10 +864,11 @@ const PALETTES = {
   light: {
     base: [0.98, 0.98, 0.98],
     edge: [0.9, 0.9, 0.9],
-    sky: [0.1, 0.1, 0.11],
-    mid: [0.45, 0.45, 0.46],
-    far: [0.76, 0.76, 0.77],
-    silver: [0.18, 0.18, 0.2],
+    sky: [0.16, 0.16, 0.17],
+    mid: [0.66, 0.66, 0.67],
+    far: [0.9, 0.9, 0.905],
+    silver: [0.34, 0.34, 0.36],
+    dustAlpha: 0.42,
     lo: [0.6, 0.6, 0.62],
     hi: [1, 1, 1],
     edgeInk: [0.12, 0.12, 0.13],
@@ -927,6 +931,8 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
   let transition = null;
   let intro = null;
   let lastDrawn = null;
+  let lastIndex = -1;
+  let lastT = 0;
 
   function resize() {
     const w = window.innerWidth;
@@ -992,6 +998,13 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
     const index = scene();
     // Under reduced motion each scene holds one representative frame instead of its last.
     const t = reduced ? POSTER[index] : sceneTime();
+    // A scene that loops back to its start eases into it like a scene change, cube by cube,
+    // instead of every actor popping back to its first position at once.
+    if (index === lastIndex && t + 0.5 < lastT && lastDrawn && !transition) {
+      transition = { start: now, from: { ...lastDrawn, rect: targetRect } };
+    }
+    lastIndex = index;
+    lastT = t;
     const live = poseAt(index, t);
     const rect = targetRect;
     let cubes = live.cubes;
@@ -1108,6 +1121,7 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
     gl.uniform2f(dust.u.uArc, g.arc[0], g.arc[1]);
     gl.uniform1f(dust.u.uDepth, g.depth);
     gl.uniform3fv(dust.u.uSilver, colors.silver);
+    gl.uniform1f(dust.u.uDustAlpha, colors.dustAlpha);
     gl.drawArrays(gl.POINTS, 0, g.count);
 
     // 3. cubes
