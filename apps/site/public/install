@@ -16,6 +16,9 @@ API_LATEST="https://api.github.com/repos/$REPO/releases/latest"
 WEB_LATEST="https://github.com/$REPO/releases/latest"
 DOWNLOAD_BASE="https://github.com/$REPO/releases/download"
 SIGNER_WORKFLOW="$REPO/.github/workflows/release.yml"
+# The signing certificate must name release.yml run from main or a release/* branch: a workflow
+# run from any other ref (a PR branch, a fork, a tag someone pushed) does not count.
+CERT_IDENTITY_REGEX='^https://github\.com/Advance-Labs/ninebrains/\.github/workflows/release\.yml@refs/heads/(main|release/[^@]+)$'
 BUNDLE_ID='dev.advancelabs.ninebrains'
 SITE='https://ninebrains.runs-on.dev'
 SOURCE_DOCS='https://docs.advancelabs.dev/ninebrains/install-from-source/'
@@ -52,7 +55,8 @@ Options:
 Every download is checked against the release's SHA256SUMS. That catches a corrupted or swapped
 file; it cannot catch a compromised release, since both come from the same place. With the
 GitHub CLI signed in, the installer also runs 'gh attestation verify' to check the file was built
-by $SIGNER_WORKFLOW. More: $VERIFY_DOCS
+by $SIGNER_WORKFLOW from main or a release/* branch, on a
+GitHub-hosted runner. More: $VERIFY_DOCS
 EOF
 }
 
@@ -77,7 +81,7 @@ valid_version() {
   case $1 in
     '' | *[!0-9A-Za-z.-]*) return 1 ;;
   esac
-  printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+  printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
 }
 
 need() {
@@ -110,9 +114,10 @@ plist_get() {
 }
 
 cleanup() {
-  # A swap interrupted between its two renames: put the old app back.
-  if [ -n "$SWAP_ASIDE" ] && [ -e "$SWAP_ASIDE" ] && [ ! -e "$SWAP_TARGET" ]; then
-    mv "$SWAP_ASIDE" "$SWAP_TARGET" && warn "restored the previous app at $SWAP_TARGET"
+  # A swap interrupted between its two renames: put the old app back. If that fails,
+  # restore_previous clears STAGE so the old app is not deleted with the staging folder.
+  if [ -n "$SWAP_ASIDE" ] && [ -e "$SWAP_ASIDE" ]; then
+    restore_previous && warn "restored the previous app at $SWAP_TARGET"
   fi
   if [ -n "$STAGE" ]; then rm -rf "$STAGE"; fi
   if [ -n "$TMPD" ]; then rm -rf "$TMPD"; fi
@@ -177,9 +182,9 @@ verify_provenance() {
   if command -v gh >/dev/null 2>&1 && gh attestation --help >/dev/null 2>&1 &&
     gh auth status >/dev/null 2>&1; then
     say "checking build provenance with gh attestation verify"
-    if gh attestation verify "$1" --repo "$REPO" --signer-workflow "$SIGNER_WORKFLOW" \
-      >"$TMPD/attest.log" 2>&1; then
-      PROVENANCE="verified: built by $SIGNER_WORKFLOW (gh attestation verify)"
+    if gh attestation verify "$1" --repo "$REPO" --cert-identity-regex "$CERT_IDENTITY_REGEX" \
+      --deny-self-hosted-runners >"$TMPD/attest.log" 2>&1; then
+      PROVENANCE="verified: built by $SIGNER_WORKFLOW on main or release/*, GitHub-hosted runner (gh attestation verify)"
       return 0
     fi
     cat "$TMPD/attest.log" >&2
@@ -248,7 +253,7 @@ mac_install() {
   STAGE=$(mktemp -d "$APP_DIR/.ninebrains-install.XXXXXX") || die "cannot write to $APP_DIR"
   ditto -x -k "$zip" "$STAGE/new" || die "could not unpack $(basename "$zip")"
   new="$STAGE/new/Ninebrains.app"
-  [ -d "$new" ] && [ ! -L "$new" ] || die "the zip does not contain Ninebrains.app"
+  if [ ! -d "$new" ] || [ -L "$new" ]; then die "the zip does not contain Ninebrains.app"; fi
 
   new_id=$(plist_get "$new" CFBundleIdentifier || true)
   [ "$new_id" = "$BUNDLE_ID" ] || die "downloaded app has bundle id '$new_id', expected $BUNDLE_ID"
@@ -257,9 +262,15 @@ mac_install() {
     die "downloaded app reports version '$new_version', expected $VERSION"
   codesign --verify --deep --strict "$new" 2>"$STAGE/codesign.log" || {
     cat "$STAGE/codesign.log" >&2
-    die "codesign --verify failed: the app bundle is damaged or was modified after it was built"
+    die "codesign --verify failed: the app bundle's signature does not match its contents"
   }
-  say "code signature intact (codesign --verify --deep --strict)"
+  say "code signature is internally consistent (codesign --verify --deep --strict)"
+  # Report what kind of signature it is rather than assuming: ad-hoc today, Developer ID later.
+  if codesign -dv "$new" 2>&1 | grep -q '^Signature=adhoc'; then
+    SIGNATURE=adhoc
+  else
+    SIGNATURE=$(codesign -dv "$new" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)
+  fi
 
   # Swap by rename on the same volume, keeping the old app aside until the new one is in place.
   SWAP_TARGET=$TARGET
@@ -270,11 +281,30 @@ mac_install() {
       die "could not move the old app aside"
     }
   fi
+  # Something appeared at the target in the meantime: mv would move the app *into* it.
+  if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
+    restore_previous || true
+    die "$TARGET reappeared during the install; nothing was replaced"
+  fi
   if ! mv "$new" "$TARGET"; then
-    if [ -n "$SWAP_ASIDE" ]; then mv "$SWAP_ASIDE" "$TARGET" && SWAP_ASIDE=''; fi
+    restore_previous || true
     die "could not move the new app into $APP_DIR; the previous app was left in place"
   fi
   SWAP_ASIDE=''
+}
+
+# Puts the app moved aside back at the target. If that fails, keeps the staging folder (so the
+# old app is not deleted) and says where it is.
+restore_previous() {
+  [ -n "$SWAP_ASIDE" ] || return 0
+  if [ ! -e "$SWAP_TARGET" ] && [ ! -L "$SWAP_TARGET" ] && mv "$SWAP_ASIDE" "$SWAP_TARGET"; then
+    SWAP_ASIDE=''
+    return 0
+  fi
+  warn "could not put the previous app back; it is at $SWAP_ASIDE. Move it to $SWAP_TARGET yourself."
+  STAGE=''
+  SWAP_ASIDE=''
+  return 1
 }
 
 # --- Linux ---------------------------------------------------------------------------------------
@@ -308,7 +338,7 @@ linux_install_appimage() {
 
   link="$BIN_DIR/ninebrains"
   if [ -L "$link" ] || [ ! -e "$link" ]; then
-    ln -sf Ninebrains.AppImage "$link"
+    ln -sfn Ninebrains.AppImage "$link"
   else
     warn "$link exists and is not a link; left it alone"
   fi
@@ -358,6 +388,7 @@ main() {
   SWAP_ASIDE=''
   SWAP_TARGET=''
   PROVENANCE=''
+  SIGNATURE=''
   OLD_VERSION=''
 
   while [ $# -gt 0 ]; do
@@ -393,6 +424,11 @@ main() {
     valid_version "$VERSION" || die "invalid version '$VERSION'; expected X.Y.Z or X.Y.Z-suffix"
   fi
   if [ -n "$DIR" ]; then
+    # % would be expanded in the .desktop Exec line; a newline would split it (and our output).
+    case $DIR in
+      *%* | *"
+"*) die "--dir must not contain '%' or a newline" ;;
+    esac
     case $DIR in
       /*) ;;
       *) DIR="$(pwd)/$DIR" ;;
@@ -511,9 +547,14 @@ main() {
   say "provenance $PROVENANCE"
   case $os in
     Darwin)
-      say "signature ad-hoc only: not Developer ID signed or notarized. On first launch after an"
-      say "          install or update macOS may ask for access to 'Ninebrains Safe Storage' in your"
-      say "          keychain; click Always Allow. More: $VERIFY_DOCS"
+      if [ "$SIGNATURE" = adhoc ]; then
+        say "signature ad-hoc: internally consistent, but not Developer ID signed or notarized."
+        say "          On first launch after an install or update macOS may ask for access to"
+        say "          'Ninebrains Safe Storage' in your keychain; click Always Allow."
+        say "          More: $VERIFY_DOCS"
+      else
+        say "signature ${SIGNATURE:-unknown} (codesign --verify passed)"
+      fi
       say "Open it:  open \"$TARGET\""
       ;;
     Linux)

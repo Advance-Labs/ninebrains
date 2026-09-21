@@ -37,7 +37,9 @@ function Install-Ninebrains {
   $DownloadBase = "https://github.com/$Repo/releases/download"
   $SignerWorkflow = "$Repo/.github/workflows/release.yml"
   $VerifyDocs = 'https://docs.advancelabs.dev/ninebrains/verify-download/'
-  $VersionPattern = '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+  # The signing certificate must name release.yml run from main or a release/* branch.
+  $CertIdentityRegex = '^https://github\.com/Advance-Labs/ninebrains/\.github/workflows/release\.yml@refs/heads/(main|release/[^@]+)$'
+  $VersionPattern = '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
 
   function Say([string]$Message) { Write-Host "ninebrains: $Message" }
   function Fail([string]$Message) { throw "ninebrains: error: $Message" }
@@ -128,29 +130,46 @@ CLI signed in, the installer also runs 'gh attestation verify'. More: $VerifyDoc
     $asset = "Ninebrains-$Version-win-x64.exe"
     $base = "$DownloadBase/v$Version"
 
-    # An existing per-user or per-machine install, from the uninstall entry the NSIS installer writes.
-    $installed = $null
-    foreach ($root in @(
-        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
-        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
-        'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
-      )) {
-      $entry = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -like 'Ninebrains *' -or $_.DisplayName -eq 'Ninebrains' } |
-        Where-Object { $_.DisplayName -notlike 'Ninebrains Canary*' } |
-        Select-Object -First 1
-      if ($entry) {
-        $installed = $entry
-        break
+    # Existing installs, from the uninstall entries the NSIS installer writes: HKCU for a
+    # per-user install (what this script makes), HKLM for an all-users one.
+    function Find-Install([string[]]$Roots) {
+      foreach ($root in $Roots) {
+        $entry = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue |
+          Where-Object { $_.DisplayName -like 'Ninebrains *' -or $_.DisplayName -eq 'Ninebrains' } |
+          Where-Object { $_.DisplayName -notlike 'Ninebrains Canary*' } |
+          Select-Object -First 1
+        if ($entry) { return $entry }
       }
+      return $null
     }
-    $oldVersion = if ($installed) { [string]$installed.DisplayVersion } else { '' }
+    $userInstall = Find-Install @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
+    $machineInstall = Find-Install @(
+      'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+      'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    $oldVersion = if ($userInstall) { [string]$userInstall.DisplayVersion } else { '' }
+    $machineVersion = if ($machineInstall) { [string]$machineInstall.DisplayVersion } else { '' }
 
     Say "platform  Windows x64"
     Say "release   v$Version"
     Say "file      $base/$asset"
     Say "install   for the current user (NSIS /S /currentuser)"
-    if ($oldVersion) { Say "installed $oldVersion" }
+    if ($oldVersion) { Say "installed $oldVersion (this user)" }
+    if ($machineInstall) { Say "installed $machineVersion (all users)" }
+
+    # This script only ever installs per user. Next to an all-users install that makes a second,
+    # separate copy, which is confusing; stop unless the user asked for it.
+    if ($machineInstall -and -not $Force) {
+      $message = "an all-users copy of Ninebrains $machineVersion is installed. This installer only " +
+        'installs for the current user, so it would add a second, separate copy. Uninstall the ' +
+        'all-users copy (Settings > Apps) and run this again, or download the installer from ' +
+        "$WebLatest and run it yourself to update that copy. -Force installs the per-user copy anyway."
+      if ($DryRun) {
+        Say "dry run: a real run would stop here: $message"
+        return
+      }
+      Fail $message
+    }
 
     if ($oldVersion -eq $Version -and -not $Force) {
       Say "Ninebrains $Version is already installed. Nothing to do (-Force reinstalls)."
@@ -205,22 +224,35 @@ CLI signed in, the installer also runs 'gh attestation verify'. More: $VerifyDoc
       $provenance = 'not checked (-NoAttestation)'
     } else {
       $gh = Get-Command gh -ErrorAction SilentlyContinue
+      # gh writes to stderr, which Windows PowerShell 5.1 turns into a terminating error under
+      # ErrorActionPreference 'Stop'. Run it with 'Continue' and judge only by its exit code.
+      function Invoke-Gh([string[]]$GhArgs) {
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+          $output = & $gh.Source @GhArgs 2>&1
+          return [pscustomobject]@{ Code = $LASTEXITCODE; Output = $output }
+        } finally {
+          $ErrorActionPreference = $previous
+        }
+      }
       $ghReady = $false
       if ($gh) {
-        & $gh.Source attestation --help *> $null
-        if ($LASTEXITCODE -eq 0) {
-          & $gh.Source auth status *> $null
-          $ghReady = ($LASTEXITCODE -eq 0)
+        if ((Invoke-Gh @('attestation', '--help')).Code -eq 0) {
+          $ghReady = ((Invoke-Gh @('auth', 'status')).Code -eq 0)
         }
       }
       if ($ghReady) {
         Say 'checking build provenance with gh attestation verify'
-        $log = & $gh.Source attestation verify $exe --repo $Repo --signer-workflow $SignerWorkflow 2>&1
-        if ($LASTEXITCODE -ne 0) {
-          $log | ForEach-Object { Write-Host $_ }
+        $verify = Invoke-Gh @(
+          'attestation', 'verify', $exe, '--repo', $Repo,
+          '--cert-identity-regex', $CertIdentityRegex, '--deny-self-hosted-runners'
+        )
+        if ($verify.Code -ne 0) {
+          $verify.Output | ForEach-Object { Write-Host $_ }
           Fail "gh attestation verify failed for $asset; not installing. Pass -NoAttestation to rely on the checksum alone."
         }
-        $provenance = "verified: built by $SignerWorkflow (gh attestation verify)"
+        $provenance = "verified: built by $SignerWorkflow on main or release/*, GitHub-hosted runner (gh attestation verify)"
       } elseif ($RequireAttestation) {
         Fail '-RequireAttestation needs the GitHub CLI (gh) installed and signed in (gh auth login)'
       }
@@ -230,7 +262,9 @@ CLI signed in, the installer also runs 'gh attestation verify'. More: $VerifyDoc
     $process = Start-Process -FilePath $exe -ArgumentList '/S', '/currentuser' -Wait -PassThru
     if ($process.ExitCode -ne 0) { Fail "the installer exited with code $($process.ExitCode)" }
 
-    if (-not $oldVersion) {
+    if ($machineInstall) {
+      Say "Installed per-user Ninebrains $Version (an all-users copy $machineVersion also exists)"
+    } elseif (-not $oldVersion) {
       Say "Installed Ninebrains $Version"
     } elseif ($oldVersion -eq $Version) {
       Say "Reinstalled Ninebrains $Version"
@@ -240,8 +274,16 @@ CLI signed in, the installer also runs 'gh attestation verify'. More: $VerifyDoc
     Say "verified  sha256 matches the release's SHA256SUMS (catches a corrupted or swapped file,"
     Say '          not a compromised release)'
     Say "provenance $provenance"
-    Say 'signature the installer is not code-signed. SmartScreen may still warn when you open'
-    Say "          Ninebrains, and a managed PC may block it. More: $VerifyDocs"
+    $signature = $null
+    if (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue) {
+      $signature = Get-AuthenticodeSignature -FilePath $exe
+    }
+    if ($signature -and $signature.Status -eq 'Valid') {
+      Say "signature valid Authenticode signature: $($signature.SignerCertificate.Subject)"
+    } else {
+      Say 'signature the installer is not code-signed. SmartScreen may still warn when you open'
+      Say "          Ninebrains, and a managed PC may block it. More: $VerifyDocs"
+    }
     Say 'Open it from the Start menu. To update later, run the same command again.'
   } catch {
     Write-Host $_.Exception.Message -ForegroundColor Red

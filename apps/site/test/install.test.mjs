@@ -34,6 +34,8 @@ const REPO_URL = 'https://github.com/Advance-Labs/ninebrains';
 const API_LATEST = 'https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest';
 const WEB_LATEST = `${REPO_URL}/releases/latest`;
 const download = (version, file) => `${REPO_URL}/releases/download/v${version}/${file}`;
+const CERT_IDENTITY_REGEX =
+  '^https://github\\.com/Advance-Labs/ninebrains/\\.github/workflows/release\\.yml@refs/heads/(main|release/[^@]+)$';
 
 /** An AppImage only has to look like an ELF file to the installer. */
 const APPIMAGE = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from('fake')]);
@@ -267,14 +269,31 @@ describe('install (sh): platform and release resolution', () => {
 
   test('a malformed version is refused before any network call', async () => {
     const box = sandbox();
-    for (const bad of ['1.2', '1.2.3;rm -rf ~', '../1.2.3', '1.2.3\n4.5.6', '1.2.3 ', '']) {
-      const r = await run(box, ['--dry-run', `--version=${bad}`], LINUX_X64);
-      if (bad === '') {
+    const bad = [
+      '1.2',
+      '1.2.3;rm -rf ~',
+      '../1.2.3',
+      '1.2.3\n4.5.6',
+      '1.2.3 ',
+      '1.2.3-',
+      '1.2.3-.rc',
+      '1.2.3-rc..1',
+      '1.2.3-rc.',
+      '',
+    ];
+    for (const version of ['1.2.3-rc.1', '1.2.3-canary']) {
+      const box = sandbox({ releases: { [version]: {} } });
+      const r = await run(box, ['--dry-run', '--version', version], LINUX_X64);
+      assert.equal(r.code, 0, `refused ${version}: ${r.all}`);
+    }
+    for (const version of bad) {
+      const r = await run(box, ['--dry-run', `--version=${version}`], LINUX_X64);
+      if (version === '') {
         // An empty --version= means "latest", like an unset NINEBRAINS_VERSION.
         assert.equal(r.code, 0, r.all);
         continue;
       }
-      assert.notEqual(r.code, 0, `accepted ${JSON.stringify(bad)}`);
+      assert.notEqual(r.code, 0, `accepted ${JSON.stringify(version)}`);
       assert.match(r.stderr, /invalid version/);
     }
     assert.deepEqual(box.requests(), [API_LATEST, download('0.2.0', 'SHA256SUMS')]);
@@ -391,17 +410,40 @@ describe('install (sh): verification', () => {
     assert.equal(existsSync(join(box.home, '.local/bin/Ninebrains.AppImage')), false);
   });
 
-  test('with gh signed in, runs gh attestation verify pinned to the release workflow', async () => {
+  test('with gh signed in, runs gh attestation verify pinned to release.yml on main or release/*', async () => {
     const box = sandbox();
     const r = await run(box, ['--require-attestation'], { ...LINUX_X64, FAKE_GH_AUTH: '0' });
     assert.equal(r.code, 0, r.all);
     assert.match(r.stdout, /provenance verified/);
     const verify = box.requests().find((line) => line.startsWith('gh attestation verify'));
     assert.ok(verify, box.requests().join('\n'));
-    assert.match(
-      verify,
-      /--repo Advance-Labs\/ninebrains --signer-workflow Advance-Labs\/ninebrains\/\.github\/workflows\/release\.yml$/
+    assert.ok(
+      verify.endsWith(
+        `--repo Advance-Labs/ninebrains --cert-identity-regex ${CERT_IDENTITY_REGEX} --deny-self-hosted-runners`
+      ),
+      verify
     );
+    assert.doesNotMatch(verify, /--signer-workflow/);
+  });
+
+  test('the certificate identity regex accepts main and release/* and nothing else', () => {
+    const identity = new RegExp(CERT_IDENTITY_REGEX);
+    const workflow = 'https://github.com/Advance-Labs/ninebrains/.github/workflows/release.yml';
+    // v0.1.0's real attestation carries this SAN (checked with gh attestation verify --format json).
+    assert.match(`${workflow}@refs/heads/main`, identity);
+    assert.match(`${workflow}@refs/heads/release/0.2.0`, identity);
+    for (const other of [
+      `${workflow}@refs/heads/feature/x`,
+      `${workflow}@refs/heads/mainline`,
+      `${workflow}@refs/tags/v0.2.0`,
+      `${workflow}@refs/pull/1/merge`,
+      `${workflow}@refs/heads/release/x@refs/heads/main`,
+      'https://github.com/evil/ninebrains/.github/workflows/release.yml@refs/heads/main',
+      'https://github.com/Advance-Labs/ninebrains/.github/workflows/ci.yml@refs/heads/main',
+    ]) {
+      assert.doesNotMatch(other, identity);
+    }
+    assert.ok(ps1.includes(`$CertIdentityRegex = '${CERT_IDENTITY_REGEX}'`));
   });
 
   test('a failed attestation aborts; --no-attestation skips it', async () => {
@@ -457,6 +499,11 @@ describe('install (sh): installing and updating', () => {
     const dir = join(box.root, 'tools');
     mkdirSync(dir);
     writeFileSync(join(dir, 'ninebrains'), 'mine');
+    for (const bad of ['tools%U', 'tools\nx']) {
+      const refused = await run(box, ['--dir', bad], LINUX_X64);
+      assert.notEqual(refused.code, 0, `accepted --dir ${JSON.stringify(bad)}`);
+      assert.match(refused.stderr, /--dir must not contain/);
+    }
     const r = await run(box, ['--dir', 'tools'], LINUX_X64);
     assert.equal(r.code, 0, r.all);
     assert.ok(existsSync(join(dir, 'Ninebrains.AppImage')));
@@ -566,8 +613,15 @@ describe('install (sh): script hygiene', () => {
     assert.doesNotMatch(sh, /xattr/);
   });
 
+  // Every severity, including info: ubuntu's shellcheck 0.9 flags SC2015 where 0.11 does not, so
+  // the script avoids the constructs either version reports. Show the findings when it fails.
   test('shellcheck is clean', { skip: !which('shellcheck') && 'shellcheck not installed' }, () => {
-    execFileSync('shellcheck', ['--shell=sh', INSTALL], { stdio: 'pipe' });
+    try {
+      execFileSync('shellcheck', ['--shell=sh', INSTALL], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (error) {
+      const version = execFileSync('shellcheck', ['--version'], { encoding: 'utf8' });
+      assert.fail(`${version}\n${error.stdout}${error.stderr}`);
+    }
   });
 
   test('parses under dash', { skip: !which('dash') && 'dash not installed' }, () => {
@@ -594,7 +648,8 @@ describe('install.ps1', () => {
   });
 
   test('validates the version, checks SHA256SUMS by exact name, then installs silently per user', () => {
-    assert.ok(ps1.includes(`'^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?$'`));
+    assert.ok(ps1.includes(`'^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*)?$'`));
+    assert.ok(sh.includes(`'^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*)?$'`));
     assert.match(ps1, /-ceq \$asset/);
     assert.match(ps1, /\$entries\.Count -ne 1/);
     assert.match(ps1, /Get-FileHash -Path \$exe -Algorithm SHA256/);
@@ -602,8 +657,37 @@ describe('install.ps1', () => {
     assert.match(ps1, /Start-Process -FilePath \$exe -ArgumentList '\/S', '\/currentuser' -Wait/);
     // The hash check must come before the installer runs.
     assert.ok(ps1.indexOf('Get-FileHash') < ps1.indexOf('Start-Process'));
-    assert.match(ps1, /attestation verify \$exe --repo \$Repo --signer-workflow \$SignerWorkflow/);
+    assert.match(
+      ps1,
+      /'attestation', 'verify', \$exe, '--repo', \$Repo,\s+'--cert-identity-regex', \$CertIdentityRegex, '--deny-self-hosted-runners'/
+    );
+    assert.doesNotMatch(ps1, /--signer-workflow/);
     assert.match(ps1, /SmartScreen may still warn/);
+  });
+
+  test('runs gh with ErrorActionPreference Continue and judges only the exit code', () => {
+    // Windows PowerShell 5.1 turns native stderr into a terminating error under 'Stop'.
+    const helper = ps1.match(/function Invoke-Gh[\s\S]*?\n {6}\}\n/);
+    assert.ok(helper, 'no Invoke-Gh helper');
+    assert.match(helper[0], /\$ErrorActionPreference = 'Continue'/);
+    assert.match(helper[0], /finally \{\s+\$ErrorActionPreference = \$previous/);
+    assert.match(helper[0], /Code = \$LASTEXITCODE/);
+    // Every gh call goes through the helper.
+    const direct = ps1.split('\n').filter((line) => /& \$gh\.Source/.test(line));
+    assert.deepEqual(direct, ['          $output = & $gh.Source @GhArgs 2>&1']);
+  });
+
+  test('stops next to an all-users install unless -Force, and says so when forced', () => {
+    assert.match(ps1, /Find-Install @\('HKCU:/);
+    assert.match(ps1, /\$machineInstall = Find-Install @\(\s+'HKLM:/);
+    assert.match(ps1, /if \(\$machineInstall -and -not \$Force\)/);
+    assert.match(ps1, /would add a second, separate copy/);
+    assert.match(
+      ps1,
+      /Installed per-user Ninebrains \$Version \(an all-users copy \$machineVersion also exists\)/
+    );
+    // The stop must come before anything is downloaded.
+    assert.ok(ps1.indexOf('$machineInstall -and -not $Force') < ps1.indexOf('Invoke-WebRequest'));
   });
 
   const pwsh = which('pwsh');
@@ -631,6 +715,22 @@ describe('site build and hosting', () => {
     });
     assert.equal(readFileSync(join(out, 'install'), 'utf8'), sh);
     assert.equal(readFileSync(join(out, 'install.ps1'), 'utf8'), ps1);
+  });
+
+  test('the build refuses a SITE_DIST it could wrongly delete', () => {
+    for (const target of ['/', join(APP, 'src'), join(APP, 'public'), dirname(APP)]) {
+      assert.throws(
+        () =>
+          execFileSync('node', [join(APP, 'build.mjs')], {
+            env: { ...process.env, SITE_DIST: target },
+            stdio: 'pipe',
+          }),
+        /SITE_DIST must be inside/,
+        `accepted SITE_DIST=${target}`
+      );
+    }
+    assert.ok(existsSync(join(APP, 'src', 'index.html')));
+    assert.ok(existsSync(INSTALL));
   });
 
   test('vercel serves the installers as plain text, briefly cached, not sniffed', () => {
