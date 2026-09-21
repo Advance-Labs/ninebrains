@@ -1664,13 +1664,16 @@ h1 {
     translate: 0 0;
   }
 }
-.pl-cycle .cy {
-  position: absolute;
-  width: 152px;
-  height: 66px;
-  border: 1.5px solid var(--fail);
-  border-radius: 8px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fail) 22%, transparent);
+/* The cycle is marked on the nodes themselves, so the outline always hugs each card whatever its
+ * height; .pl-cycle is only the timed trigger (its .on/.off come from data-at/data-off). */
+.planner:has(> .pl-cycle.on:not(.off)) .pnode.cyc {
+  border-color: var(--fail);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--fail) 22%, transparent),
+    0 6px 18px -8px rgba(0, 0, 0, 0.6);
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
 }
 .toast {
   position: absolute;
