@@ -16,6 +16,7 @@ import { GITHUB_OWNER, GITHUB_REPO, requireEnv } from './lib/config.ts';
 import { exec } from './lib/exec.ts';
 import { fail, info, step, warn } from './lib/log.ts';
 import { releaseHasOwnership } from './lib/release-ownership.ts';
+import { scrubBlankSigningEnv } from './lib/signing.ts';
 import { resolveReleaseVersion } from './lib/version.ts';
 import type { ReleaseChannel } from './lib/version.ts';
 
@@ -158,6 +159,11 @@ try {
       npmRebuild: false,
       ...(isCanary ? { extraMetadata: { version: overrideVersion } } : {}),
     };
+
+    // Unset GitHub secrets arrive as '' and electron-builder reads CSC_LINK from process.env
+    // directly; blank must mean absent before it looks (see scrubBlankSigningEnv).
+    const scrubbed = scrubBlankSigningEnv(process.env);
+    if (scrubbed.length) info(`Ignoring blank signing env: ${scrubbed.join(', ')}`);
 
     await electronBuild({
       targets: buildTargets,
