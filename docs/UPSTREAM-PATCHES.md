@@ -509,3 +509,10 @@ attribution.
 Release notes: `.github/workflows/release.yml` (Ninebrains-only) renders the new
 `.github/release-notes/install.md` into every release, so the Gatekeeper, SmartScreen and Linux
 steps and the docs links are on the release page instead of only in `docs/RELEASING.md`.
+
+## 23. First conversation named after its task (`feat/first-conversation-task-name`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/tasks/browser/create-task-modal/build-create-task-params.ts` | `buildInitialConversation` takes an optional `taskName` and uses it, trimmed, as the title; blank falls back to `nextDefaultConversationTitle` | Every task opened on a tab called "Claude (1)", which says nothing when several tasks are open. Custom titles do not match the `claude (N)` pattern, so later conversations still number from 1. Test: `build-create-task-params.test.ts` |
+| `src/core/features/tasks/browser/create-task-modal/use-create-task-callback.ts` | Passes `state.taskName.effectiveTaskName` (typed or generated) into `buildInitialConversation` | Same. Automation-adopted tasks keep the run's own conversation title |

@@ -32,7 +32,8 @@ function buildInitialQueue(state: InitialConversationState) {
 }
 
 export function buildInitialConversation(
-  state: InitialConversationState
+  state: InitialConversationState,
+  taskName?: string
 ): NonNullable<TaskConfig['initialConversation']> | undefined {
   const { provider } = state;
   if (!provider) return undefined;
@@ -41,7 +42,8 @@ export function buildInitialConversation(
   return {
     id: crypto.randomUUID(),
     provider,
-    title: nextDefaultConversationTitle(provider, []),
+    // Ninebrains: the first conversation is named after its task; later ones keep "Claude (N)".
+    title: taskName?.trim() || nextDefaultConversationTitle(provider, []),
     ...(type === 'acp'
       ? { initialQueue: buildInitialQueue(state) }
       : state.initialPromptSupported
