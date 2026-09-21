@@ -579,3 +579,9 @@ sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENAB
 | `src/core/features/settings/browser/search/settings-search.ts` | `check-for-new-versions` search entry | Settings search finds the new switch; the upstream `version` entry stays hidden with the updater |
 | `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | Renders `ReleaseNotice` at the top of the sidebar footer | The dismissible "Ninebrains X.Y.Z is out" notice |
 | `README.md` | Install section gains the one-line installer and an **Updating** section; "Nothing phones home" names the opt-in check | Users need a way to update now that the app can tell them a release is out |
+
+## 31. Release 0.2.0 (`release/prepare-0.2.0`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.1.0 → 0.2.0 | Written by `pnpm run release:prepare 0.2.0`; `release.yml` refuses a version that does not match |
