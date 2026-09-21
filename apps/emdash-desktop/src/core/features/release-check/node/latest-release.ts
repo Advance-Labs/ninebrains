@@ -40,6 +40,8 @@ export async function fetchLatestRelease(
         'User-Agent': 'Ninebrains-release-check',
       },
       credentials: 'omit',
+      // The endpoint answers directly; a redirect would mean something other than GitHub's API.
+      redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {

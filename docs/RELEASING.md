@@ -342,6 +342,10 @@ imports electron-updater, and `UPDATES_ENABLED` stays `false`.
   their OS with a copy button, and **What's new** (the GitHub release page).
 - **0.1.0 has none of this.** 0.2.0 is the first build that can show the notice, so 0.1.0 users
   update by hand once.
+- **Threat-model follow-up (open).** `docs/THREAT-MODEL.md` does not yet list this opt-in
+  `api.github.com` request. It needs an entry, next to SEC-36 and SEC-38, recording that the call
+  is user-enabled or user-initiated, read-only, unauthenticated and never installs anything. This
+  PR does not edit the threat model.
 
 Publishing a release is what makes the notice fire, for users who turned it on: **Latest** is what
 they are told about. Mark a bad release as a prerelease (see [Rolling back](#rolling-back)) and the

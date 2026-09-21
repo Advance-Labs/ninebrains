@@ -31,8 +31,11 @@ On Windows, in PowerShell:
 irm https://ninebrains.runs-on.dev/install.ps1 | iex
 ```
 
-The script picks the build for your machine, downloads it from GitHub Releases, checks it against
-the release's `SHA256SUMS`, and installs it. Run the same line again later to update.
+The script picks the file for your OS and CPU (the `.zip` on macOS, the AppImage into
+`~/.local/bin` on Linux x86_64, the x64 installer for the current user on Windows), downloads it
+from GitHub Releases, checks it against the release's `SHA256SUMS`, and installs it. Run the same
+line again later to update. Options such as `--deb` or `--require-attestation`, and what the
+checks prove, are in [Verify a download → Updating](verify-download.md#updating).
 
 ### From a release
 
@@ -48,7 +51,11 @@ explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScre
 
 Ninebrains does not update itself: unsigned builds cannot be updated safely from inside the app.
 Update with the one-line installer above, or download the new build and install it over the old
-one. [Verify a download → Updating](verify-download.md#updating) has the details.
+one. If you installed the `.deb`, update with
+`curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
+(it runs `sudo apt install`); the plain line would add an AppImage instead. On macOS the installer
+asks you to quit Ninebrains first; on Windows, quit it before you run the line.
+[Verify a download → Updating](verify-download.md#updating) has the details.
 
 To hear about new releases, turn on **Settings → General → Check for new versions**. Once after
 startup and every 12 hours, the app asks GitHub for the latest release. When there is a newer one,

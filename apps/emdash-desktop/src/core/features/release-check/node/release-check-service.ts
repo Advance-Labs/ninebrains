@@ -75,7 +75,11 @@ export class ReleaseCheckService {
 
   /** Reads the version and setting, then schedules the startup check if the user wants one. */
   start(): Promise<void> {
-    this.started ??= this.initialize();
+    this.started ??= this.initialize().catch((error: unknown) => {
+      // Let the next call try again instead of caching the failure forever.
+      this.started = null;
+      throw error;
+    });
     return this.started;
   }
 

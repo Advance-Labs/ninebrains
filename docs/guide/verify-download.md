@@ -147,19 +147,60 @@ Windows (PowerShell):
 irm https://ninebrains.runs-on.dev/install.ps1 | iex
 ```
 
-Quit Ninebrains first. Your projects, settings and history live in the app's data folder, which
-the installer does not touch.
+Your projects, settings and history live in the app's data folder, which the installer does not
+touch.
 
-**What the installer checks.** It downloads the installer for your OS and CPU, and the
-`SHA256SUMS` file, from the same GitHub release, and refuses to continue if the file does not
-match its line in `SHA256SUMS`. On macOS it also checks the app bundle's signature and bundle ID
-before replacing the installed app.
+**Which file it installs.** The installer picks the file for your OS and CPU:
+
+- **macOS:** the `.zip` for your Mac (Apple silicon or Intel), not the `.dmg`. It goes into
+  `/Applications` if you can write there, otherwise `~/Applications`, and never uses `sudo`.
+- **Linux x86_64:** the `.AppImage`, into `~/.local/bin` (with a `ninebrains` link and a menu
+  entry). Other Linux CPUs have no build yet, so the installer stops and points you to
+  [Install from source](install-from-source.md).
+- **Windows:** the x64 installer, always installed for the current user only (`/S /currentuser`).
+  Windows on Arm gets the x64 build, which runs under emulation. If Ninebrains is installed for
+  all users (per machine), the script stops with a message instead of adding a second copy, unless
+  you pass `-Force`.
+
+If you installed the `.deb`, update it with the `.deb` too. The default line installs the
+AppImage alongside it instead:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb
+```
+
+That runs `sudo apt install`, so it asks for your password.
+
+**If Ninebrains is running.** On macOS the installer asks you to quit it first and waits. On
+Windows it stops unless you pass `-Force`. On Linux the AppImage file is swapped in place; restart
+Ninebrains to use the new version.
+
+**What the installer checks.** It downloads the file and the release's `SHA256SUMS` from the same
+GitHub release, and stops before installing anything if the file does not match its line in
+`SHA256SUMS`. On macOS it also checks that the app bundle's ad-hoc signature is internally
+consistent (not who signed it), and its bundle ID and version, before it replaces the installed
+app.
 
 **What that does not prove.** The checksum and the file come from the same release. It catches a
 corrupted or swapped download, not a compromised release: someone who could publish a release
-could publish matching sums. The build attestation closes more of that gap. With the GitHub CLI
-installed and logged in, the installer also runs `gh attestation verify` for you; pass
-`--require-attestation` to make that step mandatory. To check a file yourself:
+could publish matching sums. The build attestation closes more of that gap. If the GitHub CLI
+(`gh`) is installed and signed in, the installer runs `gh attestation verify` for you, and if that
+check fails, **nothing is installed**. Without `gh`, it relies on the checksum alone and says so.
+
+### Installer options
+
+A piped script needs `sh -s --` (macOS, Linux) or the scriptblock form (Windows) to take options;
+`irm … | iex` cannot pass any.
+
+| What | macOS, Linux | Windows |
+|---|---|---|
+| Require the attestation check (fail if `gh` is missing or signed out) | `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install \| sh -s -- --require-attestation` | `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation` |
+| Skip the attestation check | `… \| sh -s -- --no-attestation` | `… -NoAttestation` |
+| Update a `.deb` install (Linux) | `… \| sh -s -- --deb` | |
+| Install over a running app or a same-version install | `… \| sh -s -- --force` | `… -Force` |
+| Show what would happen, change nothing | `… \| sh -s -- --dry-run` | `… -DryRun` |
+
+To check a file yourself:
 
 ```bash
 gh attestation verify Ninebrains-0.2.0-mac-arm64.zip --repo Advance-Labs/ninebrains

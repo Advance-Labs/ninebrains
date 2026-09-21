@@ -1,8 +1,11 @@
 ## Install or update in one line
 
-The installer picks the right file for your machine, downloads it from the latest release on this
-repository, checks it against that release's `SHA256SUMS`, and installs it. Run it again to update.
-It installs the latest stable release, not canary builds.
+The installer picks the file for your OS and CPU (the `.zip` on macOS, the AppImage into
+`~/.local/bin` on Linux x86_64, the x64 installer for the current user on Windows, including
+Windows on Arm), downloads it from the latest release on this repository, checks it against that
+release's `SHA256SUMS`, and installs it. With the GitHub CLI signed in it also runs
+`gh attestation verify` and installs nothing if that fails. Run it again to update. It installs the
+latest stable release, not canary builds.
 
 ```sh
 # macOS and Linux
@@ -67,8 +70,19 @@ Stuck? See [Troubleshooting](https://docs.advancelabs.dev/ninebrains/troubleshoo
 ## Updating
 
 {{PRODUCT}} does not update itself: an unsigned app should not replace its own code from the
-network. To update, quit the app and run the one-line installer above again, or download the new
-files from this page and install them over the old version. Your projects and settings are kept.
+network. To update, run the one-line installer above again, or download the new files from this
+page and install them over the old version. Your projects and settings are kept.
+
+- **Installed the `.deb`?** Update with
+  `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
+  (it runs `sudo apt install`). The plain line installs the AppImage instead.
+- **App running?** macOS asks you to quit it; Windows stops unless you pass `-Force`; the Linux
+  AppImage is swapped in place, so restart it.
+- **Windows** installs for the current user only. An all-users install makes the script stop with
+  a message unless you pass `-Force`.
+- **Options** (`--require-attestation`, `--no-attestation`, `--dry-run`): add them after
+  `sh -s --` in the curl line. On Windows, `irm … | iex` takes no options; use
+  `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation`.
 
 From 0.2.0 on, **Settings → General → Check for new versions** (off by default) tells you when a
 new release is out, and shows the download link and the installer line to copy. Nothing is

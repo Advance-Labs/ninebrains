@@ -1,5 +1,6 @@
 import { defineContract, eventStream, fallible, procedure } from '@emdash/wire/rpc';
 import { z } from 'zod';
+import { RELEASE_PAGE_URL_PATTERN } from './release-links';
 
 export const releaseCheckDomain = 'releaseCheck' as const;
 
@@ -17,7 +18,7 @@ export const latestReleaseSchema = z.object({
   /** Normalized `X.Y.Z[-pre]`, no leading `v`. */
   version: z.string(),
   /** GitHub release page, built from `version`; never taken from the response. */
-  releaseUrl: z.string(),
+  releaseUrl: z.string().regex(RELEASE_PAGE_URL_PATTERN),
   publishedAt: z.string().nullable(),
 });
 export type LatestRelease = z.infer<typeof latestReleaseSchema>;

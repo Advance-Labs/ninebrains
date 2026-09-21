@@ -32,6 +32,7 @@ describe('fetchLatestRelease', () => {
     expect(url).toBe('https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest');
     expect(init.method).toBe('GET');
     expect(init.credentials).toBe('omit');
+    expect(init.redirect).toBe('error');
     expect(JSON.stringify(init.headers)).not.toMatch(/authorization/i);
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });

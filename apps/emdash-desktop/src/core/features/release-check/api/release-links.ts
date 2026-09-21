@@ -24,6 +24,10 @@ export function installCommandFor(os: 'mac' | 'windows' | 'linux'): InstallComma
     : { shell: 'Terminal', command: POSIX_INSTALL_COMMAND };
 }
 
+/** The only release-page links the status may carry; the renderer opens this URL. */
+export const RELEASE_PAGE_URL_PATTERN =
+  /^https:\/\/github\.com\/Advance-Labs\/ninebrains\/releases\/tag\/v[0-9A-Za-z.+-]+$/;
+
 /** The GitHub release page for a version that already passed `normalizeVersion`. */
 export function releasePageUrl(version: string): string {
   return `https://github.com/${RELEASE_REPO}/releases/tag/v${encodeURIComponent(version)}`;

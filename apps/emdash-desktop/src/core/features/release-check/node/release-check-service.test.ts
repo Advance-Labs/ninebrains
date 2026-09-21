@@ -183,6 +183,32 @@ describe('ReleaseCheckService automatic checks', () => {
   });
 });
 
+describe('ReleaseCheckService start', () => {
+  it('retries start() after a failed initialization instead of caching the failure', async () => {
+    let attempts = 0;
+    const service = new ReleaseCheckService({
+      getCurrentVersion: async () => '0.1.0',
+      isPackaged: true,
+      isCanary: false,
+      fetchLatest: async () => err('offline'),
+      settings: {
+        get: async () => DEFAULT_RELEASE_CHECK_SETTINGS,
+        update: async () => {},
+        onChange: () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('settings not ready');
+          return () => {};
+        },
+      },
+    });
+
+    await expect(service.start()).rejects.toThrow('settings not ready');
+    await expect(service.getStatus()).resolves.toMatchObject({ currentVersion: '0.1.0' });
+    expect(attempts).toBe(2);
+    service.dispose();
+  });
+});
+
 describe('ReleaseCheckService results', () => {
   it('reports a newer release', async () => {
     const h = harness({});
