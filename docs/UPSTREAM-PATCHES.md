@@ -591,3 +591,10 @@ sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENAB
 | File | Change | Why |
 |---|---|---|
 | `scripts/release/verify-mac.ts` | New `--expect-notarized` flag (requires `--expected-team-id`): per app bundle, `xcrun stapler validate` and `spctl --assess --type execute` must report `source=Notarized Developer ID` | The release workflow passes it once `CSC_LINK` and notarization credentials exist, so a half-configured signing setup fails the build instead of shipping a release that still warns in Gatekeeper. Unsigned builds run exactly as before. Rollout: `docs/SIGNING.md` |
+
+## 33. New-task terminals re-send a resize the runtime dropped before spawn (`emdash/turnicated-terminals-0yhnw`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/conversations/api/browser/conversation-manager.ts` | The TUI connector remembers the last size the pane requested; `handleTuiSessionListChanged` calls `reconcileSize` for running sessions, which re-sends that size once per (`startedAt`, target) when the runtime reports a different `cols`/`rows` | A task created from the Create Task modal mounts its terminal while the worktree provisions, so the pane's resize reaches `tuiAgents.resize` before the PTY exists and is dropped as `not-found`. The agent then spawns at the seeded size, which ignores the ContextBar inset and custom fonts, and draws truncated until a task switch remounts the pane |
+| `src/core/features/conversations/browser/conversation-manager.test.ts` | Regression test: a dropped resize is replayed once, and never again once sizes match | Covers the race without a live runtime |
