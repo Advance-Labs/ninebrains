@@ -28,6 +28,8 @@ const CORE = 20 / 13;
 const SWITCH_MS = 900;
 const INTRO_MS = 1150;
 const MAX_PIXELS = 2.2e6;
+/** The still frame (seconds into each scene) shown when motion is reduced. */
+const POSTER = [5, 8, 10, 6.2, 10.6, 6, 7.4];
 
 const STATE = {
   pass: [0.29, 0.87, 0.5],
@@ -553,10 +555,13 @@ const SCENES = [
 
   // 03 Gates: cubes ride through a frame one by one; one bounces back red, retries, passes green.
   (t) => {
-    const launches = [0.2, 1.3, 2.4, 5.6, 6.7, 7.8, 8.9];
+    const launches = [0.6, 1.7, 2.8, 5.8, 6.9, 8.0, 9.1];
     const conveyor = [0, 1, 2, 3, 5, 6, 7];
     const speed = 3.5;
-    const start = -6.5;
+    // Waiting cubes queue up to the left of the frame and shuffle forward as each one leaves.
+    const front = -2.2;
+    const hit = -front / speed;
+    const moved = launches.reduce((sum, at) => sum + ramp(t, at, 0.5), 0);
     const cubes = new Array(9);
     let frameFail = 0;
     let framePass = 0;
@@ -564,11 +569,12 @@ const SCENES = [
       const u = t - launches[k];
       let x;
       let tint = [1, 1, 1, 0];
-      let passAt;
-      if (k === 2) {
+      let passAt = launches[k] + hit;
+      if (u < 0) {
+        x = front - 1.0 * Math.max(k - moved, 0);
+      } else if (k === 2) {
         // The one that fails: reaches the frame, is thrown back, waits, and tries again.
-        const hit = -start / speed;
-        if (u < hit) x = start + speed * u;
+        if (u < hit) x = front + speed * u;
         else if (u < hit + 0.5) x = -1.8 * easeOut((u - hit) / 0.5);
         else if (u < hit + 1.05) x = -1.8;
         else x = -1.8 + speed * (u - hit - 1.05);
@@ -579,28 +585,33 @@ const SCENES = [
           frameFail = Math.max(frameFail, flash(t, failAt, 1.2));
         }
       } else {
-        x = start + speed * u;
-        passAt = launches[k] - start / speed;
+        x = front + speed * u;
       }
-      if (t >= passAt) {
+      if (u >= 0 && t >= passAt) {
         tint = tinted('pass', 0.85 * flash(t, passAt, 1.1));
         framePass = Math.max(framePass, flash(t, passAt, 2.2));
       }
-      const size = 0.8 * smooth(start, start + 1.3, x) * (1 - smooth(5.2, 6.5, x));
-      cubes[i] = actor([x, 0, 0], size, { tint, r: [0, 0, -x * 0.15], a: size > 0.01 ? 1 : 0 });
+      const size = 0.9 * smooth(-5.6, -4.4, x) * (1 - smooth(4.2, 5.4, x));
+      const waiting = u < 0 ? 0.55 : 1;
+      cubes[i] = actor([x, 0, 0], size, {
+        tint,
+        b: waiting,
+        r: [0, 0, -x * 0.15],
+        a: size > 0.01 ? 1 : 0,
+      });
     });
     cubes[4] = actor([0, 1.72, 0], 0.62, {
       r: [0.3, t * 0.8, 0],
       b: 0.9 + 0.5 * framePass,
     });
-    cubes[8] = actor([-7.4, 0, 0], 0.5, { b: 0.18 });
+    cubes[8] = actor([4.6, -1.15, 0.6], 0.42, { b: 0.2, r: [0, t * 0.5, 0] });
     const ink = frameFail > 0.02 ? [...STATE.fail, 0.3 + 0.6 * frameFail] : null;
     const color =
       ink ?? (framePass > 0.02 ? [...STATE.pass, 0.3 + 0.6 * framePass] : [1, 1, 1, 0.45]);
     const lines = wireBox([0, 0, 0], [0.06, 1.15, 1.15], color);
     lines.push([
-      [-7, -0.5, 0],
-      [7, -0.5, 0],
+      [-5.4, -0.5, 0],
+      [5.4, -0.5, 0],
       [1, 1, 1, 0.12],
     ]);
     return {
@@ -979,7 +990,8 @@ export function createStage(canvas, { reduced, sceneTime, scene }) {
 
   function currentPose(now) {
     const index = scene();
-    const t = sceneTime();
+    // Under reduced motion each scene holds one representative frame instead of its last.
+    const t = reduced ? POSTER[index] : sceneTime();
     const live = poseAt(index, t);
     const rect = targetRect;
     let cubes = live.cubes;
