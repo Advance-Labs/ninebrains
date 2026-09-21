@@ -531,3 +531,9 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 | `src/core/features/files/api/browser/file-content.ts` | New `readFileBlob(ref, { maxBytes, mimeType })` | `readBytes` defaults to a 200 KB cap, which truncates nearly every real PDF. A Blob plus object URL avoids a base64 data URL several MB long |
 | `src/core/features/editor/browser/task-editor/file-content-types.tsx`, `src/core/features/editor/browser/renderers/pdf-renderer.tsx` (new) | `PdfPreview` reads up to `PDF_MAX_BYTES` (50 MB) and renders an iframe on a revoked-on-unmount `blob:` URL; distinct "too large" and "could not load" states | In-editor PDF viewing with Chromium's viewer (zoom, search, thumbnails, print) |
 | `src/main/host/window.ts` | Main window `webPreferences.plugins: true` | Electron's built-in PDF viewer is an internal plugin and stays off without it. It is Electron's only plugin; `<webview>` guests keep their own prefs, so the in-app browser is unchanged |
+
+## 26. Prompt drop highlight stays on the composer (`emdash/drag-n-drop-5iikf`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/tasks/contributions/browser/task-config/initial-conversation-section.tsx` | `usePromptFileDrop` handlers move from the wrapper around the agent selector, toggles and composer onto a plain `div` around `ChatComposer` alone; the wrapper's `bg-accent/10 ring-2 ring-accent/50 ring-inset` drag class and the unused `cn` import are removed | Dragging a file into the Create Task modal drew a square ring around the whole block, cutting across the agent selector and the composer's rounded corners. Section 3 made `accent` near-white, so the ring read as a white highlight spilling over the other controls. The composer already draws its own rounded drag state (`composerShell({ dragActive })`), so it is now the only highlight. Drops on the selector or toggles no longer insert a path; drop on the prompt box |

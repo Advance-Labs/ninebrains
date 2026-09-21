@@ -35,7 +35,6 @@ import {
 } from '@core/primitives/issues/api';
 import type { LinkedIssue } from '@core/primitives/linked-issues/api';
 import { useLocalStorage } from '@core/primitives/react-hooks/browser/useLocalStorage';
-import { cn } from '@core/primitives/styling/browser/cn';
 
 type RenderMentionIcon = NonNullable<Parameters<typeof ChatComposer>[0]['renderMentionIcon']>;
 
@@ -243,7 +242,7 @@ export function InitialConversationField({
       : `${selectedAgent?.name ?? 'This agent'} doesn't support initial prompts.`
     : null;
 
-  const { isDragOver, dropHandlers } = usePromptFileDrop({
+  const { dropHandlers } = usePromptFileDrop({
     // Local paths would not exist on the remote host of an SSH project.
     disableLocalFiles: Boolean(state.connectionId),
     workspaceId: state.projectId,
@@ -326,14 +325,7 @@ export function InitialConversationField({
 
   return (
     <Field.Root>
-      <div
-        className={cn(
-          'flex flex-col gap-2 transition-colors',
-          isDragOver && 'bg-accent/10 ring-2 ring-accent/50 ring-inset'
-        )}
-        onBlur={onPromptBlur}
-        {...(canDeliverInitialPrompt ? dropHandlers : {})}
-      >
+      <div className="flex flex-col gap-2" onBlur={onPromptBlur}>
         <div className="flex w-full">
           <AgentSelector
             value={state.provider}
@@ -367,23 +359,27 @@ export function InitialConversationField({
           </div>
         ) : null}
 
-        <ChatComposer
-          canSubmit={false}
-          showSubmitButton={false}
-          placeholder={
-            placeholder ?? 'Describe what the agent should do, or use / to select a prompt...'
-          }
-          onSubmit={() => {}}
-          onInputChange={handleComposerInputChange}
-          disabled={!canDeliverInitialPrompt}
-          editorApiRef={editorApiRef}
-          renderMentionIcon={renderMentionIcon}
-          queryCommands={canDeliverInitialPrompt ? querySlashItems : undefined}
-          modelOptions={modelOptions}
-          selectedModel={state.model ?? undefined}
-          onModelChange={(modelId) => state.setModel(modelId || null)}
-          className={textareaClassName}
-        />
+        {/* Ninebrains: the drop target is the composer alone. It draws its own rounded drag
+            highlight, so the agent selector and toggles above it are never outlined. */}
+        <div {...(canDeliverInitialPrompt ? dropHandlers : {})}>
+          <ChatComposer
+            canSubmit={false}
+            showSubmitButton={false}
+            placeholder={
+              placeholder ?? 'Describe what the agent should do, or use / to select a prompt...'
+            }
+            onSubmit={() => {}}
+            onInputChange={handleComposerInputChange}
+            disabled={!canDeliverInitialPrompt}
+            editorApiRef={editorApiRef}
+            renderMentionIcon={renderMentionIcon}
+            queryCommands={canDeliverInitialPrompt ? querySlashItems : undefined}
+            modelOptions={modelOptions}
+            selectedModel={state.model ?? undefined}
+            onModelChange={(modelId) => state.setModel(modelId || null)}
+            className={textareaClassName}
+          />
+        </div>
         {initialPromptInfo ? <Field.Description>{initialPromptInfo}</Field.Description> : null}
       </div>
     </Field.Root>
