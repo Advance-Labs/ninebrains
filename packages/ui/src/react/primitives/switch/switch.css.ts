@@ -10,17 +10,27 @@ const switchBase = style({
   flexShrink: 0,
   cursor: 'pointer',
   borderRadius: '9999px',
-  border: '1px solid transparent',
+  border: `1px solid ${vars.border1}`,
   outline: 'none',
   transition: 'background-color 150ms, border-color 150ms',
   backgroundColor: vars.surfaceHover,
   selectors: {
+    '&:hover': {
+      borderColor: vars.border2,
+    },
     '&:focus-visible': {
       borderColor: vars.borderPrimary,
       boxShadow: `0 0 0 3px color-mix(in srgb, ${vars.borderPrimary} 30%, transparent)`,
     },
+    // Ninebrains: the checked track uses the primary-button pair so the thumb (below) can take the
+    // matching contrast colour; a monochrome accent would otherwise swallow the thumb.
     '&[data-checked]': {
       backgroundColor: vars.primaryButtonBackground,
+      borderColor: vars.primaryButtonBackground,
+    },
+    '&[data-checked]:hover': {
+      backgroundColor: vars.primaryButtonBackgroundHover,
+      borderColor: vars.primaryButtonBackgroundHover,
     },
     '&[data-disabled]': {
       pointerEvents: 'none',
@@ -50,12 +60,13 @@ export const switchThumb = style({
   width: '0.75rem',
   height: '0.75rem',
   borderRadius: '9999px',
-  backgroundColor: vars.foreground,
-  transition: 'left 150ms',
+  backgroundColor: vars.foregroundMuted,
+  transition: 'left 150ms, background-color 150ms',
   pointerEvents: 'none',
   selectors: {
     [`${switchBase}[data-checked] &`]: {
       left: 'calc(100% - 0.125rem - 0.75rem)',
+      backgroundColor: vars.primaryButtonForeground,
     },
     [`${switchBase}[data-size="sm"] &`]: {
       width: '0.625rem',
