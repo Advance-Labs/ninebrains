@@ -10,7 +10,7 @@
     />
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#000000" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="canonical" href="https://ninebrains.runs-on.dev/" />
     <meta property="og:url" content="https://ninebrains.runs-on.dev/" />
     <meta property="og:type" content="website" />
@@ -77,136 +77,466 @@
 
     <main>
       <section class="hero">
-        <p class="eyebrow reveal" data-reveal data-delay="0">
-          Apache-2.0 · macOS, Windows, Linux · no telemetry
-        </p>
-        <h1 class="reveal" data-reveal data-delay="1">Run a grid of<br />coding agents.</h1>
-        <p class="lede reveal" data-reveal data-delay="2">
-          Claude Code and Codex, side by side, each in its own git worktree. A central Brain hands
-          out the work. Verification gates prove it before it counts as done.
-        </p>
-        <div class="cta reveal" data-reveal data-delay="3">
-          <a
-            class="button primary"
-            href="https://github.com/Advance-Labs/ninebrains/releases/latest"
-            >Download v0.1.0</a
+        <div class="hero-inner">
+          <div
+            class="rail"
+            role="tablist"
+            aria-label="Overview and features"
+            aria-orientation="vertical"
           >
-          <a class="button" href="https://docs.advancelabs.dev/ninebrains/getting-started/"
-            >Get started</a
-          >
+            <button
+              type="button"
+              role="tab"
+              id="tab-00"
+              aria-controls="panel-00"
+              aria-selected="true"
+              tabindex="0"
+              data-panel="00"
+            >
+              <span class="rail-num">00</span>
+              <span class="rail-label">Overview</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-01"
+              aria-controls="panel-01"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="01"
+            >
+              <span class="rail-num">01</span>
+              <span class="rail-label">Lanes</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-02"
+              aria-controls="panel-02"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="02"
+            >
+              <span class="rail-num">02</span>
+              <span class="rail-label">The Brain</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-03"
+              aria-controls="panel-03"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="03"
+            >
+              <span class="rail-num">03</span>
+              <span class="rail-label">Gates</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-04"
+              aria-controls="panel-04"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="04"
+            >
+              <span class="rail-num">04</span>
+              <span class="rail-label">Planner</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-05"
+              aria-controls="panel-05"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="05"
+            >
+              <span class="rail-num">05</span>
+              <span class="rail-label">Packs</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-06"
+              aria-controls="panel-06"
+              aria-selected="false"
+              tabindex="-1"
+              data-panel="06"
+            >
+              <span class="rail-num">06</span>
+              <span class="rail-label">Freebuff</span>
+            </button>
+          </div>
+
+          <div class="stage">
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-00"
+              aria-labelledby="tab-00"
+              data-panel="00"
+            >
+              <div class="hero-copy">
+                <p class="eyebrow">Apache-2.0 · macOS, Windows, Linux · no telemetry</p>
+                <h1>Nine agents.<br />One repo.<br />No collisions.</h1>
+                <p class="lede">
+                  Claude Code, Codex and Freebuff, side by side, each in its own git worktree. A
+                  central Brain hands out the work. Verification gates prove it before it counts as
+                  done.
+                </p>
+              </div>
+
+              <div class="lanes" aria-hidden="true">
+                <div class="lanes-bar">
+                  <span class="lanes-tab is-on">docs-search</span>
+                  <span class="lanes-tab">tab 2</span>
+                  <span class="lanes-tab">tab 3</span>
+                  <span class="lanes-count">lanes 1 to 4 of 9</span>
+                </div>
+                <div class="lanes-grid">
+                  <div class="lane">
+                    <div class="lane-head">
+                      <span class="dot working"></span>
+                      <span class="lane-agent">Claude Code</span>
+                      <span class="lane-branch">ninebrains/lane-1</span>
+                    </div>
+                    <p class="lane-ln">job-2 search-ui</p>
+                    <p class="lane-ln">read src/content/*.md</p>
+                    <p class="lane-ln">edit search/SearchBox.tsx</p>
+                    <p class="lane-ln lane-live">writing tests<span class="caret"></span></p>
+                  </div>
+                  <div class="lane">
+                    <div class="lane-head">
+                      <span class="dot pass"></span>
+                      <span class="lane-agent">Codex</span>
+                      <span class="lane-branch">ninebrains/lane-2</span>
+                    </div>
+                    <p class="lane-ln">job-1 index-content</p>
+                    <p class="lane-ln">gate: tests 41 of 41</p>
+                    <p class="lane-ln">gate: reviewer pass</p>
+                    <p class="lane-ln lane-state pass">done, job-2 unblocked</p>
+                  </div>
+                  <div class="lane">
+                    <div class="lane-head">
+                      <span class="dot working"></span>
+                      <span class="lane-agent">Freebuff</span>
+                      <span class="lane-branch">ninebrains/lane-3</span>
+                    </div>
+                    <p class="lane-ln">job-3 search-api</p>
+                    <p class="lane-ln">took over from claude</p>
+                    <p class="lane-ln">read task notes, git diff</p>
+                    <p class="lane-ln lane-live">adding /api/search<span class="caret"></span></p>
+                  </div>
+                  <div class="lane">
+                    <div class="lane-head">
+                      <span class="dot fail"></span>
+                      <span class="lane-agent">OpenCode</span>
+                      <span class="lane-branch">ninebrains/lane-4</span>
+                    </div>
+                    <p class="lane-ln">job-4 search-docs</p>
+                    <p class="lane-ln">gate: screenshots 390</p>
+                    <p class="lane-ln lane-state fail">fail: nav overlaps input</p>
+                    <p class="lane-ln">feedback sent, attempt 2 of 3</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="install" id="download">
+                <div class="install-tabs" role="tablist" aria-label="Install command">
+                  <button
+                    type="button"
+                    role="tab"
+                    id="install-tab-terminal"
+                    aria-controls="install-panel-terminal"
+                    aria-selected="true"
+                    tabindex="0"
+                    data-install="terminal"
+                  >
+                    Terminal
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id="install-tab-windows"
+                    aria-controls="install-panel-windows"
+                    aria-selected="false"
+                    tabindex="-1"
+                    data-install="windows"
+                  >
+                    Windows
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id="install-tab-download"
+                    aria-controls="install-panel-download"
+                    aria-selected="false"
+                    tabindex="-1"
+                    data-install="download"
+                  >
+                    Download
+                  </button>
+                  <span class="install-hint" data-install-hint>macOS · Linux</span>
+                </div>
+
+                <div
+                  class="install-panel"
+                  role="tabpanel"
+                  id="install-panel-terminal"
+                  aria-labelledby="install-tab-terminal"
+                  data-install-panel="terminal"
+                >
+                  <div class="cmd">
+                    <span class="cmd-prompt" aria-hidden="true">$</span>
+                    <code
+                      >curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install
+                      | sh</code
+                    >
+                    <button type="button" class="copy" data-copy>Copy</button>
+                  </div>
+                  <p class="install-note">Installs or updates. Verifies the checksum first.</p>
+                </div>
+
+                <div
+                  class="install-panel"
+                  role="tabpanel"
+                  id="install-panel-windows"
+                  aria-labelledby="install-tab-windows"
+                  data-install-panel="windows"
+                  hidden
+                >
+                  <div class="cmd">
+                    <span class="cmd-prompt" aria-hidden="true">PS&gt;</span>
+                    <code>irm https://ninebrains.runs-on.dev/install.ps1 | iex</code>
+                    <button type="button" class="copy" data-copy>Copy</button>
+                  </div>
+                  <p class="install-note">Installs or updates for your user. No admin needed.</p>
+                </div>
+
+                <div
+                  class="install-panel"
+                  role="tabpanel"
+                  id="install-panel-download"
+                  aria-labelledby="install-tab-download"
+                  data-install-panel="download"
+                  hidden
+                >
+                  <div class="downloads" data-downloads>
+                    <p class="downloads-status" data-downloads-status>
+                      Loading the latest release&hellip;
+                    </p>
+                  </div>
+                  <p class="install-note">
+                    <span data-downloads-version></span>
+                    <a href="https://github.com/Advance-Labs/ninebrains/releases/latest"
+                      >All releases</a
+                    >
+                    ·
+                    <a href="https://docs.advancelabs.dev/ninebrains/verify-download/"
+                      >Verify a download</a
+                    >
+                  </p>
+                </div>
+              </div>
+
+              <div class="works-with">
+                <span>Works with</span>
+                <span class="badge">Claude Code</span>
+                <span class="badge">Codex</span>
+                <span class="badge">Freebuff</span>
+                <span class="badge">OpenCode</span>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-01"
+              aria-labelledby="tab-01"
+              data-panel="01"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · LANES</p>
+                <h2>Every agent gets its own world.</h2>
+                <p class="feature-copy">
+                  Its own git worktree and branch, terminal, editor and browser. Four lanes to a
+                  tab, as many tabs as you want. They cannot touch each other's files, so nothing
+                  merges by accident.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 26"
+><span class="typed">$ ls .ninebrains/worktrees</span>
+<span class="ln">lane-1  lanes/a1e02c  claude</span>
+<span class="ln">lane-2  lanes/9c7f41  codex</span>
+<span class="ln">lane-3  lanes/2b81aa  claude</span>
+<span class="ln">lane-4  lanes/f30d19  freebuff</span>
+<span class="ln"><span class="pass">4 lanes, 4 worktrees, 0 shared files</span></span></code></pre>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-02"
+              aria-labelledby="tab-02"
+              data-panel="02"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · THE BRAIN</p>
+                <h2>One plan, handed out as it unblocks.</h2>
+                <p class="feature-copy">
+                  The Brain holds the work as a graph of jobs with dependencies, plus a mailbox the
+                  lanes can talk through. A job goes to whichever lane is idle, the moment
+                  everything it depends on is done.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 42"
+><span class="typed">$ brain plan "add search to the docs site"</span>
+<span class="ln">compiled 5 jobs, 3 dependency edges</span>
+<span class="ln">job-1 index-content        ready &rarr; lane-2</span>
+<span class="ln">job-2 search-ui            blocked on job-1</span>
+<span class="ln">job-3 search-api           blocked on job-1</span>
+<span class="ln"><span class="pass">job-1 done, dispatching job-2 and job-3</span></span></code></pre>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-03"
+              aria-labelledby="tab-03"
+              data-panel="03"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · VERIFICATION GATES</p>
+                <h2>No agent grades its own work.</h2>
+                <p class="feature-copy">
+                  When a lane says it is done, a second, independent run has to prove it: the tests,
+                  a screenshot check at three widths, a read-only reviewer that never sees the
+                  lane's worktree. A failed gate sends feedback back with the evidence, three times,
+                  then blocks the job and tells you.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 28"
+><span class="typed">$ gate run job-2 --attempt 1</span>
+<span class="ln">tests            <span class="fail">FAIL</span>  2 of 41</span>
+<span class="ln">screenshots      pass  390 / 768 / 1440</span>
+<span class="ln">reviewer         pass  read-only checkout</span>
+<span class="ln">&rarr; feedback sent to lane-2, attempt 2 of 3</span>
+<span class="ln">$ gate run job-2 --attempt 2</span>
+<span class="ln"><span class="pass">tests            PASS  41 of 41</span></span></code></pre>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-04"
+              aria-labelledby="tab-04"
+              data-panel="04"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · PLANNER</p>
+                <h2>Draw the plan. Run the plan.</h2>
+                <p class="feature-copy">
+                  Jobs are nodes, dependencies are edges. Run plan compiles the canvas into Brain
+                  jobs, idempotently, and refuses a graph with a cycle in it.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 34"
+><span class="typed">$ planner compile docs-search.plan</span>
+<span class="ln">3 nodes, 2 edges, 1 module</span>
+<span class="ln">checking for cycles&hellip; none found</span>
+<span class="ln"><span class="pass">compiled &rarr; 3 jobs queued (idempotent)</span></span></code></pre>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-05"
+              aria-labelledby="tab-05"
+              data-panel="05"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · PACKS</p>
+                <h2>Bundles for the work, off until you need them.</h2>
+                <p class="feature-copy">
+                  Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO
+                  and research. Every pack is off until you turn it on.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 33"
+><span class="typed">$ packs list --project ninebrains</span>
+<span class="ln">coding    <span class="pass">on</span>   builder, reviewer roles</span>
+<span class="ln">seo       off  needs AEO_MCP_BASE_URL</span>
+<span class="ln">research  off  citation-check gate</span></code></pre>
+              </div>
+            </div>
+
+            <div
+              class="panel"
+              role="tabpanel"
+              id="panel-06"
+              aria-labelledby="tab-06"
+              data-panel="06"
+              hidden
+            >
+              <div class="feature-text">
+                <p class="kicker">LIVE · FREEBUFF FALLBACK</p>
+                <h2>A usage limit does not end the lane.</h2>
+                <p class="feature-copy">
+                  When Claude Code or Codex hits its usage limit mid-task, the conversation offers
+                  to continue in Freebuff, free, in the same worktree. One click opens it and copies
+                  a handoff note, so the work keeps moving.
+                </p>
+              </div>
+              <div class="demo" data-demo aria-hidden="true">
+                <pre><code style="--n: 15"
+><span class="typed">$ lane-3 status</span>
+<span class="ln"><span class="fail">claude: usage limit reached</span></span>
+<span class="ln">[ Continue in Freebuff ]  same worktree</span>
+<span class="ln">handoff note copied: task, git status, git diff</span>
+<span class="ln"><span class="pass">lane-3 freebuff opened, paste to resume</span></span></code></pre>
+              </div>
+            </div>
+          </div>
         </div>
-        <p class="note reveal" data-reveal data-delay="4">
-          For macOS, Windows and Linux. Builds are not yet code-signed, so
-          <a href="https://docs.advancelabs.dev/ninebrains/verify-download/">check the checksum</a>
-          before you open one.
-        </p>
       </section>
 
-      <section class="shot reveal" data-reveal>
-        <img
-          src="/assets/lanes-grid.png"
-          width="2880"
-          height="1746"
-          alt="Four AI coding agents running side by side in a 2x2 grid, each lane in its own git worktree with its own terminal"
-          fetchpriority="high"
-          decoding="async"
-        />
-      </section>
-
-      <section class="statement reveal" data-reveal>
-        <h2>One agent is easy to follow.<br /><em>Four is not.</em></h2>
-        <p>
-          They share a checkout, step on each other's files, and nobody checks their claims before
-          you read them. Ninebrains fixes the three things that actually break.
-        </p>
-      </section>
-
-      <section class="feature" id="lanes">
-        <div class="copy reveal" data-reveal>
-          <p class="kicker">01 — Lanes</p>
-          <h2>Every agent gets its own world.</h2>
-          <p>
-            Its own git worktree and branch, terminal, editor and browser. Four lanes to a tab, as
-            many tabs as you want. They cannot touch each other's files, so nothing merges by
-            accident.
-          </p>
-        </div>
-        <figure class="reveal" data-reveal>
-          <img
-            src="/assets/lanes-grid.png"
-            width="2880"
-            height="1746"
-            loading="lazy"
-            decoding="async"
-            alt="The lanes grid with four agents, each showing its own branch and status light"
-          />
-        </figure>
-      </section>
-
-      <section class="feature reverse" id="brain">
-        <div class="copy reveal" data-reveal>
-          <p class="kicker">02 — The Brain</p>
-          <h2>One plan, handed out as it unblocks.</h2>
-          <p>
-            The Brain holds the work as a graph of jobs with dependencies, plus a mailbox the lanes
-            can talk through. A job goes to whichever lane is idle, the moment everything it depends
-            on is done.
-          </p>
-        </div>
-        <figure class="reveal" data-reveal>
-          <img
-            src="/assets/brain-drawer.png"
-            width="2880"
-            height="1746"
-            loading="lazy"
-            decoding="async"
-            alt="The Brain drawer showing a compiled job plan and which lane each job was dispatched to"
-          />
-        </figure>
-      </section>
-
-      <section class="feature" id="gates">
-        <div class="copy reveal" data-reveal>
-          <p class="kicker">03 — Verification gates</p>
-          <h2>No agent grades its own work.</h2>
-          <p>
-            When a lane says it is done, a second, independent run has to prove it: the tests, a
-            screenshot check at three widths, a read-only reviewer that never sees the lane's
-            worktree. A failed gate sends feedback back with the evidence, three times, then blocks
-            the job and tells you.
-          </p>
-        </div>
-        <figure class="reveal" data-reveal>
-          <img
-            src="/assets/gates-verification.png"
-            width="2880"
-            height="1746"
-            loading="lazy"
-            decoding="async"
-            alt="A verification gate result with stored evidence from two attempts, including screenshots and test output"
-          />
-        </figure>
-      </section>
-
-      <section class="feature reverse" id="planner">
-        <div class="copy reveal" data-reveal>
-          <p class="kicker">04 — Planner</p>
-          <h2>Draw the plan. Run the plan.</h2>
-          <p>
-            Jobs are nodes, dependencies are edges. <strong>Run plan</strong> compiles the canvas
-            into Brain jobs, idempotently, and refuses a graph with a cycle in it.
-          </p>
-        </div>
-        <figure class="reveal" data-reveal>
-          <img
-            src="/assets/planner.png"
-            width="2880"
-            height="1800"
-            loading="lazy"
-            decoding="async"
-            alt="The planner canvas with job nodes grouped into a module, connected by dependency edges"
-          />
-        </figure>
+      <section class="trust reveal" data-reveal>
+        <details>
+          <summary>Unsigned build: why, and how to verify</summary>
+          <div class="trust-body">
+            <p>
+              v0.1 builds are not code-signed, so macOS Gatekeeper and Windows SmartScreen will warn
+              you before you open one. The installer downloads the release's
+              <code>SHA256SUMS</code> file and checks the artifact before it touches your disk; a
+              mismatch aborts. That proves you have the exact bytes the release published. It does
+              not prove who built them, so only ever install from
+              <code>github.com/Advance-Labs/ninebrains</code> or this site.
+            </p>
+            <p>
+              Full steps, including <code>gh attestation verify</code> and how to open an unsigned
+              build by hand, are in
+              <a href="https://docs.advancelabs.dev/ninebrains/verify-download/"
+                >Verify a download</a
+              >.
+            </p>
+          </div>
+        </details>
       </section>
 
       <section class="facts reveal" data-reveal>
@@ -238,11 +568,7 @@
           never touches your credentials.
         </p>
         <div class="cta">
-          <a
-            class="button primary"
-            href="https://github.com/Advance-Labs/ninebrains/releases/latest"
-            >Download v0.1.0</a
-          >
+          <a class="button primary" href="#download">Install Ninebrains</a>
           <a class="button" href="https://github.com/Advance-Labs/ninebrains">Star it on GitHub</a>
         </div>
       </section>
