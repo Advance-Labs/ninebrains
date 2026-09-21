@@ -4,12 +4,13 @@ import { redactAll, serializeLogValue, stringifyLogValue } from '@emdash/shared/
 import { createFileTransport, trimToLineBoundary } from '@emdash/shared/logger/node';
 import { app } from 'electron';
 import type pinoLib from 'pino';
+import { BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 const DIAGNOSTIC_LOG_BYTES = 500 * 1024;
 const RETAINED_LOG_FILES = 5;
-const LOG_FILE_NAME = 'emdash.log';
-const DIAGNOSTIC_ATTACHMENT_FILENAME = 'emdash-diagnostics.log';
+const LOG_FILE_NAME = `${BRAND_SLUG}.log`;
+const DIAGNOSTIC_ATTACHMENT_FILENAME = `${BRAND_SLUG}-diagnostics.log`;
 const RENDERER_LOG_PAYLOAD_LIMIT = 64 * 1024;
 const PROCESS_EXIT_FLUSH_TIMEOUT_MS = 1000;
 

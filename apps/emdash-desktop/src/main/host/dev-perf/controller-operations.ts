@@ -4,6 +4,7 @@ import { err, ok, type Result } from '@emdash/shared';
 import { app, contentTracing } from 'electron';
 import type { DevPerfTraceError } from '@core/features/dev-perf/api/contract';
 import type { DevPerfOperations } from '@core/features/dev-perf/node/wire-controller';
+import { BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 import type { DesktopRuntimes } from '@main/gateway/desktop-runtimes';
 import { log } from '@main/lib/logger';
 
@@ -20,7 +21,10 @@ async function captureTrace(durationMs: number): Promise<Result<string, DevPerfT
   try {
     const dir = join(app.getPath('userData'), 'traces');
     await mkdir(dir, { recursive: true });
-    const file = join(dir, `emdash-trace-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    const file = join(
+      dir,
+      `${BRAND_SLUG}-trace-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+    );
     await contentTracing.startRecording({
       included_categories: ['*'],
       excluded_categories: ['*-details'],

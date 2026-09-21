@@ -2,6 +2,7 @@ import { Button } from '@emdash/ui/react/primitives';
 import { AlertCircle, CheckCircle, Github, LogIn, User } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useAccountSession, useAccountSignIn } from '@core/features/account/api/browser/useAccount';
+import { BRAND_NAME } from '@core/primitives/app-identity/api/app-identity';
 
 export function SignInStep({ onComplete }: { onComplete: () => void }) {
   const { data: session, isLoading: sessionLoading } = useAccountSession();
@@ -82,7 +83,7 @@ export function SignInStep({ onComplete }: { onComplete: () => void }) {
         <div className="flex flex-col items-center justify-center gap-2">
           <h1 className="text-center text-xl">Connect GitHub</h1>
           <p className="text-md text-center text-foreground-muted">
-            Emdash uses GitHub for git operations, pull requests and issues.
+            {BRAND_NAME} uses GitHub for git operations, pull requests and issues.
           </p>
         </div>
       </div>

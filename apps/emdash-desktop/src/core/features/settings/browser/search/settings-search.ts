@@ -1,5 +1,6 @@
 import type { SettingsPageTab } from '@core/features/settings/contributions/views';
 import { settingsPageContributions } from '@core/manifests/browser/settings-page-contributions';
+import { BRAND_NAME } from '@core/primitives/app-identity/api/app-identity';
 import {
   HOSTED_ACCOUNT_ENABLED,
   TELEMETRY_SETTINGS_ENABLED,
@@ -141,9 +142,9 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
   },
   {
     id: 'emdash-account',
-    label: 'Emdash Account',
+    label: `${BRAND_NAME} Account`,
     tab: 'general',
-    description: 'Create an Emdash account to automatically connect GitHub using OAuth2.',
+    description: `Create a ${BRAND_NAME} account to automatically connect GitHub using OAuth2.`,
     keywords: ['sign in', 'sign out', 'login', 'logout', 'oauth'],
   },
 

@@ -350,7 +350,7 @@ function positiveInteger(value: number, label: string): number {
 
 function defaultRunIdentity(): AutomationRunIdentity {
   const id = randomUUID();
-  return { id, generatedName: `emdash-${id.slice(0, 8)}` };
+  return { id, generatedName: `ninebrains-${id.slice(0, 8)}` };
 }
 
 function errorMessage(error: unknown): string {

@@ -19,6 +19,7 @@ import {
   useImportGitHubCliAccounts,
 } from '@core/features/github/api/browser/useGithubAccounts';
 import { useModalController, useOpenModal } from '@core/manifests/browser/modal-api';
+import { BRAND_NAME } from '@core/primitives/app-identity/api/app-identity';
 import { HOSTED_ACCOUNT_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import {
   GITHUB_OAUTH_APP_REQUIRED_MESSAGE,
@@ -259,7 +260,7 @@ function getOAuthContent({ isSignedIn, hasAccount }: { isSignedIn: boolean; hasA
   if (isSignedIn) {
     return {
       title: 'Link GitHub account',
-      description: 'Add another GitHub account to your Emdash account',
+      description: `Add another GitHub account to your ${BRAND_NAME} account`,
       buttonLabel: 'Link',
       loadingLabel: 'Linking...',
     };
@@ -268,15 +269,15 @@ function getOAuthContent({ isSignedIn, hasAccount }: { isSignedIn: boolean; hasA
   if (hasAccount) {
     return {
       title: 'Sign in with GitHub',
-      description: 'Sign into your Emdash account',
+      description: `Sign into your ${BRAND_NAME} account`,
       buttonLabel: 'Sign In',
       loadingLabel: 'Signing in...',
     };
   }
 
   return {
-    title: 'Sign in to Emdash',
-    description: 'Create or sign into your Emdash account with GitHub',
+    title: `Sign in to ${BRAND_NAME}`,
+    description: `Create or sign into your ${BRAND_NAME} account with GitHub`,
     buttonLabel: 'Continue',
     loadingLabel: 'Continuing...',
   };

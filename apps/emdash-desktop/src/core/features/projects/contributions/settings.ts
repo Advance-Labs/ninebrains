@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRAND_SLUG } from '@core/primitives/app-identity/api/app-identity';
 import type { LocalProjectSettings, ProjectSettings } from '@core/primitives/app-settings/api';
 import {
   defineSettingsContribution,
@@ -23,7 +24,7 @@ export const projectSettingsContribution = defineSettingsContribution<'project',
   schema: projectSettingsSchema,
   defaults: {
     pushOnCreate: true,
-    branchPrefix: 'emdash',
+    branchPrefix: BRAND_SLUG,
     appendRandomBranchSuffix: true,
     tmuxByDefault: false,
   },
