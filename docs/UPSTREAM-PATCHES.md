@@ -516,3 +516,9 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 |---|---|---|
 | `src/core/features/tasks/browser/create-task-modal/build-create-task-params.ts` | `buildInitialConversation` takes an optional `taskName` and uses it, trimmed, as the title; blank falls back to `nextDefaultConversationTitle` | Every task opened on a tab called "Claude (1)", which says nothing when several tasks are open. Custom titles do not match the `claude (N)` pattern, so later conversations still number from 1. Test: `build-create-task-params.test.ts` |
 | `src/core/features/tasks/browser/create-task-modal/use-create-task-callback.ts` | Passes `state.taskName.effectiveTaskName` (typed or generated) into `buildInitialConversation` | Same. Automation-adopted tasks keep the run's own conversation title |
+
+## 24. Build brain-mcp before the desktop app's tests (`fix/brain-mcp-build-order`)
+
+| File | Change | Why |
+|---|---|---|
+| `package.json` | `nx.implicitDependencies: ["@ninebrains/brain-mcp"]` | The app runs `packages/brain-mcp/dist` in its build (copied to `out/main/brain-mcp`) and in `brain/node/unattended.test.ts`, but never declared the package, so `^build` skipped it. In any checkout where brain-mcp had not been built (a fresh worktree, a clean clone) the pre-push hook's `nx affected -t test` failed that test with the job ending `failed` instead of `verifying`. An implicit dependency avoids a lockfile change |
