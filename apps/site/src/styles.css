@@ -827,7 +827,7 @@ h1 {
   transition: opacity 220ms var(--ease);
 }
 .panel.is-looping .win-body {
-  opacity: 0.12;
+  opacity: 0.35;
 }
 
 .win-mini {

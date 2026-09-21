@@ -5,6 +5,8 @@
  *   pnpm --filter @ninebrains/site audit:overlap -- --only 1440x900,390x844 --themes dark
  *   pnpm --filter @ninebrains/site audit:overlap -- --shots /tmp/shots   # plus a screenshot per scene
  *   pnpm --filter @ninebrains/site audit:overlap -- --fps                # frame rate at 1440x900
+ *   pnpm --filter @ninebrains/site audit:overlap -- --software           # WebGL on SwiftShader
+ *   pnpm --filter @ninebrains/site audit:overlap -- --ci                 # CI's subset, on SwiftShader
  *
  * Builds the site into a temp folder, serves it, and opens it in the workspace's Playwright
  * Chromium with `?debug=bounds`. At every viewport and theme it walks each scene (its entry frame
@@ -52,6 +54,16 @@ const VIEWPORTS = [
   '390x844',
   '360x640',
 ];
+/** `--ci`: the sizes that break first (the MacBooks, the short laptops, phones), on SwiftShader. */
+const CI_JOBS = [
+  ['dark', '1728x1117'],
+  ['dark', '1512x982'],
+  ['dark', '1280x720'],
+  ['dark', '1024x768'],
+  ['dark', '390x844'],
+  ['dark', '360x640'],
+  ['light', '1440x900'],
+];
 const SCENES = [
   '00 Overview',
   '01 Lanes',
@@ -74,6 +86,8 @@ function args() {
     shots: value('shots'),
     json: value('json'),
     fps: argv.includes('--fps'),
+    software: argv.includes('--software'),
+    ci: argv.includes('--ci'),
     concurrency: Number(value('concurrency') ?? 3),
   };
 }
@@ -234,8 +248,14 @@ async function main() {
   });
   const server = await serve(dist);
   const base = `http://127.0.0.1:${server.address().port}`;
+  // CI runners have no GPU: WebGL2 runs on SwiftShader there. `--software` forces it locally.
   const browser = await chromium.launch({
-    args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
+    args: [
+      '--enable-unsafe-swiftshader',
+      '--ignore-gpu-blocklist',
+      '--enable-webgl',
+      ...(opts.software || opts.ci ? ['--use-angle=swiftshader'] : []),
+    ],
   });
   try {
     if (opts.fps) {
@@ -243,8 +263,11 @@ async function main() {
       return;
     }
     const jobs = [];
-    for (const theme of opts.themes) {
-      for (const vp of opts.only ?? VIEWPORTS) jobs.push([theme, vp]);
+    if (opts.ci) jobs.push(...CI_JOBS);
+    else {
+      for (const theme of opts.themes) {
+        for (const vp of opts.only ?? VIEWPORTS) jobs.push([theme, vp]);
+      }
     }
     const results = [];
     const started = Date.now();
