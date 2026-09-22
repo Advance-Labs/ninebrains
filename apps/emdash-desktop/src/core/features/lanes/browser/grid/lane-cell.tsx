@@ -1,5 +1,6 @@
 import { EmptyState } from '@emdash/ui/react/components';
 import { Button, Spinner } from '@emdash/ui/react/primitives';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { brainLaneSidePanelSource } from '@core/features/brain/api/browser/side-panel-source';
 import { cn } from '@core/primitives/styling/browser/cn';
@@ -20,8 +21,10 @@ export function LaneCell({
   focused,
   dimmed,
   maximized,
+  formActive,
   onFocus,
   onToggleMaximize,
+  onActivateForm,
 }: {
   tabId: string;
   slot: LaneSlot;
@@ -30,8 +33,11 @@ export function LaneCell({
   focused: boolean;
   dimmed: boolean;
   maximized: boolean;
+  /** When empty, this slot shows the setup form instead of a light add-lane tile. */
+  formActive: boolean;
   onFocus: () => void;
   onToggleMaximize: () => void;
+  onActivateForm: () => void;
 }) {
   const [browserOpen, setBrowserOpen] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -54,7 +60,11 @@ export function LaneCell({
       )}
     >
       {!lane ? (
-        <AddLaneForm tabId={tabId} slot={slot} />
+        formActive ? (
+          <AddLaneForm tabId={tabId} slot={slot} />
+        ) : (
+          <EmptyLaneTile slot={slot} onActivate={onActivateForm} />
+        )
       ) : (
         <>
           <LaneHeader
@@ -78,6 +88,22 @@ export function LaneCell({
         </>
       )}
     </section>
+  );
+}
+
+/** Light empty-slot state: one slot at a time shows the setup form, the rest are tiles. */
+function EmptyLaneTile({ slot, onActivate }: { slot: LaneSlot; onActivate: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="lane-empty-tile"
+      aria-label={`Add a lane in slot ${slot + 1}`}
+      onClick={onActivate}
+      className="flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-xs text-foreground-muted transition-colors hover:border-(--em-accent-8) hover:text-foreground"
+    >
+      <Plus className="h-4 w-4" />
+      Add lane
+    </button>
   );
 }
 

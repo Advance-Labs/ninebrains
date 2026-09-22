@@ -17,6 +17,7 @@ import {
 } from '../../api';
 import { LaneStatusLight } from '../status-light';
 import { resetLanesRemotesForTests, useLaneBoard, useLaneStatuses } from '../use-lanes';
+import { LanesIntro } from './lanes-grid';
 import { LanesGridLayout } from './lanes-grid-layout';
 
 // Renders the grid layout from the lanes slice's own client and live models,
@@ -156,5 +157,23 @@ describe('lanes grid through the wire seam', () => {
       'true',
       'false',
     ]);
+  });
+
+  it('introduces the view on a fresh tab with no lanes', async () => {
+    const onAddLane = vi.fn();
+    await act(async () => root.render(<LanesIntro onAddLane={onAddLane} />));
+    const intro = container.querySelector('[data-testid="lanes-empty-intro"]');
+    expect(intro).toBeTruthy();
+    expect(intro?.textContent).toContain('Lanes run agents in parallel');
+    expect(intro?.textContent).toContain('Add a lane');
+  });
+
+  it('opens the first lane form from the intro action', async () => {
+    const onAddLane = vi.fn();
+    await act(async () => root.render(<LanesIntro onAddLane={onAddLane} />));
+    const button = container.querySelector<HTMLButtonElement>('[data-testid="lanes-add-first"]');
+    expect(button).toBeTruthy();
+    await act(async () => button?.click());
+    expect(onAddLane).toHaveBeenCalledOnce();
   });
 });

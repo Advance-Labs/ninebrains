@@ -37,14 +37,13 @@ function LanesViewWrapper({ children }: { children: ReactNode; tabId?: string })
 }
 
 const LanesTitlebar = observer(function LanesTitlebar() {
-  const params = useViewParams(lanesViewDef);
   const { board } = useLaneBoard();
   const { navigate } = useNavigate();
-  const tab = board.tabs.find((candidate) => candidate.tabId === params?.tabId) ?? board.tabs[0];
-  // The planner opens on the tab's first lane's project, else the first project.
+  // The planner opens on the first lane's project across all tabs, else the first project.
   const projectId =
-    tab?.slots.find((lane) => lane !== null)?.projectId ??
-    getProjectManagerStore().projects.keys().next().value;
+    board.tabs
+      .flatMap((candidate) => candidate.slots.filter((lane): lane is Lane => lane !== null))
+      .find((lane) => lane)?.projectId ?? getProjectManagerStore().projects.keys().next().value;
   return (
     <Titlebar
       leftSlot={<LanesTabStrip />}

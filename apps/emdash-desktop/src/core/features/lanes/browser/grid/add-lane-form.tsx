@@ -1,8 +1,9 @@
 import { LOCAL_HOST_REF } from '@emdash/core/primitives/host/api';
-import { Button, Input, Select } from '@emdash/ui/react/primitives';
+import { Button, Input, Select, Tooltip } from '@emdash/ui/react/primitives';
 import { observer } from 'mobx-react-lite';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAgentInstallationStatuses } from '@core/features/agents/api/browser/use-agent-installation-statuses';
+import { useAgents } from '@core/features/agents/api/browser/use-agents';
 import type { PacksListing } from '@core/features/packs/api';
 import { getPacksClient } from '@core/features/packs/api/browser/client';
 import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
@@ -10,6 +11,7 @@ import {
   LaneRoutingFields,
   type LaneRoutingValue,
 } from '@core/features/routing/contributions/lanes';
+import type { AgentModelOption } from '@core/primitives/agents/api';
 import { SSH_UNSUPPORTED_MESSAGE, type LaneProvider, type LaneSlot } from '../../api';
 import { runLaneAction } from '../use-lanes';
 
@@ -59,15 +61,27 @@ export const AddLaneForm = observer(function AddLaneForm({
     store.data ? [{ id: store.data.id, name: store.data.name, type: store.data.type }] : []
   );
   const { data: statuses } = useAgentInstallationStatuses(LOCAL_HOST_REF);
+  const { data: agentPayloads } = useAgents(LOCAL_HOST_REF);
   const installed = PROVIDERS.filter((provider) =>
     statuses?.some((status) => status.id === provider.id && status.status === 'available')
   ).map((provider) => provider.id);
+  // Curated model catalog per agent (from the provider plugins), so the model is
+  // picked from a list instead of typed; unknown agents fall back to free text.
+  const modelCatalog = useMemo(() => {
+    const catalog: Record<string, Record<string, AgentModelOption>> = {};
+    for (const agent of agentPayloads ?? []) {
+      const models = agent.capabilities?.models;
+      if (models?.kind === 'selectable') catalog[agent.id] = models.modelOptions;
+    }
+    return catalog;
+  }, [agentPayloads]);
   return (
     <AddLaneFields
       tabId={tabId}
       slot={slot}
       projects={projects}
       installed={statuses ? installed : null}
+      modelCatalog={modelCatalog}
     />
   );
 });
@@ -81,11 +95,13 @@ export function AddLaneFields({
   slot,
   projects,
   installed,
+  modelCatalog = {},
 }: {
   tabId: string;
   slot: LaneSlot;
   projects: readonly AddLaneProject[];
   installed: readonly LaneProvider[] | null;
+  modelCatalog?: Record<string, Record<string, AgentModelOption>>;
 }) {
   const [projectId, setProjectId] = useState<string | undefined>();
   const [provider, setProvider] = useState<LaneProvider | undefined>();
@@ -153,6 +169,49 @@ export function AddLaneFields({
     setBusy(false);
   };
 
+  // Model is picked from the agent's curated catalog when one exists, so nobody
+  // has to know model ids by heart; otherwise it degrades to a free-text field.
+  const renderModelField = () => {
+    const catalog = selectedProvider ? modelCatalog[selectedProvider.id] : undefined;
+    const options =
+      catalog && Object.keys(catalog).length > 0
+        ? [
+            { id: '', name: 'Default model' },
+            ...Object.entries(catalog).map(([id, option]) => ({ id, name: option.name })),
+            ...(role?.model && !catalog[role.model] ? [{ id: role.model, name: role.model }] : []),
+          ]
+        : null;
+    if (!options) {
+      return (
+        <Input
+          aria-label="Model"
+          placeholder="Model (optional, agent default)"
+          value={model}
+          maxLength={128}
+          onChange={(event) => setModel(event.target.value)}
+        />
+      );
+    }
+    return (
+      <Select.Root value={model} onValueChange={(next) => setModel(next as string)}>
+        <Select.Trigger aria-label="Model" className="w-full">
+          <Select.Value>
+            {model
+              ? (options.find((option) => option.id === model)?.name ?? model)
+              : 'Default model'}
+          </Select.Value>
+        </Select.Trigger>
+        <Select.Content align="start" width="trigger">
+          {options.map((option) => (
+            <Select.Item key={option.id} value={option.id}>
+              {option.name}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    );
+  };
+
   return (
     <div
       data-testid="lane-empty-slot"
@@ -207,9 +266,19 @@ export function AddLaneFields({
         )}
         {roles.length > 0 && (
           <Select.Root value={roleValue} onValueChange={(next) => pickRole(next as string)}>
-            <Select.Trigger aria-label="Role" className="w-full">
-              <Select.Value>{role?.label ?? 'No role'}</Select.Value>
-            </Select.Trigger>
+            <Tooltip.Root>
+              <Tooltip.Trigger
+                render={
+                  <Select.Trigger aria-label="Role" className="w-full">
+                    <Select.Value>{role?.label ?? 'No role'}</Select.Value>
+                  </Select.Trigger>
+                }
+              />
+              <Tooltip.Content>
+                Roles come from this project's Packs — bundles of tools and a prompt the agent
+                starts with.
+              </Tooltip.Content>
+            </Tooltip.Root>
             <Select.Content>
               <Select.Item value={NO_ROLE}>No role</Select.Item>
               {roles.map((candidate) => (
@@ -220,13 +289,7 @@ export function AddLaneFields({
             </Select.Content>
           </Select.Root>
         )}
-        <Input
-          aria-label="Model"
-          placeholder="Model (optional, agent default)"
-          value={model}
-          maxLength={128}
-          onChange={(event) => setModel(event.target.value)}
-        />
+        {renderModelField()}
         {selectedProvider && (
           <LaneRoutingFields
             provider={selectedProvider.id}

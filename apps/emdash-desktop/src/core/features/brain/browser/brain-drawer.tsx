@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Spinner, Textarea } from '@emdash/ui/react/primitives';
+import { Alert, Badge, Button, Spinner, Textarea, Tooltip } from '@emdash/ui/react/primitives';
 import { useState, type ReactNode } from 'react';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
 import { useNavigate } from '@core/primitives/navigation/browser/navigation-hooks';
@@ -50,13 +50,18 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           {dispatcher.stopLatched ? 'stopped' : dispatcher.paused ? 'paused' : 'dispatching'}
         </Badge>
         {!dispatcher.gatesConnected && (
-          <Badge
-            tone="warning"
-            variant="outline"
-            title="No gate runner is connected: finished work is marked unverified."
-          >
-            gates off
-          </Badge>
+          <Tooltip.Root>
+            <Tooltip.Trigger
+              render={
+                <Badge tone="warning" variant="outline">
+                  gates off
+                </Badge>
+              }
+            />
+            <Tooltip.Content>
+              No gate runner is connected — finished work is marked unverified instead of verified.
+            </Tooltip.Content>
+          </Tooltip.Root>
         )}
         <Button
           className="ml-auto"
@@ -98,6 +103,15 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           >
             Clear STOP
           </Button>
+        </div>
+      )}
+
+      {lanes.length === 0 && (
+        <div
+          data-testid="brain-drawer-no-lanes-hint"
+          className="border-b border-border px-3 py-2 text-xs text-foreground-muted"
+        >
+          Add a lane in the grid to give the Brain somewhere to hand its jobs.
         </div>
       )}
 
