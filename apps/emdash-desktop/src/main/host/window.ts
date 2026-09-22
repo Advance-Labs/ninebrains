@@ -26,7 +26,12 @@ let mainWindow: BrowserWindow | null = null;
 
 export function applyNativeTheme(theme: Theme): void {
   if (process.platform !== 'win32') return;
-  nativeTheme.themeSource = theme === 'emdark' ? 'dark' : theme === 'emlight' ? 'light' : 'system';
+  nativeTheme.themeSource =
+    theme === 'emdark' || theme === 'emhardstyle'
+      ? 'dark'
+      : theme === 'emlight'
+        ? 'light'
+        : 'system';
 }
 
 export function createMainWindow(): BrowserWindow {

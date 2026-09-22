@@ -165,6 +165,14 @@ const taskScopeImplementation = {
       taskView?.setFocusedRegion('main');
     },
   }),
+  'task.openPulse': (params) => ({
+    availability: () => taskAvailability(params),
+    execute: () => {
+      const taskView = getTaskComposition(params.projectId, params.taskId);
+      taskView?.paneLayout.open('pulse', {});
+      taskView?.setFocusedRegion('main');
+    },
+  }),
   'task.browserGoBack': (params) => ({
     availability: () =>
       taskAvailability(

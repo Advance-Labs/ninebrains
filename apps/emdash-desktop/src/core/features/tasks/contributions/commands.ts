@@ -101,6 +101,14 @@ export const openBrowserCommand = defineCommand({
   keybinding: keybinding.settings('openBrowser', 'Mod+Shift+B'),
 });
 
+export const openPulseCommand = defineCommand({
+  id: 'task.openPulse',
+  title: 'Open Pulse',
+  description: "Open this task's lifecycle and diff activity tab",
+  category: 'Task',
+  icon: 'activity',
+});
+
 export const browserGoBackCommand = defineCommand({
   id: 'task.browserGoBack',
   title: 'Browser Back',
@@ -277,6 +285,7 @@ export const TASK_COMMAND_DEFS = [
   toggleRightSidebarCommand,
   newTerminalCommand,
   openBrowserCommand,
+  openPulseCommand,
   browserGoBackCommand,
   browserGoForwardCommand,
   browserReloadCommand,

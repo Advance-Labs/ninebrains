@@ -1,5 +1,5 @@
 import { SelectableCard } from '@emdash/ui/react/primitives';
-import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { Monitor, Moon, Sun, Zap, type LucideIcon } from 'lucide-react';
 import React from 'react';
 import type { Theme } from '@core/primitives/app-settings/api';
 import { captureTelemetry } from '@core/primitives/telemetry/browser/telemetry-client';
@@ -23,6 +23,12 @@ const themeOptions: Array<{
     label: 'Ninebrains Dark',
     ariaLabel: 'Set theme to Ninebrains Dark',
     icon: Moon,
+  },
+  {
+    value: 'emhardstyle',
+    label: 'Hardstyle',
+    ariaLabel: 'Set theme to Hardstyle',
+    icon: Zap,
   },
 ];
 

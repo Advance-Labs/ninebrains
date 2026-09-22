@@ -1,3 +1,4 @@
+import { arenaViewDef } from '@core/features/arena/contributions/views';
 import { automationsViewDef } from '@core/features/automations/contributions/views';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
@@ -9,6 +10,7 @@ import { defineViewCatalog } from '@core/primitives/views/api';
 
 export const viewCatalog = defineViewCatalog([
   homeViewDef,
+  arenaViewDef,
   automationsViewDef,
   projectViewDef,
   taskViewDef,

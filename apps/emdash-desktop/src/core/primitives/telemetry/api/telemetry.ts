@@ -22,7 +22,8 @@ export type FocusView =
   | 'settings'
   | 'automations'
   | 'lanes'
-  | 'planner';
+  | 'planner'
+  | 'arena';
 export type FocusMainPanel = 'agents' | 'editor' | 'diff' | 'browser' | 'terminal';
 export type FocusedRegion = 'main' | 'bottom';
 
@@ -72,6 +73,7 @@ export type TelemetryEventProperties = {
   task_viewed: { from_view: FocusView | null };
   settings_viewed: { from_view: FocusView | null };
   automations_viewed: { from_view: FocusView | null };
+  arena_viewed: { from_view: FocusView | null };
 
   automation_created: {
     enabled: boolean;
