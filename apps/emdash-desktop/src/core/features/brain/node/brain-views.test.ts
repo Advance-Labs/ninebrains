@@ -89,4 +89,24 @@ describe('lane side panel source (Brain DB read model)', () => {
     expect(after.state).toBe('running');
     expect(after.attempts).toBe(1);
   });
+
+  it('allJobs lists open jobs across every project, for the Arena cross-project view', () => {
+    const { brain, views } = setup();
+    brain.upsertLane(APP_IDENTITY, {
+      id: 'B',
+      projectId: 'p2',
+      provider: 'claude',
+      status: 'idle',
+    });
+    brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'in p1' });
+    brain.createJob(APP_IDENTITY, { projectId: 'p2', title: 'in p2' });
+    views.refresh();
+
+    expect(peekCell(views.allJobs).map((job) => [job.projectId, job.title])).toEqual(
+      expect.arrayContaining([
+        ['p1', 'in p1'],
+        ['p2', 'in p2'],
+      ])
+    );
+  });
 });

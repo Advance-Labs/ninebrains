@@ -63,6 +63,23 @@ const planner = createPlannerService({
 - Nodes inside a module are bounded by it (`extent: 'parent'`). Moving a node
   between modules is not supported in v0.1; copy and paste into the other
   module instead.
+- **Accepting a draft can be partial.** `acceptAllProposals(doc)` is the
+  original all-or-nothing accept; `acceptSelectedProposals(doc, nodeIds)`
+  (required, not optional — an omitted vs. an empty selection should never be
+  the same code path with opposite meanings) accepts only those proposed
+  nodes and leaves the rest dashed. An edge resolves only when it **touches an
+  accepted node** and neither endpoint is still proposed — `mergeProposal`
+  marks every draft edge `proposed: true`, including ones between two
+  pre-existing, already-accepted nodes (a new dependency the Brain proposed
+  between old jobs), so accepting one unrelated new node must not silently
+  also accept that edge. The canvas shows "Accept `<n>` selected" beside
+  "Accept all" whenever the current selection includes proposed nodes, so you
+  can keep some of the Brain's draft and reject the rest by selecting them and
+  deleting (nodes stay editable double-click before or after accepting —
+  there was no separate "edit" affordance to add). "Reject with reason"
+  (telling the Brain why, not just deleting) was scoped out for now: it would
+  need a new message/note path back to the originating Brain session, which is
+  more surface than a night's unsupervised change should add without review.
 
 ## Upstream files touched
 

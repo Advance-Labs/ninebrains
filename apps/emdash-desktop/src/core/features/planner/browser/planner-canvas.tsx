@@ -146,6 +146,12 @@ function PlannerCanvasInner({
     [save, saveDebounceMs]
   );
 
+  const selectedProposedCount = useMemo(
+    () =>
+      doc ? doc.nodes.filter((node) => node.proposed && selectedNodes.has(node.id)).length : 0,
+    [doc, selectedNodes]
+  );
+
   const derivedNodes = useMemo(
     () =>
       doc
@@ -434,11 +440,22 @@ function PlannerCanvasInner({
                   <span>
                     The Brain proposed a draft. Dashed items are not part of the plan yet.
                   </span>
-                  <Button variant="primary" onClick={() => change(model.acceptProposals)}>
-                    Accept
+                  {selectedProposedCount > 0 ? (
+                    <Button
+                      variant="primary"
+                      onClick={() => change((d) => model.acceptSelectedProposals(d, selectedNodes))}
+                    >
+                      Accept {selectedProposedCount} selected
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant={selectedProposedCount > 0 ? 'ghost' : 'primary'}
+                    onClick={() => change(model.acceptAllProposals)}
+                  >
+                    Accept all
                   </Button>
                   <Button variant="ghost" onClick={() => change(model.rejectProposals)}>
-                    Reject
+                    Reject all
                   </Button>
                 </div>
               </Panel>

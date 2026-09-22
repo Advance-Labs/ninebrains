@@ -13,6 +13,7 @@ import {
 import { getBrainClient, type BrainClient } from '../api/browser/client';
 
 let overviewRemote: Promise<RemoteModel<typeof brainContract.overview>> | undefined;
+let allJobsRemote: Promise<RemoteModel<typeof brainContract.allJobs>> | undefined;
 let projectRemote: Promise<RemoteModel<typeof brainContract.project>> | undefined;
 
 const getOverviewRemote = () => {
@@ -20,6 +21,19 @@ const getOverviewRemote = () => {
     remote(brainContract.overview, client.overview, { lingerMs: 15_000 })
   );
   return overviewRemote;
+};
+
+/**
+ * Its own remote (not part of `overview`): Arena's cross-project job list is
+ * larger and changes more often than `overview`'s other fields, so keeping it
+ * separate means the titlebar, Settings and the run-mode control — every
+ * always-mounted `overview` consumer — don't also subscribe to it.
+ */
+const getAllJobsRemote = () => {
+  allJobsRemote ??= getBrainClient().then((client) =>
+    remote(brainContract.allJobs, client.allJobs, { lingerMs: 15_000 })
+  );
+  return allJobsRemote;
 };
 
 const getProjectRemote = () => {
@@ -70,6 +84,19 @@ export function useBrainOverview() {
     sessions: sessions.value ?? NO_SESSIONS,
     dispatcher: dispatcher.value ?? IDLE_DISPATCHER,
   };
+}
+
+/**
+ * Every open job across every project (Arena's cross-project view), plus
+ * whether that list is known-good: `error` is set when the fetch failed, so
+ * callers can show a degraded state instead of reading an empty list as
+ * "there is genuinely nothing to show" (`open.length === 0`).
+ */
+export function useBrainAllJobs(): { jobs: BrainJobView[]; error: unknown } {
+  const jobs = useRemoteModelState(brainContract.allJobs, getAllJobsRemote, undefined, 'jobs', {
+    initialValue: NO_JOBS,
+  });
+  return { jobs: jobs.value ?? NO_JOBS, error: jobs.status === 'error' ? jobs.error : undefined };
 }
 
 export function useBrainJobs(projectId: string | null): BrainJobView[] {

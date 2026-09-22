@@ -12,18 +12,29 @@ export function BrainTitlebarControls({
 }) {
   const { unread, dispatcher } = useBrainOverview();
   const total = Object.values(unread).reduce((sum, count) => sum + count, 0);
+  const status = dispatcher.stopLatched ? 'stopped' : dispatcher.paused ? 'paused' : 'dispatching';
   return (
     <div className="flex items-center gap-1 pr-2">
-      <Button
-        size="sm"
-        variant="ghost"
-        aria-pressed={drawerOpen}
-        data-testid="brain-drawer-toggle"
-        onClick={onToggleDrawer}
-      >
-        Brain
-        {total > 0 && <Badge tone="info">{total}</Badge>}
-      </Button>
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          render={
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-pressed={drawerOpen}
+              data-testid="brain-drawer-toggle"
+              onClick={onToggleDrawer}
+            >
+              Brain
+              {total > 0 && <Badge tone="info">{total}</Badge>}
+            </Button>
+          }
+        />
+        <Tooltip.Content>
+          {status}
+          {total > 0 && ` · ${total} unread`}
+        </Tooltip.Content>
+      </Tooltip.Root>
       <Tooltip.Root>
         <Tooltip.Trigger
           render={

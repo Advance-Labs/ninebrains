@@ -288,6 +288,7 @@ describe.skipIf(!import.meta.env.VITE_ROUTING_SCREENSHOTS)('routing screenshots'
             sessions: cell([]),
             dispatcher: cell(DISPATCHER),
           }),
+          allJobs: expose(contract[brainDomain].allJobs, { jobs: cell([]) }),
           project: expose(contract[brainDomain].project, {
             jobs: () => cell([]),
             done: () => cell([]),

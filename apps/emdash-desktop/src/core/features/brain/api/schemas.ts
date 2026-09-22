@@ -14,6 +14,28 @@ export const brainJobStateSchema = z.enum([
 ]);
 export type BrainJobState = z.infer<typeof brainJobStateSchema>;
 
+/**
+ * One place every job-state UI derives from, so a new state is a compile
+ * error here instead of a silent gap in whichever dashboard forgot it.
+ */
+export const JOB_STATE_META: Record<BrainJobState, { label: string; bucket: 'open' | 'closed' }> = {
+  proposed: { label: 'waiting', bucket: 'open' },
+  ready: { label: 'ready', bucket: 'open' },
+  claimed: { label: 'claimed', bucket: 'open' },
+  running: { label: 'running', bucket: 'open' },
+  verifying: { label: 'verifying', bucket: 'open' },
+  blocked: { label: 'blocked', bucket: 'open' },
+  done: { label: 'done', bucket: 'closed' },
+  failed: { label: 'failed', bucket: 'closed' },
+};
+
+/** States that still need attention — a Brain-role `listJobs({ states })` filter for cross-project views. */
+export const OPEN_JOB_STATES: readonly BrainJobState[] = (
+  Object.entries(JOB_STATE_META) as Array<[BrainJobState, (typeof JOB_STATE_META)[BrainJobState]]>
+)
+  .filter(([, meta]) => meta.bucket === 'open')
+  .map(([state]) => state);
+
 /** SEC-14: every id that can reach a path is a safe path segment. */
 export const brainIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 

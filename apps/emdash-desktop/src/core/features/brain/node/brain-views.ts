@@ -2,6 +2,7 @@ import { cell, type Cell } from '@emdash/wire/state';
 import type { Brain, DoneEntry, Job, Note } from '@ninebrains/brain-core';
 import {
   addressKey,
+  OPEN_JOB_STATES,
   type BrainAddress,
   type BrainDispatcherView,
   type BrainDoneView,
@@ -12,6 +13,9 @@ import {
 } from '../api';
 import { APP_IDENTITY } from './dispatcher';
 import { isVerified } from './verification';
+
+/** How many open jobs Arena's cross-project view carries; open jobs, not lifetime history. */
+const ALL_JOBS_LIMIT = 500;
 
 export interface PanelCells {
   jobs: Cell<BrainJobView[]>;
@@ -72,6 +76,8 @@ export class BrainViews {
   readonly unread: Cell<BrainUnread> = cell<BrainUnread>({});
   readonly sessions: Cell<BrainSessionView[]> = cell<BrainSessionView[]>([]);
   readonly dispatcher: Cell<BrainDispatcherView>;
+  /** Every open job across every project (Arena's cross-project view). */
+  readonly allJobs: Cell<BrainJobView[]> = cell<BrainJobView[]>([]);
   private readonly projects = new Map<string, PanelCells>();
   private readonly lanes = new Map<string, PanelCells>();
   private scheduled = false;
@@ -80,7 +86,8 @@ export class BrainViews {
   constructor(
     private readonly brain: Brain,
     private readonly inboxes: () => BrainAddress[],
-    private readonly dispatcherState: () => BrainDispatcherView
+    private readonly dispatcherState: () => BrainDispatcherView,
+    private readonly onError: (context: string, error: unknown) => void = () => {}
   ) {
     this.dispatcher = cell(dispatcherState());
     const offs = (['jobChanged', 'jobBlocked', 'messageSent', 'laneChanged'] as const).map((type) =>
@@ -132,6 +139,18 @@ export class BrainViews {
     for (const [projectId, cells] of this.projects) this.fillProject(projectId, cells);
     for (const [laneId, cells] of this.lanes) this.fillLane(laneId, cells);
     this.dispatcher.set(this.dispatcherState());
+    try {
+      this.allJobs.set(
+        this.brain
+          .listJobs(APP_IDENTITY, { states: OPEN_JOB_STATES, limit: ALL_JOBS_LIMIT })
+          .map(jobView)
+      );
+    } catch (error) {
+      // Cross-project and unscoped: keep the last-known list rather than let one bad
+      // record (or a closed DB mid-shutdown) abort the rest of this refresh, which
+      // would otherwise also silently stop the unread badge below from updating.
+      this.onError('brain: cross-project job list refresh failed', error);
+    }
     const unread: BrainUnread = {};
     for (const address of this.inboxes()) {
       unread[addressKey(address)] = this.brain.store.listMessages({

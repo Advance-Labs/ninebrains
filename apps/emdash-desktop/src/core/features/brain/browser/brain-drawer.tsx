@@ -5,6 +5,7 @@ import { useNavigate } from '@core/primitives/navigation/browser/navigation-hook
 import { cn } from '@core/primitives/styling/browser/cn';
 import {
   addressKey,
+  JOB_STATE_META,
   type BrainAddress,
   type BrainMessageView,
   type BrainSessionView,
@@ -88,6 +89,12 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
         </Button>
       </header>
 
+      <SummaryStrip
+        dispatcher={dispatcher}
+        sessionCount={visible.length}
+        jobStates={jobs.map((job) => job.state)}
+      />
+
       {dispatcher.stopLatched && (
         <div className="p-2">
           <Alert.Root status="destructive">
@@ -109,9 +116,13 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
       {lanes.length === 0 && (
         <div
           data-testid="brain-drawer-no-lanes-hint"
-          className="border-b border-border px-3 py-2 text-xs text-foreground-muted"
+          className="space-y-1 border-b border-border px-3 py-2 text-xs text-foreground-muted"
         >
-          Add a lane in the grid to give the Brain somewhere to hand its jobs.
+          <p>
+            The Brain plans work as jobs and hands each one to an idle lane. It tracks what&apos;s
+            done, blocked, or waiting, so you don&apos;t have to babysit every agent yourself.
+          </p>
+          <p>Add a lane in the grid to give it somewhere to hand its jobs.</p>
         </div>
       )}
 
@@ -201,6 +212,39 @@ function SessionBody({
   );
 }
 
+/** One-line plain-language status, e.g. "3 lanes working · 2 jobs blocked · dispatcher paused". */
+function SummaryStrip({
+  dispatcher,
+  sessionCount,
+  jobStates,
+}: {
+  dispatcher: ReturnType<typeof useBrainOverview>['dispatcher'];
+  sessionCount: number;
+  jobStates: readonly string[];
+}) {
+  const blocked = jobStates.filter((state) => state === 'blocked').length;
+  const parts = [
+    dispatcher.stopLatched
+      ? 'stopped'
+      : dispatcher.paused
+        ? 'dispatcher paused'
+        : dispatcher.activeRuns > 0
+          ? `${dispatcher.activeRuns} job${dispatcher.activeRuns === 1 ? '' : 's'} running`
+          : 'dispatcher idle',
+    sessionCount > 0 && `${sessionCount} Brain session${sessionCount === 1 ? '' : 's'}`,
+    blocked > 0 && `${blocked} blocked here`,
+  ].filter(Boolean);
+
+  return (
+    <p
+      data-testid="brain-drawer-summary"
+      className="border-b border-border px-3 py-1.5 text-xs text-foreground-muted"
+    >
+      {parts.join(' · ')}
+    </p>
+  );
+}
+
 function JobCounts({ states }: { states: readonly string[] }) {
   if (states.length === 0) return null;
   return (
@@ -212,7 +256,7 @@ function JobCounts({ states }: { states: readonly string[] }) {
             key={state}
             tone={state === 'blocked' ? 'error' : state === 'done' ? 'success' : 'neutral'}
           >
-            {count} {state}
+            {count} {JOB_STATE_META[state].label}
           </Badge>
         ) : null;
       })}

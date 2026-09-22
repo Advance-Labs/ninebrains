@@ -10,7 +10,8 @@ agent in a worktree (`features/lanes`).
 
 | Path | What |
 |---|---|
-| `api/contract.ts` | `brain` wire contract: `project` / `lanePanel` / `overview` live models, `events`, procedures |
+| `api/contract.ts` | `brain` wire contract: `project` / `lanePanel` / `overview` / `allJobs` live models, `events`, procedures. `allJobs` (its own model, unkeyed) is every open job across every project — kept separate from `overview` so `overview`'s always-mounted consumers (titlebar, Settings, lane run-mode) don't also subscribe to it |
+| `api/schemas.ts` | `JOB_STATE_META`/`OPEN_JOB_STATES` — the one place job-state labels and the open/closed split are defined, so every dashboard derives from it instead of hand-maintaining its own (divergent) state list |
 | `api/side-panel-items.ts`, `api/browser/side-panel-source.ts` | `LaneSidePanelSource` over the `lanePanel` live model (Jobs / Done / Notes, verified or unverified badge) |
 | `node/brain-db.ts` | Opens `<userData>/ninebrains-brain.db` with `defineDurableSqliteStore` + `BRAIN_BUNDLED_MIGRATIONS`; dir 0700, file 0600 |
 | `node/endpoint.ts` | `startBrainHttpServer` on 127.0.0.1 plus a ledger: one token per launch key (`lane:`, `brain:`, `run:`) |
@@ -23,7 +24,9 @@ agent in a worktree (`features/lanes`).
 | `node/brain-sessions.ts` | Brain sessions: brain-mode `claude` PTYs in their own worktree Task, persisted in the `brain.sessions` memento |
 | `node/stop.ts` | Global STOP with a 4.5 s answer deadline |
 | `node/brain-service.ts` | `BrainService`: owns all of the above and implements the procedures |
-| `browser/brain-drawer.tsx`, `browser/titlebar-controls.tsx` | The drawer and the titlebar toggle + STOP, mounted by the Lanes view through `contributions/lanes-drawer.ts` |
+| `browser/brain-drawer.tsx`, `browser/titlebar-controls.tsx` | The drawer (with a plain-language `SummaryStrip`) and the titlebar toggle + STOP (hover tooltip shows dispatcher status and unread count), mounted by the Lanes view through `contributions/lanes-drawer.ts` |
+| `contributions/settings.ts` | What Settings uses from this slice (`useBrainOverview`, `runBrainAction`), consumed by `settings/browser/components/BrainSettingsCard.tsx` |
+| `contributions/arena.ts` | What the Arena view uses from this slice (`useBrainOverview`), consumed by `arena/browser/arena-dashboard.tsx`'s `BrainSection` |
 
 The composition root is `app/main/bootstrap/boot/ninebrains/create-ninebrains-services.ts`.
 Lanes and the Brain may not import each other's `node/`, so they meet there
@@ -50,6 +53,31 @@ packs service (keychain `SecretResolver`), the planner (`createBrainPlanTarget`
    dispatches them.
 5. Lights: the job state feeds `mapLaneStatus` (`verifying`, `blocked`) and
    the lane's `activeJobId`.
+
+## Discoverability and the cross-project view
+
+Settings → General has a "Brain" card (`BrainSettingsCard`) explaining what
+Brain does, its live dispatch state, and a pause switch. The Lanes first-run
+intro links straight to the drawer ("What does the Brain do?"). Arena (every
+provisioned task across every open project) also shows a `BrainSection`:
+dispatcher state plus every open job's state across all projects, with blocked
+jobs listed by name and a one-click jump to that project's Planner canvas.
+
+This works because `BrainService` is a single app-wide instance (constructed
+once in `create-ninebrains-services.ts`); `projectId` is a scoping parameter
+on individual calls, not a sign of per-project instantiation. `overview`
+(`unread` / `sessions` / `dispatcher`) was already unkeyed and already spanned
+every project on the backend, so Arena's cross-project view didn't need a new
+aggregator class — just one more Brain-role, unfiltered-by-project query:
+`brain.listJobs(APP_IDENTITY, { states: OPEN_JOB_STATES, limit: 500 })` in
+`BrainViews.refresh()`. `states` matters: without it the query sorts by
+creation time ascending with no way to exclude finished work, so a filtered-
+only-by-limit query eventually fills up with the oldest `done` jobs (`done`
+entries are never archived) and the cross-project view silently goes stale
+forever past a few hundred lifetime jobs. `allJobs` is its own live model,
+not a fourth field on `overview` — see `api/contract.ts`'s comment for why.
+Brain *tokens* remain per-project (see Accepted risks below) — that is a
+separate, narrower constraint than instance scope, easy to conflate with it.
 
 ## Security requirements
 
@@ -126,8 +154,14 @@ packs service (keychain `SecretResolver`), the planner (`createBrainPlanTarget`
   work with a hung renderer (SEC-30).
 - The live sandbox deny (SEC-11) is proven only as settings content; the real
   CLI check stays a manual pre-release step.
-- Brain tokens are per project (v0.1 has no global Brain); a session can only
-  plan inside the project it was started in.
+- Brain *tokens* are per project (a session can only plan inside the project
+  it was started in), even though the `BrainService` instance and its
+  `overview` read model already span every open project — see "Discoverability
+  and the cross-project view" above.
+- `apps/workspace-server` (remote/SSH lanes) has no Brain wiring at all today;
+  remote lanes are outside orchestration entirely. Extending Brain there needs
+  its own design pass (how a remote lane gets a `lane`-role grant without a
+  second token-minting authority) before implementation — not started.
 
 ## Tests
 

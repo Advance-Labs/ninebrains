@@ -5,7 +5,6 @@ import {
   Spinner,
   useCollapsiblePanelBinding,
 } from '@emdash/ui/react/primitives';
-import { observable, runInAction } from 'mobx';
 import { observer } from 'mobx-react-lite';
 import { useMemo, type ReactNode } from 'react';
 import {
@@ -25,12 +24,9 @@ import type { Lane, LaneTab } from '../../api';
 import { lanesViewDef } from '../../contributions/views';
 import { LaneTerminal } from '../lane-terminal';
 import { runLaneAction, useLaneBoard } from '../use-lanes';
+import { brainDrawer, setDrawerOpen } from './brain-drawer-state';
 import { LanesGrid } from './lanes-grid';
 import { LanesTabStrip } from './lanes-tab-strip';
-
-/** Whether the Brain drawer is open. Shared by the titlebar toggle and the main panel. */
-const brainDrawer = observable({ open: false });
-const setDrawerOpen = (open: boolean) => runInAction(() => (brainDrawer.open = open));
 
 function LanesViewWrapper({ children }: { children: ReactNode; tabId?: string }) {
   return <>{children}</>;
