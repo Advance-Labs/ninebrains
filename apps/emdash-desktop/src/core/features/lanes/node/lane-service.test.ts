@@ -1,9 +1,9 @@
 import type { TuiAgentStateStatus } from '@emdash/core/runtimes/tui-agents/api';
 import { err, ok } from '@emdash/shared';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LanesGridConfig } from '../api';
 import type { LaneAgentSnapshot, LaneProjectInfo, LaneServicePorts } from './lane-ports';
-import { LaneService } from './lane-service';
+import { LANE_START_TIMEOUT_MS, LaneService } from './lane-service';
 import type { TuiSessionStatus } from './lane-status';
 
 const LOCAL: LaneProjectInfo = { projectId: 'p1', name: 'Repo', host: 'local', baseRef: 'main' };
@@ -165,6 +165,62 @@ describe('LaneService lifecycle', () => {
     const result = await harness.service.startLane(laneId);
     expect(result).toEqual(err(expect.objectContaining({ type: 'start-failed' })));
     expect(harness.service.getLane(laneId)?.session).toBe('failed');
+  });
+});
+
+describe('LaneService start/stop races', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a stop while starting is not overwritten by a late-finishing start', async () => {
+    const harness = createHarness();
+    const { laneId } = await addLane(harness);
+    await harness.service.stopLane(laneId);
+    harness.pushFeed();
+    expect(harness.service.getLane(laneId)?.session).toBe('stopped');
+
+    let resolveProvision!: () => void;
+    harness.ports.tasks.provision.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveProvision = () => resolve(ok({ path: '/tmp/wt' }) as never);
+        })
+    );
+    const startPromise = harness.service.startLane(laneId);
+    await Promise.resolve();
+    expect(harness.service.getLane(laneId)?.session).toBe('starting');
+
+    // Stops the lane while the start from above is still in flight.
+    await harness.service.stopLane(laneId);
+    harness.pushFeed();
+    expect(harness.service.getLane(laneId)?.session).toBe('stopped');
+
+    resolveProvision();
+    await startPromise;
+    harness.pushFeed();
+    expect(harness.service.getLane(laneId)?.session).toBe('stopped');
+  });
+
+  it('fails a lane stuck starting instead of spinning forever', async () => {
+    const harness = createHarness();
+    const { laneId } = await addLane(harness);
+    await harness.service.stopLane(laneId);
+    harness.pushFeed();
+
+    harness.ports.tasks.provision.mockImplementationOnce(() => new Promise(() => {}));
+    const startPromise = harness.service.startLane(laneId);
+    await Promise.resolve();
+    expect(harness.service.getLane(laneId)?.session).toBe('starting');
+
+    await vi.advanceTimersByTimeAsync(LANE_START_TIMEOUT_MS);
+    const result = await startPromise;
+    expect(result.success).toBe(false);
+    expect(harness.service.getLane(laneId)?.session).toBe('failed');
+    expect(harness.service.getLane(laneId)?.error).toMatch(/taking too long/);
   });
 });
 
