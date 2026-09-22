@@ -1,6 +1,7 @@
 import { ContextMenu, toast } from '@emdash/ui/react/primitives';
 import { Archive, Copy, MessageSquare, Pencil, Pin, PinOff, RotateCcw, Trash2 } from 'lucide-react';
 import React from 'react';
+import { BoundShortcut } from '@core/primitives/keybindings/browser/shortcut';
 
 interface TaskContextMenuProps {
   children: React.ReactNode;
@@ -58,16 +59,19 @@ export function TaskContextMenu({
             <ContextMenu.Item onClick={onUnpin}>
               <PinOff className="size-4" />
               Unpin task
+              <BoundShortcut command="task.pin" className="ml-auto" />
             </ContextMenu.Item>
           ) : (
             <ContextMenu.Item onClick={onPin}>
               <Pin className="size-4" />
               Pin task
+              <BoundShortcut command="task.pin" className="ml-auto" />
             </ContextMenu.Item>
           ))}
         <ContextMenu.Item onClick={onRename}>
           <Pencil className="size-4" />
           Rename
+          <BoundShortcut command="task.rename" className="ml-auto" />
         </ContextMenu.Item>
         {onReconnect && (
           <ContextMenu.Item onClick={onReconnect}>
@@ -89,6 +93,7 @@ export function TaskContextMenu({
           >
             <Archive className="size-4" />
             Archive
+            <BoundShortcut command="task.archive" className="ml-auto" />
           </ContextMenu.Item>
         )}
         {archiveDisabledReason && (
@@ -106,12 +111,14 @@ export function TaskContextMenu({
           <ContextMenu.Item onClick={() => void handleCopyBranchName()}>
             <Copy className="size-4" />
             Copy branch name
+            <BoundShortcut command="task.copyBranchName" className="ml-auto" />
           </ContextMenu.Item>
         )}
         <ContextMenu.Separator />
         <ContextMenu.Item variant="destructive" onClick={onDelete}>
           <Trash2 className="size-4" />
           Delete
+          <BoundShortcut command="task.delete" className="ml-auto" />
         </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Root>

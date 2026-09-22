@@ -2,6 +2,7 @@ import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
 import { browserControlsRegistry } from '@core/features/browser/api/browser/browser-controls-registry';
 import type { BrowserTabResource } from '@core/features/browser/api/browser/browser-tab-resource';
+import { projectViewDef } from '@core/features/projects/contributions/views';
 import {
   runGitFetch,
   runGitPublishCurrentBranch,
@@ -300,6 +301,63 @@ const taskScopeImplementation = {
       const task = getRegisteredTaskData(params.projectId, params.taskId);
       const taskStore = getTaskStore(params.projectId, params.taskId);
       if (task && taskStore) void taskStore.setPinned(!task.isPinned);
+    },
+  }),
+  'task.rename': (params) => ({
+    availability: () =>
+      taskAvailability(
+        params,
+        () => Boolean(getRegisteredTaskData(params.projectId, params.taskId)),
+        'Task data is unavailable'
+      ),
+    execute: () => {
+      const currentName = getTaskStore(params.projectId, params.taskId)?.data.name ?? '';
+      void openModal('renameTaskModal', { ...params, currentName });
+    },
+  }),
+  'task.copyBranchName': (params) => ({
+    availability: () => {
+      if (getTaskStore(params.projectId, params.taskId)?.state !== 'provisioned') return hidden;
+      const branchName = getTaskGitCheckoutStore(params.projectId, params.taskId)?.branchName;
+      return branchName ? enabled : hidden;
+    },
+    execute: () => {
+      const branchName = getTaskGitCheckoutStore(params.projectId, params.taskId)?.branchName;
+      if (!branchName) return;
+      void navigator.clipboard
+        .writeText(branchName)
+        .then(() => toast('Branch name copied'))
+        .catch(() => toast.error('Copy failed'));
+    },
+  }),
+  'task.delete': (params) => ({
+    availability: () =>
+      taskAvailability(
+        params,
+        () => Boolean(getRegisteredTaskData(params.projectId, params.taskId)),
+        'Task data is unavailable'
+      ),
+    execute: () => {
+      const taskName = getTaskStore(params.projectId, params.taskId)?.data.name ?? '';
+      void openModal('deleteTaskModal', {
+        projectId: params.projectId,
+        tasks: [{ taskId: params.taskId, taskName }],
+      }).then((outcome) => {
+        if (!outcome.success) return;
+        const { deleteWorktree, deleteBranch, deleteConversations } = outcome.data;
+        void getTaskManagerStore(params.projectId)?.deleteTasks([params.taskId], {
+          deleteWorktree,
+          deleteBranch,
+          deleteConversations,
+        });
+        const current = getNavigation().currentRef;
+        if (
+          current.viewId === 'task' &&
+          (current.params as { taskId?: string }).taskId === params.taskId
+        ) {
+          getNavigation().navigate(projectViewDef({ projectId: params.projectId }));
+        }
+      });
     },
   }),
   'task.archive': (params) => ({
