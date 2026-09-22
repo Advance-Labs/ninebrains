@@ -45,6 +45,20 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** How long a lane may sit in `starting` before it's reported as failed instead of spinning forever. */
+export const LANE_START_TIMEOUT_MS = 90_000;
+
+const LANE_START_TIMEOUT_MESSAGE =
+  "Starting the lane is taking too long (worktree setup or the agent launch may be stuck). It's been marked failed — try Start again.";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** Deterministic per-lane branch, so restored lanes can show it without storing it. */
 export function laneBranchName(laneId: string): string {
   return `lanes/${laneId.slice(0, 8)}`;
@@ -65,6 +79,8 @@ export class LaneService {
 
   private grid: LanesGridConfig = { tabs: [] };
   private readonly runtime = new Map<string, LaneRuntime>();
+  /** Bumped on every stop/start so a late-finishing start can't resurrect a lane the user stopped. */
+  private readonly generation = new Map<string, number>();
   private readonly projectNames = new Map<string, string>();
   private snapshot: LaneAgentSnapshot = EMPTY_SNAPSHOT;
   private readonly pending = new Set<Promise<void>>();
@@ -258,6 +274,7 @@ export class LaneService {
     await this.initialize();
     const location = this.locate(laneId);
     if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    this.bumpGeneration(laneId);
     try {
       await this.ports.conversations.stop(location.config.conversationId);
     } catch (error) {
@@ -430,46 +447,85 @@ export class LaneService {
   private async startSession(laneId: string): Promise<Result<void, LaneError>> {
     const initial = this.locate(laneId);
     if (!initial) return err(laneError('lane-not-found', 'That lane no longer exists.'));
+    const generation = this.bumpGeneration(laneId);
     this.setRuntime(laneId, { session: 'starting', error: null });
     try {
-      const provisioned = await this.ports.tasks.provision(initial.config.taskId);
-      if (!provisioned.success) return this.failStart(laneId, provisioned.error);
-      this.worktrees.set(laneId, provisioned.data.path);
-      await this.ports.brain
-        ?.prepareLaunch(initial.config)
-        .catch((error: unknown) => this.ports.onError('lanes: Brain launch prep failed', error));
-      // Re-read: the lane may have moved or been removed while provisioning.
-      const location = this.locate(laneId);
-      if (!location) return err(laneError('lane-not-found', 'That lane no longer exists.'));
-      const { config } = location;
-      if (config.conversationReady) {
-        await this.ports.conversations.launch({
-          conversationId: config.conversationId,
-          projectId: config.projectId,
-          taskId: config.taskId,
-        });
-      } else {
-        await this.ports.conversations.create({
-          conversationId: config.conversationId,
-          projectId: config.projectId,
-          taskId: config.taskId,
-          provider: config.provider,
-          model: config.model,
-          title: `Lane ${location.slot + 1}`,
-        });
-        config.conversationReady = true;
-        this.persist();
-      }
+      await withTimeout(
+        this.runStartSequence(laneId, initial.config.taskId),
+        LANE_START_TIMEOUT_MS,
+        LANE_START_TIMEOUT_MESSAGE
+      );
     } catch (error) {
-      return this.failStart(laneId, messageOf(error));
+      return this.failStart(laneId, generation, messageOf(error));
+    }
+    if (!this.isCurrent(laneId, generation)) {
+      // A stop arrived while this was starting: don't resurrect it, and shut down
+      // what just launched instead of leaving an orphaned conversation running.
+      await this.stopSupersededStart(laneId);
+      return ok(undefined);
     }
     this.setRuntime(laneId, { session: 'running', error: null });
     return ok(undefined);
   }
 
-  private failStart(laneId: string, message: string): Result<void, LaneError> {
-    this.setRuntime(laneId, { session: 'failed', error: message });
+  private async stopSupersededStart(laneId: string): Promise<void> {
+    const location = this.locate(laneId);
+    if (!location) return;
+    try {
+      await this.ports.conversations.stop(location.config.conversationId);
+    } catch (error) {
+      this.ports.onError('lanes: stop of a superseded start failed', error);
+    }
+  }
+
+  /** The provision → Brain prep → conversation create/launch chain, bounded by a timeout in the caller. */
+  private async runStartSequence(laneId: string, taskId: string): Promise<void> {
+    const provisioned = await this.ports.tasks.provision(taskId);
+    if (!provisioned.success) throw new Error(provisioned.error);
+    this.worktrees.set(laneId, provisioned.data.path);
+    const started = this.locate(laneId);
+    if (!started) throw new Error('That lane no longer exists.');
+    await this.ports.brain
+      ?.prepareLaunch(started.config)
+      .catch((error: unknown) => this.ports.onError('lanes: Brain launch prep failed', error));
+    // Re-read: the lane may have moved or been removed while provisioning.
+    const location = this.locate(laneId);
+    if (!location) throw new Error('That lane no longer exists.');
+    const { config } = location;
+    if (config.conversationReady) {
+      await this.ports.conversations.launch({
+        conversationId: config.conversationId,
+        projectId: config.projectId,
+        taskId: config.taskId,
+      });
+    } else {
+      await this.ports.conversations.create({
+        conversationId: config.conversationId,
+        projectId: config.projectId,
+        taskId: config.taskId,
+        provider: config.provider,
+        model: config.model,
+        title: `Lane ${location.slot + 1}`,
+      });
+      config.conversationReady = true;
+      this.persist();
+    }
+  }
+
+  private failStart(laneId: string, generation: number, message: string): Result<void, LaneError> {
+    if (this.isCurrent(laneId, generation))
+      this.setRuntime(laneId, { session: 'failed', error: message });
     return err(laneError('start-failed', message));
+  }
+
+  private bumpGeneration(laneId: string): number {
+    const next = (this.generation.get(laneId) ?? 0) + 1;
+    this.generation.set(laneId, next);
+    return next;
+  }
+
+  private isCurrent(laneId: string, generation: number): boolean {
+    return (this.generation.get(laneId) ?? 0) === generation;
   }
 
   private async setAsleep(laneId: string, asleep: boolean): Promise<Result<void, LaneError>> {
