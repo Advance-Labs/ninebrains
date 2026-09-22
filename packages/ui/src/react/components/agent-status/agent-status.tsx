@@ -1,8 +1,8 @@
-import { THEME_MANIFEST, useThemeOptional } from '@react/primitives/theme-provider';
 import { Tooltip } from '@react/primitives/tooltip';
 import { cx } from '@styles/utilities/cx';
 import * as React from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { AwaitingInputIcon } from './awaiting-input-icon';
+import { WorkingMarkIcon } from './working-mark-icon';
 import * as styles from './agent-status.css';
 
 export type AgentStatusKind = 'working' | 'awaiting-input' | 'error' | 'completed' | 'idle';
@@ -32,22 +32,6 @@ function toCssLength(size: string | number) {
   return typeof size === 'number' ? `${size}px` : size;
 }
 
-/**
- * Resolves the app's active theme polarity for `<ThinkingOrb theme>`. The
- * orb's own `theme="auto"` detection looks for a `data-theme` attribute or a
- * `dark`/`light` class on an ancestor (the Tailwind/shadcn convention); this
- * app applies theme via `.emlight` / `.emdark` / `.emsolarized-*` selector
- * classes on `<html>` instead, so auto-detection would never match. Pin the
- * orb's theme from the same THEME_MANIFEST polarity the rest of the design
- * system uses.
- */
-function useOrbTheme(): 'light' | 'dark' {
-  const ctx = useThemeOptional();
-  if (!ctx) return 'light';
-  const entry = THEME_MANIFEST.find((e) => e.id === ctx.themeId);
-  return entry?.polarity ?? 'light';
-}
-
 function AgentStatus({
   status,
   size = '1.5rem',
@@ -58,8 +42,6 @@ function AgentStatus({
   'aria-label': ariaLabel,
   ...props
 }: AgentStatusProps) {
-  const orbTheme = useOrbTheme();
-
   if (!status || status === 'idle') return null;
 
   const indicator = (
@@ -76,7 +58,7 @@ function AgentStatus({
         } as React.CSSProperties
       }
     >
-      <AgentStatusGlyph status={status} theme={orbTheme} />
+      <AgentStatusGlyph status={status} />
     </span>
   );
 
@@ -90,25 +72,21 @@ function AgentStatus({
   );
 }
 
-function AgentStatusGlyph({
-  status,
-  theme,
-}: {
-  status: ActiveAgentStatusKind;
-  theme: 'light' | 'dark';
-}) {
+function AgentStatusGlyph({ status }: { status: ActiveAgentStatusKind }) {
   switch (status) {
-    // Real work in progress (tool runs, multi-step turns) — thinking-orbs
-    // `working` state. The canonical schema (TuiAgentStateStatus) doesn't
-    // distinguish tool phases (search/test/generate) on this path, so this
-    // stays the generic `working` orb rather than a faked-in phase.
+    // Real work in progress (tool runs, multi-step turns). Ninebrains uses its
+    // own brand mark here instead of the shared thinking-orbs `working` state:
+    // flat, hard-edged squares with no gradient or grain, per docs/brand/README.md.
     case 'working':
-      return <ThinkingOrb state="working" size={20} theme={theme} aria-hidden="true" />;
+      return <WorkingMarkIcon className={styles.icon} />;
 
-    // Agent session is live but blocked on the user (permission prompt,
-    // idle prompt, elicitation dialog) — thinking-orbs `breathing` state.
+    // Agent session is live but blocked on the user (permission prompt, idle
+    // prompt, elicitation dialog). Ninebrains uses a warning-colored breathing
+    // dot here instead of the shared thinking-orbs `breathing` state, so "come
+    // back to this task" reads as a distinct, colored signal rather than
+    // blending in with the monochrome working glyph.
     case 'awaiting-input':
-      return <ThinkingOrb state="breathing" size={20} theme={theme} aria-hidden="true" />;
+      return <AwaitingInputIcon className={styles.icon} />;
 
     case 'completed':
       return (

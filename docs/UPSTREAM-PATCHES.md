@@ -629,3 +629,35 @@ New Ninebrains-only files: `src/core/features/mcp/browser/seed-mcp.ts` (+ test),
 | `src/core/features/tasks/contributions/commands.ts` | New `task.rename` (F2), `task.delete` (Mod+Backspace), `task.copyBranchName` (Mod+Alt+C, via a `code()` chord since Alt cannot combine with a printable key token) commands; `task.pin` gains a `Mod+Shift+P` keybinding | Pin, Rename, Archive, Copy branch name and Delete in the task context menu had no keyboard shortcuts; Archive and bulk-delete already did |
 | `src/core/features/tasks/browser/task-scope.tsx` | Implements `task.rename` (opens the rename modal), `task.copyBranchName` (copies the checked-out branch name), and `task.delete` (opens the delete modal, deletes, navigates back to the project view if the task was open) in `view.task` scope | Mirrors the existing local handlers in the sidebar/task-list rows so the shortcuts work wherever a task is open |
 | `src/core/features/tasks/contributions/browser/task-context-menu.tsx` | Shows a `BoundShortcut` hint next to each menu item | Lets the shared context menu (used by both the sidebar and the project task-list view) surface the new bindings |
+
+## 37. Brand-mark and colored agent-status icons, `thinking-orbs` dependency removed (`ninebrains/loading-state-3hkz5`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/ui/src/react/components/agent-status/agent-status.tsx` | `working` now renders a local `WorkingMarkIcon` (the nine-square brand mark, animated as a ring sweep around the eight arm squares) instead of `<ThinkingOrb state="working">`; `awaiting-input` now renders a local `AwaitingInputIcon` (a warning-colored breathing circle) instead of `<ThinkingOrb state="breathing">`. The now-unused `useOrbTheme()`/`THEME_MANIFEST` polarity plumbing from §27 was removed. `idle`, `completed` and `error` are unchanged | Ninebrains' site redesign made the flat, hard-edged nine-square mark the brand identity, and the dotted `thinking-orbs` `working` glyph read as off-brand next to it. Separately, the monochrome `breathing` ring for `awaiting-input` was too easy to miss in a task list next to the working glyph; it is a distinct warning-colored dot again (the pre-`thinking-orbs` behavior, as a circle instead of a diamond). Supersedes §27's approach for these two states; documented as a Ninebrains-only exception (not a change to the shared standard) in advance-labs `DESIGN.md` → Components → "Agent status" and `docs/operating-system/systems/17-agent-status-indicators.md` |
+| `packages/ui/package.json`, `pnpm-lock.yaml` | `thinking-orbs` dependency removed | Nothing in Ninebrains renders it anymore |
+
+New Ninebrains-only files: `packages/ui/src/react/components/agent-status/working-mark-icon.tsx` (+ `.css.ts`), `packages/ui/src/react/components/agent-status/awaiting-input-icon.tsx` (+ `.css.ts`).
+
+## 38. Hardstyle theme, and per-task/cross-task activity views (`ninebrains/loading-state-3hkz5`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/primitives/app-settings/api/app-settings.ts` | `Theme` union gains `'emhardstyle'` | New selectable theme id |
+| `src/core/features/workbench/contributions/settings.ts` | `themeSchema` enum gains `'emhardstyle'` | The persisted setting must validate and store the new value |
+| `src/core/primitives/theme/browser/theme-classes.ts`, `theme-classes.test.ts` | `THEME_CLASS_HARDSTYLE = 'emhardstyle'` added to `THEME_CLASSES` | New theme selector class, kept in convergence with `THEME_MANIFEST` |
+| `src/renderer/index.html` | Boot pre-paint script recognizes `'emhardstyle'` and treats it as dark for the splash background/foreground colors | No flash of the wrong theme before the stylesheet loads |
+| `src/core/features/settings/browser/components/ThemeCard.tsx` | New "Hardstyle" option (Zap icon) alongside System/Light/Dark | User-facing toggle, same place as light/dark/auto |
+| `src/main/host/window.ts` | `applyNativeTheme` treats `'emhardstyle'` as dark for Windows native chrome | Was falling through to the `'system'` branch for the new id |
+| `src/main/core/terminal-shell/color-env.ts` | `resolveEffectiveTheme` treats `'emhardstyle'` as dark for `COLORFGBG` | Same class of gap as the native-theme mapping above |
+| `src/core/primitives/telemetry/api/telemetry.ts` | `FocusView` gains `'arena'`; `arena_viewed: { from_view: FocusView \| null }` event added | New view needs a telemetry id, same pattern as `lanes`/`planner` |
+| `src/core/manifests/browser/browser-contributions.ts` | `+...arenaBrowserContributions.views` | Mount the Arena view runtime |
+| `src/core/manifests/browser/view-catalog.ts` (+ `view-catalog.test.ts`) | `+arenaViewDef`; expected ids and the telemetry-event map gain `'arena'` | Register the `arena` view, same pattern as `lanes`/`planner` |
+| `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | New "Arena" sidebar entry (Activity icon), modeled on the existing Automations entry | Global nav entry point for the new cross-task view |
+| `src/core/manifests/browser/task-tab-contributions.ts` | `+...pulseTaskTabContributions` | Register the new per-task Pulse tab |
+| `src/core/features/tasks/contributions/commands.ts`, `src/core/features/tasks/browser/task-scope.tsx` | New `task.openPulse` command (no keybinding), opens the `pulse` tab via `paneLayout.open('pulse', {})` | Discoverable entry point (command palette) for a tab kind with no per-instance open args, mirroring `task.openBrowser` |
+| `src/core/features/tasks/contributions/browser/lifecycle-strip.tsx`, `git-diff-pulse.tsx` (new) | Small presentational components rendering `TaskStore.workspaceLifecycle` and `useTaskGitDiffStats` | Shared by the new Pulse tab and Arena view; live in `tasks`'s own contributions surface because the `core-module-boundaries` lint rule forbids one feature importing another feature's `browser/` internals directly |
+| `packages/theme/src/core/codegen/run.ts` | `hardstyleTheme` imported and appended to `ALL_THEMES` | New theme must be included in the generated CSS build |
+| `packages/theme/src/__generated__/theme.css`, `semantic.css` | Regenerated by `pnpm theme:build` to include the `.emhardstyle` selector block | Build output, not hand-edited; regenerating after `registry.ts`/`codegen/run.ts` change is required, not optional |
+
+New Ninebrains-only files: `src/core/features/pulse/**` (per-task tab: provider, content, tab contribution), `src/core/features/arena/**` (cross-task view: view def, runtime, dashboard, browser contribution), `src/core/features/tasks/contributions/browser/{lifecycle-strip,git-diff-pulse}.tsx`, `packages/theme/src/themes/hardstyle.theme.ts` (+ its `registry.ts`/`codegen/run.ts` registration and regenerated `__generated__/{theme,semantic}.css`).

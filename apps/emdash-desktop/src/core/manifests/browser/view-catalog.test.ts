@@ -10,6 +10,7 @@ describe('viewCatalog', () => {
   it('contains exactly the current application view ids', () => {
     expect(viewCatalog.defs.map(({ id }) => id)).toEqual([
       'home',
+      'arena',
       'automations',
       'project',
       'task',
@@ -61,10 +62,13 @@ describe('viewCatalog', () => {
       )
     ).toEqual({
       home: 'home_viewed',
+      arena: 'arena_viewed',
       automations: 'automations_viewed',
       project: 'project_viewed',
       task: 'task_viewed',
       settings: 'settings_viewed',
+      lanes: undefined,
+      planner: undefined,
     });
   });
 });

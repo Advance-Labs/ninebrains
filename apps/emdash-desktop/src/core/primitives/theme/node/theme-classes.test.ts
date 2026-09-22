@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 // node surface even though the constants under test are browser code.
 import {
   THEME_CLASS_DARK,
+  THEME_CLASS_HARDSTYLE,
   THEME_CLASS_LIGHT,
   THEME_CLASSES,
   THEME_STORAGE_KEY,
@@ -21,10 +22,11 @@ describe('theme class-name convergence with @emdash/theme', () => {
   // generated @emdash/theme selectors target (.emlight/.emdark). One classList
   // write must flip both the app palette and the --em-* palette. A rename on
   // either side silently splits the two systems — these tests are the guard.
-  it('app light/dark classes equal the THEME_MANIFEST selectors', () => {
+  it('app light/dark/hardstyle classes equal the THEME_MANIFEST selectors', () => {
     expect(THEME_CLASS_LIGHT).toBe(manifestClass('light'));
     expect(THEME_CLASS_DARK).toBe(manifestClass('dark'));
-    expect(THEME_CLASSES).toEqual([THEME_CLASS_LIGHT, THEME_CLASS_DARK]);
+    expect(THEME_CLASS_HARDSTYLE).toBe(manifestClass('hardstyle'));
+    expect(THEME_CLASSES).toEqual([THEME_CLASS_LIGHT, THEME_CLASS_DARK, THEME_CLASS_HARDSTYLE]);
   });
 
   it('index.html pre-paint script uses the same class names and storage key', () => {
@@ -32,6 +34,7 @@ describe('theme class-name convergence with @emdash/theme', () => {
     const html = readFileSync(new URL('../../../../renderer/index.html', import.meta.url), 'utf8');
     expect(html).toContain(`'${THEME_CLASS_LIGHT}'`);
     expect(html).toContain(`'${THEME_CLASS_DARK}'`);
+    expect(html).toContain(`'${THEME_CLASS_HARDSTYLE}'`);
     expect(html).toContain(`localStorage.getItem('${THEME_STORAGE_KEY}')`);
   });
 });

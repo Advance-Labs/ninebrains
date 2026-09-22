@@ -28,6 +28,7 @@ export const THEME_MANIFEST: readonly ThemeManifestEntry[] = [
     polarity: 'dark',
     selector: '.emsolarized-dark',
   },
+  { id: 'hardstyle', label: 'Hardstyle', polarity: 'dark', selector: '.emhardstyle' },
 ] as const;
 
 export type ThemeId = (typeof THEME_MANIFEST)[number]['id'];

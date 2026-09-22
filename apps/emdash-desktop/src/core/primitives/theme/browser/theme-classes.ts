@@ -13,7 +13,8 @@
  */
 export const THEME_CLASS_LIGHT = 'emlight';
 export const THEME_CLASS_DARK = 'emdark';
-export const THEME_CLASSES = [THEME_CLASS_LIGHT, THEME_CLASS_DARK] as const;
+export const THEME_CLASS_HARDSTYLE = 'emhardstyle';
+export const THEME_CLASSES = [THEME_CLASS_LIGHT, THEME_CLASS_DARK, THEME_CLASS_HARDSTYLE] as const;
 
 /** localStorage key the pre-paint script reads to avoid a theme flash. */
 export const THEME_STORAGE_KEY = 'emdash-theme';

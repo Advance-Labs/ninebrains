@@ -46,7 +46,7 @@ export type TerminalSettings = {
   defaultShell: TerminalShellId;
 };
 
-export type Theme = 'emlight' | 'emdark' | null;
+export type Theme = 'emlight' | 'emdark' | 'emhardstyle' | null;
 
 export type InterfaceSettings = {
   showTrayIcon: boolean;

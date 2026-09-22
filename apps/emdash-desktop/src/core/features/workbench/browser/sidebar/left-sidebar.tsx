@@ -1,6 +1,7 @@
-import { Clock, FolderInput, MessageSquareShare, Settings } from 'lucide-react';
+import { Activity, Clock, FolderInput, MessageSquareShare, Settings } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
+import { arenaViewDef } from '@core/features/arena/contributions/views';
 import { automationsViewDef } from '@core/features/automations/contributions/views';
 import { ReleaseNotice } from '@core/features/release-check/contributions/browser/release-notice';
 import { settingsViewDef } from '@core/features/settings/contributions/views';
@@ -74,6 +75,17 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
           <ReleaseNotice />
           <SidebarMenu>
             <SidebarSearchTrigger />
+            <SidebarMenuButton
+              isActive={isCurrentView(currentView, 'arena')}
+              onClick={() => navigate(arenaViewDef())}
+              aria-label="Arena"
+              className="w-full justify-between"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Activity className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
+                <span className="truncate">Arena</span>
+              </span>
+            </SidebarMenuButton>
             <SidebarMenuButton
               isActive={isCurrentView(currentView, 'automations')}
               onClick={() => navigate(automationsViewDef())}

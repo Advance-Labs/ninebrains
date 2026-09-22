@@ -33,7 +33,12 @@ const interfaceSettingsSchema = z.object({
   hideContextBar: z.boolean(),
 });
 
-const themeSchema = z.enum(['emlight', 'emdark']).nullable().catch(null).optional().default(null);
+const themeSchema = z
+  .enum(['emlight', 'emdark', 'emhardstyle'])
+  .nullable()
+  .catch(null)
+  .optional()
+  .default(null);
 
 const openInSettingsSchema = z.object({
   default: openInAppIdSchema,

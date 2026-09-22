@@ -10,7 +10,7 @@
           var raw = localStorage.getItem('emdash-theme');
           var pref = raw ? JSON.parse(raw) : null;
           var effective =
-            pref === 'emlight' || pref === 'emdark'
+            pref === 'emlight' || pref === 'emdark' || pref === 'emhardstyle'
               ? pref
               : window.matchMedia('(prefers-color-scheme: dark)').matches
                 ? 'emdark'
@@ -18,8 +18,10 @@
           document.documentElement.classList.add(effective);
           // sRGB approximations of the theme --background / --foreground
           // tokens, applied before any stylesheet loads so the very first
-          // paint (and the boot splash) match the persisted theme.
-          var dark = effective === 'emdark';
+          // paint (and the boot splash) match the persisted theme. Hardstyle
+          // is dark-polarity too, so it shares the dark boot-splash colors;
+          // its neon accent only shows up once the real stylesheet loads.
+          var dark = effective === 'emdark' || effective === 'emhardstyle';
           var style = document.documentElement.style;
           style.backgroundColor = dark ? '#111111' : '#fcfcfc';
           style.setProperty('--boot-splash-bg', dark ? '#111111' : '#fcfcfc');
