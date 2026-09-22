@@ -46,7 +46,7 @@ something else in charge of the truth.
 |  | What it does |
 |---|---|
 | **Lanes** | Each agent gets its own git worktree and branch, terminal, editor and browser. Four to a tab, unlimited tabs. They cannot touch each other's files. |
-| **The Brain** | Holds the plan as a graph of jobs with dependencies, plus a mailbox, and hands ready jobs to whichever lane is idle. |
+| **The Brain** | Holds the plan as a graph of jobs with dependencies, plus a mailbox, and hands ready jobs to whichever lane is idle. Its status is one click away from Settings, and visible across every open project at once from Arena. |
 | **Gates** | When a lane says it is done, a second, independent run has to prove it: tests, screenshots, a read-only reviewer, citation checks. No agent grades its own work. |
 
 The name comes from the octopus: one central brain, plus a small brain in each of its eight arms.
@@ -64,14 +64,17 @@ servers, skills and automations.
 - **Lanes grid.** 2×2 lanes per tab, unlimited tabs, status lights driven by the agents' own hooks,
   sleep (hide a lane; its agent keeps running), maximize, and a per-lane browser.
 - **The Brain.** A drawer in the Lanes view runs a Claude Code session as the Brain, which turns a
-  brief into a job graph and dispatches ready jobs to idle lanes.
+  brief into a job graph and dispatches ready jobs to idle lanes. Settings → General explains what
+  it does and lets you pause dispatch; Arena shows its status and every open job across every
+  project you have open, with a jump straight to a blocked job's plan.
 - **Verification gates.** Tests, a three-width screenshot check, a read-only reviewer and citation
   checks. A failed gate sends feedback back to the lane and retries, up to three attempts, then
   blocks and tells you.
 - **Rigor settings.** Two 0-10 sliders in Settings → Gates decide which gates every job gets, with
   a per-project override.
 - **Planner.** A canvas where jobs are nodes and dependencies are edges. **Run plan** compiles it
-  into Brain jobs, idempotently, and refuses cycles.
+  into Brain jobs, idempotently, and refuses cycles. The Brain can draft a plan from a brief;
+  accept all of it or just the nodes you select, and the rest stays dashed until you decide.
 - **Packs.** Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO and
   research. Every pack is off until you turn it on.
 - **Lane roles and modes.** Start a lane from a pack role, and switch a lane between attended and
@@ -127,6 +130,27 @@ Draw the plan as jobs and dependency edges, then compile it into Brain jobs with
 Start a lane from a pack role. Its prompt, agent and model preferences fill in automatically.
 
 <img src="docs/screenshots/lanes-add-lane-role-1440.png" alt="The add-lane form with the Builder role picked from the coding pack">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Arena**
+
+Every open job across every project you have, with the Brain's dispatcher status and a jump to a
+blocked job's plan.
+
+<img src="docs/screenshots/arena-brain-section-1440.png" alt="Arena's Brain section showing dispatcher status and open job counts across every project">
+
+</td>
+<td width="50%">
+
+**Settings → General**
+
+What the Brain does, its live status, and a switch to pause dispatch, without opening the drawer.
+
+<img src="docs/screenshots/brain-settings-card-1440.png" alt="The Brain settings card in General settings, explaining what it does with a dispatch-pause switch">
 
 </td>
 </tr>
@@ -243,6 +267,7 @@ The [getting-started guide](docs/guide/getting-started.md) covers each step in d
 | **Job** | One unit of work for one lane. A job is ready when every job it depends on is done |
 | **Gate** | An independent check that must pass before a job counts as done: tests, screenshot, reviewer, security review, fact-check |
 | **Pack** | A per-project bundle of lane roles, skills, MCP servers and default gates |
+| **Arena** | Every provisioned task across every open project, in one place, including the Brain's dispatcher status and open jobs |
 
 ## How it compares
 
