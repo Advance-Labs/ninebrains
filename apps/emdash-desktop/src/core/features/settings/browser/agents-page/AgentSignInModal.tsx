@@ -228,6 +228,7 @@ function createLoginTerminal(): Terminal {
     lineHeight: TERMINAL_LINE_HEIGHT,
     letterSpacing: TERMINAL_LETTER_SPACING,
     allowProposedApi: true,
+    macOptionClickForcesSelection: true,
     scrollOnUserInput: false,
     linkHandler: {
       activate: (event, text) => {
