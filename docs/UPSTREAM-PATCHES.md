@@ -621,3 +621,11 @@ New Ninebrains-only files: `src/core/features/mcp/browser/seed-mcp.ts` (+ test),
 |---|---|---|
 | `src/core/features/terminals/api/browser/pty/pty.ts` | Enable macOS `macOptionClickForcesSelection` so Option+drag forces a text selection even while the TUI runs its own mouse capture | Terminal TUIs (htop, lazygit, vim) grab the mouse, so plain drag selects nothing; Option+drag restores selection without breaking TUI mouse handling (#44) |
 | `src/core/features/settings/browser/agents-page/AgentSignInModal.tsx` | Add the same Option+drag affordance hint when an agent sign-in modal hosts a TUI preview | Keeps the selection behavior consistent where a terminal renders inside the modal |
+
+## 36. Keyboard shortcuts for the task context menu (`ninebrains/ripe-points-chew-ghl65`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/tasks/contributions/commands.ts` | New `task.rename` (F2), `task.delete` (Mod+Backspace), `task.copyBranchName` (Mod+Alt+C, via a `code()` chord since Alt cannot combine with a printable key token) commands; `task.pin` gains a `Mod+Shift+P` keybinding | Pin, Rename, Archive, Copy branch name and Delete in the task context menu had no keyboard shortcuts; Archive and bulk-delete already did |
+| `src/core/features/tasks/browser/task-scope.tsx` | Implements `task.rename` (opens the rename modal), `task.copyBranchName` (copies the checked-out branch name), and `task.delete` (opens the delete modal, deletes, navigates back to the project view if the task was open) in `view.task` scope | Mirrors the existing local handlers in the sidebar/task-list rows so the shortcuts work wherever a task is open |
+| `src/core/features/tasks/contributions/browser/task-context-menu.tsx` | Shows a `BoundShortcut` hint next to each menu item | Lets the shared context menu (used by both the sidebar and the project task-list view) surface the new bindings |

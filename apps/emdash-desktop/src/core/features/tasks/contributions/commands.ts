@@ -1,5 +1,5 @@
 import { defineCommand } from '@core/primitives/commands/api';
-import { keybinding } from '@core/primitives/keybindings/api';
+import { code, keybinding } from '@core/primitives/keybindings/api';
 
 export const newConversationCommand = defineCommand({
   id: 'task.newConversation',
@@ -180,6 +180,18 @@ export const pinTaskCommand = defineCommand({
   description: 'Pin this task to keep it at the top',
   category: 'Task',
   icon: 'pin',
+  keybinding: keybinding.settings('pinTask', 'Mod+Shift+P'),
+});
+
+export const renameTaskCommand = defineCommand({
+  id: 'task.rename',
+  title: 'Rename Task',
+  description: 'Rename the current task',
+  category: 'Task',
+  icon: 'pencil',
+  keybinding: keybinding.settings('renameTask', 'F2', {
+    ignoreWhenEditorFocused: true,
+  }),
 });
 
 export const archiveTaskCommand = defineCommand({
@@ -191,6 +203,26 @@ export const archiveTaskCommand = defineCommand({
   keybinding: keybinding.settings('archiveTask', 'Mod+Shift+E', {
     ignoreWhenEditorFocused: true,
   }),
+});
+
+export const deleteTaskCommand = defineCommand({
+  id: 'task.delete',
+  title: 'Delete Task',
+  description: 'Delete the current task',
+  category: 'Task',
+  icon: 'trash-2',
+  keybinding: keybinding.settings('deleteTask', 'Mod+Backspace', {
+    ignoreWhenTextInputFocused: true,
+  }),
+});
+
+export const copyBranchNameCommand = defineCommand({
+  id: 'task.copyBranchName',
+  title: 'Copy Branch Name',
+  description: "Copy the current task's branch name",
+  category: 'Git',
+  icon: 'copy',
+  keybinding: keybinding.settings('copyBranchName', code(['Mod', 'Alt'], 'KeyC')),
 });
 
 export const convertAutomationCommand = defineCommand({
@@ -255,7 +287,10 @@ export const TASK_COMMAND_DEFS = [
   gitPullCommand,
   gitPushCommand,
   pinTaskCommand,
+  renameTaskCommand,
   archiveTaskCommand,
+  deleteTaskCommand,
+  copyBranchNameCommand,
   convertAutomationCommand,
   nextTaskCommand,
   previousTaskCommand,
