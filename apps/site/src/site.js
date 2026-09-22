@@ -543,26 +543,71 @@ function initInstallTabs(onShown) {
   openDownload();
 }
 
+/**
+ * The legacy copy path: a selected, off-screen textarea and execCommand. It is synchronous, so it
+ * still runs inside the click's user activation, and it works where the async Clipboard API is
+ * missing or refused (older or locked-down browsers, embedded webviews, plain http).
+ */
+function copyWithSelection(text) {
+  const focused = document.activeElement;
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+  document.body.append(area);
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  area.remove();
+  // Selecting the textarea moved focus; hand it back so keyboard users stay on the button.
+  if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
+  return ok;
+}
+
+/** Selects the command on the page so a manual Ctrl+C / Cmd+C picks it up. */
+function selectCommand(code) {
+  const range = document.createRange();
+  range.selectNodeContents(code);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
 function initCopyButtons() {
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   for (const button of document.querySelectorAll('[data-copy]')) {
+    const original = button.textContent;
+    let reset = 0;
+    const show = (label, state) => {
+      clearTimeout(reset);
+      button.textContent = label;
+      button.dataset.copied = state;
+      reset = setTimeout(() => {
+        button.textContent = original;
+        button.dataset.copied = 'false';
+      }, 1800);
+    };
     button.addEventListener('click', async () => {
       const code = button.closest('.cmd')?.querySelector('code');
       // The formatter may wrap the command in the HTML; copy the one line the page shows.
       const text = code?.textContent?.replace(/\s+/g, ' ').trim();
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        // No clipboard (insecure context, permissions): the command is still selectable text.
-        return;
+      if (!code || !text) return;
+      // Try the synchronous path first: an await before it would spend the click's activation.
+      let ok = copyWithSelection(text);
+      if (!ok && navigator.clipboard?.writeText) {
+        ok = await navigator.clipboard.writeText(text).then(
+          () => true,
+          () => false
+        );
       }
-      const original = button.textContent;
-      button.textContent = '✓ Copied';
-      button.dataset.copied = 'true';
-      setTimeout(() => {
-        button.textContent = original;
-        button.dataset.copied = 'false';
-      }, 1800);
+      if (ok) return show('✓ Copied', 'true');
+      // Nothing let us write: leave the command selected and say how to finish by hand.
+      selectCommand(code);
+      show(mac ? 'Press ⌘C' : 'Press Ctrl+C', 'manual');
     });
   }
 }
