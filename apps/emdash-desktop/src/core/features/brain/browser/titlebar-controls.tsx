@@ -1,4 +1,4 @@
-import { Badge, Button } from '@emdash/ui/react/primitives';
+import { Badge, Button, Tooltip } from '@emdash/ui/react/primitives';
 import { stopAllAgentWork } from '../contributions/stop-action';
 import { useBrainOverview } from './use-brain';
 
@@ -24,16 +24,24 @@ export function BrainTitlebarControls({
         Brain
         {total > 0 && <Badge tone="info">{total}</Badge>}
       </Button>
-      <Button
-        size="sm"
-        variant="destructive"
-        data-testid="brain-stop"
-        title="Stop all agent work (Mod+Shift+Backspace)"
-        disabled={dispatcher.stopLatched}
-        onClick={() => void stopAllAgentWork()}
-      >
-        {dispatcher.stopLatched ? 'Stopped' : 'STOP'}
-      </Button>
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          render={
+            <Button
+              size="sm"
+              variant="destructive"
+              data-testid="brain-stop"
+              disabled={dispatcher.stopLatched}
+              onClick={() => void stopAllAgentWork()}
+            >
+              {dispatcher.stopLatched ? 'Stopped' : 'STOP'}
+            </Button>
+          }
+        />
+        <Tooltip.Content>
+          STOP: stop every agent and pause dispatching until you clear it (Mod+Shift+Backspace).
+        </Tooltip.Content>
+      </Tooltip.Root>
     </div>
   );
 }

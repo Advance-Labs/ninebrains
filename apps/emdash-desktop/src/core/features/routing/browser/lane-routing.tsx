@@ -1,4 +1,4 @@
-import { Badge, Button, Popover, Select, toast } from '@emdash/ui/react/primitives';
+import { Badge, Button, Popover, Select, toast, Tooltip } from '@emdash/ui/react/primitives';
 import { Cpu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { LaneProvider } from '@core/features/lanes/api';
@@ -178,33 +178,42 @@ export function LaneRoutingControl({
 
   return (
     <Popover.Root open={open} onOpenChange={openChange}>
-      <Popover.Trigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 max-w-[16rem] shrink-0 px-1"
-            aria-label={`Lane models: ${isCodex ? '' : `subagents ${tierText}, `}${authText}`}
-            data-testid="lane-routing"
-          />
-        }
-      >
-        <Badge
-          variant="outline"
-          tone={authProfileId ? 'info' : 'neutral'}
-          className="max-w-full min-w-0"
-        >
-          <Cpu className="hidden h-3 w-3 shrink-0 @[36rem]:inline" />
-          {isCodex ? (
-            <span className="truncate">{authText}</span>
-          ) : (
-            <span className="truncate">
-              {tierText}
-              <span className="hidden @[36rem]:inline">&nbsp;·&nbsp;{authText}</span>
-            </span>
-          )}
-        </Badge>
-      </Popover.Trigger>
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          render={
+            <Popover.Trigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 max-w-[16rem] shrink-0 px-1"
+                  aria-label={`Lane models: ${isCodex ? '' : `subagents ${tierText}, `}${authText}`}
+                  data-testid="lane-routing"
+                />
+              }
+            >
+              <Badge
+                variant="outline"
+                tone={authProfileId ? 'info' : 'neutral'}
+                className="max-w-full min-w-0"
+              >
+                <Cpu className="hidden h-3 w-3 shrink-0 @[36rem]:inline" />
+                {isCodex ? (
+                  <span className="truncate">{authText}</span>
+                ) : (
+                  <span className="truncate">
+                    {tierText}
+                    <span className="hidden @[36rem]:inline">&nbsp;·&nbsp;{authText}</span>
+                  </span>
+                )}
+              </Badge>
+            </Popover.Trigger>
+          }
+        />
+        <Tooltip.Content>
+          Models for this lane: the agent's subagent tier and which key it runs on.
+        </Tooltip.Content>
+      </Tooltip.Root>
       <Popover.Content align="start" className="w-72 max-w-[calc(100vw-2rem)]">
         <div className="flex flex-col gap-3 p-1" data-testid="lane-routing-popover">
           <div className="text-sm font-medium text-foreground">Models for this lane</div>
