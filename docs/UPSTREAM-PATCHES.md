@@ -679,3 +679,9 @@ New Ninebrains-only files: `src/core/features/workbench/browser/home-view.browse
 | `src/core/features/settings/browser/pages/general-settings-page.tsx` | New "Brain" `SettingsSection` rendering `BrainSettingsCard`; page description mentions the Brain | The Brain becomes discoverable from Settings, not only the Lanes drawer's "Start Brain" button |
 
 New Ninebrains-only files: `src/core/features/brain/contributions/{arena,settings}.ts` (what the Arena and Settings slices reach into the Brain slice for), `src/core/features/lanes/browser/grid/brain-drawer-state.ts` (drawer open/close state, extracted so the Lanes first-run intro can open it too, without a circular import), `src/core/features/planner/browser/canvas-model.test.ts`, `src/core/features/settings/browser/components/BrainSettingsCard.tsx`.
+
+## 41. Release 0.2.1 (`chore/release-0.2.1`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.0 → 0.2.1 | Written by `pnpm run release:prepare 0.2.1`; `release.yml` refuses a version that does not match |
