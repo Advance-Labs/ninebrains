@@ -7,6 +7,7 @@
   "bin": {
     "ninebrains-cowork-server": "./dist/index.mjs"
   },
+  "type": "module",
   "exports": {
     "./protocol": {
       "development": "./src/protocol.ts",
@@ -14,7 +15,6 @@
       "default": "./dist/protocol.mjs"
     }
   },
-  "type": "module",
   "scripts": {
     "build": "tsdown && tsdown --config tsdown.protocol.config.ts",
     "dev": "tsx src/index.ts",

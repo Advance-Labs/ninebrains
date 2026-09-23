@@ -38,6 +38,23 @@ tabs in a Monaco editor. Save with Mod+S.
 
 To open the worktree in another editor, use the **Open in** menu, or Mod+O.
 
+### Cowork on an SSH worktree
+
+Cowork lets two people edit the same text file live when each opens the same worktree on one SSH
+host through their own Unix account. The host owner first starts the
+[Cowork server](../../apps/cowork-server/README.md) and gives both people its socket path and
+access token through a trusted channel. Both accounts need access to the shared worktree and
+socket.
+
+Open a text file, choose **Cowork** in its toolbar, enter the socket path and token, then choose
+**Join shared file**. Typing synchronizes between joined editors. Save writes the shared text to
+the worktree. After an SSH interruption, choose **Reconnect** to merge edits made while offline.
+Use **Leave shared file** to return to ordinary file editing.
+
+Cowork currently needs manual server setup and a manual join for each file. It shares editor text;
+it does not share cursors, terminals, agents, or task tabs. If another program changes the file on
+disk, Save reports a conflict and keeps the editor buffer for review.
+
 ## Changes and diffs
 
 Open the **Changes** panel (Mod+Shift+1, or **Changes** in the task's title bar). It lists staged
