@@ -57,9 +57,10 @@ it.each([true, false])(
       key: resourceKeyFromFileRef(ref),
       uri: encodeResourceUri(ref),
       status: { kind: 'ready' },
-      dirty: false,
-      conflicted: false,
-      saving: false,
+    dirty: false,
+    conflicted: false,
+    saving: false,
+    collaborative: false,
       get readOnly() {
         return permissions.readOnly;
       },

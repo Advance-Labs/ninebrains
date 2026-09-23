@@ -2,10 +2,17 @@ import { autorun } from 'mobx';
 import { observer } from 'mobx-react-lite';
 import type * as monacoNS from 'monaco-editor';
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
+import {
+  useCoworkEditor,
+  type CoworkEditor,
+} from '@core/features/cowork/api/browser/use-cowork-editor';
 import { encodeFacetUri } from '@core/features/editor/api/browser/facet-binder/facet-uri';
 import { useIsActiveTask } from '@core/features/tasks/api/browser/hooks/use-is-active-task';
 import { useTaskViewContext } from '@core/features/tasks/contributions/browser/task-view-context';
-import { useTaskComposition } from '@core/features/workbench/api/browser/task-composition-context';
+import {
+  useTaskComposition,
+  useWorkspace,
+} from '@core/features/workbench/api/browser/task-composition-context';
 import { editorScope } from '@core/features/workbench/contributions/scopes';
 import { useOpenModal } from '@core/manifests/browser/modal-api';
 import { projectAvailabilityUi } from '@core/manifests/browser/project-availability-ui';
@@ -28,6 +35,7 @@ interface EditorContextValue {
    * given DOM element. Called by MonacoFileRenderer to position the editor host.
    */
   setEditorHost: (el: HTMLElement | null) => void;
+  cowork: CoworkEditor;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -46,7 +54,13 @@ export const EditorProvider = observer(function EditorProvider({
   const { projectId, taskId } = useTaskViewContext();
   const taskView = useTaskComposition();
   const { editorView, paneLayout } = taskView;
+  const workspace = useWorkspace();
   const { paneId, pane: paneTabManager } = usePaneContext();
+  const editorRef = useRef<monacoNS.editor.IStandaloneCodeEditor | null>(null);
+  const activeResource = getActiveFileResource(paneTabManager);
+  const cowork = useCoworkEditor(editorRef, activeResource, workspace);
+  const coworkSaveRef = useRef(cowork.save);
+  coworkSaveRef.current = cowork.save;
   const { effectiveTheme } = useTheme();
   const isActive = useIsActiveTask(taskId);
   const liveActionDisabledReason = projectAvailabilityUi.getLiveActionDisabledReason(projectId);
@@ -60,13 +74,19 @@ export const EditorProvider = observer(function EditorProvider({
       },
       execute: () => {
         const resource = getActiveFileResource(paneTabManager);
-        if (resource && !resource.readOnly) void editorView.saveFile(resource.path);
+        if (resource && !resource.readOnly) {
+          void coworkSaveRef.current(resource.path).then((savedPath) => {
+            if (!savedPath) return editorView.saveFile(resource.path);
+          });
+        }
       },
     }),
     'editor.saveAll': () => ({
       availability: () => (liveActionDisabledReason ? disabled(liveActionDisabledReason) : enabled),
       execute: () => {
-        void editorView.saveAllFiles();
+        void coworkSaveRef
+          .current()
+          .then((savedPath) => editorView.saveAllFiles(savedPath ?? undefined));
       },
     }),
   } satisfies ViewScopeImpl<typeof editorScope>;
@@ -79,7 +99,6 @@ export const EditorProvider = observer(function EditorProvider({
   const openConflictModal = useOpenModal('conflictDialog');
 
   // The directly-created Monaco editor for this pane.
-  const editorRef = useRef<monacoNS.editor.IStandaloneCodeEditor | null>(null);
   // The container <div> appended to the pane's host element.
   const containerRef = useRef<HTMLDivElement | null>(null);
   const focusPendingRef = useRef(false);
@@ -124,10 +143,16 @@ export const EditorProvider = observer(function EditorProvider({
     addMonacoKeyboardShortcuts(editor, m, {
       onSave: () => {
         const resource = getActiveFileResource(paneTabManager);
-        if (resource && !resource.readOnly) void editorView.saveFile(resource.path);
+        if (resource && !resource.readOnly) {
+          void coworkSaveRef.current(resource.path).then((savedPath) => {
+            if (!savedPath) return editorView.saveFile(resource.path);
+          });
+        }
       },
       onSaveAll: () => {
-        void editorView.saveAllFiles();
+        void coworkSaveRef
+          .current()
+          .then((savedPath) => editorView.saveAllFiles(savedPath ?? undefined));
       },
     });
 
@@ -282,7 +307,7 @@ export const EditorProvider = observer(function EditorProvider({
 
   return (
     <ViewScopeInstanceProvider instance={editorScopeInstance}>
-      <EditorContext.Provider value={{ setEditorHost }}>{children}</EditorContext.Provider>
+      <EditorContext.Provider value={{ setEditorHost, cowork }}>{children}</EditorContext.Provider>
     </ViewScopeInstanceProvider>
   );
 });

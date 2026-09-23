@@ -54,6 +54,7 @@ export type SaveFileError =
   | { type: 'readonly' }
   | { type: 'no-etag' }
   | { type: 'conflict' }
+  | { type: 'collaborative' }
   | { type: 'write-failed'; message: string };
 
 /**
@@ -71,6 +72,7 @@ export interface OpenFileEntry {
   readonly conflicted: boolean;
   readonly saving: boolean;
   readonly readOnly: boolean;
+  readonly collaborative: boolean;
   handleFor(facet: Facet): FacetHandle | undefined;
   /** Per-ref readiness of a git snapshot facet (spec §6). */
   gitStatus(ref: GitRef): ContentStatus | undefined;
@@ -123,6 +125,9 @@ class OpenFileEntryImpl implements OpenFileEntry {
   conflicted = false;
   saving = false;
   readOnly = false;
+  collaborative = false;
+  collaborativeCount = 0;
+  expectedCollaborativeDiskText: string | null = null;
 
   readonly facetHandles = observable.map<string, FacetHandle>([], { deep: false });
   readonly gitStatuses = observable.map<string, ContentStatus>([], { deep: false });
@@ -155,6 +160,7 @@ class OpenFileEntryImpl implements OpenFileEntry {
       conflicted: observable,
       saving: observable,
       readOnly: observable,
+      collaborative: observable,
     });
   }
 
@@ -304,6 +310,22 @@ export class OpenFileStore {
     this.reconcileDirty(entry);
   }
 
+  /** Keeps single-user writes and discards from mutating an active shared buffer. */
+  setCollaborative(entry: OpenFileEntry, collaborative: boolean): void {
+    const impl = this.entries.get(entry.key);
+    if (!impl || impl !== entry) return;
+    impl.collaborativeCount = Math.max(0, impl.collaborativeCount + (collaborative ? 1 : -1));
+    runInAction(() => (impl.collaborative = impl.collaborativeCount > 0));
+  }
+
+  /** Accepts a disk write acknowledged by the shared editor for this buffer. */
+  confirmCollaborativeSave(entry: OpenFileEntry, content: string): void {
+    const impl = this.entries.get(entry.key);
+    if (!impl || impl !== entry) return;
+    impl.expectedCollaborativeDiskText = content;
+    if (impl.lastDiskText === content) this.applyDiskText(impl);
+  }
+
   /**
    * Writes the buffer through the content model's etag-preconditioned write
    * mutation. A stale etag classifies as a conflict: the entry flags
@@ -317,6 +339,7 @@ export class OpenFileStore {
   ): Promise<Result<void, SaveFileError>> {
     const impl = this.entries.get(entry.key);
     if (!impl || impl !== entry) return err({ type: 'not-open' as const });
+    if (impl.collaborative) return err({ type: 'collaborative' as const });
     if (impl.readOnly) return err({ type: 'readonly' as const });
     const slot = impl.slots.get(BUFFER_SLOT);
     const handle = slot?.handle;
@@ -380,6 +403,7 @@ export class OpenFileStore {
   reloadFromDisk(entry: OpenFileEntry): void {
     const impl = this.entries.get(entry.key);
     if (!impl || impl !== entry) return;
+    if (impl.collaborative) return;
     const handle = impl.slots.get(BUFFER_SLOT)?.handle;
     if (!handle || impl.lastDiskText === undefined) return;
     this.silentSet(impl, handle, impl.lastDiskText);
@@ -783,6 +807,15 @@ export class OpenFileStore {
     const bufferHandle = entry.slots.get(BUFFER_SLOT)?.handle;
     if (!bufferHandle) return;
     const matches = bufferHandle.getText() === text;
+    if (entry.expectedCollaborativeDiskText === text) {
+      entry.expectedCollaborativeDiskText = null;
+      entry.baseEtag = entry.lastDiskEtag;
+      runInAction(() => {
+        entry.dirty = !matches;
+        entry.conflicted = false;
+      });
+      return;
+    }
     if (!entry.dirty || matches) {
       if (!matches) this.silentSet(entry, bufferHandle, text);
       entry.baseEtag = entry.lastDiskEtag;

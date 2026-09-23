@@ -156,6 +156,10 @@ export const fileTabProvider: TabProvider<'file', FilePayload, FileTabResource, 
     ): Promise<boolean> {
       const fileEntry = resource.entry;
       if (!fileEntry?.dirty) return true;
+      if (fileEntry.collaborative) {
+        toast.error('Save or leave Cowork before closing this file');
+        return false;
+      }
       const liveActionDisabledReason = projectAvailabilityUi.getLiveActionDisabledReason(
         (ctx as TaskTabContext).projectId
       );

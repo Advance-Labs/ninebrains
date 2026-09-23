@@ -596,6 +596,34 @@ describe('OpenFileStore', () => {
   });
 
   describe('save and conflict policy', () => {
+    it('accepts a cowork save without losing edits typed before the disk watcher catches up', async () => {
+      const h = start();
+      const path = '/repo/src/index.ts';
+      const { entry } = await openReady(h, path, 'one');
+      bufferHandle(entry).setText('shared');
+      await waitFor(() => entry.dirty);
+
+      h.store.confirmCollaborativeSave(entry, 'shared');
+      bufferHandle(entry).setText('shared again');
+      h.publish(h.diskKey(path), textContent('shared', 'e2'));
+      await waitFor(() => entry.handleFor(DISK)?.getText() === 'shared');
+      expect(bufferHandle(entry).getText()).toBe('shared again');
+      expect(entry.conflicted).toBe(false);
+    });
+
+    it('blocks ordinary saves while a shared editor owns the buffer', async () => {
+      const h = start();
+      const { entry } = await openReady(h, '/repo/src/index.ts', 'one');
+      bufferHandle(entry).setText('shared edit');
+      h.store.setCollaborative(entry, true);
+      await expect(h.store.save(entry)).resolves.toEqual({
+        success: false,
+        error: { type: 'collaborative' },
+      });
+      h.store.setCollaborative(entry, false);
+      await expect(h.store.save(entry)).resolves.toMatchObject({ success: true });
+    });
+
     it('saves through the etag precondition and clears the crash-recovery buffer', async () => {
       const h = start();
       const path = '/repo/src/index.ts';

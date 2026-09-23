@@ -276,9 +276,10 @@ export class EditorViewStore {
     }
   }
 
-  async saveAllFiles(): Promise<void> {
+  async saveAllFiles(excludePath?: string): Promise<void> {
     for (const resource of this.openFileResources) {
-      if (resource.entry?.dirty) await this.saveFile(resource.path);
+      if (resource.path !== excludePath && resource.entry?.dirty)
+        await this.saveFile(resource.path);
     }
   }
 

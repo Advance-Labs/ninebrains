@@ -1,0 +1,41 @@
+{
+  "name": "@ninebrains/cowork-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Repository-scoped text collaboration service for Ninebrains",
+  "license": "Apache-2.0",
+  "bin": {
+    "ninebrains-cowork-server": "./dist/index.mjs"
+  },
+  "exports": {
+    "./protocol": {
+      "development": "./src/protocol.ts",
+      "types": "./src/protocol.ts",
+      "default": "./dist/protocol.mjs"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsdown && tsdown --config tsdown.protocol.config.ts",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "lint": "oxlint .",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "yjs": "^13.6.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.1",
+    "@typescript/native-preview": "7.0.0-dev.20260609.1",
+    "tsdown": "^0.22.2",
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
