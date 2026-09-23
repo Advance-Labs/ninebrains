@@ -41,7 +41,15 @@ async function openLanes(page) {
   await page.getByTestId('lanes-grid').waitFor({ timeout: LONG });
 }
 
+async function dismissIntroIfShown(page) {
+  const intro = page.getByTestId('lanes-empty-intro');
+  if (await intro.isVisible().catch(() => false)) {
+    await page.getByTestId('lanes-add-first').click();
+  }
+}
+
 async function addLane(page, slot) {
+  await dismissIntroIfShown(page);
   const cell = page.locator(`[data-testid="lane-cell"][data-slot="${slot}"]`);
   const add = cell.getByRole('button', { name: 'Add lane' });
   await add.waitFor({ timeout: LONG });

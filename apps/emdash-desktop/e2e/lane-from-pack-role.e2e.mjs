@@ -7,7 +7,15 @@
 // Run: `pnpm run build` at the repo root first, then `node e2e/lane-from-pack-role.e2e.mjs`.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LONG, addProject, openLanes, runCommand, step, until } from './brain-e2e.mjs';
+import {
+  LONG,
+  addProject,
+  dismissIntroIfShown,
+  openLanes,
+  runCommand,
+  step,
+  until,
+} from './brain-e2e.mjs';
 import { closeApp, hangWatchdog, launchApp, setContentSize } from './harness.mjs';
 
 const ROLE_LABEL = 'Builder (Coding)';
@@ -31,6 +39,7 @@ async function enableCodingPack(page) {
 }
 
 async function addLaneWithRole(page, slot, roleLabel) {
+  await dismissIntroIfShown(page);
   const cell = page.locator(`[data-testid="lane-cell"][data-slot="${slot}"]`);
   const roleSelect = cell.getByRole('combobox', { name: 'Role' });
   await roleSelect.waitFor({ timeout: LONG });
