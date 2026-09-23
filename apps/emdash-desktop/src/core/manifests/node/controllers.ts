@@ -24,6 +24,7 @@ import {
 import { createCatalogWireController } from '@core/features/catalog/node/wire-controller';
 import type { CompensationRunner } from '@core/features/conversations/node/createConversation';
 import { createConversationsWireController } from '@core/features/conversations/node/wire-controller';
+import { createCoworkWireController } from '@core/features/cowork/node/wire-controller';
 import {
   createDevPerfWireController,
   type DevPerfOperations,
@@ -241,6 +242,14 @@ export const desktopNodeControllers = {
   },
   editor: {
     create: ({ editorBuffer }) => createEditorWireController({ editorBuffer }),
+  },
+  cowork: {
+    create: ({ ssh }) =>
+      createCoworkWireController(async (connectionId, socketPath) => {
+        const proxy = ssh.manager.getProxy(connectionId);
+        if (!proxy) throw new Error('SSH connection is unavailable');
+        return proxy.forwardOutStreamLocal(socketPath);
+      }),
   },
   files: {
     create: ({ runtimes }) => createFilesWireController({ runtimes }),

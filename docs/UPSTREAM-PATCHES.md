@@ -708,3 +708,18 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 
 New Ninebrains-only files: `packages/core/src/runtimes/workspace-registry/node/clean-artifacts.ts` (+ test),
 `src/core/features/tasks/node/archived-worktree-cleanup.ts` (+ `.db.test.ts`).
+
+## 44. Cowork shared SSH text editing (`ninebrains/ninebrains-cowork-feature-8zbqf`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json`, `pnpm-lock.yaml` | Add Yjs, its Monaco binding, and the binding's required awareness protocol dependency | Merge concurrent editor text and keep the lockfile reproducible |
+| `src/core/features/editor/api/browser/open-file-store/open-file-store.ts`, `src/core/features/editor/api/browser/open-file-store/open-file-store.test.ts` | Route joined-file saves through Cowork and keep the shared buffer on save failure | Prevent the ordinary per-user save path from overwriting converged text |
+| `src/core/features/editor/api/browser/task-editor/stores/editor-view-store.ts` | Track whether an editor file is in a Cowork session | Keep local file state and collaborative state coordinated |
+| `src/core/features/editor/browser/task-editor/editor-provider.tsx`, `src/core/features/editor/browser/task-editor/file-content-toolbar.tsx`, `src/core/features/editor/browser/task-editor/file-tab-provider.tsx` | Bind the active Monaco model to Cowork and add join, leave, status, and reconnect controls | Make live text editing available on SSH worktrees |
+| `src/core/features/editor/contributions/browser/monaco/sticky-diff-editor.browser.test.tsx` | Adjust the editor test setup for the new context | Keep existing editor browser coverage working |
+| `src/core/manifests/node/controllers.ts`, `src/core/manifests/shared/domain-contracts.ts` | Register the typed Cowork Wire domain and controller | Carry Cowork requests through the existing desktop gateway |
+| `src/renderer/app/app-shutdown-lifecycle.tsx` | Leave Cowork sessions during shutdown | Release collaborative editor resources cleanly |
+
+New Ninebrains-only files: `apps/cowork-server/**`, `src/core/features/cowork/**`,
+`docs/plans/2026-09-23-cowork.md`.

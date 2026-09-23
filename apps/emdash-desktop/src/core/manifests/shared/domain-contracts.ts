@@ -5,6 +5,7 @@ import { brainContract, brainDomain } from '@core/features/brain/api';
 import { browserContract, browserDomain } from '@core/features/browser/api';
 import { catalogDomain, catalogWireContract } from '@core/features/catalog/api';
 import { conversationsContract, conversationsDomain } from '@core/features/conversations/api';
+import { coworkContract, coworkDomain } from '@core/features/cowork/api';
 import { devPerfContract, devPerfDomain } from '@core/features/dev-perf/api';
 import { editorContract, editorDomain } from '@core/features/editor/api';
 import { filesDomain, filesWireContract } from '@core/features/files/api';
@@ -61,6 +62,7 @@ export const desktopDomainContracts = {
   [appSettingsDomain]: appSettingsContract,
   [devPerfDomain]: devPerfContract,
   [editorDomain]: editorContract,
+  [coworkDomain]: coworkContract,
   [filesDomain]: filesWireContract,
   [legacyPortDomain]: legacyPortContract,
   [loggingDomain]: loggingWireContract,

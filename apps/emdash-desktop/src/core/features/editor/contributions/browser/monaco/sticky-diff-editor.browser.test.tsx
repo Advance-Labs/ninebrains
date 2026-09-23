@@ -60,6 +60,7 @@ it.each([true, false])(
       dirty: false,
       conflicted: false,
       saving: false,
+      collaborative: false,
       get readOnly() {
         return permissions.readOnly;
       },

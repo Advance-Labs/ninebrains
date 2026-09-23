@@ -23,6 +23,12 @@ export function AppShutdownLifecycle() {
       // app-global OpenFileStore.
       const dirtyCount = openFileStore.dirtyEntries().length;
       if (dirtyCount > 0) {
+        if (openFileStore.dirtyEntries().some((entry) => entry.collaborative)) {
+          toast.error('Save or leave Cowork before quitting', {
+            description: 'A shared file has unsaved changes.',
+          });
+          return false;
+        }
         const outcome = await openUnsavedChangesModal({ count: dirtyCount });
         if (!outcome.success || activeRequestId.current !== requestId) return false;
 
