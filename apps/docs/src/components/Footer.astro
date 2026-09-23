@@ -1,0 +1,22 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+<Default><slot /></Default>
+<p class="parent-credit">
+  Built by <a href="https://advancelabs.dev/lab/ninebrains">Advance Labs</a>
+</p>
+
+<style>
+  @layer starlight.core {
+    .parent-credit {
+      margin: 0.5rem 0 0;
+      font-size: var(--sl-text-xs);
+      color: var(--sl-color-gray-3);
+      text-align: center;
+    }
+    .parent-credit a {
+      color: inherit;
+    }
+  }
+</style>

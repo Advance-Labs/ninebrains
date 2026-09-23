@@ -95,6 +95,7 @@ export default defineConfig({
       logo: { src: './public/favicon.svg', alt: 'Ninebrains' },
       favicon: '/favicon.svg',
       customCss: ['./src/styles/brand.css'],
+      components: { Footer: './src/components/Footer.astro' },
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
       head: [
         { tag: 'meta', attrs: { property: 'og:site_name', content: 'Ninebrains Docs' } },
