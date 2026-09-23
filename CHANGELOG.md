@@ -6,6 +6,39 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-23
+
+The Brain is now visible everywhere it matters: a Settings → General card explains what it does
+and lets you pause dispatch, and Arena shows its status and every open job across every project you
+have open at once, with a jump straight to a blocked job's plan. The Planner can accept just a
+selection of the Brain's proposed draft jobs instead of all-or-nothing.
+
+Also in this release: a first-run board on Lanes that explains the Lanes → Planner → Brain flow,
+keyboard shortcuts for the task context menu, Option+drag text selection inside TUIs that capture
+the mouse, and MCP/project-context support for Freebuff and Codebuff. Fixes a starting lane that
+could hang indefinitely, the install page's Copy button on browsers that refuse the Clipboard API,
+and a dropped terminal resize on newly created tasks.
+
+### Features
+
+- **brain:** make the Brain discoverable and cross-project (#61) (b502fac)
+- **lanes:** first-run board that explains itself, home deep-links to Lanes/Planner (#58) (ab8b1d1)
+- **ui,theme:** brand-mark agent status, Hardstyle theme, Pulse/Arena views (#59) (45e4201)
+- **tasks:** add keyboard shortcuts to task context menu (#57) (b89fe7e)
+- **terminals:** force text selection with Option+drag while TUIs track the mouse (fixes #44) (#55) (e9c3292)
+- **providers:** give Freebuff and Codebuff MCP servers and project context (#54) (373afd8)
+- **site:** bring back the loading intro: nine cubes fall into the mark, then hand off to the page (#53) (8e2f43d)
+- **release:** steer macOS to the quarantine-free installer and make Apple signing turnkey (#47) (59a8492)
+- **site:** cinematic single-screen landing with a 3D nine-cube stage and per-feature demos (#48) (6db2c7d)
+
+### Fixes
+
+- **lanes:** stop a starting lane for real, bound how long it may spin, and surface a dead terminal (#60) (877c751)
+- **site:** make the install Copy button work where the Clipboard API is refused (#56) (21da34c)
+- **site:** outline the planner's cycle on the nodes themselves (#52) (939a155)
+- **site:** nothing overlaps: layout-measured 3D stage, dissolve transitions, populated first frames (#51) (616a58e)
+- **conversations:** re-send terminal size dropped before the agent PTY spawns (#50) (2ccc329)
+
 ## [0.2.0] - 2026-09-21
 
 When Claude Code or Codex runs out of usage mid-task, the conversation now offers to carry on in
