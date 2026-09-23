@@ -93,7 +93,9 @@
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
+        "@id": "https://advancelabs.dev/lab/ninebrains#software",
         "name": "Ninebrains",
+        "url": "https://ninebrains.runs-on.dev/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Windows, Linux",
         "softwareVersion": "0.1.0",
@@ -103,11 +105,18 @@
         "isAccessibleForFree": true,
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "codeRepository": "https://github.com/Advance-Labs/ninebrains",
+        "isBasedOn": "https://github.com/generalaction/emdash",
         "author": {
           "@type": "Organization",
           "name": "Advance Labs Inc.",
           "url": "https://advancelabs.dev"
-        }
+        },
+        "creator": { "@id": "https://advancelabs.dev/#organization" },
+        "publisher": { "@id": "https://advancelabs.dev/#organization" },
+        "sameAs": [
+          "https://github.com/Advance-Labs/ninebrains",
+          "https://advancelabs.dev/lab/ninebrains"
+        ]
       }
     </script>
   </head>
@@ -1312,6 +1321,7 @@
       <nav>
         <a href="https://github.com/Advance-Labs/ninebrains/blob/main/docs/SECURITY.md">Security</a>
         <a href="https://github.com/Advance-Labs/ninebrains/blob/main/LICENSE.md">Licence</a>
+        <a href="https://advancelabs.dev/lab/ninebrains">Built by Advance Labs</a>
         <a href="https://advancelabs.dev">© 2026 Advance Labs Inc.</a>
       </nav>
     </footer>
