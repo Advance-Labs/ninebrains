@@ -15,7 +15,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 function streamResponse(chunks: string[], status = 200): Response {
   const source = Readable.from(chunks.map((text) => Buffer.from(text)));
-  const body = Readable.toWeb(source) as unknown as BodyInit;
+  const body = Readable.toWeb(source);
   return new Response(body, {
     status,
     headers: { 'content-length': String(Buffer.byteLength(chunks.join(''))) },
@@ -42,7 +42,7 @@ describe('downloadAndHash', () => {
   it('reports it cannot know the total when content-length is absent', async () => {
     const fetchImpl = vi.fn(async () => {
       const source = Readable.from([Buffer.from('abc')]);
-      return new Response(Readable.toWeb(source) as unknown as BodyInit);
+      return new Response(Readable.toWeb(source));
     });
     const dest = join(dir, 'x.bin');
     const reported: number[] = [];

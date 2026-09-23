@@ -6,6 +6,9 @@ const navigationMocks = vi.hoisted(() => ({
   useWorkspaceSlots: vi.fn(),
 }));
 
+vi.mock('@core/features/updates/browser/update-status-pill', () => ({
+  UpdateStatusPill: () => null,
+}));
 vi.mock('@core/features/workbench/browser/sidebar/left-sidebar', () => ({
   LeftSidebar: () => null,
 }));

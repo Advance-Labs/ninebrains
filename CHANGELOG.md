@@ -8,6 +8,13 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [0.2.1] - 2026-09-23
 
+Ninebrains can now update itself. The app checks GitHub for a newer release, tells you what
+changed, and fetches it when you press **Download**; nothing is installed until you choose
+**Restart now**. Every update has to verify against Ninebrains' own Ed25519 update key, whose
+public half is compiled into the app, so a tampered or unsigned build is refused even though the
+installers themselves still ship unsigned. This is the first release that carries the updater, so
+it is also the last one you will need to install by hand.
+
 The Brain is now visible everywhere it matters: a Settings → General card explains what it does
 and lets you pause dispatch, and Arena shows its status and every open job across every project you
 have open at once, with a jump straight to a blocked job's plan. The Planner can accept just a
@@ -21,6 +28,7 @@ and a dropped terminal resize on newly created tasks.
 
 ### Features
 
+- **updates:** signed auto-update from GitHub releases (#70) (a44a74e)
 - **brain:** make the Brain discoverable and cross-project (#61) (b502fac)
 - **lanes:** first-run board that explains itself, home deep-links to Lanes/Planner (#58) (ab8b1d1)
 - **ui,theme:** brand-mark agent status, Hardstyle theme, Pulse/Arena views (#59) (45e4201)

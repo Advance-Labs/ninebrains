@@ -723,6 +723,7 @@ dead and pulling electron-updater out is what made the check match what the rele
 | `src/core/features/updates/` (new; `api/`, `node/`, `browser/`) | Wire domain over the update service; bottom-right pill ("Download now", then "Restart now"), sidebar is untouched | The only UI surface; idle splits idle/"Download" and never auto-installs |
 | `scripts/release/sign-update-digest.mjs` (+ test) | Signs the release's `SHA256SUMS.json`; the `release` job in `release.yml` runs it and fails closed when the secret is unset | One signing gate in the whole pipeline |
 | Deletions | `src/core/features/release-check/`; `dev-app-update.yml` / `dev-app-update.canary.yml`; the builder configs' publish provider (now `publish: null`) | Anything that could feed or patch the app outside the signed path is gone |
+| `src/renderer/tests/browser/workspace-view-slots.test.tsx` | Stubs `UpdateStatusPill` alongside the sidebar, window scope and layout stubs | The titlebar now renders the pill, and this test replaces `@emdash/ui/react/primitives` with a `Toaster`-only factory, so the pill's `Button` import could not link and the file failed to import at all |
 
 New Ninebrains-only files: `src/core/primitives/app-identity/api/update-signing-key.ts`,
 `src/core/features/updates/**`, `src/main/host/updates/{feed,integrity,download,staging,update-service,version,types}.ts`,

@@ -90,5 +90,5 @@ fails, and a failure means nothing about the file.
 `SHA256SUMS.json` verifies against the Ed25519 public key compiled into the app; the matching
 private key lives only as a GitHub secret and the release workflow signs with it and fails closed
 if it is missing. Updates never install without the user pressing **Download** and then **Restart
-now**. See [RELEASING](RELEASING.md#in-app-updates). The release guide in this repository
-(`docs/RELEASING.md`, "Verifying a download") has the commands for each OS.
+now**. The release guide in this repository (`docs/RELEASING.md`, "In-app updates" and
+"Verifying a download") covers the update path and the verification commands for each OS.
