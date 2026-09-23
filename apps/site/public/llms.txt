@@ -1,0 +1,90 @@
+# Ninebrains
+
+> An open-source desktop workbench that runs parallel coding agents, each in its own git
+> worktree, with a central Brain that hands out the work and verification gates that prove it
+> before it counts as done. Free and open source for macOS, Windows and Linux.
+
+## About
+
+Ninebrains is a desktop application, a fork of Emdash, published by Advance Labs Inc. under
+Apache-2.0. It runs Claude Code, Codex and Freebuff side by side. It runs the CLIs you are
+already logged in to and never handles your credentials.
+
+- Site: https://ninebrains.runs-on.dev/
+- Source: https://github.com/Advance-Labs/ninebrains
+- Docs: https://docs.advancelabs.dev/ninebrains
+- Downloads: https://github.com/Advance-Labs/ninebrains/releases/latest
+- Licence: Apache-2.0
+- Platforms: macOS, Windows, Linux
+- Price: free
+
+## Install
+
+    curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+
+Installs or updates. Checks the SHA256 first. No Gatekeeper warning on macOS. A PowerShell
+installer is at https://ninebrains.runs-on.dev/install.ps1, and signed installers, .dmg and
+.exe downloads are on the releases page.
+
+## How it works
+
+### Lanes: four agents, four worktrees
+Every lane gets its own git worktree and branch, terminal, editor and browser. Four lanes to a
+tab, as many tabs as you want. Lanes cannot touch each other's files, so nothing merges by
+accident.
+
+### The Brain: a brief becomes a job graph
+The Brain turns a brief into a graph of jobs with dependencies, plus a mailbox the lanes can
+talk through. A job goes to whichever lane is idle, the moment everything it depends on is
+done. Arena shows its status across every project you have open at once.
+
+### Gates: proven by a second run
+No agent grades its own work. When a lane says it is done, a second run has to prove it: the
+tests, screenshots at three widths, a read-only reviewer. A failed gate sends the evidence
+back, up to three attempts, then blocks the job and tells you.
+
+### Planner: draw the plan, run the plan
+Jobs are nodes, dependencies are edges. Run plan compiles the canvas into Brain jobs,
+idempotently, and refuses a graph with a cycle in it.
+
+### Packs: off until you turn them on
+Per-project bundles of lane roles, skills, MCP servers and gates, for coding, SEO and research.
+A project that has not turned a pack on gets nothing from it.
+
+### Freebuff: a usage limit is a handoff
+When Claude Code or Codex hits its usage limit mid-task, the conversation offers to continue in
+Freebuff, free, in the same worktree. One click opens it and copies a handoff note.
+
+## Key facts
+
+Q: What is Ninebrains?
+A: An open-source desktop workbench for running several coding agents at once on one repository,
+each isolated in its own git worktree, coordinated by a central Brain and checked by independent
+verification gates.
+
+Q: Which agents does it run?
+A: Claude Code, Codex, Freebuff and OpenCode.
+
+Q: How do agents avoid conflicting with each other?
+A: Each lane works in its own git worktree and branch, so lanes cannot write to each other's
+files.
+
+Q: Does Ninebrains see my API keys or logins?
+A: No. It runs the CLIs you are already logged in to and never touches your credentials.
+
+Q: Is Ninebrains free?
+A: Yes. It is free and open source under Apache-2.0.
+
+Q: Are the builds code-signed?
+A: Not yet. A .dmg or .exe downloaded in a browser makes macOS Gatekeeper or Windows SmartScreen
+warn you before it opens, and unsigned builds do not auto-update. The install script checks the
+SHA256 and avoids the Gatekeeper warning on macOS.
+
+Q: Who makes Ninebrains?
+A: Advance Labs Inc., an independent Canadian lab in London, Ontario. https://advancelabs.dev
+
+## Related
+
+- Advance Labs: https://advancelabs.dev
+- runs-on.dev, free subdomains for developer projects: https://runs-on.dev
+- Emdash, the upstream project Ninebrains forks: https://github.com/generalaction/emdash
