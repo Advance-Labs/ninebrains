@@ -2790,3 +2790,11 @@ html.intro:not(.intro-reveal) .panel:not([hidden]) .win {
 html.intro-reveal .panel:not([hidden]) .win {
   animation-delay: calc(250ms * var(--k, 1));
 }
+
+/* The swapper is a custom element defined by a script from another origin. Until that
+   script arrives, or if it never does, the browser treats the tag as an unknown element
+   and lays it out in flow: measured at 50px tall, which is enough to push this one-screen
+   page into the overlaps the site-overlap audit exists to catch. :defined is the guard. */
+human-machine-swapper:not(:defined) {
+  display: none;
+}
