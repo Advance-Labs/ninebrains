@@ -741,3 +741,11 @@ default.
 | `agents/README.md` | Adds a `plans/` entry to the directory layout, pointing at `agents/plans/detached-sessions.md` | The docs map is how agents discover topic pages; an unlisted plan does not get read |
 
 New Ninebrains-only files: `agents/plans/detached-sessions.md`.
+
+## 46. Easier-to-read terminal font (`ninebrains/text-changes-zewlr`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/settings/browser/components/TerminalSettingsCard.tsx` | Adds bundled Atkinson Hyperlegible Mono under an always-visible "Easier to read" font group and explains its softer, distinctive letter shapes | The installed-font picker only surfaced fonts already present on the host, so users who need less square, more distinguishable terminal text had no reliable built-in option |
+| `src/renderer/main.tsx` | Loads the variable font's normal and italic CSS | The font must be available to xterm on every supported host and retain ANSI italic styling |
+| `package.json` (desktop), `pnpm-lock.yaml` | Adds `@fontsource-variable/atkinson-hyperlegible-mono` 5.3.0 (OFL-1.1) | Bundles the fixed-width accessibility font without relying on an OS font installation |
