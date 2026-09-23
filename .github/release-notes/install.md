@@ -80,9 +80,14 @@ Stuck? See [Troubleshooting](https://docs.advancelabs.dev/ninebrains/troubleshoo
 
 ## Updating
 
-{{PRODUCT}} does not update itself: an unsigned app should not replace its own code from the
-network. To update, run the one-line installer above again, or download the new files from this
-page and install them over the old version. Your projects and settings are kept.
+{{PRODUCT}} updates itself. In packaged builds it checks GitHub Releases for a newer version (once
+30 seconds after startup, then hourly) and shows a **Download** button when there is one; each
+update is accepted only after its checksum file verifies against an Ed25519 key embedded in the
+app, nothing downloads until you click, and the install happens on the launch that follows your
+**Restart now** choice. macOS and Linux swap in the new build in place; Windows runs the new
+installer at quit and relaunches. Your projects and settings are kept.
+
+The one-line installer above also still updates a running install, same checks and same versions:
 
 - **Installed the `.deb`?** Update with
   `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
@@ -95,9 +100,8 @@ page and install them over the old version. Your projects and settings are kept.
   `sh -s --` in the curl line. On Windows, `irm … | iex` takes no options; use
   `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation`.
 
-From 0.2.0 on, **Settings → General → Check for new versions** (off by default) tells you when a
-new release is out, and shows the download link and the installer line to copy. Nothing is
-downloaded or installed for you. 0.1.0 has no such notice.
+Canary builds update from canary releases only, and an update never downgrades you: after a bad
+release, update to the next good one rather than back to an older version.
 
 ## Documentation
 

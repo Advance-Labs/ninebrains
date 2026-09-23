@@ -1,16 +1,9 @@
-import { toast } from '@emdash/ui/react/primitives';
-import { ArrowUpRight } from 'lucide-react';
 import { action, computed, makeObservable, observable, runInAction } from 'mobx';
-import { settingsViewDef } from '@core/features/settings/contributions/views';
 import type { DesktopUpdateEvent } from '@core/features/updates/api';
 import { getHostClient } from '@core/primitives/desktop-host/browser/host-client';
-import { getNavigation } from '@core/primitives/navigation/browser/navigation-selectors';
 import { getUpdatesClient } from '../api/browser/client';
 
-const LAST_NOTIFIED_KEY = 'emdash:update:lastNotified';
-const SNOOZE_HOURS = 6;
-
-type DownloadProgress = {
+export type DownloadProgress = {
   percent?: number;
   transferred?: number;
   total?: number;
@@ -90,7 +83,7 @@ export class UpdateStore {
         });
       } else if (res.result === null) {
         runInAction(() => {
-          this.state = { status: 'idle' };
+          this.state = { status: 'not-available' };
         });
       }
     } catch {
@@ -237,56 +230,5 @@ export class UpdateStore {
           break;
       }
     });
-    if (event.type === 'available') this._maybeToastAvailable(event.version);
-  }
-
-  private _maybeToastAvailable(version: string): void {
-    if (!this._shouldNotify(version)) return;
-    this._showAvailableToast(version);
-    this._rememberNotified(version);
-  }
-
-  private _showAvailableToast(version: string): void {
-    toast('Update Available', {
-      description: `Version ${version} is available to download and install.`,
-      duration: 10_000,
-      action: {
-        label: (
-          <span className="flex items-center gap-1.5">
-            Update
-            <ArrowUpRight className="size-3.5" />
-          </span>
-        ),
-        onClick: () => {
-          getNavigation().navigate(settingsViewDef({ tab: 'general' }));
-          if (this.state.status === 'available') {
-            void this.download();
-          }
-        },
-      },
-    });
-  }
-
-  private _shouldNotify(version: string): boolean {
-    try {
-      const raw = localStorage.getItem(LAST_NOTIFIED_KEY);
-      if (!raw) return true;
-      const parsed = JSON.parse(raw) as { version?: string; at?: number };
-      if (parsed.version === version) {
-        const at = parsed.at ?? 0;
-        if (Date.now() - at < Math.max(1, SNOOZE_HOURS) * 3_600_000) return false;
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  }
-
-  private _rememberNotified(version: string): void {
-    try {
-      localStorage.setItem(LAST_NOTIFIED_KEY, JSON.stringify({ version, at: Date.now() }));
-    } catch {
-      // localStorage may be unavailable
-    }
   }
 }

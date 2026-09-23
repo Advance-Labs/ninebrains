@@ -1,6 +1,0 @@
-provider: github
-owner: Advance-Labs
-repo: ninebrains
-channel: canary
-allowPrerelease: true
-updaterCacheDirName: ninebrains-canary-updater

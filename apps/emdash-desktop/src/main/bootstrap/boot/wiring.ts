@@ -1,10 +1,8 @@
-import { app } from 'electron';
 import { providerTokenRegistry } from '@core/features/account/api/node/provider-token-registry';
 import type { EmdashAccountService } from '@core/features/account/node/services/emdash-account-service';
 import { GitHubAuthServerAdapter } from '@core/features/github/node/accounts/github-auth-server-adapter';
 import { provisionWorkspaceErrorToWorkspaceError } from '@core/features/workspaces/node/wire-controller';
 import type { DesktopControllerContext } from '@core/manifests/node/controllers';
-import { IS_CANARY } from '@core/primitives/app-identity/api/app-identity';
 import { appOperations } from '@main/core/app/controller';
 import {
   createDependencyManagerResolver,
@@ -129,11 +127,6 @@ export function createDesktopWireOptions(
     projectSettings: services.projectSettings,
     providerSettings: services.providerSettings,
     reconcileSweep: services.reconcileSweep,
-    releaseCheckHost: {
-      getAppVersion: () => appOperations.getAppVersion(),
-      isPackaged: app.isPackaged,
-      isCanary: IS_CANARY,
-    },
     search: services.search,
     sessionLaunchContexts: services.sessionLaunchContexts,
     runtimeClients: {

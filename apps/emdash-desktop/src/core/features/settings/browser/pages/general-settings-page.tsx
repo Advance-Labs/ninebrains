@@ -1,5 +1,4 @@
 import { PageLayout, SettingsSection } from '@emdash/ui/react/patterns';
-import { ReleaseCheckCard } from '@core/features/release-check/contributions/browser/release-check-card';
 import {
   HOSTED_ACCOUNT_ENABLED,
   TELEMETRY_SETTINGS_ENABLED,
@@ -37,8 +36,6 @@ export function GeneralSettingsPage() {
         </SettingsSection>
       )}
       <SettingsSection title="App">
-        {/* Ninebrains: tells you a new release is out; never downloads or installs (SEC-36). */}
-        <ReleaseCheckCard />
         {UPDATES_ENABLED && <UpdateCard />}
         {TELEMETRY_SETTINGS_ENABLED && <TelemetryCard />}
       </SettingsSection>

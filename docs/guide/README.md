@@ -56,4 +56,5 @@ On top of **Emdash**, which it is built on:
 
 - the 2×2 lane grid across worktrees;
 - the Brain, the planner, the gates and the packs;
-- no telemetry endpoint, no hosted account, and no update feed until builds are signed.
+- no telemetry endpoint and no hosted account; auto-update runs on Ninebrains' own signed digest
+  (releases only, nothing installed without your choice), not on OS signing.

@@ -81,12 +81,15 @@ servers, skills and automations.
   unattended from its header.
 - **Unattended runs.** `claude -p` and experimental `codex exec` runs, with per-run budgets, a
   sandbox, a minimal environment and a STOP switch that ends every run in under 5 seconds.
-- **Nothing phones home.** Telemetry is off, with no endpoint built in. No hosted account. No
-  auto-update until builds are signed. An optional **Check for new versions** setting (off by
-  default) asks GitHub whether a newer release is out, and only tells you.
+- **Nothing phones home.** Telemetry is off, with no endpoint built in. No hosted account.
+  Auto-update checks GitHub Releases in packaged builds (once at 30 s, then hourly, release metadata
+  only) and never downloads or installs anything without your **Download** and **Restart now**
+  choices; every candidate must verify against Ninebrains' own Ed25519 update key, baked into the
+  app.
 
 **Planned:** a per-lane account picker and usage meter, per-lane port leases, an overnight queue
-with a morning digest, a video pack, signed builds and auto-update.
+with a morning digest, a video pack, and signed builds (Apple Developer ID + notarization, Windows
+Authenticode) so Gatekeeper and SmartScreen stop warning.
 
 ### A closer look
 
@@ -190,8 +193,10 @@ Get the latest build from [GitHub Releases](https://github.com/Advance-Labs/nine
 | Linux | `Ninebrains-0.1.0-linux-x86_64.AppImage` or `…-linux-amd64.deb` |
 
 v0.1 builds are **not code-signed**. macOS Gatekeeper and Windows SmartScreen will warn you, and
-unsigned builds do not auto-update. Check every download against the release's `SHA256SUMS` file
-and build attestation before you open it:
+that is the layer the one-line installer and the in-app updater work around, not through. Updates
+installed from **inside** the app are signed with Ninebrains' own Ed25519 update key; check every
+**manual** download against the release's `SHA256SUMS` file and build attestation before you open
+it:
 
 ```bash
 shasum -a 256 -c SHA256SUMS --ignore-missing
@@ -202,9 +207,14 @@ gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebra
 
 ### Updating
 
-Ninebrains does not update itself. To update, run the one-line installer again, or download the new
-build from [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download). Your projects,
-settings and history stay where they are.
+Ninebrains updates itself: a packaged install checks GitHub Releases for a newer version (once
+30 s after startup, then hourly) and shows a **Download** button at the bottom-right when one is
+out. Nothing downloads until you click it, each candidate is accepted only after its `SHA256SUMS.json`
+verifies against an Ed25519 key baked into the app, and the new build installs on the launch that
+follows your **Restart now** choice (in place on macOS/Linux; the new installer at quit on Windows).
+Your projects, settings and history stay where they are.
+
+The one-line installer above is still there for manual installs, if you prefer it:
 
 - **Linux `.deb` installs:** update with `curl ... | sh -s -- --deb` (runs `sudo apt install`). The
   plain line installs the AppImage into `~/.local/bin` instead.
@@ -217,10 +227,8 @@ settings and history stay where they are.
   because `irm ... | iex` takes no arguments. All options:
   [Verify a download → Installer options](docs/guide/verify-download.md#installer-options).
 
-From 0.2.0 on, the app can tell you when a new release is out: turn on **Settings → General →
-Check for new versions**, or press **Check now** there. It is off by default, because it is a
-request to `api.github.com` you did not otherwise make. 0.1.0 builds have no notice; update them by
-hand once.
+Canary builds update from canary releases only (`Ninebrains-Canary-*` prereleases), and an update
+never downgrades you: after a bad release, install the next good one.
 
 ### Build from source
 

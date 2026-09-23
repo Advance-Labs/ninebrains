@@ -78,7 +78,6 @@
     "croner": "^10.0.1",
     "cronstrue": "^3.14.0",
     "drizzle-orm": "^0.32.1",
-    "electron-updater": "^6.3.9",
     "human-id": "^4.1.2",
     "ignore": "^5.3.1",
     "jsonc-parser": "^3.3.1",

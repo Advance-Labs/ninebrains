@@ -11,15 +11,15 @@ or are root files.
 
 | File | What | Why |
 |---|---|---|
-| `src/core/primitives/app-identity/api/fork-flags.ts` (new) | `UPDATES_ENABLED`, `HOSTED_ACCOUNT_ENABLED`, `TELEMETRY_SETTINGS_ENABLED`, all `false` | One switch per feature that needs Emdash servers |
+| `src/core/primitives/app-identity/api/fork-flags.ts` (new) | `UPDATES_ENABLED`, `HOSTED_ACCOUNT_ENABLED`, `TELEMETRY_SETTINGS_ENABLED`, `USER_PACKS_ENABLED`, `MODEL_PROFILES_ENABLED`; `UPDATES_ENABLED` is `true`, the rest `false` | One switch per feature that needs an external service. Updates run against Ninebrains' own signed GitHub pipeline (patch 43), not Emdash's feed |
 | `src/main/lib/telemetry.ts` | PostHog key/host forced to `undefined`; telemetry is opt-in (`storedEnabled !== 'true'`) | No telemetry to Emdash's PostHog; off by default and pointed at nothing. `isEnabled()` is false, so capture, identify, `/decide` feature flags, DAU, perf vitals and crash `$exception` events never send |
 | `.github/actions/setup-build/action.yml` | `posthog-key` / `posthog-host` inputs and the `VITE_POSTHOG_*` env lines removed; `pnpm/action-setup`, `actions/setup-node` and `actions/setup-python` pinned to commit SHAs (W7 CI) | No telemetry key is ever baked into a build. The release and e2e builds run through this action, so its actions are pinned like the workflows' |
 | `src/core/features/settings/browser/pages/general-settings-page.tsx` | Account section, UpdateCard and TelemetryCard gated by fork-flags | Remove UI that needs Emdash servers instead of leaving it broken |
 | `src/core/features/settings/browser/search/settings-search.ts` | `withoutForkHiddenEntries` drops the `version`, `privacy-telemetry`, `emdash-account` entries | Search must not land on hidden settings |
-| `src/main/host/updates/update-service.ts` | `initialize` returns early unless `UPDATES_ENABLED`; release-notes URL → `Advance-Labs/ninebrains`; `autoInstallOnAppQuit` `true` → `false` (`autoDownload` was already `false`) | No update polling of Emdash's feed; ours stays off until a release exists (the repo is private, so electron-updater could not read it anyway). Even with updates enabled, nothing downloads or installs without an explicit user action, because builds are unsigned until plan 7.1. Test: `src/main/host/updates/update-service.test.ts` |
 | `src/main/lib/telemetry.test.ts` (new) | Asserts that a fresh profile is opted out and that nothing is fetched, even with PostHog keys in the env and the user opted in | Guards the telemetry defaults below. The upstream code fails the second case. Note: the `TELEMETRY_ENABLED` env kill switch in `bootstrap/core/config.ts` keeps its upstream default; the stored user preference is what now defaults to off |
-| `dev-app-update.yml`, `dev-app-update.canary.yml` | owner/repo → `Advance-Labs/ninebrains`, cache dir `ninebrains-updater` | Updater feed points at our GitHub Releases |
-| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | publish → GitHub `Advance-Labs/ninebrains` only (R2 generic feed removed); Emdash's Azure signing profile removed; `copyright` added; Info.plist usage strings renamed | No publishing to or updating from Emdash's R2; no Emdash signing identity |
+| `src/main/host/updates/*` | Replaced electron-updater with a custom pipeline (`update-service.ts`, `feed.ts`, `download.ts`, `staging.ts`, `integrity.ts`, `apply/`, `version.ts`, `types.ts`) | Store-bought update flows (Emdash's feed, R2 manifests, electron-updater's signature checks) matched nothing we sign, so `initialize` short-circuits unless `UPDATES_ENABLED` and the real work reads `api.github.com` releases directly, verifies `SHA256SUMS.json` against Ninebrains' embedded Ed25519 key, and only then offers + applies. Tests: `src/main/host/updates/*.test.ts` |
+| `dev-app-update.yml`, `dev-app-update.canary.yml` | Deleted | electron-updater is gone; nothing reads these files anymore (replaced by patch 43's direct-release pipeline) |
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `publish: null` (both); Emdash's Azure signing profile removed; `copyright` added; Info.plist usage strings renamed; `runAfterFinish: true` on Windows | No publishing to or updating from Emdash's R2; no `app-update.yml` in the bundle (SEC-36); after a staged NSIS install the app relaunches itself |
 | `src/main/host/menu.ts` | "Check for Updates…" items gated by `UPDATES_ENABLED`; install-ID header uses `app.name` | No dead update entry points |
 | `src/core/features/account/node/config.ts` | auth server base URL `''` (was `https://auth.emdash.sh`) | Emdash account sign-in/link/health can never reach Emdash |
 | `src/renderer/App.tsx` | Onboarding "Sign in" step only when `HOSTED_ACCOUNT_ENABLED` | First-run flow does not push users to Emdash's account |
@@ -181,7 +181,7 @@ Full rationale in `docs/RELEASING.md`.
 
 | File | What | Why |
 |---|---|---|
-| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `publish: null` (was GitHub draft); mac dmg+zip for arm64 **and x64**, signing from `resolveMacSigning(env)` (`identity: '-'` ad-hoc, `notarize: false` with no env); win nsis only (msi dropped), `resolveWinSigning(env)`; linux AppImage+deb (rpm dropped); `nsis.differentialPackage: false`; `artifactName` `Ninebrains-${version}-${os}-${arch}.${ext}` | SEC-36: no `app-update.yml` or `latest*.yml` while builds are unsigned. Signing switches on from env only and never fails without it |
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `publish: null` (was GitHub draft); mac dmg+zip for arm64 **and x64**, signing from `resolveMacSigning(env)` (`identity: '-'` ad-hoc, `notarize: false` with no env); win nsis only (msi dropped), `resolveWinSigning(env)`; linux AppImage+deb (rpm dropped); `nsis.differentialPackage: false`, `nsis.runAfterFinish: true`; `artifactName` `Ninebrains-${version}-${os}-${arch}.${ext}` | SEC-36: no `app-update.yml` or `latest*.yml` — the updater (patch 43) reads GitHub Releases directly and has no manifest to be hijacked. `runAfterFinish` relaunches the app after a staged NSIS install on Windows; OS signing still switches on from env only and never fails without it |
 | `scripts/release/build.ts` | `--release-id` optional: without it, no GitHub token or draft check (local mode); default targets drop rpm and msi; `cpSync(..., { verbatimSymlinks: true })` when copying `release/` out of the deploy dir | Build jobs run with `contents: read`, and the same path works on a laptop. Without `verbatimSymlinks`, the `.framework` symlinks in the copied app pointed into the deleted deploy dir, so `codesign --verify` (and `verify-mac.ts`) failed. This is an upstream bug |
 | `package.json` (desktop) | `version` 1.2.4 → 0.1.0 | Ninebrains' first version; nothing keys state or migrations off it (RELEASING.md, Versioning) |
 
@@ -562,23 +562,15 @@ steps and the docs links are on the release page instead of only in `docs/RELEAS
 |---|---|---|
 | `src/core/features/projects/browser/components/pr-view/pr-row.tsx` | The `RelativeTime` and `PrDiffStat` spans get `transition-opacity group-hover:opacity-0` (and `shrink-0` on the time) | The "Review in Task" button is absolutely positioned over the row's right edge and fades in on hover, but the timestamp and `+N -N` diff stat stayed visible under its translucent `secondary` background, so the three overlapped. Same hover swap as `pr-entry.tsx` and the tab items |
 
-## 30. "New version available" notice, not auto-update (`feat/update-notice`)
+## 30. "New version available" notice, not auto-update (`feat/update-notice`) — superseded
 
-New slice `src/core/features/release-check/` (contract, node service and controller, browser store,
-sidebar notice, Settings card). It never touches electron-updater; `UPDATES_ENABLED` stays `false`
-(SEC-36). The check is opt-in because SEC-38 allows no unprompted traffic on first run. See
-`docs/RELEASING.md` → Update notice.
-
-| File | Change | Why |
-|---|---|---|
-| `src/core/manifests/shared/domain-contracts.ts`, `src/core/manifests/node/controllers.ts` | `releaseCheck` domain and controller; `DesktopControllerContext.releaseCheckHost` (app version, `app.isPackaged`, `IS_CANARY`) | Registers the new Wire slice the usual way. The controller starts the service and disposes it with its scope |
-| `src/main/bootstrap/boot/wiring.ts` | Passes `releaseCheckHost` from `appOperations.getAppVersion`, `app.isPackaged` and `IS_CANARY` | Keeps Electron out of the slice so it stays unit-testable |
-| `src/core/manifests/shared/settings-contributions.ts` | `ninebrains.releaseCheck` setting (`autoCheck` default `false`, `dismissedVersion`) | The "Check for new versions" switch and the per-version dismissal, persisted in main |
-| `src/core/manifests/browser/app-scoped-stores.ts` | Registers `releaseCheckAppStoreContributions` | App-scoped store mirroring main's status over the event stream |
-| `src/core/features/settings/browser/pages/general-settings-page.tsx` | The **App** section always renders and holds `ReleaseCheckCard`; `UpdateCard` and `TelemetryCard` keep their fork-flag guards | Upstream's section only appeared with the updater or telemetry on, both off here |
-| `src/core/features/settings/browser/search/settings-search.ts` | `check-for-new-versions` search entry | Settings search finds the new switch; the upstream `version` entry stays hidden with the updater |
-| `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | Renders `ReleaseNotice` at the top of the sidebar footer | The dismissible "Ninebrains X.Y.Z is out" notice |
-| `README.md` | Install section gains the one-line installer and an **Updating** section; "Nothing phones home" names the opt-in check | Users need a way to update now that the app can tell them a release is out |
+This slice (`src/core/features/release-check/`) was the opt-in *notice* that pointed users at a
+manual download. Patch 43 replaced it with the real updater and **deleted** the slice: the
+`ninebrains.releaseCheck` setting, the `releaseCheck` Wire domain, the sidebar notice and the
+Settings card are gone. The reference is kept so a rebase knows the files were intentionally
+removed, not lost. History: the notice was opt-in because SEC-38 allows no unprompted traffic on
+first run; that rule still holds, and patch 43's check is packaged-build-only (no first-run
+traffic), so it does not violate SEC-38.
 
 ## 31. Release 0.2.0 (`release/prepare-0.2.0`)
 
@@ -692,6 +684,7 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 |---|---|---|
 | `src/renderer/index.html` | Boot splash: the old radial logo and "ninebrains" wordmark are replaced by the website's nine-square `#intro` mark, centred and sized the same (`clamp(96px, 12vmin, 120px)`); the indeterminate progress bar is replaced by `WorkingMarkIcon`'s clockwise arm sweep and core pulse, starting at 1.2s (when the bar used to appear); static under reduced motion. Theme background/foreground tokens are kept, not the site's `#000`/`#fafafa` | The splash still showed the retired branding; the app's first paint now matches the site, and keeping the theme colours avoids a flash when the splash hands off |
 
+<<<<<<< HEAD
 ## 43. Clean Artifacts cleans artifacts; archived worktrees expire after 30 days (`ninebrains/archived-uxcqd`)
 
 | File | Change | Why |
@@ -708,3 +701,30 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 
 New Ninebrains-only files: `packages/core/src/runtimes/workspace-registry/node/clean-artifacts.ts` (+ test),
 `src/core/features/tasks/node/archived-worktree-cleanup.ts` (+ `.db.test.ts`).
+
+## 44. Signed auto-update with our own Ed25519 key (`ninebrains/auto-update-*`)
+
+The diy updater replaces both electron-updater and patch 30's notice. `UPDATES_ENABLED` is `true`.
+The trust anchor is an Ed25519 key pair: `scripts/release/sign-update-digest.mjs` signs the
+release's `SHA256SUMS.json` with the private key (repo secret `NINEBRAINS_UPDATE_SIGNING_KEY`),
+and the app verifies that signature against the public key baked into the build. Marking patches 30
+dead and pulling electron-updater out is what made the check match what the release actually signs
+(THREAT-MODEL SEC-36). See `docs/RELEASING.md` → In-app updates and `agents/risky-areas/updater.md`.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/primitives/app-identity/api/update-signing-key.ts` (new) | Embedded Ed25519 public key for update signatures | The only identity an update must match; a hijacked release or feed cannot satisfy it |
+| `src/main/host/updates/feed.ts` | Reads `api.github.com/repos/Advance-Labs/ninebrains/releases/{latest\|a canary scan}` (unauthenticated), reduces to SemVer-newer releases for the app's channel, maps a release to its platform artifact and signed `SHA256SUMS.json` | The feed is GitHub Releases; nothing else (no R2, no first-run traffic on dev builds) |
+| `src/main/host/updates/integrity.ts` | Derives, encodes and verifies the Ed25519 signature over the release's checksum JSON | Byte-for-byte trust gate before a download is offered |
+| `src/main/host/updates/download.ts` | Streams the selected installer or checksum to disk with size + hash checks | Never holds the whole file in memory; partial download is discarded |
+| `src/main/host/updates/staging.ts` | Stages artifacts under the userData cache dir with a marker (`requestedAt`, `installKind`, `signature`); `isSafeArtifactName` limits names to a plain basename; clear-by-name never trusts the marker's stored path | Path-safety for artifacts that come from a network feed (write path and delete path both derive from the validated artifact name) |
+| `src/main/host/updates/apply/index.ts` | Applies a staged update on next launch: replaces the `.app` or AppImage/`.deb` for mac/Linux, relaunches; Windows spawns the staged NSIS installer from `will-quit` (`electron-builder` `runAfterFinish: true` restarts it) | Running binaries cannot swap themselves; the user's **Restart now** is the moment of truth |
+| `src/main/host/updates/update-service.ts` | Owns check → offer ⇒ download → stage ⇒ verify → apply-on-launch state; `initialize` applies a pending update once, right after the main window is up, then relaunches | Boot stays window-first; the updater never runs before the app is usable |
+| `src/core/features/updates/` (new; `api/`, `node/`, `browser/`) | Wire domain over the update service; bottom-right pill ("Download now", then "Restart now"), sidebar is untouched | The only UI surface; idle splits idle/"Download" and never auto-installs |
+| `scripts/release/sign-update-digest.mjs` (+ test) | Signs the release's `SHA256SUMS.json`; the `release` job in `release.yml` runs it and fails closed when the secret is unset | One signing gate in the whole pipeline |
+| Deletions | `src/core/features/release-check/`; `dev-app-update.yml` / `dev-app-update.canary.yml`; the builder configs' publish provider (now `publish: null`) | Anything that could feed or patch the app outside the signed path is gone |
+
+New Ninebrains-only files: `src/core/primitives/app-identity/api/update-signing-key.ts`,
+`src/core/features/updates/**`, `src/main/host/updates/{feed,integrity,download,staging,update-service,version,types}.ts`,
+`src/main/host/updates/apply/**`, `apps/emdash-desktop/scripts/release/sign-update-digest.mjs`,
+and their tests.

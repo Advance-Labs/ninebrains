@@ -1,0 +1,50 @@
+/* The nine-square brand mark as a loading indicator. Mirrors the boot-splash keyframes
+   (src/renderer/index.html) so an in-app busy state reads as the same mark taking a lap. */
+.brand-loading-mark {
+  display: block;
+  fill: currentColor;
+}
+
+.brand-loading-mark rect {
+  animation: brand-loading-arm 1.6s linear infinite;
+  animation-fill-mode: backwards;
+}
+
+.brand-loading-mark .brand-loading-mark-core {
+  animation: brand-loading-core 0.8s ease-in-out 1.2s infinite;
+  animation-fill-mode: backwards;
+}
+
+@keyframes brand-loading-arm {
+  0% {
+    opacity: 1;
+  }
+  25% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.25;
+  }
+  75% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0.08;
+  }
+}
+
+@keyframes brand-loading-core {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loading-mark rect {
+    animation: none;
+  }
+}

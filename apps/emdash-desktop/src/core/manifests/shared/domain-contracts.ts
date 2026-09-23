@@ -21,7 +21,6 @@ import { packsContract, packsDomain } from '@core/features/packs/api';
 import { plannerContract, plannerDomain } from '@core/features/planner/api';
 import { previewServersContract, previewServersDomain } from '@core/features/preview-servers/api';
 import { projectsDomain, projectsWireContract } from '@core/features/projects/api';
-import { releaseCheckContract, releaseCheckDomain } from '@core/features/release-check/api';
 import { repositoryContract, repositoryDomain } from '@core/features/repository/api';
 import { routingContract, routingDomain } from '@core/features/routing/api';
 import { searchContract, searchDomain } from '@core/features/search/api';
@@ -101,5 +100,4 @@ export const desktopDomainContracts = {
   [brainDomain]: brainContract,
   [plannerDomain]: plannerContract,
   [routingDomain]: routingContract,
-  [releaseCheckDomain]: releaseCheckContract,
 } as const;

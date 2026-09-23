@@ -1,10 +1,12 @@
 # Releasing Ninebrains
 
 Ninebrains ships **unsigned**. macOS builds are ad-hoc signed and not notarized, and Windows builds
-carry no Authenticode signature. The integrity guarantee comes from the `SHA256SUMS` published with
-every release (THREAT-MODEL SEC-37). Auto-update stays off until signing lands (SEC-36). From 0.2.0
-the app can *tell* users a new release is out (opt-in, see [Update notice](#update-notice)); users
-update with the one-line installer or a manual download.
+carry no Authenticode signature. Manual downloads are verified with the `SHA256SUMS` published with
+every release (THREAT-MODEL SEC-37) plus build-provenance attestations. The in-app updater does not
+rely on OS signatures: every update it installs must verify against Ninebrains' own Ed25519 update
+key, whose public half is compiled into the app (THREAT-MODEL SEC-36). Updates are user-initiated:
+the app offers a **Download** button and a **Restart now** choice, and nothing downloads or applies
+on its own (see [In-app updates](#in-app-updates)).
 
 - Workflow: `.github/workflows/release.yml` (manual only, from `main` or `release/*`)
 - Gate: `ci-ok` green on the exact commit (`tooling/scripts/require-green.mjs`), plus e2e in the run
@@ -97,11 +99,10 @@ Fix a shipped release without shipping everything that has landed on `main` sinc
 
 ## Rolling back
 
-There is no auto-update, so nothing reaches users on its own. Rolling back means stopping new
-downloads of a bad build and shipping a good one. The [update notice](#update-notice) and the
-one-line installer both follow **Latest**, so step 1 below also stops them pointing at a bad build.
-**Never move or reuse a tag**; the workflow refuses a published version, and a changed tag breaks
-everyone's checksums.
+There is an in-app updater, but it only acts on what the user confirms. Rolling back means stopping
+new downloads of a bad build and shipping a good one. The updater and the one-line installer both
+follow **Latest**, so step 1 below stops them offering a bad build. **Never move or reuse a tag**;
+the workflow refuses a published version, and a changed tag breaks everyone's checksums.
 
 - **Still a draft:** delete the draft on the Releases page. Drafts create no tag.
 - **Published and bad:**
@@ -124,11 +125,18 @@ everyone's checksums.
 | `e2e` | ubuntu-22.04 | `contents: read` | `e2e.yml`: the built app under xvfb with the fake agent. The draft is not created unless it passes |
 | `build` ×3 | macos-14, windows-2022, ubuntu-22.04 | `contents: read` | `pnpm run build`, then `build.ts` in local mode; `verify-mac.ts` on macOS; uploads installers as workflow artifacts |
 | `attest` | ubuntu-latest | `id-token`, `attestations: write` | Build-provenance attestations. Runs because the repo is public; a private repo would skip it (see below) |
-| `release` | ubuntu-latest | `contents: write` | Writes and verifies `SHA256SUMS`, creates or reuses the draft, uploads with `--clobber`, deletes stale assets, then re-downloads the draft and re-verifies |
+| `release` | ubuntu-latest | `contents: write` | Writes and verifies `SHA256SUMS`, signs `SHA256SUMS.json` with the repo's `NINEBRAINS_UPDATE_SIGNING_KEY` secret (`sign-update-digest.mjs`, fails closed if it is not set), creates or reuses the draft, uploads with `--clobber`, deletes stale assets, then re-downloads the draft and re-verifies |
 
-Only the `release` job can write to the repo, and it runs no project code beyond `checksums.mjs`. The
-build jobs, which install and run third-party packages, have read-only tokens. The runner images match
+Only the `release` job can write to the repo, and it runs no project code beyond `checksums.mjs` and
+`sign-update-digest.mjs`. The build jobs, which install and run third-party packages, have read-only
+tokens. The runner images match
 `build-matrix.yml`: `setup-build` pins MSVC 2022, and ubuntu-22.04 keeps the glibc floor at 2.35.
+
+**Update signing.** One gate in the whole pipeline produces a signature: the `release` job signs the
+release's checksum file, and the app trusts exactly that. Because the signing step fails closed when
+the secret is missing, a release is never published unsigned by accident. The signature is an
+Ed25519 digest signature; it is not an OS code signature, so it does not affect Gatekeeper or
+SmartScreen (see [SIGNING.md](SIGNING.md)).
 
 **Idempotent.** Re-running a failed run, or dispatching the same version again from the same commit,
 rebuilds everything and reuses the one draft for the tag. The workflow stops without changing
@@ -301,69 +309,43 @@ identity before it issues a public-trust certificate profile, so check eligibili
 A `.pfx` from any other CA also works: set `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` (electron-builder
 reads them directly) and pass them in the Package step.
 
-## Why auto-update stays off
+## In-app updates
 
-Three layers keep it off:
-- `UPDATES_ENABLED` is `false` in `src/core/primitives/app-identity/api/fork-flags.ts`;
-- `autoInstallOnAppQuit` is `false`;
-- the builder configs have `publish: null`, so no `app-update.yml` is packaged into the app and no
-  `latest*.yml` feed is produced.
+`UPDATES_ENABLED` is `true`. electron-updater was removed; the updater is a small custom pipeline
+under `src/main/host/updates/` so the trust check exactly matches what we sign:
 
-`release-config.test.mjs` fails if a publish provider comes back, or if anything points at upstream's
-`generalaction` feed.
+- **Trust anchor.** `scripts/release/sign-update-digest.mjs` signs the release's `SHA256SUMS.json`
+  with the Ed25519 private key held as repo secret `NINEBRAINS_UPDATE_SIGNING_KEY`; the app embeds
+  the matching public key (`src/core/primitives/app-identity/api/update-signing-key.ts`). Nothing is
+  downloaded or applied until that checksum file verifies against the embedded key. This is the
+  SEC-36 identity check: a hijacked release or feed still cannot install code, because it cannot
+  produce a valid signature. The signing step in `release.yml` fails closed — a release without a
+  signature is a broken release.
+- **Check.** In packaged builds only, 30 s after startup and then hourly, the app asks GitHub
+  (`api.github.com`, unauthenticated) for the newest release on its channel: `releases/latest` on
+  stable, a scan of `-canary.N` prereleases on canary. Version order is SemVer precedence; a release
+  older than or equal to the running version is ignored.
+- **Nothing auto-installs.** A verified newer version surfaces a **Download** button on a small
+  pill at the bottom-right. The download streams to a staging directory and is re-checked against
+  the signed digest byte-for-byte before the update is considered ready; a mismatch discards it and
+  reports an error. The user then picks **Restart now**.
+- **Apply on relaunch.** The app quits; on the next launch it applies the staged update in place and
+  relaunches onto it (macOS and Linux). On Windows the running `.exe` cannot be replaced, so the
+  staged NSIS installer is launched from `will-quit` and `runAfterFinish: true` restarts the app.
+- **Channels and artifacts.** Stable publishes `Ninebrains-<version>-<os>-<arch>.<ext>`; canary
+  publishes `Ninebrains-Canary-<version>-<os>-<arch>.<ext>` as a prerelease with its own app
+  identity and data directory. There is no separate R2 feed.
+- **Failures are local.** A failed apply is discarded (the staged marker is cleared) and the app
+  keeps running on the old version. No update is ever applied automatically at quit.
+- **Safe Storage caveat.** On macOS, each update is a new ad-hoc build identity, so Keychain asks
+  for "Safe Storage" again after an update (see [Opening an unsigned build](#opening-an-unsigned-build)).
 
-The reasons:
-- **An update is remote code execution by design.** Without a signature check, whoever can write to
-  the feed (a hijacked release, a stolen token, a man-in-the-middle on a misconfigured feed) can
-  install code on every user's machine (THREAT-MODEL T28).
-- **The platform checks need signatures.** electron-updater on macOS (Squirrel.Mac) only installs an
-  update signed by the same identity as the running app. On Windows, the publisher check that
-  electron-updater runs has nothing to compare against when the app is unsigned.
+Mechanics and risk notes: `agents/risky-areas/updater.md`.
 
-The repo is public now, so the GitHub provider could read a feed without a token. That removed a
-practical obstacle, not a reason: the two points above still hold. What the app does instead is the
-[update notice](#update-notice), which reads one public API endpoint and never installs anything.
-
-Turning it on is one change that happens after signing:
-1. Restore a `github` provider for `Advance-Labs/ninebrains` in both builder configs.
-2. Set `UPDATES_ENABLED` to `true`.
-3. Update the SEC-36 test to allow exactly that provider.
-4. Check electron-updater's signature verification on both OSes before the first update ships.
-
-## Update notice
-
-Code: `apps/emdash-desktop/src/core/features/release-check/`. It is not the updater: it never
-imports electron-updater, and `UPDATES_ENABLED` stays `false`.
-
-- **What it does.** Main sends one unauthenticated `GET
-  https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest` (10 s timeout, no cookies,
-  no token), reads `tag_name`, and compares it with the running version by SemVer precedence, so
-  `0.3.0` is newer than `0.3.0-rc.1`. Drafts, prereleases and tags that are not SemVer count as "no
-  update". The release link is built from the version, never taken from the response.
-- **When.** Only when the user turns on **Settings → General → Check for new versions**
-  (`ninebrains.releaseCheck.autoCheck`, default `false`): 30 s after startup, then every 12 h,
-  counting any attempt, and only in packaged builds. **Check now** runs one check on demand, at
-  most one request a minute. Canary builds never check: `releases/latest` never returns a
-  prerelease, and a canary user moves to a newer canary by hand.
-- **Why off by default.** SEC-38 says a first run makes no network request the user did not start.
-  An automatic check on by default would break that, so it waits for the user.
-- **Failures are silent.** Offline, the 60 requests an hour GitHub allows anonymous callers (403 or
-  429), any other non-2xx, or a bad body: nothing pops up, the last good answer is kept, and
-  Settings shows one plain line about the latest attempt.
-- **What the user sees.** A notice at the bottom of the left sidebar, which they can close for that
-  version (`dismissedVersion`); a newer release shows it again. Settings → General shows **Download
-  Ninebrains X.Y.Z** (opens `https://ninebrains.runs-on.dev/#download`), the installer one-liner for
-  their OS with a copy button, and **What's new** (the GitHub release page).
-- **0.1.0 has none of this.** 0.2.0 is the first build that can show the notice, so 0.1.0 users
-  update by hand once.
-- **Threat-model follow-up (open).** `docs/THREAT-MODEL.md` does not yet list this opt-in
-  `api.github.com` request. It needs an entry, next to SEC-36 and SEC-38, recording that the call
-  is user-enabled or user-initiated, read-only, unauthenticated and never installs anything. This
-  PR does not edit the threat model.
-
-Publishing a release is what makes the notice fire, for users who turned it on: **Latest** is what
+Publishing a release is what makes the check fire for users on the same channel: **Latest** is what
 they are told about. Mark a bad release as a prerelease (see [Rolling back](#rolling-back)) and the
-notice stops pointing at it.
+updater stops offering it; users who already applied it update to the next good build by hand, since
+the updater never downgrades.
 
 ## Versioning
 
@@ -375,12 +357,12 @@ nothing keys state or migrations off the version number:
 - **Remote workspace-server** installs resolve the version from the server channel pointer and the
   protocol major (`workspace-server/provision/installer.ts`), independent of the desktop version.
 - **`app.getVersion()`** is only displayed (About menu, recovery window), sent as handshake or
-  telemetry metadata (telemetry is off), or used by the updater (off).
+  telemetry metadata (telemetry is off), or used by the updater (version comparison).
   `resolveAppVersion`'s `package.json` fallback only matches a package named `emdash`, which is dead
   code in both upstream and here.
 - **Canary** versions are derived: `0.1.0` becomes `0.1.1-canary.<run>` (`scripts/release/lib/version.ts`).
-- **Downgrade from 1.2.4.** electron-updater rejects downgrades, but no user has a build from our feed,
-  and the updater is off.
+- **Downgrades.** Our updater refuses to downgrade or reinstall — it only shortlists strictly newer
+  SemVer versions — so a user who applied a bad build moves off it via the next good build.
 
 ## Local verification (2026-09-10, macOS 26 arm64)
 
@@ -392,7 +374,7 @@ Command: `build.ts --platform mac --arch arm64 --targets dmg` (local mode, no si
 | Bundle | `CFBundleIdentifier` `dev.advancelabs.ninebrains`, name and executable `Ninebrains`, version `0.1.0` |
 | Icon | `icon.icns` is byte-identical to `src/assets/images/emdash/emdash.icns`, the asset the fork ships today |
 | Signature | `Signature=adhoc`, `flags=(adhoc,runtime)`; `codesign --verify --deep --strict` passes on the app inside the dmg; notarization skipped |
-| SEC-36 | no `Contents/Resources/app-update.yml`; builder reported "Prepared 0 local update manifest(s)" |
+| SEC-36 | no `Contents/Resources/app-update.yml` (electron-updater removed; the updater reads the GitHub release directly); builder reported "Prepared 0 local update manifest(s)" |
 | Launch | Starts from the mounted dmg and takes its singleton lock in `~/Library/Application Support/ninebrains`; no `emdash` directory is created. Boot then waits on the Keychain prompt above (the key was created earlier by an e2e run with a different signature). With `--use-mock-keychain` it boots fully (20 processes, services running). |
 | Checksums | `checksums.mjs release` wrote `SHA256SUMS` and `SHA256SUMS.json`; `--verify` and `shasum -a 256 -c SHA256SUMS` both pass |
 
@@ -411,7 +393,8 @@ included, and the published release has all seven installers and both sums files
 
 | Requirement | Status |
 |---|---|
-| SEC-36: no `app-update.yml`, no update timer, `autoInstallOnAppQuit` unreachable, no upstream owner | Met. `publish: null` in both configs; `UPDATES_ENABLED=false` returns before any `autoUpdater` setup; `release-config.test.mjs` rejects a publish provider or `generalaction`. The packaged-app check under Local verification confirms there is no `app-update.yml` in the bundle. |
+| SEC-36: updates are signed with Ninebrains' own Ed25519 key; no upstream owners or feeds | Met. electron-updater is gone (no `app-update.yml`, no `autoUpdater`); the custom updater verifies each release's `SHA256SUMS.json` against the embedded public key before anything downloads or applies; the private key only lives as the `NINEBRAINS_UPDATE_SIGNING_KEY` secret and the signing step fails closed. |
+| SEC-36b: nothing is downloaded or installed without the user choosing it | Met. Verified updates only surface a **Download** button; a second user choice (**Restart now**) launches the apply. No auto-download, no `autoInstallOnAppQuit`. |
 | SEC-37: `SHA256SUMS` as an asset and in the release notes | Met. |
 | SEC-37 test: the workflow re-verifies sums before publishing | Met, twice: before upload, and again after re-downloading the draft. Publishing stays a human step after both. |
 | SEC-37: CI builds from a tag | **Deviation.** Dispatch-only, by decision (Actions minutes, and publishing is Lucas's call). The draft is pinned to the built commit, and publishing creates the tag at that commit, so the tag and the bytes still match. |

@@ -84,5 +84,11 @@ GitHub release (`shasum -a 256 -c SHA256SUMS`). That proves you have the exact b
 not who built them. Build-provenance attestations are not available while the repository is
 private. Once the repository is public, `gh attestation verify <file> --repo
 Advance-Labs/ninebrains` will also prove which workflow built the file. Until then that command
-fails, and a failure means nothing about the file. Unsigned builds do not auto-update. The release
-guide in the repository (`docs/RELEASING.md`, "Verifying a download") has the commands for each OS.
+fails, and a failure means nothing about the file.
+
+**In-app updates are a separate trust chain.** Ninebrains updates itself only from releases whose
+`SHA256SUMS.json` verifies against the Ed25519 public key compiled into the app; the matching
+private key lives only as a GitHub secret and the release workflow signs with it and fails closed
+if it is missing. Updates never install without the user pressing **Download** and then **Restart
+now**. See [RELEASING](RELEASING.md#in-app-updates). The release guide in this repository
+(`docs/RELEASING.md`, "Verifying a download") has the commands for each OS.

@@ -67,9 +67,11 @@ Lead time: mostly waiting on Apple, typically a few days to two weeks.
    - Warn users once: the first launch of the first signed build asks for the Keychain one last
      time, because the identity changed from ad-hoc to Developer ID. After that it sticks across
      updates.
-8. **Then auto-update** ([RELEASING.md, "Why auto-update stays off"](RELEASING.md#why-auto-update-stays-off)).
-   Squirrel.Mac checks that an update carries the same Developer ID as the running app, which is the
-   check that makes turning it on safe.
+8. **Re-examine the update path** ([RELEASING.md, "In-app updates"](RELEASING.md#in-app-updates)).
+   The updater already runs on Ninebrains' own Ed25519 signature and does not wait for OS signing;
+   with a Developer ID identity the extra wins are: macOS Keychain ("Safe Storage") stops re-prompting
+   on every update, and Gatekeeper accepts each new build without "Open Anyway". The update trust
+   chain itself is unchanged.
 
 The installer needs no change for Phase 1. It already reports the signing authority when the
 signature isn't ad-hoc, and the Terminal path stays the one-command way to install and update.
@@ -89,10 +91,28 @@ Windows users see SmartScreen's "Windows protected your PC". Options, cheapest f
 Signing alone doesn't clear SmartScreen immediately: reputation builds with downloads. Expect the
 warning to fade over the first releases rather than vanish on day one.
 
+## Our own update signature (already live)
+
+The app updates itself with a signature we issue, independent of Apple or Microsoft:
+
+- The release signs its `SHA256SUMS.json` with an Ed25519 key whose private half is the repo secret
+  `NINEBRAINS_UPDATE_SIGNING_KEY`; the app embeds the public half
+  (`src/core/primitives/app-identity/api/update-signing-key.ts`). Every update must verify against
+  that key before it is even offered, and applies only after the user chooses **Restart now**. See
+  [RELEASING.md, "In-app updates"](RELEASING.md#in-app-updates) and `agents/risky-areas/updater.md`.
+- **This is not an OS code signature.** It does nothing for Gatekeeper, SmartScreen, or the macOS
+  Safe Storage re-prompts; those still wait for Phase 1/2 above. It is the *update* trust anchor,
+  and it is what makes the updater safe on unsigned builds.
+- **Key handling.** The `.pem` lives in the password manager, never in the repo. Rotate by
+  (a) generating a new key, (b) embedding the new public half and shipping it in the same release
+  that first uses the new private half — the embedded key is only read at update time, so at least
+  one release must trust both during the switch — and (c) re-pointing the secret. Keep the old
+  public half trusted until the last build that embeds it is out of support. A rotated secret is
+  what the release job uses the same day (`sign-update-digest.mjs` fails closed if it is unset).
+
 ## Not doing
 
 - **Stripping quarantine in the installer or the app.** See above.
-- **A self-signed certificate to stop the Keychain re-prompts.** A stable self-signed identity
-  would keep the Keychain approval across updates. But it does nothing for Gatekeeper, it means
-  one more identity change when Developer ID lands, and it's one more secret to manage. At USD 99
-  the real fix costs about the same effort.
+- **Switching the update signature to a CA-issued certificate.** The Ed25519 key is ours to issue
+  and to rotate, and the checksum file it signs carries no third-party cost or expiry. It already
+  satisfies SEC-36; OS signing is a separate layer above it.

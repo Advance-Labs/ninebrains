@@ -1,4 +1,5 @@
 import { Toaster } from '@emdash/ui/react/primitives';
+import { UpdateStatusPill } from '@core/features/updates/browser/update-status-pill';
 import { LeftSidebar } from '@core/features/workbench/browser/sidebar/left-sidebar';
 import { WindowScope } from '@core/features/workbench/browser/window-scope';
 import {
@@ -27,6 +28,7 @@ export function Workspace() {
         }
       />
       <Toaster />
+      <UpdateStatusPill />
     </WindowScope>
   );
 }
