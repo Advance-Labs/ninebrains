@@ -25,11 +25,13 @@ export function createBrainWireController(service: BrainService): {
     sessions: views.sessions,
     dispatcher: views.dispatcher,
   });
+  const allJobs = expose(brainContract.allJobs, { jobs: views.allJobs });
   return {
     impl: {
       project,
       lanePanel,
       overview,
+      allJobs,
       events: brainEvents,
       createJob: (input) => service.createJob(input),
       linkJobs: ({ from, to }) => service.linkJobs(from, to),
@@ -49,6 +51,7 @@ export function createBrainWireController(service: BrainService): {
       await project.dispose();
       await lanePanel.dispose();
       await overview.dispose();
+      await allJobs.dispose();
     },
   };
 }

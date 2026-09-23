@@ -191,7 +191,8 @@ export class BrainService {
     this.views = new BrainViews(
       deps.brain,
       () => this.inboxes(),
-      () => this.dispatcherView()
+      () => this.dispatcherView(),
+      deps.onError
     );
     this.verification =
       deps.verification === 'external'

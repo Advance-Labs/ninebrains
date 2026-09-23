@@ -1,5 +1,6 @@
 import '@emdash/ui/style.css';
 import { ok } from '@emdash/shared';
+import { SettingsSection } from '@emdash/ui/react/patterns';
 import { createEventStreamHost } from '@emdash/wire/live';
 import { createInProcessWire, defineContract } from '@emdash/wire/rpc';
 import { cell, expose } from '@emdash/wire/state';
@@ -9,6 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { agentsContract, agentsDomain } from '@core/features/agents/api/contract';
+import { BrainSection } from '@core/features/arena/browser/arena-dashboard';
 import {
   brainContract,
   brainDomain,
@@ -28,6 +30,7 @@ import {
 } from '@core/features/packs/api';
 import { PacksPanel } from '@core/features/packs/browser/packs-view';
 import { routingContract, routingDomain } from '@core/features/routing/api';
+import { BrainSettingsCard } from '@core/features/settings/browser/components/BrainSettingsCard';
 import { ThemeProvider } from '@core/primitives/theme/browser/theme-provider';
 import { resetWireConnection, seedWireConnection } from '@core/primitives/wire/browser/connection';
 
@@ -88,6 +91,17 @@ const JOBS = [
   job('j3', 'Add form validation', 'verifying'),
   job('j4', 'Write the FAQ copy', 'ready'),
 ];
+
+// No 'blocked' jobs: Arena's blocked-job list resolves each job's project name
+// through the (unmocked, in this file) project stores, so this stays in states
+// that only feed the dispatcher/state badges.
+const ARENA_JOBS: BrainJobView[] = [
+  { ...job('aj1', 'Wire the checkout flow', 'running'), projectId: 'p1' },
+  { ...job('aj2', 'Draft the SEO audit report', 'verifying'), projectId: 'p2' },
+  { ...job('aj3', 'Fix the sitemap crawl errors', 'ready'), projectId: 'p2', laneId: null },
+];
+
+const allJobsCell = cell<BrainJobView[]>([]);
 
 const CODING_PACK: PackSummary = {
   id: 'coding',
@@ -286,6 +300,7 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
             sessions: cell([SESSION]),
             dispatcher: cell(DISPATCHER),
           }),
+          allJobs: expose(contract[brainDomain].allJobs, { jobs: allJobsCell }),
           project: expose(contract[brainDomain].project, {
             jobs: () => cell(JOBS),
             done: () => cell([]),
@@ -500,5 +515,36 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
         throw new Error('not rendered');
     });
     await page.screenshot({ path: `${SHOTS}/brain-drawer-plan-1440.png` });
+  });
+
+  it('Brain settings card, light, 1440', async () => {
+    await show(
+      'emlight',
+      1440,
+      170,
+      <div className="p-6">
+        <SettingsSection title="Brain">
+          <BrainSettingsCard />
+        </SettingsSection>
+      </div>
+    );
+    await page.screenshot({ path: `${SHOTS}/brain-settings-card-1440.png` });
+  });
+
+  it('Arena, Brain section across projects, light, 1440', async () => {
+    allJobsCell.set(ARENA_JOBS);
+    await show(
+      'emlight',
+      1440,
+      110,
+      <div className="p-6">
+        <BrainSection />
+      </div>
+    );
+    await vi.waitFor(() => {
+      if (!document.body.textContent?.includes('dispatching')) throw new Error('not rendered');
+    });
+    await page.screenshot({ path: `${SHOTS}/arena-brain-section-1440.png` });
+    allJobsCell.set([]);
   });
 });

@@ -670,3 +670,12 @@ New Ninebrains-only files: `src/core/features/pulse/**` (per-task tab: provider,
 | `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | New "Lanes" `SidebarMenuButton` (before "Automations", after the "Arena" entry from §38) navigates to `lanesViewDef({})` | A persistent entry point in the sidebar alongside the other Manage views, matching the new home tile |
 
 New Ninebrains-only files: `src/core/features/workbench/browser/home-view.browser.test.tsx`.
+
+## 40. Brain discoverability and a cross-project view (`ninebrains/viral-ai-r9k9c`)
+
+| File | Change | Why |
+|---|---|---|
+| `README.md` | The Brain feature-table row, the "In this build" bullets for Brain and Planner, and a new "Arena" glossary row now mention Settings discoverability, the Arena cross-project view, and Planner's partial-accept flow; two new screenshot cards in "A closer look" | Docs match the new Settings card, Arena's Brain section, and Planner's partial accept, added below |
+| `src/core/features/settings/browser/pages/general-settings-page.tsx` | New "Brain" `SettingsSection` rendering `BrainSettingsCard`; page description mentions the Brain | The Brain becomes discoverable from Settings, not only the Lanes drawer's "Start Brain" button |
+
+New Ninebrains-only files: `src/core/features/brain/contributions/{arena,settings}.ts` (what the Arena and Settings slices reach into the Brain slice for), `src/core/features/lanes/browser/grid/brain-drawer-state.ts` (drawer open/close state, extracted so the Lanes first-run intro can open it too, without a circular import), `src/core/features/planner/browser/canvas-model.test.ts`, `src/core/features/settings/browser/components/BrainSettingsCard.tsx`.

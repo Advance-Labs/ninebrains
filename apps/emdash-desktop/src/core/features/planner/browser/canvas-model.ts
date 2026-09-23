@@ -288,9 +288,38 @@ export function hasProposals(doc: CanvasDoc): boolean {
   return doc.nodes.some((node) => node.proposed) || doc.edges.some((edge) => edge.proposed);
 }
 
-export function acceptProposals(doc: CanvasDoc): CanvasDoc {
-  const clear = <T extends { proposed?: boolean }>({ proposed: _p, ...rest }: T) => rest as T;
-  return { ...doc, nodes: doc.nodes.map(clear), edges: doc.edges.map(clear) };
+function clearProposed<T extends { proposed?: boolean }>({ proposed: _p, ...rest }: T): T {
+  return rest as T;
+}
+
+/** Accepts every proposed node and edge into the plan. */
+export function acceptAllProposals(doc: CanvasDoc): CanvasDoc {
+  return { ...doc, nodes: doc.nodes.map(clearProposed), edges: doc.edges.map(clearProposed) };
+}
+
+/**
+ * Accepts only the given proposed nodes (e.g. a canvas selection), leaving
+ * the rest dashed. An edge resolves only when it touches an accepted node
+ * *and* neither of its endpoints is still proposed — an edge between two
+ * already-accepted (pre-existing) nodes that the draft merely proposed a new
+ * dependency for is left alone unless that dependency's own node was part of
+ * this selection, so accepting one new node never silently pulls in an
+ * unrelated edge between nodes that were already on the canvas.
+ */
+export function acceptSelectedProposals(doc: CanvasDoc, nodeIds: ReadonlySet<string>): CanvasDoc {
+  const nodes = doc.nodes.map((node) =>
+    node.proposed && nodeIds.has(node.id) ? clearProposed(node) : node
+  );
+  const stillProposed = new Set(nodes.filter((node) => node.proposed).map((node) => node.id));
+  const edges = doc.edges.map((edge) =>
+    edge.proposed &&
+    (nodeIds.has(edge.source) || nodeIds.has(edge.target)) &&
+    !stillProposed.has(edge.source) &&
+    !stillProposed.has(edge.target)
+      ? clearProposed(edge)
+      : edge
+  );
+  return { ...doc, nodes, edges };
 }
 
 export function rejectProposals(doc: CanvasDoc): CanvasDoc {

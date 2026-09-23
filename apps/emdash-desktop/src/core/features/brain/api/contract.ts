@@ -38,6 +38,16 @@ export const brainContract = defineContract({
       dispatcher: liveState({ data: brainDispatcherViewSchema }),
     },
   }),
+  /**
+   * Every open job across every project, for Arena's cross-project view. Its
+   * own model (not folded into `overview`) so the titlebar, Settings and the
+   * lane run-mode control — all always-mounted `overview` consumers — don't
+   * also subscribe to this larger, more frequently changing list.
+   */
+  allJobs: liveModel({
+    key: z.void().optional(),
+    states: { jobs: liveState({ data: z.array(brainJobViewSchema) }) },
+  }),
   events: eventStream({ key: z.void(), event: z.custom<BrainWireEvent>() }),
 
   createJob: fallible({
