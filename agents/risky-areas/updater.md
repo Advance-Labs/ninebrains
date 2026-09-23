@@ -1,125 +1,97 @@
 # Risky Area: Updater And Packaging
 
+The in-app updater is a small custom pipeline under `src/main/host/updates/` (electron-updater was
+removed). Its one job is to make sure the app only ever runs code whose checksum file was signed by
+us, and only when the user asks. See `docs/RELEASING.md` → In-app updates for the release-time view.
+
 ## Main Files
 
-- `src/main/core/updates/update-service.ts`
-- `src/main/core/updates/controller.ts`
-- `build/`
-- `package.json`
-- `electron-builder.config.ts`
-- `electron-builder.canary.config.ts`
-- `scripts/release/build.ts`
-- `scripts/release/notarize-mac.ts`
-- `scripts/release/rebuild-native.ts`
-- `scripts/release/upload-github-assets.ts`
-- `scripts/release/finalize-release.ts`
-- `.github/workflows/release-prod.yml`
-- `.github/workflows/release-canary.yml`
+- `src/main/host/updates/update-service.ts` — check → offer → download → stage → apply state machine
+- `src/main/host/updates/feed.ts` — GitHub Releases feed (stable `latest`, canary prerelease scan)
+- `src/main/host/updates/integrity.ts` — Ed25519 signature derivation, encoding and verification
+- `src/main/host/updates/download.ts` — streamed artifact download with size/hash checks
+- `src/main/host/updates/staging.ts` — staging area + marker; `isSafeArtifactName` path-safety
+- `src/main/host/updates/apply/index.ts` — apply-on-next-launch (mac/Linux swap, Windows NSIS)
+- `src/main/host/updates/version.ts`, `types.ts` — SemVer ordering and shared types
+- `src/core/features/updates/` — Wire domain (contract, controller, store, pill UI)
+- `src/core/primitives/app-identity/api/update-signing-key.ts` — the embedded public key
+- `scripts/release/sign-update-digest.mjs` — signs `SHA256SUMS.json` in the release job
+- `scripts/release/build.ts` — electron-builder, local mode (`--release-id` absent ⇒ no GitHub)
+- `scripts/release/checksums.mjs` — `SHA256SUMS` / `SHA256SUMS.json` generation and verification
+- `scripts/release/verify-mac.ts`, `verify-linux.ts`, `verify-win.ts` — platform artifact checks
+- `electron-builder.config.ts`, `electron-builder.canary.config.ts` — `publish: null`, both
+- `.github/workflows/release.yml` — the one release workflow (dispatch-only, stable + canary)
+- `build/` — packaging assets (unchanged unless the task is packaging/signing)
+
+Legacy scripts that are **not wired into `release.yml`** (upstream remnants, safe to ignore for
+normal work): `scripts/release/{upload-github-assets.ts, finalize-release.ts, notarize-mac.ts,
+rebuild-native.ts}` and `scripts/release/lib/{object-promotion,promotion-journal,release-ownership,
+release-assets,artifacts,…}.ts`. Don't rely on them in a release; say so when a task touches them.
 
 ## Rules
 
-- avoid changing updater defaults casually
-- treat signing, notarization, packaging targets, and native rebuild flow as release-critical
-- keep build output directories and packaging config stable unless the task is explicitly about release behavior
+- treat `src/main/host/updates/` and anything the updater runs (spawning the Windows installer,
+  moving/removing staged files) as high risk; read this page before editing
+- never weaken the trust chain: the Ed25519 public key, the digest comparison against the signed
+  `SHA256SUMS.json`, and the "nothing downloads or applies without the user" invariants are the point
+- `isSafeArtifactName` bounds every file the updater derives a path from (write *and* delete path
+  derive from the validated artifact name, never from a marker's stored path)
+- keep build output directories and packaging config stable unless the task is explicitly about
+  release behavior
+- the signing secret (`NINEBRAINS_UPDATE_SIGNING_KEY`) must never be logged, committed, or embedded;
+  only its public half ships in the app
 
-## Update Feed / Publishing Strategy
+## How an update happens
 
-The stable release pipeline publishes to **GitHub Releases** (primary feed) and **Cloudflare R2**
-(legacy/migration feed). Both feeds are served from the same platform builds and are promoted by a
-single finalizer only after the complete supported architecture set builds and verifies.
+1. **Check.** Packaged builds only; nothing on dev. 30 s after startup, then hourly
+   (`update-service.ts`). `feed.ts` asks `api.github.com/repos/Advance-Labs/ninebrains` for
+   `releases/latest` (stable) or scans ten `-canary.N` prereleases (canary), unauthenticated,
+   and keeps releases that are SemVer-newer than the running version for the app's channel.
+2. **Offer.** A newer verified version shows a **Download** button on the bottom-right pill
+   (updates slice store → pill). No artifact is fetched yet.
+3. **Download + verify.** `download.ts` streams the platform artifact (and the release's
+   `SHA256SUMS.json`) to a staging dir. `integrity.ts` verifies the Ed25519 signature of the checksum
+   file against the embedded key, then compares the artifact's SHA-256 to the digest value. Any
+   failure discards the file and surfaces an error; the app stays on the old version.
+4. **Apply on next launch.** After the user picks **Restart now**, the app quits. On the next
+   launch `initialize()` (called after the main window is up) checks the staged marker and applies:
+   - macOS/Linux: replace the bundle/AppImage/`.deb` in place (`apply/index.ts`) and relaunch.
+   - Windows: the running `.exe` is locked, so `update-service.ts` registers a `will-quit` handler
+     that spawns the staged NSIS installer detached for the current user (`/S /D=<app dir>`), after
+     `clearPendingUpdateSync` clears the marker; electron-builder's `runAfterFinish: true` restarts
+     the app when the install completes.
+5. **Failure is local.** A failed apply clears the marker and leaves the old version running. No
+   update is ever applied automatically at quit.
 
-### Two feeds, one artifact set
+## Security invariants
 
-electron-builder emits channel manifests named by the **first** publish provider's `channel`:
+- **Trust anchor is our key, not OS signatures.** Builds are unsigned (ad-hoc / no Authenticode).
+  The updater deliberately does not lean on Gatekeeper or SmartScreen, which have nothing to check
+  against for an unsigned app. Verification is the Ed25519 signature over `SHA256SUMS.json`; a
+  hijacked release or feed cannot forge it (THREAT-MODEL TB6 / SEC-36).
+- **No unprompted traffic.** A packaged first run makes no network request: the check starts after
+  a 30 s delay and only against `api.github.com` for release metadata (SEC-38).
+- **No downgrades.** Version shortlisting is strict SemVer `>`; the app never replaces itself with
+  an equal or older build, even from a verified feed.
+- **Canary/prerelease isolation.** Canary channel scan only matches `-canary.N` tags; a `-canary`
+  app does not see stable releases and vice versa. No R2, no separate channel manifests.
 
-- Stable: `provider: github` has no explicit channel → defaults to `latest` → emits `latest*.yml`.
-- Canary: `provider: github` sets `channel: 'canary'` → emits `canary*.yml`.
+## Packaging interface
 
-The R2 feed uses different channel names (`v1-stable`, `v1-canary`) that pre-date the GitHub
-migration. Rather than running a second packaging pass, `scripts/release/build.ts` calls
-`duplicateChannelManifests()` after the electron-builder step to copy
-`latest*.yml → v1-stable*.yml` (or `canary*.yml → v1-canary*.yml`). The duplicated manifests are
-kept local until platform verification finishes. `upload-github-assets.ts` then hashes the final
-files, refreshes manifest checksums and sizes, and uploads the artifacts and both manifest variants
-to the exact owned GitHub draft. On macOS this happens only after notarization and stapling.
-
-### Rollback-safe R2 promotion
-
-Platform jobs never write the live R2 channel. `scripts/release/finalize-release.ts` first validates
-the exact owned GitHub release, the complete architecture inventory, and every update manifest entry.
-It downloads every referenced GitHub asset, verifies its SHA-512 against the manifest, uploads
-installer assets under an immutable `releases/<tag>/<run>-<attempt>/` prefix, and rewrites the R2
-manifests to those keys. Before replacing any root `v1-stable*.yml` or `v1-canary*.yml` object, it
-snapshots the complete previous manifest set. Promotion or a confirmed GitHub publication failure
-restores that set. The original snapshot is journaled in R2 by tag, run, and commit before any root
-changes, so it survives retries and runner termination. If GitHub's response is ambiguous, the
-complete new R2 set is retained; a retry restores the journaled public roots when the release is
-still a draft or reconciles every root when publication actually succeeded.
-
-### Update channels on GitHub
-
-The app does **not** override `autoUpdater.channel`; the GitHub provider resolves the channel naturally:
-
-- **Stable** (`allowPrerelease=false`): resolves to `latest`, fetches `latest*.yml` from the newest non-prerelease GitHub release.
-- **Canary** (`allowPrerelease=true`): resolves the target release tag from the Atom feed by matching the semver prerelease identifier of the installed version (`canary`) against each entry. Once a `-canary.N` tag is found it fetches `canary*.yml` from that release, as defined by `channel: 'canary'` in `electron-builder.canary.config.ts`.
-
-The `UPDATE_CHANNEL` / `v1-stable` / `v1-canary` naming applies **only** to the flat R2 bucket (via the `generic` publish block's `channel`). It is kept as a log label in `update-service.ts` for diagnostics but is not passed to `autoUpdater.channel`.
-
-### R2 decommission path
-
-R2 uploads continue until telemetry confirms all clients have migrated to the GitHub-backed feed. At that point:
-
-1. Remove the `provider: generic` block from `electron-builder.config.ts` and `electron-builder.canary.config.ts`.
-2. Remove R2 staging/promotion from `finalize-release.ts` and `duplicateChannelManifests` from
-   `build.ts`.
-3. Decommission the R2 bucket.
-
-- Canary publishes to GitHub as prereleases. `ALLOW_PRERELEASE` in `update-service.ts` is driven by `IS_CANARY` so canary clients accept prerelease versions automatically.
-- The `finalize-release.ts` script runs after all three platform builds complete, validates the
-  exact release and manifest contents, promotes R2, and flips the GitHub draft to published. Until
-  that job finishes the release remains invisible to GitHub-backed electron-updater clients.
-
-## Release Scripts Library Usage
-
-- `scripts/release/build.ts` — uses `electron-builder`'s programmatic `build()` API (no CLI spawn)
-- `scripts/release/upload-github-assets.ts` — uploads only final, platform-scoped artifacts after
-  verification and regenerates updater metadata from their bytes
-- `scripts/release/rebuild-native.ts` — uses `@electron/rebuild`'s `rebuild()` API (no CLI spawn)
-- `scripts/release/notarize-mac.ts` — uses `@electron/notarize`'s `notarize()` API for DMG submission + auto-staple; system spawns are kept only for `.app` bundle stapling and Gatekeeper verification
-
-## Release Manifest Parser Dependency
-
-Release scripts declare `yaml` 2.9 as a direct development dependency because electron-builder
-emits YAML updater manifests that must be parsed, structurally validated, merged, and serialized.
-Node.js does not provide a YAML parser. A handwritten parser would be unsafe, while importing the
-copy used transitively by Vite or electron-builder would create an undeclared and unstable
-dependency on their internal dependency graphs.
-
-Dependency assessment recorded on 2026-09-01:
-
-- `yaml` 2.9.0 was already resolved in `pnpm-lock.yaml`, so declaring it directly adds no package
-  resolution or transitive dependency
-- the package uses the permissive ISC license, has no runtime dependencies or native components,
-  and defines no install or postinstall lifecycle hook
-- a targeted `pnpm audit` check reports no advisory for `yaml`; the workspace-wide audit still
-  reports unrelated existing dependency findings and is not considered clean
-- it remains a development dependency because only repository release tooling imports it; it is not
-  shipped as an application runtime dependency
+- Both builder configs set `publish: null`; electron-builder writes no `app-update.yml`, so there is
+  no feed metadata inside the app for a MITM to repoint.
+- `release.yml` is the only release entry point (manual dispatch from `main` / `release/*`, stable
+  or canary channel). The `release` job writes and verifies `SHA256SUMS`, runs `sign-update-digest.mjs`
+  (fails closed without the secret), builds the draft, uploads with `--clobber`, and re-verifies the
+  draft's downloaded bytes before it is publishable.
+- `build.ts` in local mode never contacts GitHub and drops output in `apps/emdash-desktop/release/`
+  (gitignored).
 
 ## Current Notes
 
-- macOS and Linux release jobs rebuild native modules for the target Electron version
-- Linux releases use `.github/workflows/release-linux.yml` to build x64 and arm64 in a
-  native-runner matrix inside the same Ubuntu 22.04 userspace baseline. Both architectures emit
-  AppImage, DEB, and RPM artifacts. Verification extracts every package payload and checks the main
-  executable, required native modules, binary architecture, package metadata, and GLIBC ceiling.
-- Production and canary workflows have separate non-canceling concurrency groups. Every build and
-  the finalizer receives the exact draft id; a run/commit marker prevents a different dispatch from
-  adopting a stale draft.
-- Production and canary remain separate release entry points because they select different product
-  identities, versions, and publication semantics. Both call the same reusable Linux architecture
-  matrix; there are not separate stable and canary Linux implementations.
-- A public desktop release always includes x64 and arm64. Failed architecture jobs are retried at
-  the GitHub Actions job level rather than publishing a partial updater release.
-- changelog and auto-update behavior are separate but related surfaces in the app
-- the `finalize-release` CI job requires `contents: write` permission and the default `GITHUB_TOKEN`
+- Changelog (release notes) and updater behavior are related but separate surfaces; a changelog
+  entry does not imply the updater checks were re-run.
+- macOS Safe Storage is keyed to the ad-hoc build identity, so each in-app update (a new build)
+  re-prompts for the keychain item. Not a code bug; documented in RELEASING.md.
+- Test surface that must stay green: `src/main/host/updates/*.test.ts` (unit), the `sign-update-digest`
+  node tests run by the root `test:tooling` glob, and `scripts/release/*.test.mjs`.

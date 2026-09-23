@@ -343,6 +343,19 @@ jobs:
           node apps/emdash-desktop/scripts/release/checksums.mjs dist-release
           node apps/emdash-desktop/scripts/release/checksums.mjs --verify dist-release
 
+      # SEC-36/"our own update signature": sign the checksums with the Ninebrains update key so the
+      # in-app updater can trust them. Fail closed: a release without a signature can never be
+      # installed by the updater, so shipping one silently is a broken release.
+      - name: Sign SHA256SUMS with the Ninebrains update key
+        env:
+          NINEBRAINS_UPDATE_SIGNING_KEY: ${{ secrets.NINEBRAINS_UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$NINEBRAINS_UPDATE_SIGNING_KEY" ]; then
+            echo "::error::NINEBRAINS_UPDATE_SIGNING_KEY is not configured. Set the repo secret (see docs/SIGNING.md) or the updater will never trust a release."
+            exit 1
+          fi
+          node apps/emdash-desktop/scripts/release/sign-update-digest.mjs dist-release
+
       - name: Write release notes
         run: |
           # The install steps and docs links live in .github/release-notes/install.md so people can
@@ -419,4 +432,5 @@ jobs:
           mkdir verify
           gh release download "$TAG" --dir verify
           node apps/emdash-desktop/scripts/release/checksums.mjs --verify verify
+          node apps/emdash-desktop/scripts/release/sign-update-digest.mjs --verify verify
           echo "Draft $TAG is ready for review: $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

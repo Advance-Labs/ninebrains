@@ -86,8 +86,10 @@ The app's own `EMDASH_*` variables are removed from the environment agents get.
 | `FLAG_<NAME>` | Dev builds only | Forces feature flag `<name>` on (`true` or `1`) or off. Ignored in packaged builds. No feature in this build reads a flag |
 | `EMDASH_SKIP_ELECTRON_REBUILD=1` | Install time | Skips rebuilding native modules for Electron |
 
-Some switches are fixed when the app is built, with no variable to change them: auto-update, the
-hosted account, the telemetry settings card and user packs are all off.
+Some switches are fixed when the app is built, with no variable to change them: the hosted account,
+the telemetry settings card and user packs are all off. Auto-update is on (built into the app, in
+packaged builds) and cannot be disabled per-install; its checks are release-metadata-only and it
+never downloads or applies anything without you choosing it.
 
 ## File locations
 

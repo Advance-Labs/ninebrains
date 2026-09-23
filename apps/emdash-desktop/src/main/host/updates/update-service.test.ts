@@ -1,49 +1,83 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { updateService } from './update-service';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { UpdateService } from './update-service';
 
-const fakeUpdater = vi.hoisted(() => ({
-  autoDownload: true,
-  autoInstallOnAppQuit: true,
-  autoRunAppAfterInstall: false,
-  allowPrerelease: true,
-  allowDowngrade: true,
-  requestHeaders: {},
-  logger: null as unknown,
-  on: vi.fn(),
-  checkForUpdates: vi.fn(),
-  downloadUpdate: vi.fn(),
-  quitAndInstall: vi.fn(),
+const hoisted = vi.hoisted(() => {
+  const app = {
+    once: vi.fn(),
+    relaunch: vi.fn(),
+    quit: vi.fn(),
+    exit: vi.fn(),
+    isPackaged: false,
+  };
+  return {
+    app,
+    updateEvents: { emit: vi.fn() },
+    resolveAppVersion: vi.fn(async () => '0.0.0-test'),
+  };
+});
+
+vi.mock('electron', () => ({
+  app: hoisted.app,
+  net: { fetch: vi.fn() },
 }));
-
-vi.mock('electron-updater', () => ({ default: { autoUpdater: fakeUpdater } }));
-vi.mock('@main/core/app/utils', () => ({ resolveAppVersion: vi.fn(async () => '0.0.0-test') }));
+vi.mock('@core/features/updates/node', () => ({ updateEvents: hoisted.updateEvents }));
+vi.mock('@main/core/app/utils', () => ({ resolveAppVersion: hoisted.resolveAppVersion }));
 vi.mock('@main/lib/logger', () => ({
   log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('@core/features/updates/node', () => ({ updateEvents: { emit: vi.fn() } }));
 
-// Ninebrains update policy (docs/UPSTREAM-PATCHES.md): no feed is polled until the first
-// Advance-Labs/ninebrains release, and nothing is ever downloaded or installed automatically.
-describe('Ninebrains update policy', () => {
+describe('UpdateService', () => {
+  let service: UpdateService;
+  const fetchImpl = vi.fn();
+
+  beforeEach(() => {
+    hoisted.app.once.mockClear();
+    hoisted.updateEvents.emit.mockClear();
+    hoisted.resolveAppVersion.mockClear();
+    fetchImpl.mockReset();
+    service = new UpdateService(fetchImpl);
+  });
+
   afterEach(() => {
-    vi.unstubAllEnvs();
+    service.dispose();
   });
 
-  it('does not poll any update feed in a production build while UPDATES_ENABLED is off', async () => {
-    vi.stubEnv('DEV', false);
-
-    await updateService.initialize();
-
-    expect(updateService.isActive).toBe(false);
-    await expect(updateService.checkForUpdates()).resolves.toBeNull();
-    expect(fakeUpdater.on).not.toHaveBeenCalled();
-    expect(fakeUpdater.checkForUpdates).not.toHaveBeenCalled();
+  it('registers the Windows will-quit installer hook at construction', () => {
+    expect(hoisted.app.once).toHaveBeenCalledWith('will-quit', expect.any(Function));
   });
 
-  it('never downloads or installs on quit automatically, even once updates are enabled', () => {
-    (updateService as unknown as { setupAutoUpdater(): void }).setupAutoUpdater();
+  it('initializes but stays inactive in a dev/test build (no polling, no writes)', async () => {
+    await service.initialize();
+    expect(hoisted.resolveAppVersion).toHaveBeenCalled();
+    expect(service.isActive).toBe(false);
+    expect(hoisted.updateEvents.emit).not.toHaveBeenCalled();
+  });
 
-    expect(fakeUpdater.autoDownload).toBe(false);
-    expect(fakeUpdater.autoInstallOnAppQuit).toBe(false);
+  it('never downloads while inactive', async () => {
+    await service.initialize();
+    await expect(service.downloadUpdate()).rejects.toThrow(/not active/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('never installs while inactive', async () => {
+    await service.initialize();
+    expect(() => service.quitAndInstall()).toThrow(/not active/);
+    expect(hoisted.app.relaunch).not.toHaveBeenCalled();
+    expect(hoisted.app.quit).not.toHaveBeenCalled();
+  });
+
+  it('returns null from checks while inactive', async () => {
+    await service.initialize();
+    await expect(service.checkForUpdates()).resolves.toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('exposes a snapshot state and tolerates dispose() twice', async () => {
+    await service.initialize();
+    const state = service.getState();
+    expect(state).toMatchObject({ status: 'idle', currentVersion: '0.0.0-test' });
+    expect(service.isInstallRequested).toBe(false);
+    service.dispose();
+    await expect(service.fetchReleaseNotes()).resolves.toBeNull();
   });
 });

@@ -49,19 +49,20 @@ explains how to open an unsigned app past macOS Gatekeeper and Windows SmartScre
 
 ### Updating
 
-Ninebrains does not update itself: unsigned builds cannot be updated safely from inside the app.
-Update with the one-line installer above, or download the new build and install it over the old
-one. If you installed the `.deb`, update with
+Ninebrains updates itself. In packaged builds it checks GitHub Releases for a newer version (once
+30 s after startup, then hourly) and shows a **Download** button at the bottom-right when one is
+out; the download happens only when you click it, and the new build installs on the launch that
+follows your **Restart now** choice. Every update is accepted only after the release's
+`SHA256SUMS.json` verifies against an Ed25519 key embedded in the app, and the downloaded file is
+re-checked against it before it counts as ready. Canary builds update from canary releases, and
+nothing ever downgrades you.
+
+The one-line installer above still updates a manual install too, for anyone who prefers it. If you
+installed the `.deb`, update with
 `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
 (it runs `sudo apt install`); the plain line would add an AppImage instead. On macOS the installer
 asks you to quit Ninebrains first; on Windows, quit it before you run the line.
 [Verify a download → Updating](verify-download.md#updating) has the details.
-
-To hear about new releases, turn on **Settings → General → Check for new versions**. Once after
-startup and every 12 hours, the app asks GitHub for the latest release. When there is a newer one,
-a notice appears at the bottom of the left sidebar, and Settings → General shows a download button
-and the installer line to copy. Nothing is downloaded or installed for you. The setting is off by
-default; **Check now** on the same page works either way. Versions before 0.2.0 do not have it.
 
 ### From source
 

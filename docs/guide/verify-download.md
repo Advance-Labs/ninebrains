@@ -124,26 +124,22 @@ sudo apt install ./Ninebrains-*-linux-amd64.deb
 
 ## Updating
 
-Ninebrains never downloads or installs an update by itself. An unsigned app that replaced itself
-from the network would run whatever the release feed served, with nothing to check it against, so
-in-app updates stay off until builds are signed.
+Ninebrains updates itself without the one-line installer. In packaged builds it checks GitHub
+Releases for a newer version (once 30 s after startup, then hourly), and shows a **Download**
+button at the bottom-right when there is one. Three properties keep this safe for an unsigned app:
 
-### Hear about a new release
-
-Turn on **Settings → General → Check for new versions** (0.2.0 and later). Once after startup and
-every 12 hours, the app sends one request to `api.github.com` for the latest release, with no
-account or token. If a newer version exists, a notice appears at the bottom of the left sidebar;
-close it and it stays closed until the next release. Settings → General shows a **Download** button
-(it opens [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download) in your browser), the
-installer line for your OS with a copy button, and a link to the release notes.
-
-The setting is off by default, so a fresh install makes no request you did not ask for. **Check
-now** on the same page runs one check whenever you press it. Canary builds never check. 0.1.0 has
-no notice at all; update it by hand once.
+- **Signed digest.** Every update is accepted only after the release's `SHA256SUMS.json` verifies
+  against an Ed25519 public key embedded in the app (the private half lives only as a GitHub
+  secret). A hijacked release or feed cannot forge that signature.
+- **User-choice only.** Nothing downloads until you click **Download**, and the new build installs
+  only on the launch that follows your **Restart now** choice. There is no automatic download or
+  apply-at-quit.
+- **Fresh checks.** The downloaded file is re-checked byte-for-byte against the signed digest
+  before the update counts as ready; a mismatch is discarded.
 
 ### Update in one line
 
-The same line that installs Ninebrains updates it.
+The same line that installs Ninebrains updates it, and still works if you prefer it.
 
 macOS and Linux:
 

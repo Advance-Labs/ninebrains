@@ -71,11 +71,14 @@ const config: Configuration = {
     ...resolveWinSigning(process.env),
   },
   nsis: {
-    // Differential packages only serve the updater, which is off (SEC-36).
+    // Differential packages only serve electron-updater, which Ninebrains does not use.
     differentialPackage: false,
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     perMachine: false,
+    // The DIY updater hands the staged installer to Windows after the app quits (files unlocked);
+    // runAfterFinish relaunches the new version when the install completes.
+    runAfterFinish: true,
   },
   npmRebuild: false,
   // Encrypt Chromium's on-disk cookie store (in-app browser logins) with OS-level

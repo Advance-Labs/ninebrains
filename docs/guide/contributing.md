@@ -118,8 +118,10 @@ it reports.
 ## Releases
 
 Releases are cut by a maintainer from a manual workflow. It builds every target, writes
-`SHA256SUMS`, and creates a draft release that a maintainer reviews before publishing. Builds are
-unsigned, and auto-update stays off until they are signed. Users check downloads as described in
+`SHA256SUMS`, signs that checksum file with Ninebrains' Ed25519 update key, and creates a draft
+release that a maintainer reviews before publishing. Builds are unsigned, so Gatekeeper and
+SmartScreen still warn on manual downloads; in-app updates are verified with the app's embedded
+update key and never install without your choice. Users check downloads as described in
 [Verify and open a download](verify-download.md).
 
 ## Rebasing on upstream

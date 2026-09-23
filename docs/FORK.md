@@ -126,8 +126,13 @@ License file is MIT). `pnpm check` runs it between typecheck and test.
       repository *variable* (not a secret); `build-matrix.yml` already passes it through.
 2. **Feature flags are empty.** Upstream fetched them from PostHog `/decide`; with telemetry cut,
    every `useFeatureFlag` is `false` outside dev (`FLAG_*` env overrides still work in dev).
-3. **Auto-update is off** (`UPDATES_ENABLED`). Turn it on with the first signed release (plan 7.1/7.2).
-   A private repo needs a token for electron-updater, so the repo must be public first.
+3. **Auto-update is on with our own key** (`UPDATES_ENABLED`). The app does not use electron-updater:
+   it verifies each release's `SHA256SUMS.json` against the Ed25519 public key compiled into the app
+   (`src/core/primitives/app-identity/api/update-signing-key.ts`) before offering anything, and both
+   the download and the apply wait for the user. The private half is the repo secret
+   `NINEBRAINS_UPDATE_SIGNING_KEY`; `release.yml` signs with it and fails closed if it is unset, so
+   set that secret before the next release. Update the embedded public key in the same PR as any key
+   rotation.
 4. **Remote workspace server:** no Ninebrains release carries it yet, so SSH projects fail at
    install (`artifact-download-failed`) until one is published, or until
    `EMDASH_WORKSPACE_SERVER_ARTIFACTS_URL` points at a mirror.

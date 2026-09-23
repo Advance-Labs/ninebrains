@@ -66,10 +66,6 @@ import type { ProjectSettingsService } from '@core/features/projects/api/node/se
 import type { ProjectDeletionDependencies } from '@core/features/projects/node/operations/deleteProject';
 import { getProjectById } from '@core/features/projects/node/operations/getProjects';
 import { createProjectsWireController } from '@core/features/projects/node/wire-controller';
-import {
-  createReleaseCheckController,
-  type ReleaseCheckHost,
-} from '@core/features/release-check/node/wire-controller';
 import { createRepositoryWireController } from '@core/features/repository/node/wire-controller';
 import {
   createDisabledRoutingService,
@@ -197,8 +193,6 @@ export type DesktopControllerContext = {
   readonly planner?: PlannerService;
   /** Ninebrains model routing (features/routing/README.md). Absent: profiles off. */
   readonly routing?: RoutingService;
-  /** Ninebrains "new version available" check (features/release-check). */
-  readonly releaseCheckHost: ReleaseCheckHost;
 };
 
 type DesktopDomain = Extract<keyof typeof desktopDomainContracts, string>;
@@ -513,10 +507,6 @@ export const desktopNodeControllers = {
   },
   routing: {
     create: ({ routing }) => createRoutingWireController(routing ?? createDisabledRoutingService()),
-  },
-  releaseCheck: {
-    create: ({ appSettings, logger, releaseCheckHost, scope }) =>
-      createReleaseCheckController({ appSettings, host: releaseCheckHost, logger, scope }),
   },
 } satisfies {
   readonly [Domain in DesktopDomain]: DesktopNodeControllerContribution;

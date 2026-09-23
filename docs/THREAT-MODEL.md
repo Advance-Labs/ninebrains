@@ -63,7 +63,7 @@ per-lane tokens as a boundary where the sandbox is off.
                         │ Brain endpoint 127.0.0.1:<rand>  token→identity map          │
                         │ Brain DB (only main opens it)   dispatcher   run supervisor  │
                         │ gate runner ─ evidence store (<userData>/ninebrains/evidence) │
-                        │ CDP gate host   pack loader + safeStorage   updater (off)     │
+                        │ CDP gate host   pack loader + safeStorage   updater (signed only) │
                         └──▲─────────────▲──────────────▲──────────────▲───────────────┘
               TB2 (HTTP+token)     TB5 (stdio/env)   TB7 (read-only)  TB3 (CDP)
  ┌───────── lane (semi-trusted: obeys untrusted input) ─────────┐  ┌─ reviewer run ──┐
@@ -85,7 +85,7 @@ per-lane tokens as a boundary where the sandbox is off.
 | TB3 web ↔ lane/gates | page text, screenshots, fetched bodies, SEO data | untrusted *data*, never instructions |
 | TB4 local host ↔ endpoint | other processes, browser tabs, DNS rebinding | reject anything that isn't brain-mcp |
 | TB5 main ↔ pack MCP | third-party code, their env secrets | untrusted code, pinned and least-privilege |
-| TB6 app ↔ release channel | installers, update feed | no updater until signed; checksums always |
+| TB6 app ↔ release channel | installers, signed update feed, checksum files | updates install only after verifying the feed's signed digest; user confirms the download and the apply |
 | TB7 worker ↔ reviewer | diff, evidence, verdict | reviewer is independent and cannot write |
 
 ## 3. Assets
@@ -136,7 +136,7 @@ Likelihood (L) and impact (I): H/M/L. "Req" points at §5.
 | T25 | Unattended run deploys, pushes, emails, pays or changes DNS because a page told it to | M | H | no outbound credentials or network unless the plan allowlists them | SEC-32 |
 | T26 | Brain-created session gets `--dangerously-skip-permissions` via upstream `autoApprove` | M | H | argv guard test on every launch builder | SEC-12 |
 | T27 | App reads `.credentials.json` / `auth.json` (D5) or moves a `CLAUDE_CONFIG_DIR` | L | H | status via CLI only; FS spy test | SEC-34 |
-| T28 | Unsigned build auto-updates from a feed we don't control (upstream Emdash feed, hijacked release) | M | H | updater compiled out until signing; checksums + provenance | SEC-36, SEC-37 |
+| T28 | App updates itself from a feed we don't control (upstream Emdash feed, hijacked release, MITM'd metadata) | M | H | updater trusts only releases whose `SHA256SUMS.json` verifies against the embedded Ed25519 key; nothing downloads or applies without the user; checksums + provenance for manual installs | SEC-36, SEC-36b, SEC-37 |
 | T29 | Telemetry or a crash report leaves the machine | L | M | default off; no key or host compiled in; egress test | SEC-38 |
 | T30 | An incident can't be reconstructed because the logs were in memory (remediation lesson 4) | M | M | append-only `security_events` in the Brain DB | SEC-33 |
 | T31 | The reviewer gate's `git diff` runs in the review checkout, which shares the lane-writable repo config, so a `filter.<x>.clean` driver in `.git/config` runs during the diff. Review checkouts themselves empty every filter driver (L4). It runs under the tests-gate sandbox on macOS and on Linux with bubblewrap, but unsandboxed on Linux without it and on Windows | M | H | **Fixed 2026-09-12:** `reviewer-gate.ts` lists the repo's filter drivers with `git config` and blanks `smudge`/`clean`/`process` for the diff and the untracked listing, the same rule as `review-checkout.ts`; it fails closed on an unreadable config or an unsafe name (`T31` tests in `reviewer-gate.test.ts`). The listing and the diff are separate git processes; T33 keeps the config stable between them | SEC-18, SEC-20 |
@@ -436,12 +436,17 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   / `github_pat_`, `AKIA…`, `xox[bap]-`, `-----BEGIN … PRIVATE KEY-----`, JWTs, `Bearer …`, live
   Ninebrains tokens, and the values of all pack secrets.
   Test `SEC-35 redactor`: a fixture transcript with each pattern is stored redacted.
-- **SEC-36 Updater off until signing exists.** Unsigned builds compile the updater out: no
-  `app-update.yml`, no `checkForUpdates` timer, and `autoInstallOnAppQuit` unreachable. The publish
-  owner must never be `generalaction` (upstream's feed). The updater is re-enabled only with signed
-  builds (plan 7.1) and signature verification on.
-  Test `SEC-36 updater disabled`: a packaged-build smoke test sees no updater network call; a config
-  test rejects an upstream publish owner.
+- **SEC-36 Updates carry Ninebrains' own signature.** electron-updater is gone; the custom updater
+  under `src/main/host/updates/` accepts a release only when its `SHA256SUMS.json` verifies against
+  the Ed25519 public key baked into the app (`update-signing-key.ts`). The matching private key lives
+  only as the `NINEBRAINS_UPDATE_SIGNING_KEY` repo secret, `release.yml` signs with it and fails
+  closed if it is unset, and the publish owner is never upstream's. Nothing else feeds or patches the
+  app: `publish: null`, no `app-update.yml`, no dev-app-update files.
+- **SEC-36b No update installs without the user.** A verified newer version only shows a **Download**
+  button; a second choice (**Restart now**) launches the apply on next launch. There is no automatic
+  download, `autoInstallOnAppQuit`, or apply-at-quit path.
+  Test `SEC-36 updater trust`: integrity and feed unit tests reject a mangled signature, a wrong key
+  and an unsigned checksum file; the packaged-build smoke test still sees no network call on startup.
 - **SEC-37 Release integrity.** CI builds releases from a tag, publishes `SHA256SUMS` as an asset and
   in the release notes, and attaches GitHub build-provenance attestations. The README documents
   `shasum -a 256 -c` and `gh attestation verify`.
@@ -558,8 +563,9 @@ the agents or slices expected to close the gap.
 | SEC-33 | Open | `security_events` table |
 | SEC-34 | Open | No fs-spy test |
 | SEC-35 | Partial | Transcript (`redact.test.ts`) and evidence (`evidence-hygiene.test.ts`) redactors. Gate feedback and crash output are not redacted yet |
-| SEC-36 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `update-service.test.ts`. The packaged-build smoke test is open |
-| SEC-37 | Open | Release workflow [w4-release] |
+| SEC-36 | Implemented, not SEC-titled | UPSTREAM-PATCHES §43, `src/main/host/updates/*.test.ts`, `scripts/release/sign-update-digest.test.mjs`. The packaged-build smoke test is open |
+| SEC-36b | Implemented, not SEC-titled | Same tests: no install path exists without an explicit user choice, and the staged-marker apply only runs on next launch after **Restart now** |
+| SEC-37 | Reimplemented | `release.yml`: `checksums.mjs` writes and re-verifies sums, `sign-update-digest.mjs` signs the checksum file (fails closed), artifacts upload + draft re-verified before publish |
 | SEC-38 | Implemented, not SEC-titled | UPSTREAM-PATCHES §1, `telemetry.test.ts`. The first-run egress test is open |
 | SEC-39 | Done [w7-routing] | `launch-env.test.ts`, `routing-launch.e2e.test.ts` (attended, Brain session, unattended claude and codex, reviewer). Empty-means-unset checked on claude 2.1.269; the real attended CLI is not e2e-tested |
 | SEC-40 | Done [w7-routing] | `routing-service.test.ts`, `profiles-repo.db.test.ts`, `routing-launch.e2e.test.ts` (transcript and settings carry no key). The key is readable by the lane's own tools (R19) |
@@ -601,10 +607,10 @@ has its `argv` option. Item 9: the app's `fetchText` pins at connect time with `
 9. **net-guard does not pin.** `createLiveSafeFetchDeps` resolves with `dns.lookup`, then global
    `fetch` resolves again, so DNS rebinding is still open, whatever its README says. Fix it in
    aeo-toolkit (undici `connect.lookup`) before depending on `@advance-labs/net-guard` 0.2.2. SEC-21.
-10. **Upstream defaults to revisit in 0.5:** updater `autoInstallOnAppQuit = true` plus a periodic check
-    (SEC-36); telemetry preference defaults to `true` (SEC-38; the key is already nulled); and
-    `AGENT_ENV_VARS` passes `GITHUB_TOKEN`, `AWS_*` and others through (fine for attended lanes, too
-    broad for SEC-13).
+10. **Upstream defaults to revisit in 0.5:** telemetry preference defaults to `true` (SEC-38; the key
+    is already nulled); `AGENT_ENV_VARS` passes `GITHUB_TOKEN`, `AWS_*` and others through (fine for
+    attended lanes, too broad for SEC-13). The old updater item (`autoInstallOnAppQuit = true`) is
+    resolved: electron-updater is gone and SEC-36/H now rule the DIY pipeline.
 
 ## 7. Accepted risks for v0.1
 

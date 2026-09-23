@@ -5,8 +5,12 @@
  * code as dead.
  */
 
-/** Auto-update from Advance-Labs/ninebrains GitHub Releases. Off until the first release exists. */
-export const UPDATES_ENABLED: boolean = false;
+/**
+ * Auto-update from Advance-Labs/ninebrains GitHub Releases, signed with Ninebrains' own Ed25519 key
+ * (docs/SIGNING.md, "Our own update signature"). The updater stages a verified installer on
+ * download and applies it at the next launch; nothing is installed without the signed digest.
+ */
+export const UPDATES_ENABLED: boolean = true;
 
 /** Emdash account sign-in against Emdash's auth server. Ninebrains has no account server. */
 export const HOSTED_ACCOUNT_ENABLED: boolean = false;
