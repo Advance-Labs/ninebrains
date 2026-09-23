@@ -100,7 +100,20 @@ export async function openLanes(page) {
   await page.getByTestId('lanes-grid').waitFor({ timeout: LONG });
 }
 
+/**
+ * A tab with zero lanes shows the first-run intro instead of the grid (no `lane-cell`
+ * elements exist yet). Its "Add a lane" button opens slot 0's add-lane form, the same
+ * state the grid would already be in without the intro.
+ */
+export async function dismissIntroIfShown(page) {
+  const intro = page.getByTestId('lanes-empty-intro');
+  if (await intro.isVisible().catch(() => false)) {
+    await page.getByTestId('lanes-add-first').click();
+  }
+}
+
 export async function addLane(page, slot) {
+  await dismissIntroIfShown(page);
   const selector = `[data-testid="lane-cell"][data-slot="${slot}"] button`;
   await page.waitForFunction(
     (sel) =>
