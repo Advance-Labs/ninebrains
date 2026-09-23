@@ -72,7 +72,7 @@ Directories, package names and TS identifiers are unchanged (`apps/emdash-deskto
 |---|---|
 | `app-identity.ts`, `app-identity.canary.ts` | `APP_ID` `dev.advancelabs.ninebrains[.canary]`, `PRODUCT_NAME` Ninebrains, `APP_NAME_LOWER`/`ARTIFACT_PREFIX` `ninebrains` |
 | `src/main/bootstrap/boot/phases/apply-identity.ts` | `app.setAboutPanelOptions` with Ninebrains name and copyright |
-| `src/renderer/index.html` | `<title>`, boot-splash logo (Ninebrains mark + wordmark) and splash strings |
+| `src/renderer/index.html` | `<title>`, boot-splash mark (the website's nine-square loading mark, with a delayed ring sweep) and splash strings |
 | `src/core/primitives/app-identity/browser/emdash-logo.tsx`, `emdash-shimmer-logo.tsx` | Emdash wordmark paths replaced with the Ninebrains mark + wordmark (`LogoShapes`) |
 | `src/assets/images/emdash/*.png`, `*.icns`, `build/dmg-background.tiff` | File contents replaced with the original Ninebrains mark (same filenames). The DMG background lost Emdash's three-dash motif |
 | `package.json` (desktop) | description, homepage, author (Advance Labs Inc.) |
@@ -685,3 +685,9 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.0 → 0.2.1 | Written by `pnpm run release:prepare 0.2.1`; `release.yml` refuses a version that does not match |
+
+## 42. Boot splash uses the website's loading mark (`ninebrains/loading-55uqq`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/renderer/index.html` | Boot splash: the old radial logo and "ninebrains" wordmark are replaced by the website's nine-square `#intro` mark, centred and sized the same (`clamp(96px, 12vmin, 120px)`); the indeterminate progress bar is replaced by `WorkingMarkIcon`'s clockwise arm sweep and core pulse, starting at 1.2s (when the bar used to appear); static under reduced motion. Theme background/foreground tokens are kept, not the site's `#000`/`#fafafa` | The splash still showed the retired branding; the app's first paint now matches the site, and keeping the theme colours avoids a flash when the splash hands off |

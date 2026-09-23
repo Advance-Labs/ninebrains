@@ -54,33 +54,26 @@
         opacity: 0;
         pointer-events: none;
       }
-      #boot-splash .boot-splash-logo {
-        height: 26px;
-        width: auto;
+      /*
+        The website's loading mark (apps/site/src/index.html #intro): the nine-square brand mark,
+        centred and sized the same. Geometry is shared with WorkingMarkIcon and
+        tooling/brand/glyph.mjs. If boot runs long, the arms start the same clockwise sweep
+        WorkingMarkIcon uses, so a slow start still reads as alive rather than frozen.
+      */
+      #boot-splash .boot-splash-mark {
+        display: block;
+        width: clamp(96px, 12vmin, 120px);
+        height: auto;
         fill: var(--boot-splash-fg, #202020);
-        stroke: var(--boot-splash-fg, #202020);
-        opacity: 0.9;
       }
-      #boot-splash .boot-splash-progress {
-        position: relative;
-        width: 132px;
-        height: 2px;
-        border-radius: 1px;
-        overflow: hidden;
-        background-color: color-mix(in srgb, var(--boot-splash-fg, #202020) 14%, transparent);
-        opacity: 0;
-        animation: boot-splash-reveal 240ms ease-out 1200ms forwards;
+      #boot-splash .boot-splash-mark rect {
+        animation: boot-splash-arm 1.6s linear infinite;
+        animation-delay: calc(1.2s + var(--i) * 0.2s);
+        animation-fill-mode: backwards;
       }
-      #boot-splash .boot-splash-progress::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 40%;
-        border-radius: 1px;
-        background-color: color-mix(in srgb, var(--boot-splash-fg, #202020) 55%, transparent);
-        animation: boot-splash-slide 1.3s ease-in-out infinite;
+      #boot-splash .boot-splash-mark .boot-splash-core {
+        animation: boot-splash-core 0.8s ease-in-out 1.2s infinite;
+        animation-fill-mode: backwards;
       }
       #boot-splash-escape {
         position: absolute;
@@ -117,57 +110,55 @@
       .boot-splash-escape-actions button:hover {
         background-color: color-mix(in srgb, var(--boot-splash-fg, #202020) 8%, transparent);
       }
-      @keyframes boot-splash-reveal {
-        to {
+      /* Same fade curve as WorkingMarkIcon: a bright head with a soft tail, never fully gone. */
+      @keyframes boot-splash-arm {
+        0% {
           opacity: 1;
         }
-      }
-      @keyframes boot-splash-slide {
-        0% {
-          left: -40%;
+        25% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 0.25;
+        }
+        75% {
+          opacity: 0.12;
         }
         100% {
-          left: 100%;
+          opacity: 0.08;
+        }
+      }
+      @keyframes boot-splash-core {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.45;
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        #boot-splash .boot-splash-progress {
-          animation-duration: 1ms;
-        }
-        #boot-splash .boot-splash-progress::before {
+        #boot-splash .boot-splash-mark rect,
+        #boot-splash .boot-splash-mark .boot-splash-core {
           animation: none;
-          left: 30%;
         }
       }
     </style>
   </head>
   <body>
     <div id="boot-splash">
-      <svg class="boot-splash-logo" viewBox="0 0 350 70" xmlns="http://www.w3.org/2000/svg">
-        <g fill="none" stroke-width="3" stroke-linecap="round">
-          <path transform="rotate(0 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(45 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(90 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(135 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(180 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(225 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(270 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-          <path transform="rotate(315 35 35)" d="M 35 25 C 41.2 17.5, 29.2 11.5, 36.4 5" />
-        </g>
-        <g stroke-width="0">
-          <circle transform="rotate(0 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(45 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(90 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(135 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(180 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(225 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(270 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle transform="rotate(315 35 35)" cx="36.4" cy="5" r="3.4" />
-          <circle cx="35" cy="35" r="11.8" />
-          <text x="82" y="51" font-size="46" font-weight="600" letter-spacing="-1">ninebrains</text>
-        </g>
+      <svg class="boot-splash-mark" viewBox="0 0 70 70" aria-hidden="true" focusable="false">
+        <!-- Arms clockwise from the top; --i staggers the sweep so it traces a lap. -->
+        <rect style="--i: 0" x="28.5" y="7.5" width="13" height="13" rx="2" />
+        <rect style="--i: 1" x="49.5" y="7.5" width="13" height="13" rx="2" />
+        <rect style="--i: 2" x="49.5" y="28.5" width="13" height="13" rx="2" />
+        <rect style="--i: 3" x="49.5" y="49.5" width="13" height="13" rx="2" />
+        <rect style="--i: 4" x="28.5" y="49.5" width="13" height="13" rx="2" />
+        <rect style="--i: 5" x="7.5" y="49.5" width="13" height="13" rx="2" />
+        <rect style="--i: 6" x="7.5" y="28.5" width="13" height="13" rx="2" />
+        <rect style="--i: 7" x="7.5" y="7.5" width="13" height="13" rx="2" />
+        <rect class="boot-splash-core" x="25" y="25" width="20" height="20" rx="2" />
       </svg>
-      <div class="boot-splash-progress"></div>
       <div id="boot-splash-escape" hidden>
         <p>Ninebrains is taking longer than expected to start.</p>
         <div class="boot-splash-escape-actions">
