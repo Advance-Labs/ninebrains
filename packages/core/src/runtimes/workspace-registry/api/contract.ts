@@ -6,6 +6,7 @@ import {
   createWorktreeErrorSchema,
   deleteWorkspaceErrorSchema,
   deleteWorktreeErrorSchema,
+  cleanArtifactsErrorSchema,
   measureUsageErrorSchema,
   runScriptErrorSchema,
   updateWorktreeErrorSchema,
@@ -20,6 +21,8 @@ import {
   deleteWorktreeInputSchema,
   getProjectConfigInputSchema,
   importLegacyLifecycleSettingsInputSchema,
+  cleanArtifactsInputSchema,
+  cleanArtifactsResultSchema,
   measureUsageInputSchema,
   patchPersonalProjectConfigInputSchema,
   projectConfigStateSchema,
@@ -227,6 +230,18 @@ export const workspaceRegistryContract = defineContract({
     input: measureUsageInputSchema,
     data: workspaceUsageSchema,
     error: measureUsageErrorSchema,
+  }),
+
+  /**
+   * Ninebrains: removes a worktree's git-ignored artifacts (the `measureUsage` artifact roots) while
+   * keeping the worktree, its tracked and untracked files, and every root that holds a
+   * `preservePatterns` match. Deactivates first (sessions + teardown) under the
+   * per-workspace claim; a failed teardown removes nothing. Worktree records only.
+   */
+  cleanArtifacts: fallible({
+    input: cleanArtifactsInputSchema,
+    data: cleanArtifactsResultSchema,
+    error: cleanArtifactsErrorSchema,
   }),
 
   /**

@@ -45,7 +45,7 @@ export async function measureWorkspaceUsage(
   }
 }
 
-async function listIgnoredArtifactRoots(
+export async function listIgnoredArtifactRoots(
   workspacePath: string,
   options: Pick<MeasureWorkspaceUsageOptions, 'signal' | 'createGitExec'>
 ): Promise<Result<string[], MeasureWorkspaceUsageError>> {

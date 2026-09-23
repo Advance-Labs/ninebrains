@@ -294,28 +294,44 @@ export const WorkspaceDetailPage = observer(function WorkspaceDetailPage({
     [openTask]
   );
 
+  // Ninebrains: cleans ignored artifacts through the host `cleanArtifacts` verb; it used to
+  // call `archive`, which force-removed the whole worktree despite this dialog's promise.
   const handleCleanArtifacts = useCallback(
     async (item: WorkspaceDetailListItem) => {
       const { row } = item;
+      if (!row.workspaceId) {
+        toast.error('Could not clean artifacts', {
+          description: 'This workspace is not registered on its host yet.',
+        });
+        return;
+      }
       const outcome = await openConfirm({
         title: `Clean artifacts for ${item.name}?`,
         description: row.hasActiveSessions
-          ? 'This stops active sessions, runs teardown scripts, and removes gitignored artifacts. Tasks remain restorable, but dependencies may need to be restored.'
-          : 'This runs teardown scripts and removes gitignored dependencies, build output, and caches. The worktree and its tasks stay intact.',
+          ? 'This stops active sessions, runs teardown scripts, and removes gitignored dependencies, build output, and caches. Files matching preservePatterns, your uncommitted changes, and the worktree stay. Tasks remain restorable, but dependencies may need reinstalling.'
+          : 'This runs teardown scripts and removes gitignored dependencies, build output, and caches. Files matching preservePatterns, your uncommitted changes, and the worktree stay.',
         confirmLabel: 'Clean Artifacts',
       });
       if (!outcome.success) return;
 
       try {
         const client = await getWorkspacesWireClient();
-        const result = await client.archive({
+        const result = await client.cleanArtifacts({
           projectId: row.projectId,
-          workspaceId: row.workspaceId ?? undefined,
-          workspacePath: row.path,
-          branchName: row.branch,
+          workspaceId: row.workspaceId,
         });
         if (result.success) {
-          toast(`Queued artifact cleanup for ${item.name}`);
+          const { removed, kept, failed } = result.data;
+          const details = [
+            kept.length > 0 ? `Kept ${kept.join(', ')} (preservePatterns).` : null,
+            failed > 0 ? `${failed} could not be removed.` : null,
+          ].filter((line): line is string => line !== null);
+          toast(
+            `Removed ${removed} artifact ${removed === 1 ? 'path' : 'paths'} from ${item.name}`,
+            {
+              ...(details.length > 0 && { description: details.join(' ') }),
+            }
+          );
         } else {
           toast.error('Could not clean artifacts', { description: result.error.message });
         }

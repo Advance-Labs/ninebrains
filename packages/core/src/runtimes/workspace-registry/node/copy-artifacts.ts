@@ -119,7 +119,7 @@ export async function executeCopyArtifacts(
  * to top-level entries: a match nested inside another matched directory rides its
  * parent. Matches are repo-relative POSIX paths.
  */
-async function resolvePatternMatches(
+export async function resolvePatternMatches(
   repositoryPath: string,
   patterns: string[]
 ): Promise<string[]> {
@@ -293,7 +293,7 @@ async function cowClone(source: string, destination: string): Promise<void> {
   throw new Error(`No copy-on-write tier on ${process.platform}`);
 }
 
-function isSafePattern(pattern: string): boolean {
+export function isSafePattern(pattern: string): boolean {
   if (!pattern || path.isAbsolute(pattern)) return false;
   return !pattern.split(/[\\/]/).some((part) => part === '..');
 }

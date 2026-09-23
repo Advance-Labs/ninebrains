@@ -31,8 +31,6 @@ import { reconcileSweepTriggers } from '@core/services/reconcile-sweep/node/reco
  * `deleteWorktree`/`deleteWorkspace` RPC against an effectively attached Project,
  * then the mirror row is untracked. If attachment disappears, the interactive
  * mutation refuses and leaves the mirror unchanged; it never creates recovery work.
- * Archive differs from delete only in the desktop annotation; host-side both remove
- * the worktree with `deleteBranch: false`.
  */
 
 export type WorkspaceRemovalResult = Result<MutationAck, MutationError>;
@@ -109,14 +107,6 @@ export async function deleteWorkspacePathThroughRegistry(
     requireUnused: true,
     deleteConversations: options.deleteConversations ?? false,
   });
-}
-
-export async function archiveWorkspaceThroughRegistry(
-  db: AppDb,
-  runtimes: WorkspaceRemovalBroker,
-  input: ArchiveWorkspaceInput
-): Promise<WorkspaceRemovalResult> {
-  return removeWorkspacePathThroughRegistry(db, runtimes, input, { requireUnused: false });
 }
 
 async function removeWorkspacePathThroughRegistry(

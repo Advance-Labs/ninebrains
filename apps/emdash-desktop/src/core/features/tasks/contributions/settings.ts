@@ -10,6 +10,7 @@ const taskSettingsSchema = z.object({
   deleteBranchByDefault: z.boolean(),
   preserveNameCapitalization: z.boolean(),
   includeIssueContextByDefault: z.boolean(),
+  cleanUpArchivedWorktrees: z.boolean(),
 });
 
 export const taskSettingsContribution = defineSettingsContribution<'tasks', TaskSettings>({
@@ -23,5 +24,6 @@ export const taskSettingsContribution = defineSettingsContribution<'tasks', Task
     deleteBranchByDefault: false,
     preserveNameCapitalization: false,
     includeIssueContextByDefault: true,
+    cleanUpArchivedWorktrees: true,
   },
 });

@@ -30,6 +30,8 @@ export type TaskSettings = {
   deleteBranchByDefault: boolean;
   preserveNameCapitalization: boolean;
   includeIssueContextByDefault: boolean;
+  /** Remove worktrees of tasks archived over 30 days ago; Restore recreates them. */
+  cleanUpArchivedWorktrees: boolean;
 };
 
 export type FilesSettings = {
