@@ -25,3 +25,20 @@ export const workspaceUsageSchema = z.object({
   errors: z.array(workspaceUsageErrorSchema),
 });
 export type WorkspaceUsage = z.infer<typeof workspaceUsageSchema>;
+
+/** Keyed by workspace id, like `measureUsage`. */
+export const cleanArtifactsInputSchema = z.object({
+  workspaceId: z.string().min(1),
+});
+export type CleanArtifactsInput = z.infer<typeof cleanArtifactsInputSchema>;
+
+/**
+ * What one artifact clean did, as workspace-relative `git clean -ndX` roots: `removed`
+ * were deleted; `kept` hold (or sit inside) a `preservePatterns` match and were left.
+ */
+export const cleanArtifactsResultSchema = z.object({
+  removed: z.array(z.string()),
+  kept: z.array(z.string()),
+  errors: z.array(workspaceUsageErrorSchema),
+});
+export type CleanArtifactsResult = z.infer<typeof cleanArtifactsResultSchema>;

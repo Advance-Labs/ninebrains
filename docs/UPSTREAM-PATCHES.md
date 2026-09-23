@@ -691,3 +691,20 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 | File | Change | Why |
 |---|---|---|
 | `src/renderer/index.html` | Boot splash: the old radial logo and "ninebrains" wordmark are replaced by the website's nine-square `#intro` mark, centred and sized the same (`clamp(96px, 12vmin, 120px)`); the indeterminate progress bar is replaced by `WorkingMarkIcon`'s clockwise arm sweep and core pulse, starting at 1.2s (when the bar used to appear); static under reduced motion. Theme background/foreground tokens are kept, not the site's `#000`/`#fafafa` | The splash still showed the retired branding; the app's first paint now matches the site, and keeping the theme colours avoids a flash when the splash hands off |
+
+## 43. Clean Artifacts cleans artifacts; archived worktrees expire after 30 days (`ninebrains/archived-uxcqd`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/runtimes/workspace-registry/api/contract.ts`, `packages/core/src/runtimes/workspace-registry/api/errors.ts`, `packages/core/src/runtimes/workspace-registry/api/index.ts`, `packages/core/src/runtimes/workspace-registry/api/schemas/usage.ts` | New `cleanArtifacts` host verb with its input, result and error schemas | The worktree page's Clean Artifacts button had no verb that removed only ignored files |
+| `packages/core/src/runtimes/workspace-registry/node/runtime.ts`, `packages/core/src/runtimes/workspace-registry/node/api/controller.ts` | `cleanArtifacts`: under the per-workspace claim, deactivate (sessions + teardown), then remove ignored roots under the worktree writer lock; worktrees only | Same locking and deactivation as `deleteWorktree`, so nothing holds the files being removed |
+| `packages/core/src/runtimes/workspace-registry/node/measure-usage.ts`, `packages/core/src/runtimes/workspace-registry/node/copy-artifacts.ts` | `listIgnoredArtifactRoots`, `resolvePatternMatches`, `isSafePattern` exported | The clean removes exactly what `measureUsage` reports as reclaimable and keeps `preservePatterns` matches with the same resolver the copy uses |
+| `src/core/features/workspaces/api/wire-contract.ts`, `src/core/features/workspaces/node/wire-controller.ts`, `src/core/features/workspaces/node/workspace-mutation-service.ts`, `src/core/features/workspaces/api/node/operations/workspace-removal.ts` | Desktop `archive` mutation (and `archiveWorkspaceThroughRegistry`) replaced by `cleanArtifacts` | `archive` ran `git worktree remove --force` while the dialog promised "the worktree and its tasks stay intact" |
+| `src/core/features/workspaces/contributions/browser/workspace-detail-page.tsx` | Clean Artifacts calls `cleanArtifacts`; dialog copy states what stays; toast reports removed and kept roots | The UI says what the action does |
+| `src/core/features/workspaces/node/operations/list-project-workspaces.ts` | `canCleanArtifacts` only for registered worktrees | The verb refuses repository roots, whose ignored files are the user's own |
+| `src/main/bootstrap/boot/phases/services.ts` | Hourly `sweepArchivedWorktrees` periodic sweep | Worktrees of tasks archived over 30 days are removed; branch and mirror row stay, so Restore replays the creation |
+| `src/core/features/tasks/contributions/settings.ts`, `src/core/primitives/app-settings/api/app-settings.ts`, `src/core/features/tasks/api/browser/hooks/useTaskSettings.ts`, `src/core/features/settings/browser/components/TaskSettingsRows.tsx`, `src/core/features/settings/browser/pages/general-settings-page.tsx` | `tasks.cleanUpArchivedWorktrees` setting (default on) and its General settings row | An off switch for the automatic removal |
+| `src/core/features/workspaces/node/wire-controller.test.ts`, `src/core/features/workspaces/node/workspace-mutation-service.test.ts` | Tests follow the `archive` → `cleanArtifacts` rename | |
+
+New Ninebrains-only files: `packages/core/src/runtimes/workspace-registry/node/clean-artifacts.ts` (+ test),
+`src/core/features/tasks/node/archived-worktree-cleanup.ts` (+ `.db.test.ts`).

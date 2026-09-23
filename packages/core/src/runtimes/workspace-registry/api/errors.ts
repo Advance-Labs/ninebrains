@@ -98,6 +98,21 @@ export const measureUsageErrorSchema = z.discriminatedUnion('type', [
 ]);
 export type MeasureUsageError = z.infer<typeof measureUsageErrorSchema>;
 
+export const cleanArtifactsErrorSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('workspace-not-found'), workspaceId: z.string() }),
+  /** Only worktrees are cleanable; a repository root's ignored files are the user's own. */
+  z.object({ type: z.literal('not-a-worktree'), workspaceId: z.string() }),
+  z.object({ type: z.literal('workspace-missing'), workspaceId: z.string() }),
+  /** The teardown script failed; nothing was removed. */
+  z.object({ type: z.literal('teardown-failed'), message: z.string() }),
+  /** `git clean -ndX` (the artifact-root listing) failed in the workspace. */
+  z.object({ type: z.literal('git-command-failed'), message: z.string() }),
+  z.object({ type: z.literal('filesystem-error'), message: z.string() }),
+  /** git reported an ignored artifact outside the workspace tree; clean refused. */
+  z.object({ type: z.literal('unsafe-artifact-path'), message: z.string() }),
+]);
+export type CleanArtifactsError = z.infer<typeof cleanArtifactsErrorSchema>;
+
 export const createWorktreeErrorSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('repository-not-found'), repositoryId: z.string() }),
   z.object({

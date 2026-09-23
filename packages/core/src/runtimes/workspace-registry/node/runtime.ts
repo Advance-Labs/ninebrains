@@ -30,6 +30,7 @@ import type {
   CreateWorktreeError,
   DeleteWorkspaceError,
   DeleteWorktreeError,
+  CleanArtifactsError,
   MeasureUsageError,
   RunScriptError,
   UpdateWorktreeError,
@@ -43,6 +44,8 @@ import type {
   DeleteWorkspaceInput,
   DeleteWorktreeInput,
   ImportLegacyLifecycleSettingsInput,
+  CleanArtifactsInput,
+  CleanArtifactsResult,
   MeasureUsageInput,
   GetProjectConfigInput,
   PatchPersonalProjectConfigInput,
@@ -62,6 +65,7 @@ import type {
 } from '../api/schemas';
 import { WorkspaceActivationManager, type WorkspaceDeactivationResult } from './activation';
 import { BackgroundStepRunner } from './background-steps';
+import { cleanWorkspaceArtifacts } from './clean-artifacts';
 import { readWorkspaceConfig, type WorkspaceConfigEntry } from './config-model';
 import { executeCreateWorktree } from './create-worktree';
 import { executeDeleteWorktree } from './delete-worktree';
@@ -850,6 +854,41 @@ export class WorkspaceRegistryRuntime {
       return err({ type: 'workspace-not-found', workspaceId: input.workspaceId });
     }
     return measureWorkspaceUsage({ workspacePath: record.path, signal });
+  }
+
+  /**
+   * Ninebrains: removes the worktree's reclaimable git-ignored artifacts, keeping `preservePatterns`
+   * matches. Held under the per-workspace claim: deactivation (script runs, sessions,
+   * teardown) comes first so no process holds the files being removed, and a failed
+   * teardown removes nothing. The removal takes the per-worktree writer lock so probes
+   * wait rather than observing a half-cleaned tree. Writes nothing durable; the next
+   * `measureUsage` observes the reclaimed space.
+   */
+  cleanArtifacts(
+    input: CleanArtifactsInput
+  ): Promise<Result<CleanArtifactsResult, CleanArtifactsError>> {
+    return this.workspaceClaims.runExclusive(input.workspaceId, async () => {
+      const record = this.store.get(input.workspaceId);
+      if (!record) {
+        return err({ type: 'workspace-not-found', workspaceId: input.workspaceId });
+      }
+      if (record.kind !== 'worktree') {
+        return err({ type: 'not-a-worktree', workspaceId: input.workspaceId });
+      }
+      if (record.observedStatus === 'missing') {
+        return err({ type: 'workspace-missing', workspaceId: input.workspaceId });
+      }
+      const { teardownFailure } = await this.deactivateLocked(record);
+      if (teardownFailure) {
+        return err({ type: 'teardown-failed', message: teardownFailure.message });
+      }
+      return this.gitContext.locks.withWriter(record.path, () =>
+        cleanWorkspaceArtifacts({
+          workspacePath: record.path,
+          preservePatterns: record.lifecycle?.preservePatterns ?? [],
+        })
+      );
+    });
   }
 
   /**

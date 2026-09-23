@@ -239,7 +239,8 @@ function buildCandidateRow(
   return {
     ...base,
     pathState: 'measured',
-    canCleanArtifacts: !remote && !pendingRemoval,
+    // Ninebrains: the host verb cleans worktrees only: a repository root's ignored files are the user's own.
+    canCleanArtifacts: !remote && !pendingRemoval && candidate.workspace?.kind === 'worktree',
   };
 }
 

@@ -166,6 +166,32 @@ export const DeleteBranchByDefaultRow: React.FC = () => {
   );
 };
 
+export const CleanUpArchivedWorktreesRow: React.FC = () => {
+  const taskSettings = useTaskSettings();
+
+  return (
+    <SettingRow
+      title="Clean up archived worktrees"
+      description="Remove the worktree of a task archived for over 30 days. The branch is kept, and restoring the task recreates the worktree. Worktrees with uncommitted changes are never removed."
+      control={
+        <>
+          <ResetToDefaultButton
+            visible={taskSettings.isFieldOverridden('cleanUpArchivedWorktrees')}
+            defaultLabel="on"
+            onReset={taskSettings.resetCleanUpArchivedWorktrees}
+            disabled={taskSettings.loading || taskSettings.saving}
+          />
+          <Switch
+            checked={taskSettings.cleanUpArchivedWorktrees}
+            disabled={taskSettings.loading || taskSettings.saving}
+            onCheckedChange={taskSettings.updateCleanUpArchivedWorktrees}
+          />
+        </>
+      }
+    />
+  );
+};
+
 export const PreserveTaskNameCapitalizationRow: React.FC = () => {
   const taskSettings = useTaskSettings();
 
