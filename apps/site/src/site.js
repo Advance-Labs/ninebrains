@@ -547,6 +547,13 @@ function initInstallTabs(onShown) {
  * The legacy copy path: a selected, off-screen textarea and execCommand. It is synchronous, so it
  * still runs inside the click's user activation, and it works where the async Clipboard API is
  * missing or refused (older or locked-down browsers, embedded webviews, plain http).
+ *
+ * Returns 'copied', 'refused' (the call ran and said no) or 'blocked': it answered yes without
+ * copying anything. A real copy always fires a copy event at the document first, so that event is
+ * the only honest witness. Content blockers stand in for execCommand and return true, which is
+ * what a shell one-liner meets today: uBlock Origin's ClickFix defence matches `irm ... | iex`,
+ * takes the call, and reports success. Trusting the return value there puts a green Copied on a
+ * button over an untouched clipboard, which is the worst of the three answers.
  */
 function copyWithSelection(text) {
   const focused = document.activeElement;
@@ -556,16 +563,23 @@ function copyWithSelection(text) {
   area.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
   document.body.append(area);
   area.select();
+  let witnessed = false;
+  const witness = () => {
+    witnessed = true;
+  };
+  document.addEventListener('copy', witness, true);
   let ok = false;
   try {
     ok = document.execCommand('copy');
   } catch {
     ok = false;
   }
+  document.removeEventListener('copy', witness, true);
   area.remove();
   // Selecting the textarea moved focus; hand it back so keyboard users stay on the button.
   if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
-  return ok;
+  if (witnessed) return 'copied';
+  return ok ? 'blocked' : 'refused';
 }
 
 /** Selects the command on the page so a manual Ctrl+C / Cmd+C picks it up. */
@@ -597,15 +611,20 @@ function initCopyButtons() {
       const text = code?.textContent?.replace(/\s+/g, ' ').trim();
       if (!code || !text) return;
       // Try the synchronous path first: an await before it would spend the click's activation.
-      let ok = copyWithSelection(text);
-      if (!ok && navigator.clipboard?.writeText) {
-        ok = await navigator.clipboard.writeText(text).then(
+      const wrote = copyWithSelection(text);
+      if (wrote === 'copied') return show('✓ Copied', 'true');
+      // Only when the sync path refused outright. 'blocked' means something took the write and
+      // said yes without making it; the async API answers to the same block and refuses just as
+      // quietly, so asking it would buy a second false yes and a second warning over the page.
+      if (wrote === 'refused' && navigator.clipboard?.writeText) {
+        const ok = await navigator.clipboard.writeText(text).then(
           () => true,
           () => false
         );
+        if (ok) return show('✓ Copied', 'true');
       }
-      if (ok) return show('✓ Copied', 'true');
-      // Nothing let us write: leave the command selected and say how to finish by hand.
+      // Nothing let us write: leave the command selected and say how to finish by hand. A copy the
+      // reader makes themselves is theirs, so no blocker stands in the way of that one.
       selectCommand(code);
       show(mac ? 'Press ⌘C' : 'Press Ctrl+C', 'manual');
     });
