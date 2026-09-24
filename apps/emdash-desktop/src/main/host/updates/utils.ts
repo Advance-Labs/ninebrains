@@ -16,11 +16,18 @@ export function formatUpdaterError(error: unknown): string {
     statusMessage?: string;
     description?: string;
   };
-  const status = err.statusCode || err.code || err.status;
+  // Only a numeric status is an HTTP status. `err.code` is also where Node puts filesystem and
+  // socket codes, so folding it in here reported `ENOTEMPTY` from an `fs.rm` as "failed with HTTP
+  // ENOTEMPTY" — which is why a broken in-place install read as a network problem in the log.
+  const status = err.statusCode ?? err.status;
   const statusText = err.statusMessage || err.description;
-  if (status) {
+  if (typeof status === 'number') {
     const base = `Update request failed with HTTP ${status}`;
     return statusText ? `${base}: ${stripMarkupAndTruncate(String(statusText))}` : base;
+  }
+  if (err.code) {
+    const message = error instanceof Error ? error.message : String(err.code);
+    return stripMarkupAndTruncate(message.includes(err.code) ? message : `${err.code}: ${message}`);
   }
   const message = error instanceof Error ? error.message : String(error ?? 'Unknown update error');
   return stripMarkupAndTruncate(message);

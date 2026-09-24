@@ -103,12 +103,60 @@ async function installMacAppSwap(pending: PendingUpdate): Promise<void> {
     await fsp.rename(rollbackDir, bundlePath).catch(() => undefined);
     throw error;
   }
-  await fsp.rm(rollbackDir, { recursive: true, force: true });
-  await fsp.rm(stagingDir, { recursive: true, force: true });
+  // The swap is done: from here the update IS applied, so nothing below may reject. `rollbackDir`
+  // is the bundle THIS process is executing from — macOS will not unlink a running binary or the
+  // open app.asar, so the recursive walk leaves those behind and the final rmdir returns
+  // ENOTEMPTY, every time, on every Mac. Letting that reject failed an install that had already
+  // succeeded: the caller rolled the UI back to "Restart now", never relaunched, and each retry
+  // swapped the already-updated bundle again and stranded another copy of it.
+  // Both directories are swept on the next boot, when the old bundle is no longer running.
+  await discard(rollbackDir);
+  await discard(stagingDir);
   log.info('Applied Ninebrains update in place', {
     from: pending.version,
     bundle: bundlePath,
   });
+}
+
+/** Removes a leftover update directory, or logs why it could not go. Never throws. */
+async function discard(dir: string): Promise<void> {
+  try {
+    await fsp.rm(dir, { recursive: true, force: true });
+  } catch (error) {
+    log.info('Leaving an update directory for the next boot to sweep', {
+      dir,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+const LEFTOVER_DIR = /^\.ninebrains-(rollback|update)-/;
+
+/**
+ * Removes the `.ninebrains-rollback-*` / `.ninebrains-update-*` directories an in-place update
+ * leaves beside the bundle. Called at boot, when the running process is the NEW bundle and the
+ * old one is finally free to delete. Best effort: anything still held is left for the next boot.
+ */
+export async function sweepLeftoverUpdateDirs(destinationRoot: string): Promise<number> {
+  let swept = 0;
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(destinationRoot);
+  } catch {
+    return 0;
+  }
+  for (const entry of entries) {
+    if (!LEFTOVER_DIR.test(entry)) continue;
+    const dir = join(destinationRoot, entry);
+    try {
+      await fsp.rm(dir, { recursive: true, force: true });
+      swept += 1;
+    } catch {
+      // Still in use (an older copy of this app is running from it). Next boot gets it.
+    }
+  }
+  if (swept > 0) log.info('Swept leftover update directories', { count: swept, destinationRoot });
+  return swept;
 }
 
 async function installLinuxAppImage(pending: PendingUpdate): Promise<void> {
