@@ -38,7 +38,7 @@ export type PtySpawnIntent =
       tmux?: { name: string; identity?: string };
     };
 
-export type LocalPtySpawnWarning = 'tmux_unsupported_on_windows';
+export type LocalPtySpawnWarning = 'tmux_unsupported_on_windows' | 'tmux_missing';
 
 export type ResolvedLocalPtySpawn = {
   invocation: NativeInvocation;
@@ -342,6 +342,21 @@ export function resolveLocalPtySpawn({
   return platform === 'win32'
     ? resolveWindowsSpawn(intent, env, fileExists)
     : resolvePosixSpawn(intent, env, platform);
+}
+
+/**
+ * Decides which warning, if any, applies to a session's tmux request. Kept pure and
+ * host-agnostic (the caller supplies `isLocalWindows`) so it can be reused wherever tmux
+ * availability is resolved without coupling this module to workspace/host types.
+ */
+export function resolveTmuxWarning(options: {
+  requested: boolean;
+  available: boolean;
+  isLocalWindows: boolean;
+}): LocalPtySpawnWarning | undefined {
+  if (!options.requested) return undefined;
+  if (options.isLocalWindows) return 'tmux_unsupported_on_windows';
+  return options.available ? undefined : 'tmux_missing';
 }
 
 export function logLocalPtySpawnWarnings(

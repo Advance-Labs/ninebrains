@@ -1,4 +1,5 @@
-import type { RuntimeBroker } from '@emdash/core/services/runtime-broker/api';
+import { resolveTmuxWarning, type LocalPtySpawnWarning } from '@emdash/core/services/pty/api';
+import type { HostRuntimesClient, RuntimeBroker } from '@emdash/core/services/runtime-broker/api';
 import { err, ok, type Result } from '@emdash/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { ProjectAttachmentError } from '@core/features/projects/api';
@@ -15,6 +16,7 @@ import { tasks } from '@core/services/app-db/node/schema';
 export type TaskSessionLaunchContext = Readonly<{
   workspace: WorkspaceIdentity;
   tmux: boolean;
+  tmuxWarning?: LocalPtySpawnWarning;
   shellSetup?: string;
   env: Readonly<Record<string, string>>;
 }>;
@@ -92,13 +94,14 @@ export class TaskSessionLaunchContextResolver {
     const runtime = await this.dependencies.runtimes.client(identity.host);
     if (!runtime.success) return runtime;
 
-    const [effective, tmux, projectConfig] = await Promise.all([
+    const [effective, tmux, projectConfig, tmuxAvailable] = await Promise.all([
       resolveProjectEffectiveSettings({
         settings: project.data.settings,
         repoFacts: project.data.repoFacts,
       }),
       project.data.settings.resolveTmux(),
       runtime.data.workspaceRegistry.getProjectConfig({ workspaceId: identity.workspaceId }),
+      resolveTmuxAvailability(runtime.data.hostDependencies),
     ]);
     if (!projectConfig.success) {
       return err({
@@ -107,9 +110,18 @@ export class TaskSessionLaunchContextResolver {
       });
     }
 
+    const platform = process.platform;
+    const isLocalWindows = identity.host.type === 'local' && platform === 'win32';
+    const tmuxWarning = resolveTmuxWarning({
+      requested: tmux.value,
+      available: tmuxAvailable,
+      isLocalWindows,
+    });
+
     return ok({
       workspace: identity,
-      tmux: resolveSessionTmux(identity.host, tmux.value),
+      tmux: resolveSessionTmux(identity.host, tmux.value && tmuxAvailable, platform),
+      tmuxWarning,
       shellSetup: projectConfig.data.resolved.shellSetup?.value,
       env: {
         ...projectConfig.data.resolved.env.value,
@@ -123,6 +135,24 @@ export class TaskSessionLaunchContextResolver {
         }),
       },
     });
+  }
+}
+
+/**
+ * Resolves whether tmux is available on the session's own host. This is per-host by
+ * construction: it goes through the runtime client bound to `identity.host`, so SSH hosts
+ * consult their own machine rather than the desktop's. A failed or throwing lookup is treated
+ * as "tmux is absent" rather than surfaced as a hard error, so a flaky dependency probe never
+ * blocks a session from starting.
+ */
+async function resolveTmuxAvailability(
+  hostDependencies: Pick<HostRuntimesClient['hostDependencies'], 'resolver'>
+): Promise<boolean> {
+  try {
+    const resolved = await hostDependencies.resolver.resolve({ id: 'tmux' });
+    return resolved.success;
+  } catch {
+    return false;
   }
 }
 
