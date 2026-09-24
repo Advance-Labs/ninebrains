@@ -8,6 +8,12 @@
       "reason": "Font files bundled into the renderer. OFL-1.1 allows bundling and redistribution with software; it only bars selling the font on its own and reusing the reserved font name. It does not touch the licence of our code."
     },
     {
+      "package": "@fontsource-variable/atkinson-hyperlegible-mono",
+      "license": "OFL-1.1",
+      "reviewed": "2026-09-24",
+      "reason": "Monospace accessibility font bundled into the renderer as a terminal font option. Same OFL-1.1 terms as Inter and JetBrains Mono: redistribution with software is allowed, only standalone sale and reuse of the reserved font name are barred, and our code keeps its own licence."
+    },
+    {
       "package": "@fontsource-variable/jetbrains-mono",
       "license": "OFL-1.1",
       "reviewed": "2026-09-10",
