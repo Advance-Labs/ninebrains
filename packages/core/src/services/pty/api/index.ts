@@ -9,6 +9,7 @@ export { isUnexpectedPtyExit } from './exit-classification';
 export {
   logLocalPtySpawnWarnings,
   resolveLocalPtySpawn,
+  resolveTmuxWarning,
   type LocalPtySpawnWarning,
   type PtyCommandSpec,
   type PtySpawnIntent,

@@ -749,3 +749,17 @@ New Ninebrains-only files: `agents/plans/detached-sessions.md`.
 | `src/core/features/settings/browser/components/TerminalSettingsCard.tsx` | Adds bundled Atkinson Hyperlegible Mono under an always-visible "Easier to read" font group and explains its softer, distinctive letter shapes | The installed-font picker only surfaced fonts already present on the host, so users who need less square, more distinguishable terminal text had no reliable built-in option |
 | `src/renderer/main.tsx` | Loads the variable font's normal and italic CSS | The font must be available to xterm on every supported host and retain ANSI italic styling |
 | `package.json` (desktop), `pnpm-lock.yaml` | Adds `@fontsource-variable/atkinson-hyperlegible-mono` 5.3.0 (OFL-1.1) | Bundles the fixed-width accessibility font without relying on an OS font installation |
+## 47. Gate tmux on the binary being available (`ninebrains/auto-update-*`)
+
+Requesting tmux on a host where the `tmux` binary is not installed used to fail the session
+outright (`/bin/sh -c 'tmux has-session … || tmux new-session …'` exits non-zero). This is T1 of
+`agents/plans/detached-sessions.md`: a missing binary now degrades to a plain PTY instead.
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/core/features/tasks/api/node/task-session-launch-context.ts` | The launch context's `Promise.all` now also resolves tmux availability per host via `runtime.data.hostDependencies.resolver.resolve({ id: 'tmux' })` (a lookup failure or thrown error is treated as absent, never a hard error); `resolveSessionTmux` is called with `tmux.value && tmuxAvailable`; the result carries an optional `tmuxWarning` computed by the new `resolveTmuxWarning` helper | `resolveSessionTmux` stays pure and synchronous; the async availability check happens once, in the resolver's existing `Promise.all`, and is resolved against the session's own host so SSH hosts consult their own machine |
+| `apps/emdash-desktop/src/core/features/tasks/node/task-session-launch-context.test.ts` | Adds a `tmux availability gate` suite covering: binary present, binary absent (falls back to plain PTY with `tmux_missing`), local Windows (unchanged, `tmux_unsupported_on_windows`), remote host (resolved against that host), and a dependency-lookup failure (treated as absent) | Covers the five acceptance rows from the plan's T1 |
+| `packages/core/src/services/pty/api/local-spawn.ts` | `LocalPtySpawnWarning` gains `'tmux_missing'`; new exported `resolveTmuxWarning({ requested, available, isLocalWindows })` picks between no warning, `tmux_missing`, and `tmux_unsupported_on_windows` | The renderer needs to tell "install tmux and it will work" apart from "your OS cannot run tmux" |
+| `packages/core/src/services/pty/api/local-spawn.test.ts`, `packages/core/src/services/pty/api/index.ts` | Unit tests for `resolveTmuxWarning`; re-exports it alongside the existing local-spawn exports | |
+
+No new Ninebrains-only files.

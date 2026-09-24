@@ -1,9 +1,81 @@
-import { ok } from '@emdash/shared';
+import { err, ok } from '@emdash/shared';
 import { describe, expect, it, vi } from 'vitest';
 import {
   resolveSessionTmux,
   TaskSessionLaunchContextResolver,
 } from '../api/node/task-session-launch-context';
+
+function buildRuntimeClient(options: {
+  getProjectConfig?: () => Promise<unknown>;
+  resolveTmuxDependency?: () => Promise<unknown>;
+}) {
+  const getProjectConfig =
+    options.getProjectConfig ??
+    (async () =>
+      ok({
+        resolved: {
+          shellSetup: { value: undefined, from: 'default' as const },
+          env: { value: {}, from: 'default' as const },
+        },
+      }));
+  const resolveTmuxDependency =
+    options.resolveTmuxDependency ?? (async () => ok({ id: 'tmux', path: '/usr/bin/tmux' }));
+  return {
+    workspaceRegistry: { getProjectConfig },
+    hostDependencies: { resolver: { resolve: vi.fn(resolveTmuxDependency) } },
+  };
+}
+
+function buildResolver(options: {
+  host: { type: 'local' | 'remote'; id: string };
+  tmuxRequested: boolean;
+  resolveTmuxDependency?: () => Promise<unknown>;
+}) {
+  const identity = {
+    workspaceId: 'workspace-1',
+    projectId: 'project-1',
+    host: options.host,
+    path: '/repo/worktree',
+  };
+  const settings = {
+    resolveTmux: vi.fn(async () => ({
+      value: options.tmuxRequested,
+      provenance: { kind: 'set' as const },
+    })),
+    getStoredGitSettings: vi.fn(async () => ({
+      defaultBranch: { remote: null, branch: 'main' },
+    })),
+    getPlacementContext: vi.fn(async () => ({
+      hostWorktreeRoot: null,
+      builtInWorktreeRoot: '/tmp/worktrees',
+      homeDirectory: '/tmp',
+      hostTmux: null,
+      appDefaultTmux: false,
+    })),
+  };
+  const repoFacts = { get: vi.fn(async () => ({ remotes: [], localBranches: ['main'] })) };
+  const runtimeClient = buildRuntimeClient({
+    resolveTmuxDependency: options.resolveTmuxDependency,
+  });
+  const resolver = new TaskSessionLaunchContextResolver({
+    db: {
+      select: vi.fn(() =>
+        selecting({
+          id: 'task-1',
+          projectId: 'project-1',
+          workspaceId: 'workspace-1',
+          name: 'Task',
+        })
+      ),
+    } as never,
+    projects: {
+      requireAttached: vi.fn(() => ok({ repoPath: '/repo', settings, repoFacts } as never)),
+    },
+    runtimes: { client: vi.fn(async () => ok(runtimeClient as never)) },
+    workspaceIdentity: { resolve: vi.fn(async () => identity) },
+  });
+  return resolver.bind({ projectId: 'project-1', taskId: 'task-1', workspaceId: 'workspace-1' });
+}
 
 describe('TaskSessionLaunchContextResolver', () => {
   it('forces tmux off only for local Windows sessions', () => {
@@ -74,7 +146,14 @@ describe('TaskSessionLaunchContextResolver', () => {
         ),
       },
       runtimes: {
-        client: vi.fn(async () => ok({ workspaceRegistry: { getProjectConfig } } as never)),
+        client: vi.fn(async () =>
+          ok({
+            workspaceRegistry: { getProjectConfig },
+            hostDependencies: {
+              resolver: { resolve: vi.fn(async () => ok({ id: 'tmux', path: '/usr/bin/tmux' })) },
+            },
+          } as never)
+        ),
       },
       workspaceIdentity: { resolve: vi.fn(async () => identity) },
     });
@@ -156,6 +235,85 @@ describe('TaskSessionLaunchContextResolver', () => {
       },
     });
     expect(requireAttached).not.toHaveBeenCalled();
+  });
+
+  describe('tmux availability gate', () => {
+    it('keeps tmux on when requested and the binary is present on the host', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+        resolveTmuxDependency: async () => ok({ id: 'tmux', path: '/usr/bin/tmux' }),
+      });
+
+      const result = await source.resolve();
+
+      expect(result).toMatchObject({ success: true, data: { tmux: true, tmuxWarning: undefined } });
+    });
+
+    it('falls back to a plain pty and surfaces tmux_missing when the binary is absent', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+        resolveTmuxDependency: async () => err({ type: 'missing', id: 'tmux' }),
+      });
+
+      const result = await source.resolve();
+
+      expect(result).toMatchObject({
+        success: true,
+        data: { tmux: false, tmuxWarning: 'tmux_missing' },
+      });
+    });
+
+    it('stays off with tmux_unsupported_on_windows on local Windows regardless of the binary', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+        resolveTmuxDependency: async () => ok({ id: 'tmux', path: 'C:\\tmux.exe' }),
+      });
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      try {
+        const result = await source.resolve();
+        expect(result).toMatchObject({
+          success: true,
+          data: { tmux: false, tmuxWarning: 'tmux_unsupported_on_windows' },
+        });
+      } finally {
+        Object.defineProperty(process, 'platform', { value: originalPlatform });
+      }
+    });
+
+    it('resolves availability against the remote host, not the desktop', async () => {
+      const resolveTmuxDependency = vi.fn(async () => ok({ id: 'tmux', path: '/usr/bin/tmux' }));
+      const source = buildResolver({
+        host: { type: 'remote', id: 'ssh-1' },
+        tmuxRequested: true,
+        resolveTmuxDependency,
+      });
+
+      const result = await source.resolve();
+
+      expect(result).toMatchObject({ success: true, data: { tmux: true } });
+      expect(resolveTmuxDependency).toHaveBeenCalled();
+    });
+
+    it('treats a dependency lookup failure as absent rather than a hard error', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+        resolveTmuxDependency: async () => {
+          throw new Error('probe crashed');
+        },
+      });
+
+      const result = await source.resolve();
+
+      expect(result).toMatchObject({
+        success: true,
+        data: { tmux: false, tmuxWarning: 'tmux_missing' },
+      });
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResolvedPtyShellProfile } from './local-spawn';
-import { resolveLocalPtySpawn } from './local-spawn';
+import { resolveLocalPtySpawn, resolveTmuxWarning } from './local-spawn';
 
 const powershellProfile: ResolvedPtyShellProfile = {
   id: 'pwsh',
@@ -185,5 +185,37 @@ describe('resolveLocalPtySpawn', () => {
         entry.commandArgs
       );
     }
+  });
+});
+
+describe('resolveTmuxWarning', () => {
+  it('returns no warning when tmux was not requested', () => {
+    expect(
+      resolveTmuxWarning({ requested: false, available: false, isLocalWindows: false })
+    ).toBeUndefined();
+    expect(
+      resolveTmuxWarning({ requested: false, available: false, isLocalWindows: true })
+    ).toBeUndefined();
+  });
+
+  it('returns no warning when tmux was requested and is available', () => {
+    expect(
+      resolveTmuxWarning({ requested: true, available: true, isLocalWindows: false })
+    ).toBeUndefined();
+  });
+
+  it('flags tmux_missing when requested but the binary is absent on a non-Windows host', () => {
+    expect(resolveTmuxWarning({ requested: true, available: false, isLocalWindows: false })).toBe(
+      'tmux_missing'
+    );
+  });
+
+  it('flags tmux_unsupported_on_windows on local Windows regardless of binary availability', () => {
+    expect(resolveTmuxWarning({ requested: true, available: true, isLocalWindows: true })).toBe(
+      'tmux_unsupported_on_windows'
+    );
+    expect(resolveTmuxWarning({ requested: true, available: false, isLocalWindows: true })).toBe(
+      'tmux_unsupported_on_windows'
+    );
   });
 });
