@@ -901,29 +901,11 @@ const PALETTES = {
     /** How much ink a falling cube already carries: none on black, where lit cubes read. */
     fallInk: 0,
   },
-  light: {
-    base: [0.98, 0.98, 0.98],
-    edge: [0.9, 0.9, 0.9],
-    sky: [0.16, 0.16, 0.17],
-    mid: [0.66, 0.66, 0.67],
-    far: [0.9, 0.9, 0.905],
-    silver: [0.34, 0.34, 0.36],
-    dustAlpha: 0.42,
-    lo: [0.6, 0.6, 0.62],
-    hi: [1, 1, 1],
-    edgeInk: [0.12, 0.12, 0.13],
-    lineInk: [0, 0, 0],
-    veil: [0.98, 0.98, 0.98],
-    ink: [0.039 / 1.01, 0.039 / 1.01, 0.039 / 1.01],
-    // Light cubes on a white veil barely read, so they fall already half inked.
-    fallInk: 0.5,
-  },
 };
 
 /** The floor each scene stands on: a pool of light, a fading grid and a soft shadow per cube. */
 const GROUND = {
   dark: { pool: [1, 1, 1, 0.07], grid: 0.24, shadow: [0, 0, 0, 0.85] },
-  light: { pool: [0, 0, 0, 0.045], grid: 0.22, shadow: [0, 0, 0, 0.28] },
 };
 
 // --- framing: every scene fits its whole timeline into the safe rectangle ----------------------
@@ -1160,7 +1142,6 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   gl.vertexAttribPointer(lColor, 4, gl.FLOAT, false, 28, 12);
   gl.bindVertexArray(null);
 
-  const lightQuery = window.matchMedia('(prefers-color-scheme: light)');
   const born = performance.now();
   let width = 1;
   let height = 1;
@@ -1239,7 +1220,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   }
 
   function palette() {
-    return lightQuery.matches ? PALETTES.light : PALETTES.dark;
+    return PALETTES.dark;
   }
 
   /**
@@ -1485,7 +1466,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   function draw(now) {
     resize();
     const colors = palette();
-    const ground = lightQuery.matches ? GROUND.light : GROUND.dark;
+    const ground = GROUND.dark;
     const time = (now - born) / 1000;
     const frames = reduced ? 1200 : time * 60;
     smoothPointer = smoothPointer.map((v, i) => v + (pointer[i] - v) * 0.06);
@@ -1508,7 +1489,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.uniform1f(field.u.uScale, g.scale);
     gl.uniform1f(field.u.uFrame, frames);
     gl.uniform1f(field.u.uWaveK, g.waveK);
-    gl.uniform1f(field.u.uLight, lightQuery.matches ? 1 : 0);
+    gl.uniform1f(field.u.uLight, 0);
     gl.uniform3fv(field.u.uBase, colors.base);
     gl.uniform3fv(field.u.uEdge, colors.edge);
     gl.uniform3fv(field.u.uSky, colors.sky);
@@ -1694,7 +1675,6 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     if (document.hidden) stop();
     else start();
   });
-  lightQuery.addEventListener?.('change', still);
   window.addEventListener('resize', still);
   canvas.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
