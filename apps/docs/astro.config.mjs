@@ -126,6 +126,7 @@ export default defineConfig({
             { label: 'Unattended runs', slug: 'unattended-runs' },
             { label: 'Accounts', slug: 'accounts' },
             { label: 'Everyday workflow', slug: 'ide-workflow' },
+            { label: 'Cowork', slug: 'cowork' },
             { label: 'Keyboard shortcuts', slug: 'keyboard-shortcuts' },
           ],
         },

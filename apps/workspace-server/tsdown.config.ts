@@ -5,6 +5,8 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     ...workspaceWorkerBuildInputs(),
+    cowork: 'src/cowork/serve.ts',
+    'cowork-protocol': 'src/cowork/protocol.ts',
   },
   format: ['esm'],
   outputOptions: {
