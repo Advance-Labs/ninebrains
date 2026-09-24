@@ -520,6 +520,45 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   names (`CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). A route's `''`
   removes the variable. Test `SEC-13 routing env comes only from the route`.
 
+### Cowork shared editing (CW, `apps/workspace-server/src/cowork`, 2026-09-23)
+
+The `serve-cowork` role is a separate process from the wire daemon, with its own socket, its own
+token and no workspace-worker dependency. It is reachable by local accounts in the socket's group,
+so the token is the whole authorization boundary.
+
+- **SEC-47 The socket, state and token are the server account's alone.** The role refuses to start
+  unless the token file is a regular file owned by the server account with no group or world bits
+  (`0600`), the socket directory is owned by it and not group or world writable, and the state
+  directory is owned by it, mode `0700`, and outside the worktree. The socket itself is `chmod`ed to
+  `0660`, so the group is the grant. A token under 32 bytes is refused. The token is compared with
+  `timingSafeEqual` after a length check. Tests `restricts the shared socket to owner and group`,
+  `rejects socket directories peers can replace and state directories peers can modify`, and the
+  unauthorized case in `rejects unauthorized joins, path traversal, and symlink escapes`.
+- **SEC-48 A shared path never leaves the worktree.** A client path must be relative and free of
+  NUL. It is resolved against the worktree root, checked lexically, `realpath`ed, checked again
+  after resolution, and must name a regular file the server can read and write. Document identity
+  is the canonical path, so two spellings of one file are one document and no alias reaches a
+  document the peer did not join. Authorization resolves through `canonicalize()`, which performs
+  those checks without making the document resident. Tests `rejects unauthorized joins, path
+  traversal, and symlink escapes` and `does not make a document resident when the peer has not
+  joined it`.
+- **SEC-49 Save refuses to clobber an outside write.** Before writing, Save re-`lstat`s the path,
+  opens it `O_NOFOLLOW`, re-checks device and inode and `realpath`, and compares the file's hash
+  against the hash observed when the document was loaded. A mismatch raises `external-change` and
+  writes nothing. The same hash check runs when a document is reloaded from persisted state. This
+  narrows the race and does not close it: agents and editors do not honor the lock, and there is no
+  atomic compare-and-swap over an arbitrary writer, so a write landing inside the final window is
+  still lost. Tests `refuses to save over an external disk change`, `does not follow a file replaced
+  with a symlink before Save`, and `preserves unsaved document state across restart and detects
+  outside writes`.
+- **SEC-50 A token holder cannot exhaust the process.** At most 8 peers, at most 128 resident
+  documents, at most `MAX_FRAME_BYTES` (2 MiB) per frame and per unterminated remainder, and at most
+  `MAX_DOCUMENT_BYTES` (1 MiB) of document text. Frames are bounded individually rather than by the
+  accumulated read buffer, so two legal frames in one read are both served. Rejecting a request for
+  an unjoined path loads nothing, so failed requests cannot fill the resident cap. Tests `does not
+  make a document resident when the peer has not joined it`, `bounds each frame rather than the
+  whole read buffer`, and `reports and drops a peer that sends a frame larger than the limit`.
+
 ## 5a. Status (2026-09-11)
 
 "Done" means the code enforces it and a test named after the ID proves it. "Open" means no
@@ -575,6 +614,10 @@ the agents or slices expected to close the gap.
 | SEC-44 | Done [w7-routing] | `profile.test.ts`, `vendors.test.ts`, `routing-service.test.ts`, `profiles-repo.db.test.ts` |
 | SEC-45 | Done for unattended claude [w7-routing] | `routing-launch.e2e.test.ts`. Attended lanes have no egress list (as today) |
 | SEC-46 | N/A in wave 1 | No gateway exists |
+| SEC-47 | Done | `server.test.ts`: socket mode `0660`, and the socket-directory and state-directory preflights. Token length and `timingSafeEqual` are code-enforced without an ID-named test |
+| SEC-48 | Done | `server.test.ts`: traversal, symlink escape, and the unjoined-path case that proves authorization resolves without loading |
+| SEC-49 | Partial by design | `server.test.ts`: external change, symlink swap before Save, and reload-time detection. The residual race with an outside writer is accepted; see the note in the requirement |
+| SEC-50 | Done | `server.test.ts`: the unjoined-path cap case, the two-frames-in-one-read case, and the oversized-frame drop. Yjs history growth past `MAX_DOCUMENT_BYTES * 4` is a known sharp edge, not covered |
 
 ## 6. Where the current design already breaks a requirement
 

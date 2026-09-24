@@ -72,21 +72,40 @@ disk, or reports `external-change` when the file no longer matches the disk vers
 join. The client must use Yjs to apply updates; plain text replacement messages are unsupported.
 
 A client may name a file by any relative spelling that stays inside the worktree. Every server
-message answers with the worktree-relative canonical name, so two clients that joined the same
-file by different spellings still agree on the `path` they see in `joined`, `update` and `saved`.
-A frame larger than `MAX_FRAME_BYTES` drops the connection; the error reporting that is
-best-effort, because the reset can arrive before a peer that is still uploading reads it.
+message answers with the worktree-relative canonical name, so two clients that joined the same file
+by different spellings still agree on the `path` they see in `joined`, `update` and `saved`. Treat
+that canonical name, not the string you sent, as the document's identity.
 
 The desktop imports the typed message schemas from `@emdash/workspace-server/cowork-protocol`
 (the `cowork-protocol.mjs` bundle, which has no native or workspace dependencies).
 
 ## Limits and known races
 
-Current limits: eight simultaneous socket peers, 128 open documents, 1 MiB text documents, and
-2 MiB request frames. Disk writes from other processes are detected before Save, but arbitrary
-external writers do not honor a cowork lock; a write racing within the final check and write
-cannot be made atomic with ordinary POSIX files. The current desktop shows a save error and
-preserves the local buffer; a dedicated shared conflict resolution UI is still needed.
+Current limits: eight simultaneous socket peers, 128 open documents, 1 MiB of document text, and
+2 MiB per request frame. The frame limit applies to each frame and to any unterminated remainder,
+not to the accumulated read buffer, so two legal frames arriving in one read are both served.
+
+A request naming a file the peer has not joined is refused without loading that file. This matters
+beyond tidiness: only a peer that joined a document releases it, so resolving a path by loading it
+would leave documents resident that nothing ever frees, and 128 refused requests would exhaust the
+open-document cap for every peer until the process restarted.
+
+A peer that breaks a limit is dropped immediately. The server writes the reason first, but delivery
+is best effort: resetting a peer that is still uploading can discard the error before it is read.
+Closing gracefully instead would let a peer that ignores the FIN hold the connection open, so the
+drop stays immediate and clients should treat an unexplained disconnect as a possible limit breach.
+
+Disk writes from other processes are detected before Save, but arbitrary external writers do not
+honor a cowork lock; a write racing inside the final check-and-write cannot be made atomic with
+ordinary POSIX files. The current desktop shows a save error and preserves the local buffer; a
+dedicated shared conflict resolution UI is still needed.
+
+A document's persisted Yjs state is capped at four times the text limit. Yjs tombstones accumulate
+as a file is edited, and nothing compacts them, so a document edited heavily enough will start
+refusing updates rather than shrinking its history. No one has hit this, and it has no fix yet.
+
+The security boundary is written up as SEC-47 through SEC-50 in `docs/THREAT-MODEL.md`. Read
+`agents/risky-areas/cowork.md` before changing anything in `src/cowork/`.
 
 ## Code map
 
