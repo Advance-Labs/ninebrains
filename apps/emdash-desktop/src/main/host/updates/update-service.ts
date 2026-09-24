@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { dirname } from 'node:path';
 import type { Disposable } from '@emdash/shared/concurrency';
 import { app, net } from 'electron';
 import { updateEvents } from '@core/features/updates/node';
@@ -6,7 +7,12 @@ import { UPDATE_CHANNEL } from '@core/primitives/app-identity/api/app-identity';
 import { UPDATES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
 import { resolveAppVersion } from '@main/core/app/utils';
 import { log } from '@main/lib/logger';
-import { applyStagedUpdate, spawnWindowsInstaller } from './apply';
+import {
+  applyStagedUpdate,
+  resolveMacBundlePath,
+  spawnWindowsInstaller,
+  sweepLeftoverUpdateDirs,
+} from './apply';
 import { downloadAndHash, type DownloadProgress } from './download';
 import { fetchLatestRelease, resolveInstaller, type FeedFetcher } from './feed';
 import {
@@ -78,9 +84,14 @@ export class UpdateService implements Disposable {
 
     this.active = true;
 
-    await this.applyPendingUpdateAtBoot().catch((error) => {
+    const relaunching = await this.applyPendingUpdateAtBoot().catch((error) => {
       log.error('Failed to apply a pending update at boot', { error: formatUpdaterError(error) });
+      return false;
     });
+    // Only once we know this process is staying: an in-place update leaves the previous bundle
+    // beside the new one because a running app cannot delete the binary it is executing from.
+    // By now that old bundle is no longer running, so it can finally go.
+    if (!relaunching) await this.sweepLeftoverUpdateDirs();
 
     log.info('UpdateService initialized', {
       version: this.updateState.currentVersion,
@@ -88,6 +99,21 @@ export class UpdateService implements Disposable {
     });
 
     this.scheduleNextCheck(STARTUP_DELAY_MS);
+  }
+
+  /** Best effort, and never fatal: leftovers only cost disk, and the next boot tries again. */
+  private async sweepLeftoverUpdateDirs(): Promise<void> {
+    // macOS only: it is the one platform that swaps the bundle in place and so has to leave the
+    // old one behind. The Linux AppImage path renames its `.part` over the target, which removes
+    // it, and Windows hands the whole job to the NSIS installer.
+    if (process.platform !== 'darwin') return;
+    try {
+      await sweepLeftoverUpdateDirs(dirname(resolveMacBundlePath()));
+    } catch (error) {
+      log.info('Could not sweep leftover update directories', {
+        error: formatUpdaterError(error),
+      });
+    }
   }
 
   setNotificationPublisher(publisher: UpdateNotificationPublisher): void {

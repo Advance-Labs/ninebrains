@@ -800,3 +800,18 @@ job is to notice it.
 | `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | The dispose guard now matches `expect.arrayContaining(['kill-session'])` on any `tmux` invocation instead of one exact argv | Matching the verb rather than one exact target form means any shape of regression trips it; the positive eviction assertions above it keep their exact argv, which is correct for asserting a specific call was made |
 
 No new Ninebrains-only files.
+
+## 50. macOS auto-update could never finish (`ninebrains/update-restart-loop`)
+
+In-place install applied the update, then failed on cleanup and reported the whole install as
+failed. The app never relaunched, the pill fell back to "Restart now", and each retry swapped the
+already-updated bundle again, stranding another copy of it (1.5 GB after four attempts on the
+reporter's machine). Deterministic on every Mac, not a race.
+
+| File | Change | Why |
+|---|---|---|
+| `src/main/host/updates/apply/index.ts` | After the bundle swap succeeds, removing `rollbackDir` and `stagingDir` is best effort (`discard()`), never fatal | `rollbackDir` is the bundle the running process executes from. macOS will not unlink a live binary or the open `app.asar`, so the recursive walk leaves them and the final `rmdir` returns `ENOTEMPTY`. That throw sat on the success path, so it rejected an install that had already completed |
+| `src/main/host/updates/apply/index.ts` | New `sweepLeftoverUpdateDirs(root)`: removes `.ninebrains-rollback-*` and `.ninebrains-update-*` beside the bundle, skipping anything still held | The old bundle can only be deleted once it is no longer running, i.e. from the next boot |
+| `src/main/host/updates/update-service.ts` | Calls the sweep at boot, macOS only, when `applyPendingUpdateAtBoot` did not ask for a relaunch | By then the new bundle is the running one. Linux renames its `.part` over the target and Windows hands off to NSIS, so neither leaves anything behind |
+| `src/main/host/updates/utils.ts` (+ new test) | `formatUpdaterError` treats only a numeric `statusCode`/`status` as HTTP; a Node `code` is reported as itself | `err.code` was folded in with the HTTP status, so the `ENOTEMPTY` above was logged as "Update request failed with HTTP ENOTEMPTY" — a filesystem bug reported as a network one, which is where the diagnosis went first |
+| `src/main/host/updates/apply/index.test.ts` | Sweep tests, plus a darwin-gated test that mocks `fs.rm` into the real `ENOTEMPTY` and asserts the install still resolves and the bundle still swapped | Verified to fail against the pre-fix cleanup with the same error the shipped build produced. The node suite runs on Ubuntu in CI, so the swap test is gated rather than skipped by accident |
