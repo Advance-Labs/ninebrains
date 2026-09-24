@@ -172,6 +172,17 @@ test('copy buttons sit next to a command, not floating free', () => {
   }
 });
 
+test('the Human/Machine pill is chrome this page reveals, not a late arrival', () => {
+  // The pill is a fixed control from another origin, so the site owns it through a slot: the
+  // slot is what carries --d and joins the opening's reveal, and it is the only element whose
+  // opacity the component's own :host rule does not override.
+  assert.match(flat, /<div class="hms-slot"> <human-machine-swapper/);
+  const css = readFileSync(join(DIST, 'styles.css'), 'utf8');
+  assert.match(css, /\.nav,\s*\.rail,\s*footer,\s*\.hms-slot \{\s*--d: 60ms;/);
+  // Once for the reveal's transition, once for the state it starts hidden in.
+  assert.equal([...css.matchAll(/^\s*\.hms-slot,$/gm)].length, 2);
+});
+
 test('no em dashes in site copy', () => {
   // The header/title's own separator ("Ninebrains — run ...") is the one place an em dash is
   // structural chrome, not copy; everything else in <main> must be free of them.

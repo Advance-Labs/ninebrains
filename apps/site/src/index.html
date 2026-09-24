@@ -81,6 +81,9 @@
         }
       </style></noscript
     >
+    <!-- The Human/Machine pill comes up with the nav, so its script has the length of the
+         opening to arrive. The handshake to another origin is the slow part of that. -->
+    <link rel="preconnect" href="https://advancelabs.dev" />
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/styles.css" />
     <script type="application/ld+json">
@@ -132,7 +135,9 @@
     <canvas id="scene" aria-hidden="true"></canvas>
     <div class="scanlines" aria-hidden="true"></div>
 
-    <human-machine-swapper data-position="top-center"></human-machine-swapper>
+    <div class="hms-slot">
+      <human-machine-swapper data-position="top-center"></human-machine-swapper>
+    </div>
     <script src="https://advancelabs.dev/hms/human-machine-swapper.js" async></script>
 
     <header class="nav">
