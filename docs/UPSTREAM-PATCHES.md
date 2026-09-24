@@ -763,3 +763,14 @@ outright (`/bin/sh -c 'tmux has-session … || tmux new-session …'` exits non-
 | `packages/core/src/services/pty/api/local-spawn.test.ts`, `packages/core/src/services/pty/api/index.ts` | Unit tests for `resolveTmuxWarning`; re-exports it alongside the existing local-spawn exports | |
 
 No new Ninebrains-only files.
+
+## 48. Regression tests lock in the detach-not-kill tmux guarantee (`ninebrains/auto-update-*`, T4)
+
+`detached-sessions.md` T4: the guarantee that quitting the app leaves tmux-backed TUI agent
+sessions running is currently implicit in what `dispose()`/`runQuitCleanup()` happen not to do.
+These tests fail if a future change wires a tmux `kill-session` into either path.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | New test: `TuiAgentsRuntime.dispose()` on a tmux-backed session kills the pty client but never calls `tmux kill-session` | Locks in that quit detaches, not destroys, the tmux server so the agent keeps working while the app is closed or updating |
+| `apps/emdash-desktop/src/main/bootstrap/shutdown.test.ts` | New test + a `vi.mock` of `@emdash/core/services/pty/api`'s `killTmuxSession`: `runQuitCleanup()` never calls it | Guards the shutdown phase list itself, in case a future phase reaches for a direct tmux kill instead of delegating to `runtimes.dispose()` |
