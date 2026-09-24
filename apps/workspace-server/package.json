@@ -11,6 +11,9 @@
   "type": "module",
   "main": "./dist/index.mjs",
   "exports": {
+    ".": {
+      "default": "./dist/index.mjs"
+    },
     "./cowork-protocol": {
       "development": "./src/cowork/protocol.ts",
       "types": "./src/cowork/protocol.ts",
