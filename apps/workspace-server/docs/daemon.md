@@ -11,11 +11,13 @@ debugging harness because stdout is reserved for the wire protocol.
 
 ## Process Roles
 
-The command line has two roles:
+The command line has three roles:
 
 - `serve` is the foreground server process. In socket mode, this is the daemon.
 - `start`, `stop`, and `status` are short-lived lifecycle commands that manage or
   inspect the daemon process.
+- `serve-cowork` runs the narrow shared-text editing service on its own socket,
+  independent of the wire daemon. See `cowork.md`.
 
 ```mermaid
 flowchart LR
@@ -199,6 +201,7 @@ whether the daemon is not running or unhealthy.
 - `src/gateway/entries/` contains the ACP, agent-config, and TUI-agent entries that inject the
   application plugin registry; all other workers reuse Core runtime entries directly.
 - `src/runtime/paths.ts` owns runtime database, intent, and attachment paths.
+- `src/cowork/` owns the separate `serve-cowork` text-collaboration role (`cowork.md`).
 
 ## Desktop Integration
 

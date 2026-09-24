@@ -43,6 +43,8 @@ const expectedEntryBundleNames = [
   'acp-runtime.mjs',
   'agent-config-runtime.mjs',
   'automations-runtime.mjs',
+  'cowork.mjs',
+  'cowork-protocol.mjs',
   'file-search-runtime.mjs',
   'files-runtime.mjs',
   'fs-watch-runtime.mjs',
@@ -701,12 +703,61 @@ async function verifyLocalArtifact(extractedArtifact: string): Promise<void> {
     await runCommand(launcherPath, ['start', ...lifecycleArgs]);
     await runCommand(launcherPath, ['status', ...lifecycleArgs]);
     await runCommand(launcherPath, ['stop', ...lifecycleArgs]);
+    await verifyCoworkSmoke(launcherPath, runtimeDirectory);
   } finally {
     await runCommand(launcherPath, ['stop', ...lifecycleArgs], { stdio: 'ignore' }).catch(
       () => undefined
     );
     await rm(runtimeDirectory, { recursive: true, force: true });
   }
+}
+
+async function verifyCoworkSmoke(launcherPath: string, runtimeDirectory: string): Promise<void> {
+  const base = join(runtimeDirectory, 'cowork');
+  const worktree = join(base, 'worktree');
+  const socketDirectory = join(base, 'socket');
+  const stateDirectory = join(base, 'state');
+  const tokenPath = join(base, 'token');
+  const socketPath = join(socketDirectory, 'cowork.sock');
+  await mkdir(worktree, { recursive: true });
+  await mkdir(socketDirectory, { recursive: true });
+  await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(tokenPath, 'smoke token with at least thirty two bytes', { mode: 0o600 });
+
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    const child = spawn(
+      launcherPath,
+      ['serve-cowork', worktree, socketPath, stateDirectory, tokenPath],
+      { stdio: 'ignore' }
+    );
+    child.once('error', rejectPromise);
+    const deadline = Date.now() + 15_000;
+    const poll = setInterval(() => {
+      void stat(socketPath)
+        .then(async (socketStat) => {
+          if (socketStat.isFile() || socketStat.isSocket()) {
+            clearInterval(poll);
+            child.kill('SIGTERM');
+            child.once('exit', (code, signal) => {
+              if (code === 0 || code === 130 || code === 143 || code === null) resolvePromise();
+              else {
+                rejectPromise(
+                  new Error(
+                    `cowork smoke: serve-cowork exited ${signal ?? code} after socket appeared`
+                  )
+                );
+              }
+            });
+          }
+        })
+        .catch(() => undefined);
+      if (Date.now() > deadline) {
+        clearInterval(poll);
+        child.kill('SIGKILL');
+        rejectPromise(new Error('cowork smoke: serve-cowork did not create its socket'));
+      }
+    }, 200);
+  });
 }
 
 async function verifyLinuxArtifact(
@@ -731,6 +782,24 @@ trap cleanup EXIT INT TERM
 "$server" start --socket-path "$socket"
 "$server" status --socket-path "$socket"
 "$server" stop --socket-path "$socket"
+mkdir -p /tmp/emdash-smoke/cowork/worktree
+mkdir -p /tmp/emdash-smoke/cowork/socket
+mkdir -p /tmp/emdash-smoke/cowork/state
+printf '%s\\n' smoke-token-with-at-least-thirty-two-bytes > /tmp/emdash-smoke/cowork/token
+chmod 600 /tmp/emdash-smoke/cowork/token
+chmod 700 /tmp/emdash-smoke/cowork/state
+"$server" serve-cowork /tmp/emdash-smoke/cowork/worktree \
+  /tmp/emdash-smoke/cowork/socket/cowork.sock /tmp/emdash-smoke/cowork/state \
+  /tmp/emdash-smoke/cowork/token &
+cowork_pid=$!
+i=0
+until [ -S /tmp/emdash-smoke/cowork/socket/cowork.sock ] || [ "$i" -ge 50 ]; do
+  sleep 0.2
+  i=$((i + 1))
+done
+[ -S /tmp/emdash-smoke/cowork/socket/cowork.sock ]
+kill "$cowork_pid"
+wait "$cowork_pid" || true
 `;
 
   await runCommand('docker', [
