@@ -12,6 +12,10 @@
  */
 
 :root {
+  /* Dark only. The site is one dark scene with a WebGL stage behind it; a light
+     repaint of it was never a second design, just an inversion that fought the artwork.
+     This also keeps form controls and scrollbars dark on a light OS. */
+  color-scheme: dark;
   --bg: #000000;
   --fg: #fafafa;
   --dim: #a3a3a3;
@@ -53,33 +57,6 @@
   --u: min(1vw, 1.6vh);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #fafafa;
-    --fg: #0a0a0a;
-    --dim: #525252;
-    --faint: #8a8a8a;
-    --line: rgba(0, 0, 0, 0.1);
-    --line-2: rgba(0, 0, 0, 0.2);
-    --glass: rgba(250, 250, 250, 0.66);
-
-    --app-bg: #ffffff;
-    --app-1: #fafafa;
-    --app-2: #f3f3f3;
-    --app-3: #ebebeb;
-    --app-line: #e3e3e3;
-    --app-line-2: #cfcfcf;
-    --app-fg: #171717;
-    --app-dim: #5c5c5c;
-    --app-faint: #9a9a9a;
-
-    --pass: #16a34a;
-    --fail: #dc2626;
-    --warn: #b45309;
-    --run: #2563eb;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
@@ -105,13 +82,6 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv11', 'ss01';
-}
-
-@media (prefers-color-scheme: light) {
-  body {
-    background:
-      radial-gradient(120% 90% at 100% 110%, rgba(0, 0, 0, 0.09), transparent 55%), var(--bg);
-  }
 }
 
 a {
@@ -168,12 +138,6 @@ code {
   opacity: 0.22;
   transition: opacity 600ms var(--ease);
 }
-@media (prefers-color-scheme: light) {
-  .scanlines {
-    opacity: 0.06;
-  }
-}
-
 .nav,
 main,
 footer {
@@ -767,14 +731,6 @@ h1 {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   will-change: transform;
 }
-@media (prefers-color-scheme: light) {
-  .win {
-    box-shadow:
-      0 50px 110px -40px rgba(0, 0, 0, 0.35),
-      0 0 0 1px rgba(0, 0, 0, 0.03);
-  }
-}
-
 /* A glass sheen that slides with the pointer, so the pane reads as an object in space. */
 .win::after {
   content: '';
@@ -2797,4 +2753,36 @@ html.intro-reveal .panel:not([hidden]) .win {
    page into the overlaps the site-overlap audit exists to catch. :defined is the guard. */
 human-machine-swapper:not(:defined) {
   display: none;
+}
+
+/* ── The Human/Machine swapper (advancelabs.dev/hms) ──────────────────────────
+   The component is a fixed control from another origin, and it exposes its edges so the
+   host decides where it sits. This site has to, twice over. */
+
+/* Until the script loads, the browser lays the unknown element out in flow at about 50px
+   tall, which on a one-screen page pushes the rail and the footer into each other. */
+human-machine-swapper:not(:defined) {
+  display: none;
+}
+
+/* Not during the opening. The pill is chrome, and chrome arriving on top of the mark while
+   the cubes are still flying reads as a page that has not settled.
+
+   visibility, not opacity. When an outer rule and a :host rule set the SAME property, the
+   shadow tree wins: outer opacity:0 measured as a computed 1 against the component's own
+   :host opacity. The component never sets visibility, so that is the property the host is
+   allowed to have. */
+html.intro human-machine-swapper {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* On a phone both default edges are taken: a 48px nav above, a 58px tab rail below. Sit
+   above the rail, measured from the same token the rail's own height comes from so the two
+   cannot drift. */
+@media (max-width: 899px) {
+  human-machine-swapper {
+    --hms-top: auto;
+    --hms-bottom: calc(var(--foot-h) + 12px);
+  }
 }

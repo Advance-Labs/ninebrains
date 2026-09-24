@@ -9,9 +9,8 @@
       content="Free, open-source desktop app for macOS, Windows and Linux that runs a grid of AI coding agents in parallel. Each agent gets its own git worktree, a central Brain hands out the work, and verification gates prove it before it counts as done."
     />
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
     <link rel="canonical" href="https://ninebrains.runs-on.dev/" />
     <meta property="og:url" content="https://ninebrains.runs-on.dev/" />
     <meta property="og:type" content="website" />
@@ -66,12 +65,6 @@
           width: var(--m);
           left: round(down, calc(50% - var(--m) / 2), 1px);
           top: round(down, calc(50% - var(--m) / 2), 1px);
-        }
-      }
-      @media (prefers-color-scheme: light) {
-        #intro {
-          background: #fafafa;
-          color: #0a0a0a;
         }
       }
       @keyframes intro-out {
