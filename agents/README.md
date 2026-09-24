@@ -22,6 +22,9 @@ This directory is the system of record for agent-facing repo guidance. Keep topi
   - task-oriented procedures like testing, worktrees, remote development, and Nx task orchestration
 - `integrations/`
   - provider, MCP, and external service guidance
+- `plans/`
+  - staged build plans for work that spans several PRs
+  - [`detached-sessions.md`](plans/detached-sessions.md) — agents keep working while the app is closed or updating: what already works, the tmux availability gate, and the task sequence
 - `risky-areas/`
   - places where incorrect changes are expensive
 - `conventions/`

@@ -729,3 +729,15 @@ New Ninebrains-only files: `src/core/primitives/app-identity/api/update-signing-
 `src/core/features/updates/**`, `src/main/host/updates/{feed,integrity,download,staging,update-service,version,types}.ts`,
 `src/main/host/updates/apply/**`, `apps/emdash-desktop/scripts/release/sign-update-digest.mjs`,
 and their tests.
+
+## 45. Agent docs map gains a `plans/` section (`ninebrains/auto-update-*`)
+
+Staged build plans that span several PRs need a home agents can find. The first one documents how
+TUI agent sessions already survive the app closing, and what is missing before that can be the
+default.
+
+| File | Change | Why |
+|---|---|---|
+| `agents/README.md` | Adds a `plans/` entry to the directory layout, pointing at `agents/plans/detached-sessions.md` | The docs map is how agents discover topic pages; an unlisted plan does not get read |
+
+New Ninebrains-only files: `agents/plans/detached-sessions.md`.
