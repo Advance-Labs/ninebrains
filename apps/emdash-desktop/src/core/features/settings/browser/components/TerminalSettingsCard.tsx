@@ -24,9 +24,14 @@ type FontOption = {
 };
 
 type FontGroup = {
-  value: 'popular' | 'installed';
+  value: 'easier-to-read' | 'popular' | 'installed';
   label: string;
   items: FontOption[];
+};
+
+const EASIER_TO_READ_OPTION: FontOption = {
+  value: 'Atkinson Hyperlegible Mono Variable',
+  label: 'Atkinson Hyperlegible Mono',
 };
 
 const POPULAR_FONTS = [
@@ -100,6 +105,7 @@ const TerminalSettingsCard: React.FC = () => {
     }
 
     return [
+      { value: 'easier-to-read', label: 'Easier to read', items: [EASIER_TO_READ_OPTION] },
       { value: 'popular', label: 'Popular', items: popularItems },
       { value: 'installed', label: 'Installed', items: installedItems },
     ];
@@ -210,7 +216,7 @@ const TerminalSettingsCard: React.FC = () => {
         />
         <SettingRow
           title="Terminal font"
-          description="Choose the font family for the terminal."
+          description="Choose a terminal font. Try Atkinson Hyperlegible Mono for softer, more distinctive letter shapes."
           control={
             <div className="w-[183px] flex-shrink-0">
               <Combobox.Root

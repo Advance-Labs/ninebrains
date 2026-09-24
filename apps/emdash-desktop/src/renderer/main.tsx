@@ -22,6 +22,8 @@ import { mementoCatalog } from '@core/manifests/shared/memento-catalog';
 import { log } from '@core/primitives/logging/browser/logger';
 import { getMementosWireClient } from '@core/primitives/mementos/api/client';
 import { configureMementos, initMementos } from '@core/primitives/mementos/browser';
+import '@fontsource-variable/atkinson-hyperlegible-mono/wght-italic.css';
+import '@fontsource-variable/atkinson-hyperlegible-mono/wght.css';
 import '@fontsource-variable/inter/index.css';
 import '@emdash/ui/style.css';
 import '@emdash/chat-ui/style.css';
