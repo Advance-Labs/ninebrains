@@ -575,6 +575,34 @@ describe('TuiAgentsRuntime', () => {
     );
   });
 
+  it(
+    'dispose kills pty clients but never issues a tmux kill-session, so agents keep working ' +
+      'while the app is closed or updating',
+    async () => {
+      const identity = 'project:task:conversation-1';
+      const sessionName = makeTmuxSessionName(identity, 'workspace');
+      const encodedIdentity = Buffer.from(
+        JSON.stringify({ version: 1, identity }),
+        'utf8'
+      ).toString('base64url');
+      const exec = vi.fn(async () => ({
+        stdout: `${sessionName}\t42\tv1:${encodedIdentity}\n`,
+        stderr: '',
+      }));
+      const { runtime, spawner } = createRuntime({ exec: { exec } });
+
+      await runtime.startSession(startInput({ tmux: { identity } }));
+      exec.mockClear();
+      await runtime.dispose();
+
+      // Quit must detach, not destroy: the pty client dies with the app, but the
+      // tmux server (and the agent process inside it) must survive so the user can
+      // reattach after reopening the app or finishing an update.
+      expect(spawner.processes[0]!.killCount).toBeGreaterThan(0);
+      expect(exec).not.toHaveBeenCalledWith('tmux', ['kill-session', '-t', `=${sessionName}`]);
+    }
+  );
+
   it('falls back to a fresh session when resume exits immediately', async () => {
     const { runtime, spawner, agentHost } = createRuntime();
 

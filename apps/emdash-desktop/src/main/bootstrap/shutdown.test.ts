@@ -1,3 +1,4 @@
+import type * as PtyApi from '@emdash/core/services/pty/api';
 import type { BrowserWindow } from 'electron';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   automationsStop: vi.fn(),
   closeAppDb: vi.fn(),
   editorBuffersDispose: vi.fn(),
+  killTmuxSession: vi.fn(),
   projectsDispose: vi.fn(),
   projectsRelease: vi.fn(),
   pullRequestsDispose: vi.fn(),
@@ -32,6 +34,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   app: { exit: vi.fn(), on: vi.fn() },
 }));
+// Quit must detach tmux-backed agent sessions, not destroy them, so agents keep
+// working while the app is closed or updating (see runtime.ts's `killTmuxSession`
+// call, which is only reachable from eviction, never from quit). Spying on the
+// real export here means any future phase that reaches for a direct tmux kill
+// during quit cleanup trips this mock, wherever it is wired in.
+vi.mock('@emdash/core/services/pty/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof PtyApi>();
+  return { ...actual, killTmuxSession: mocks.killTmuxSession };
+});
 vi.mock('@core/features/workbench/node', () => ({
   desktopHostEvents: { emit: vi.fn() },
 }));
@@ -116,6 +127,28 @@ describe('quit cleanup phases', () => {
       mocks.projectsDispose.mock.invocationCallOrder[0]!
     );
   });
+
+  it(
+    'never kills a tmux session directly during quit cleanup, so tmux-backed agents keep ' +
+      'working while the app is closed or updating',
+    async () => {
+      configureQuitCleanupServices({
+        automations: { stop: mocks.automationsStop },
+        editorBuffers: { dispose: mocks.editorBuffersDispose },
+        projects: {
+          dispose: mocks.projectsDispose,
+          release: mocks.projectsRelease,
+        },
+        pullRequests: { dispose: mocks.pullRequestsDispose },
+        runtimes: { dispose: mocks.runtimesDispose },
+      });
+
+      await runQuitCleanup();
+
+      expect(mocks.runtimesDispose).toHaveBeenCalled();
+      expect(mocks.killTmuxSession).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('shutdown coordinator', () => {
