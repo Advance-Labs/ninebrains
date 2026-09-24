@@ -37,6 +37,45 @@ describe('loadWorkspaceServerConfig', () => {
     });
   });
 
+  it('parses the serve-cowork role into its four positional paths', () => {
+    const config = expectLoaded(
+      loadWorkspaceServerConfig(
+        [
+          'serve-cowork',
+          '/srv/repos/project',
+          '/srv/ninebrains-cowork/cowork.sock',
+          '/srv/ninebrains-cowork/state',
+          '/srv/ninebrains-cowork/token',
+        ],
+        {}
+      )
+    );
+
+    expect(config).toEqual({
+      command: 'serve-cowork',
+      appVersion: '0.0.0',
+      serve: { kind: 'socket', path: '/srv/ninebrains-cowork/cowork.sock' },
+      cowork: {
+        root: '/srv/repos/project',
+        socketPath: '/srv/ninebrains-cowork/cowork.sock',
+        stateDir: '/srv/ninebrains-cowork/state',
+        tokenFile: '/srv/ninebrains-cowork/token',
+      },
+    });
+  });
+
+  it('rejects serve-cowork with missing positional paths', () => {
+    const result = loadWorkspaceServerConfig(['serve-cowork', '/srv/repos/project'], {});
+
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        type: 'args',
+        message: 'serve-cowork expects: <worktree-root> <socket-path> <state-dir> <token-file>',
+      },
+    });
+  });
+
   it('rejects unknown commands', () => {
     const result = loadWorkspaceServerConfig(['restart'], {});
 

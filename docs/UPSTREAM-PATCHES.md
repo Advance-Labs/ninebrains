@@ -787,3 +787,26 @@ These tests fail if a future change wires a tmux `kill-session` into either path
 | `src/core/features/brain/node/brain-service.ts` (+ test) | `gatesConnected` is true when `verification: 'external'`, not only when a `gateRunner` is passed | The desktop composition root wires gates externally and passes no `gateRunner`, so every shipped build showed a "gates off" badge claiming finished work was unverified while verification ran fine |
 | `src/main/host/updates/feed.ts` (+ test) | New `isCanaryChannel()` replaces three `channel === 'canary'` comparisons (feed URL, list-vs-single parse, release filter); the no-digest warning logs the call's channel instead of the build constant | `UPDATE_CHANNEL` ships as `v1-canary`, which none of the three matched, so a canary build fetched `/releases/latest` (prereleases excluded), parsed that single release as a list, and would have offered itself a stable build. The tests passed because every case called the feed with the bare `canary` no build sends; the new one binds to `app-identity.canary.ts` |
 | `docs/UPSTREAM-PATCHES.md` | Removed a stray `<<<<<<< HEAD` line above section 43 | Committed to main in an earlier merge of this log; it has no matching `=======` or `>>>>>>>` |
+
+## 50. Cowork shared text editing folded into the workspace server (`feat/cowork-fold-workspace-server`)
+
+A `serve-cowork` CLI role inside the packaged workspace-server artifact, rather than a separate
+`apps/cowork-server` app. It serves collaborative Yjs text for one worktree on its own
+group-accessible Unix socket, gated by its own session token, with no workspace-worker dependency.
+The trust boundary is written up as SEC-47 through SEC-50 in `docs/THREAT-MODEL.md`, and the rules
+a change must preserve are in `agents/risky-areas/cowork.md`.
+
+| File | Change | Why |
+|---|---|---|
+| `apps/workspace-server/src/config.ts`, `apps/workspace-server/src/config.test.ts` | `serve-cowork` added to the command list, parsed from four positional paths (`<worktree-root> <socket-path> <state-dir> <token-file>`) into a `cowork` config branch | The role takes paths, not the daemon's flags, so it needs its own argv shape and its own arity error |
+| `apps/workspace-server/src/index.ts` | `serve-cowork` case dispatches to `serveCowork` and installs the same process signal handlers | The role shares the daemon's shutdown lifecycle without sharing its wiring |
+| `apps/workspace-server/tsdown.config.ts` | New `cowork` and `cowork-protocol` bundle entries | The role ships in the packaged artifact, and the desktop needs the schemas without pulling in native or workspace dependencies |
+| `apps/workspace-server/package.json` | Version 0.1.5 → 0.2.0, `yjs` dependency, and an `exports` map with `./cowork-protocol` plus a `"."` entry | The protocol subpath is the desktop's import surface. Adding `exports` makes `main` unreachable, so `"."` is declared explicitly rather than left to be discovered later |
+| `apps/workspace-server/scripts/package.ts` | `cowork.mjs` and `cowork-protocol.mjs` added to the expected bundle names, and `--verify` smoke-starts `serve-cowork` on darwin and linux | Packaging must fail when a role is missing from the artifact, and the role must be provably startable from the packaged launcher |
+| `apps/workspace-server/docs/daemon.md`, `apps/workspace-server/docs/packaging.md` | Describe the third role and the two new bundles | The daemon docs listed every role and bundle, and would otherwise be wrong |
+| `AGENTS.md` | `apps/workspace-server/src/cowork/` listed as high risk, and the new risky-areas page linked | Agents must read the boundary rules before touching the socket, token, or save path |
+| `pnpm-lock.yaml` | Adds `yjs` (MIT) | The CRDT the shared documents are built on |
+
+New Ninebrains-only files: `apps/workspace-server/src/cowork/**` (`server.ts`, `documents.ts`,
+`protocol.ts`, `serve.ts`, and `server.test.ts`), `apps/workspace-server/docs/cowork.md`,
+`docs/guide/cowork.md`, and `agents/risky-areas/cowork.md`.

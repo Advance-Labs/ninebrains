@@ -271,10 +271,10 @@ pnpm run test
 - Do not dispatch release workflows, publish packages, upload artifacts, or trigger
   external deployments unless the user explicitly asks for release work.
 - Treat `src/main/core/acp/`, `packages/core/src/services/pty/`,
-  `src/core/services/ssh/`, `src/main/db/`, updater code, and provider process
-  spawning as high risk.
-- Read the matching `agents/risky-areas/` page before touching database, PTY, SSH, or
-  updater code.
+  `src/core/services/ssh/`, `src/main/db/`, `apps/workspace-server/src/cowork/`, updater
+  code, and provider process spawning as high risk.
+- Read the matching `agents/risky-areas/` page before touching database, PTY, SSH,
+  cowork, or updater code.
 - Do not weaken shell quoting, spawn behavior, env allowlists, path validation, or
   secret redaction casually.
 - Prefer existing service, provider, plugin, Wire, modal, view, tab, and store patterns
@@ -414,6 +414,7 @@ pnpm run test
 - [Database risk notes](agents/risky-areas/database.md)
 - [PTY risk notes](agents/risky-areas/pty.md)
 - [SSH risk notes](agents/risky-areas/ssh.md)
+- [Cowork risk notes](agents/risky-areas/cowork.md)
 - [Updater risk notes](agents/risky-areas/updater.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Project README](README.md)

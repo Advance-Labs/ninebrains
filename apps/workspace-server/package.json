@@ -1,6 +1,6 @@
 {
   "name": "@emdash/workspace-server",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "private": true,
   "description": "Emdash Workspace Server — runs as a daemon on remote machines and exposes workspace runtimes via wire",
   "license": "Apache-2.0",
@@ -10,6 +10,16 @@
   },
   "type": "module",
   "main": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "default": "./dist/index.mjs"
+    },
+    "./cowork-protocol": {
+      "development": "./src/cowork/protocol.ts",
+      "types": "./src/cowork/protocol.ts",
+      "default": "./dist/cowork-protocol.mjs"
+    }
+  },
   "scripts": {
     "build": "tsdown --config-loader tsx",
     "dev": "tsx --watch src/index.ts",
@@ -35,6 +45,7 @@
     "@parcel/watcher": "2.5.6",
     "better-sqlite3": "12.10.0",
     "node-pty": "1.1.0",
+    "yjs": "^13.6.32",
     "zod": "^4.4.3"
   },
   "devDependencies": {
