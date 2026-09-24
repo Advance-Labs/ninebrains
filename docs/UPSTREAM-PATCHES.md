@@ -787,3 +787,16 @@ These tests fail if a future change wires a tmux `kill-session` into either path
 | `src/core/features/brain/node/brain-service.ts` (+ test) | `gatesConnected` is true when `verification: 'external'`, not only when a `gateRunner` is passed | The desktop composition root wires gates externally and passes no `gateRunner`, so every shipped build showed a "gates off" badge claiming finished work was unverified while verification ran fine |
 | `src/main/host/updates/feed.ts` (+ test) | New `isCanaryChannel()` replaces three `channel === 'canary'` comparisons (feed URL, list-vs-single parse, release filter); the no-digest warning logs the call's channel instead of the build constant | `UPDATE_CHANNEL` ships as `v1-canary`, which none of the three matched, so a canary build fetched `/releases/latest` (prereleases excluded), parsed that single release as a list, and would have offered itself a stable build. The tests passed because every case called the feed with the bare `canary` no build sends; the new one binds to `app-identity.canary.ts` |
 | `docs/UPSTREAM-PATCHES.md` | Removed a stray `<<<<<<< HEAD` line above section 43 | Committed to main in an earlier merge of this log; it has no matching `=======` or `>>>>>>>` |
+
+## 49. Tighten the detach-not-kill assertion to match the verb, not the argv (`ninebrains/auto-update-*`)
+
+Follow-up to patch 48. The guard asserted `not.toHaveBeenCalledWith('tmux', ['kill-session', '-t',
+'=<name>'])`, which only catches a regression that kills the session with that exact argv. A kill
+issued with a bare name, a `$id` target or an extra flag would have slipped past a test whose whole
+job is to notice it.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | The dispose guard now matches `expect.arrayContaining(['kill-session'])` on any `tmux` invocation instead of one exact argv | Matching the verb rather than one exact target form means any shape of regression trips it; the positive eviction assertions above it keep their exact argv, which is correct for asserting a specific call was made |
+
+No new Ninebrains-only files.

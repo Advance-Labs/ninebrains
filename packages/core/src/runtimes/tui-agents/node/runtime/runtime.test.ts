@@ -599,7 +599,9 @@ describe('TuiAgentsRuntime', () => {
       // tmux server (and the agent process inside it) must survive so the user can
       // reattach after reopening the app or finishing an update.
       expect(spawner.processes[0]!.killCount).toBeGreaterThan(0);
-      expect(exec).not.toHaveBeenCalledWith('tmux', ['kill-session', '-t', `=${sessionName}`]);
+      // Matched on the verb alone, not on exact argv: a regression that killed the session
+      // with a different target form (bare name, `$id`, extra flags) must still trip this.
+      expect(exec).not.toHaveBeenCalledWith('tmux', expect.arrayContaining(['kill-session']));
     }
   );
 
