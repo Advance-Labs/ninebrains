@@ -76,12 +76,12 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
             <SidebarMenuButton
               isActive={isCurrentView(currentView, 'arena')}
               onClick={() => navigate(arenaViewDef())}
-              aria-label="Arena"
+              aria-label="Activity"
               className="w-full justify-between"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Activity className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-                <span className="truncate">Arena</span>
+                <span className="truncate">Activity</span>
               </span>
             </SidebarMenuButton>
             <SidebarMenuButton

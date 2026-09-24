@@ -626,7 +626,12 @@ export class BrainService {
       stopLatched: state.stopLatched,
       laneModes: state.laneModes,
       activeRuns: this.deps.supervisor.activeRunIds.length,
-      gatesConnected: this.deps.gateRunner !== undefined,
+      // Either owner counts as connected: the internal hand-off holds a `gateRunner`, while
+      // `verification: 'external'` means the gates slice's runner owns `verifying` jobs and no
+      // `gateRunner` is passed here at all. Reading only `gateRunner` reported "gates off" —
+      // i.e. "finished work is unverified" — on every build that wires gates externally, which
+      // is how the desktop composition root wires them.
+      gatesConnected: this.deps.gateRunner !== undefined || this.deps.verification === 'external',
       unattendedBudgets: this.deps.unattendedBudgets ?? DEFAULT_UNATTENDED_BUDGETS,
     };
   }

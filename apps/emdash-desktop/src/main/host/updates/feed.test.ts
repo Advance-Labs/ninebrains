@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { UPDATE_CHANNEL as CANARY_UPDATE_CHANNEL } from '@core/primitives/app-identity/api/app-identity.canary';
 import * as updateSigningKey from '@core/primitives/app-identity/api/update-signing-key';
 
 vi.mock('@core/primitives/app-identity/api/update-signing-key', async () => {
@@ -143,6 +144,23 @@ describe('fetchLatestRelease', () => {
     const releases = [stableRelease()];
     const fetchImpl = vi.fn(async () => textResponse(JSON.stringify(releases)));
     expect(await fetchLatestRelease(fetchImpl, 'canary')).toBeNull();
+  });
+
+  // A canary build swaps in app-identity.canary.ts, so this constant is the exact string a real
+  // canary install passes — and `fetchLatestRelease` takes it as the default. Every case above
+  // passes the bare 'canary' that no shipped build ever sends, which is how a canary checking the
+  // stable feed (and offering itself a stable release) went unnoticed.
+  it('treats the channel constant a canary build actually ships with as canary', async () => {
+    expect(CANARY_UPDATE_CHANNEL).toBe('v1-canary');
+    expect(feedUrlForChannel(CANARY_UPDATE_CHANNEL)).toContain('/releases?per_page=10');
+
+    const releases = [
+      stableRelease({ tag_name: 'v0.2.2', prerelease: false }),
+      stableRelease({ tag_name: 'v0.2.2-canary.4', prerelease: true }),
+    ];
+    const fetchImpl = vi.fn(async () => textResponse(JSON.stringify(releases)));
+    const release = await fetchLatestRelease(fetchImpl, CANARY_UPDATE_CHANNEL);
+    expect(release?.tagName).toBe('v0.2.2-canary.4');
   });
 });
 

@@ -70,7 +70,7 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           variant="ghost"
           data-testid="brain-open-planner"
           disabled={projectId === null}
-          title={projectId === null ? 'Add a lane to this tab first' : 'Draw the plan on a canvas'}
+          title={projectId === null ? 'Open a project first' : 'Draw the plan on a canvas'}
           onClick={() => projectId && navigate(plannerViewDef({ projectId }))}
         >
           Plan
@@ -155,7 +155,7 @@ export function BrainDrawer({ projects, lanes, renderTerminal }: BrainDrawerProp
           variant={visible.length === 0 ? 'primary' : 'ghost'}
           className="h-6 px-2 text-xs"
           disabled={projectId === null}
-          title={projectId === null ? 'Add a lane to this tab first' : undefined}
+          title={projectId === null ? 'Open a project first' : undefined}
           onClick={() =>
             projectId &&
             void runBrainAction('Could not start the Brain', (c) =>

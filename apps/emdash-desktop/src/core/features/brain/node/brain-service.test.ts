@@ -15,7 +15,7 @@ afterEach(async () => {
   while (services.length > 0) await services.pop()!.dispose();
 });
 
-async function setup() {
+async function setup(extra: { verification?: 'internal' | 'external' } = {}) {
   const userDataDir = realpathSync(mkdtempSync(join(tmpdir(), 'nb-service-')));
   const brain = new Brain({ store: new InMemoryBrainStore() });
   const endpoint = await startBrainEndpoint({ brain, onInternalError: () => {} });
@@ -72,6 +72,7 @@ async function setup() {
     },
     sleep: async () => {},
     dispatch: { intervalMs: 60_000, debounceMs: 1 },
+    ...extra,
   });
   services.push(service);
   return { service, brain, endpoint, lane, writes, stopped, refresh, supervisor, userDataDir };
@@ -113,6 +114,21 @@ describe('BrainService', () => {
     const { service } = await setup();
     service.start();
     expect(peek(service.views.dispatcher)).toMatchObject({ paused: false, stopLatched: false });
+  });
+
+  // `gatesConnected: false` renders a "gates off" badge that tells the user finished work is
+  // unverified. External verification is how the desktop composition root wires gates, so
+  // deriving the flag from `gateRunner` alone showed that warning on every shipped build.
+  it('reports gates connected when the gates slice owns verification externally', async () => {
+    const { service } = await setup({ verification: 'external' });
+    service.start();
+    expect(peek(service.views.dispatcher)).toMatchObject({ gatesConnected: true });
+  });
+
+  it('reports gates disconnected when neither owner is wired', async () => {
+    const { service } = await setup();
+    service.start();
+    expect(peek(service.views.dispatcher)).toMatchObject({ gatesConnected: false });
   });
 
   it('launches a lane with a token, dispatches a job into it, and releases the launch', async () => {
