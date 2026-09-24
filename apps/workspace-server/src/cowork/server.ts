@@ -57,15 +57,14 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
     socket.setEncoding('utf8');
     socket.on('data', (chunk: string) => {
       input += chunk;
-      if (Buffer.byteLength(input) > MAX_FRAME_BYTES) {
-        send(peer, { type: 'error', code: 'too-large', message: 'Request is too large' });
-        socket.destroy();
-        return;
-      }
       let boundary = input.indexOf('\n');
       while (boundary >= 0) {
         const line = input.slice(0, boundary);
         input = input.slice(boundary + 1);
+        if (Buffer.byteLength(line) > MAX_FRAME_BYTES) {
+          failPeer(peer, 'too-large', 'Request is too large');
+          return;
+        }
         operations = operations
           .then(() => handle(line, peer))
           .catch((error: unknown) => {
@@ -82,6 +81,9 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
             });
           });
         boundary = input.indexOf('\n');
+      }
+      if (Buffer.byteLength(input) > MAX_FRAME_BYTES) {
+        failPeer(peer, 'too-large', 'Request is too large');
       }
     });
     socket.on('close', () => {
@@ -116,7 +118,7 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
       peer.joined.add(joined.path);
       send(peer, {
         type: 'joined',
-        path: message.path,
+        path: documents.relativeName(joined.path),
         update: Buffer.from(joined.update).toString('base64'),
         revision: joined.revision,
         requestId: message.requestId,
@@ -129,11 +131,12 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
     if (message.type === 'update') {
       const bytes = Buffer.from(message.update, 'base64');
       const result = await documents.update(message.path, bytes);
+      const name = documents.relativeName(result.path);
       for (const target of peers) {
         if (!target.joined.has(result.path)) continue;
         send(target, {
           type: 'update',
-          path: message.path,
+          path: name,
           update: message.update,
           revision: result.revision,
           requestId: target === peer ? message.requestId : undefined,
@@ -142,11 +145,12 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
       return;
     }
     const saved = await documents.save(message.path);
+    const savedName = documents.relativeName(saved.path);
     for (const target of peers) {
       if (target.joined.has(saved.path)) {
         send(target, {
           type: 'saved',
-          path: message.path,
+          path: savedName,
           revision: saved.revision,
           content: saved.content,
           requestId: target === peer ? message.requestId : undefined,
@@ -155,12 +159,13 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
     }
   }
 
-  // Resolve by joining only after authorization. The canonical path identity
-  // comes from the document store, so spelling aliases cannot bypass join.
+  // Resolve after authorization only. The canonical path identity comes from the
+  // document store, so spelling aliases cannot bypass join. This must canonicalize
+  // without loading: a document made resident here is one no peer has joined, so
+  // nothing would ever release it and the resident cap would fill permanently.
   async function resolveJoinedPath(path: string, peer: Peer): Promise<string> {
     if (!peer.authorized) return '';
-    const joined = await documents.join(path);
-    return joined.path;
+    return documents.canonicalize(path);
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -189,6 +194,22 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
 
 function send(peer: Peer, message: ServerMessage): void {
   if (!peer.socket.destroyed) peer.socket.write(`${JSON.stringify(message)}\n`);
+}
+
+/**
+ * Drop a peer, reporting why on a best-effort basis. `destroy()` called straight
+ * after `write` discards the frame that was just queued, so hand it to the kernel
+ * first and tear down from the write callback. Delivery still is not guaranteed:
+ * dropping a peer that is mid-upload resets the connection, and the reset can
+ * discard what that peer had not yet read. Closing gracefully instead would let a
+ * peer that ignores the FIN hold the connection open, so the drop stays immediate.
+ */
+function failPeer(peer: Peer, code: string, message: string): void {
+  const { socket } = peer;
+  if (socket.destroyed) return;
+  socket.pause();
+  const frame: ServerMessage = { type: 'error', code, message };
+  socket.write(`${JSON.stringify(frame)}\n`, () => socket.destroy());
 }
 
 function requestIdFromLine(line: string): string | undefined {

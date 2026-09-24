@@ -270,6 +270,122 @@ describe('cowork server', () => {
     expect(await stale.next()).toMatchObject({ type: 'error', code: 'external-change' });
     stale.close();
   });
+
+  it('does not make a document resident when the peer has not joined it', async () => {
+    // Rejecting an unjoined path must not load it: nothing would ever release a
+    // document no peer joined, so the resident cap would fill and stay full.
+    for (let index = 0; index < 140; index += 1) {
+      await writeFile(join(root, `other-${index}.txt`), 'x');
+    }
+    const client = await connect(socketPath);
+    try {
+      client.send({ type: 'join', token, path: 'shared.txt' });
+      expect((await client.next()).type).toBe('joined');
+
+      for (let index = 0; index < 140; index += 1) {
+        client.send({ type: 'save', path: `other-${index}.txt`, requestId: `probe-${index}` });
+        expect(await client.next()).toMatchObject({
+          type: 'error',
+          code: 'unauthorized',
+          requestId: `probe-${index}`,
+        });
+      }
+
+      // The server is still usable: the probes left nothing resident.
+      const joiner = await connect(socketPath);
+      try {
+        joiner.send({ type: 'join', token, path: 'other-0.txt' });
+        expect(await joiner.next()).toMatchObject({ type: 'joined', path: 'other-0.txt' });
+      } finally {
+        joiner.close();
+      }
+    } finally {
+      client.close();
+    }
+  });
+
+  it('bounds each frame rather than the whole read buffer', async () => {
+    // Two legal frames can arrive in one read and together exceed MAX_FRAME_BYTES.
+    // Guarding the accumulated buffer would drop a peer that did nothing wrong.
+    const client = await connect(socketPath);
+    try {
+      client.send({ type: 'join', token, path: 'shared.txt' });
+      expect((await client.next()).type).toBe('joined');
+
+      const payload = 'A'.repeat(1_200_000);
+      client.send({ type: 'update', path: 'shared.txt', update: payload, requestId: 'first' });
+      client.send({ type: 'update', path: 'shared.txt', update: payload, requestId: 'second' });
+
+      // Both frames are answered on their own merits instead of killing the peer.
+      expect(await client.next()).toMatchObject({ type: 'update', requestId: 'first' });
+      expect(await client.next()).toMatchObject({ type: 'update', requestId: 'second' });
+    } finally {
+      client.close();
+    }
+  });
+
+  it('reports and drops a peer that sends a frame larger than the limit', async () => {
+    // Raw socket: the server tears this peer down while it is still writing, so
+    // the shared helper's connect/reject wiring would surface a spurious EPIPE.
+    const socket = createConnection(socketPath);
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', () => resolve());
+      socket.once('error', reject);
+    });
+    socket.setEncoding('utf8');
+    let received = '';
+    socket.on('data', (chunk: string) => {
+      received += chunk;
+    });
+    socket.on('error', () => undefined);
+    const closed = new Promise<void>((resolve) => socket.once('close', () => resolve()));
+
+    socket.write(`${JSON.stringify({ type: 'join', token, path: 'shared.txt' })}\n`);
+    socket.write(
+      `${JSON.stringify({ type: 'update', path: 'shared.txt', update: 'A'.repeat(2_200_000) })}\n`
+    );
+
+    await closed;
+    // The peer is dropped and the oversized frame never reaches the document.
+    // The error frame is best-effort only: the reset can discard it while the
+    // peer is still uploading, so asserting delivery here would be flaky.
+    expect(received).not.toContain('"type":"update"');
+  });
+
+  it('labels broadcasts with the worktree-relative name, not the sender spelling', async () => {
+    const alice = await connect(socketPath);
+    const bob = await connect(socketPath);
+    try {
+      // Alice reaches the same document by a different but equivalent spelling.
+      alice.send({ type: 'join', token, path: './shared.txt' });
+      bob.send({ type: 'join', token, path: 'shared.txt' });
+      const aliceJoin = await alice.next();
+      const bobJoin = await bob.next();
+      expect(aliceJoin).toMatchObject({ type: 'joined', path: 'shared.txt' });
+      expect(bobJoin).toMatchObject({ type: 'joined', path: 'shared.txt' });
+      if (aliceJoin.type !== 'joined') return;
+
+      const doc = new Y.Doc();
+      Y.applyUpdate(doc, Buffer.from(aliceJoin.update, 'base64'));
+      const vector = Y.encodeStateVector(doc);
+      doc.getText('content').insert(5, ' edit');
+      alice.send({
+        type: 'update',
+        path: './shared.txt',
+        update: Buffer.from(Y.encodeStateAsUpdate(doc, vector)).toString('base64'),
+      });
+
+      expect(await alice.next()).toMatchObject({ type: 'update', path: 'shared.txt' });
+      expect(await bob.next()).toMatchObject({ type: 'update', path: 'shared.txt' });
+
+      alice.send({ type: 'save', path: './shared.txt' });
+      expect(await alice.next()).toMatchObject({ type: 'saved', path: 'shared.txt' });
+      expect(await bob.next()).toMatchObject({ type: 'saved', path: 'shared.txt' });
+    } finally {
+      alice.close();
+      bob.close();
+    }
+  });
 });
 
 async function connect(path: string): Promise<Client> {

@@ -71,6 +71,12 @@ all joined clients. `{"type":"save","path":"relative/file.txt"}` writes the conv
 disk, or reports `external-change` when the file no longer matches the disk version observed at
 join. The client must use Yjs to apply updates; plain text replacement messages are unsupported.
 
+A client may name a file by any relative spelling that stays inside the worktree. Every server
+message answers with the worktree-relative canonical name, so two clients that joined the same
+file by different spellings still agree on the `path` they see in `joined`, `update` and `saved`.
+A frame larger than `MAX_FRAME_BYTES` drops the connection; the error reporting that is
+best-effort, because the reset can arrive before a peer that is still uploading reads it.
+
 The desktop imports the typed message schemas from `@emdash/workspace-server/cowork-protocol`
 (the `cowork-protocol.mjs` bundle, which has no native or workspace dependencies).
 

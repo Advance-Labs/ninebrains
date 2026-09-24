@@ -106,6 +106,20 @@ export class CoworkDocuments {
     }
   }
 
+  /**
+   * Resolve a client path to its canonical identity without loading the document.
+   * Authorization checks need the identity only, and must not make a document
+   * resident: a peer that never joins it would never release it either.
+   */
+  async canonicalize(input: string): Promise<string> {
+    return this.canonicalPath(input);
+  }
+
+  /** The worktree-relative name every peer uses to refer to a document. */
+  relativeName(canonical: string): string {
+    return relative(this.root, canonical);
+  }
+
   async join(path: string): Promise<{ update: Uint8Array; revision: number; path: string }> {
     const doc = await this.get(path);
     return { update: Y.encodeStateAsUpdate(doc.ydoc), revision: doc.revision, path: doc.path };
