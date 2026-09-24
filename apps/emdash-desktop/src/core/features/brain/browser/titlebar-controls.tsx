@@ -35,24 +35,36 @@ export function BrainTitlebarControls({
           {total > 0 && ` · ${total} unread`}
         </Tooltip.Content>
       </Tooltip.Root>
-      <Tooltip.Root>
-        <Tooltip.Trigger
-          render={
-            <Button
-              size="sm"
-              variant="destructive"
-              data-testid="brain-stop"
-              disabled={dispatcher.stopLatched}
-              onClick={() => void stopAllAgentWork()}
-            >
-              {dispatcher.stopLatched ? 'Stopped' : 'STOP'}
-            </Button>
-          }
-        />
-        <Tooltip.Content>
-          STOP: stop every agent and pause dispatching until you clear it (Mod+Shift+Backspace).
-        </Tooltip.Content>
-      </Tooltip.Root>
+      <BrainStopButton />
     </div>
+  );
+}
+
+/**
+ * The global STOP on its own, so every view that can be open while agents run can carry it.
+ * The Planner in particular is reachable from Lanes but renders its own titlebar, so without
+ * this it was the one place you could watch a plan run with no way to stop it.
+ */
+export function BrainStopButton() {
+  const { dispatcher } = useBrainOverview();
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger
+        render={
+          <Button
+            size="sm"
+            variant="destructive"
+            data-testid="brain-stop"
+            disabled={dispatcher.stopLatched}
+            onClick={() => void stopAllAgentWork()}
+          >
+            {dispatcher.stopLatched ? 'Stopped' : 'STOP'}
+          </Button>
+        }
+      />
+      <Tooltip.Content>
+        STOP: stop every agent and pause dispatching until you clear it (Mod+Shift+Backspace).
+      </Tooltip.Content>
+    </Tooltip.Root>
   );
 }

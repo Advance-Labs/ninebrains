@@ -1,5 +1,8 @@
+import { Button } from '@emdash/ui/react/primitives';
 import type { Viewport } from '@xyflow/react';
 import { useCallback, type ReactNode } from 'react';
+import { BrainStopButton } from '@core/features/brain/contributions/planner-controls';
+import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import {
   plannerCanvasSubject,
   plannerViewportMemento,
@@ -8,7 +11,10 @@ import { DEFAULT_CANVAS_ID, plannerViewDef } from '@core/features/planner/contri
 import { Titlebar } from '@core/features/workbench/contributions/browser/Titlebar';
 import { SubjectProvider } from '@core/primitives/mementos/react';
 import { useMemento } from '@core/primitives/mementos/react/use-memento';
-import { useCurrentViewParams } from '@core/primitives/navigation/browser/navigation-hooks';
+import {
+  useCurrentViewParams,
+  useNavigate,
+} from '@core/primitives/navigation/browser/navigation-hooks';
 import { defineViewRuntime } from '@core/primitives/views/react';
 import { PlannerCanvas } from './planner-canvas';
 
@@ -16,13 +22,40 @@ function PlannerWrapper({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * The Planner renders its own titlebar, so whatever it leaves out is simply absent here. It
+ * previously left out both halves of the way back: no route to Lanes (only Lanes knows how to
+ * reach the Planner, so the trip was one-way) and no global STOP while a plan runs.
+ */
 function PlannerTitlebar() {
+  const { navigate } = useNavigate();
   return (
     <Titlebar
       leftSlot={
-        <nav aria-label="Breadcrumb" className="flex items-center px-2">
-          <span className="truncate rounded-sm px-1 py-0.5 text-sm text-foreground">Planner</span>
+        <nav aria-label="Breadcrumb" className="flex items-center gap-0.5 px-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="planner-open-lanes"
+            onClick={() => navigate(lanesViewDef({}))}
+          >
+            Lanes
+          </Button>
+          <span aria-hidden className="text-sm text-foreground-passive">
+            /
+          </span>
+          <span
+            aria-current="page"
+            className="truncate rounded-sm px-1 py-0.5 text-sm text-foreground"
+          >
+            Planner
+          </span>
         </nav>
+      }
+      rightSlot={
+        <div className="flex items-center pr-2">
+          <BrainStopButton />
+        </div>
       }
     />
   );

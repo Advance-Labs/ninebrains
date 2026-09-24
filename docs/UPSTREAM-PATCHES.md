@@ -684,7 +684,6 @@ New Ninebrains-only files: `src/core/features/brain/contributions/{arena,setting
 |---|---|---|
 | `src/renderer/index.html` | Boot splash: the old radial logo and "ninebrains" wordmark are replaced by the website's nine-square `#intro` mark, centred and sized the same (`clamp(96px, 12vmin, 120px)`); the indeterminate progress bar is replaced by `WorkingMarkIcon`'s clockwise arm sweep and core pulse, starting at 1.2s (when the bar used to appear); static under reduced motion. Theme background/foreground tokens are kept, not the site's `#000`/`#fafafa` | The splash still showed the retired branding; the app's first paint now matches the site, and keeping the theme colours avoids a flash when the splash hands off |
 
-<<<<<<< HEAD
 ## 43. Clean Artifacts cleans artifacts; archived worktrees expire after 30 days (`ninebrains/archived-uxcqd`)
 
 | File | Change | Why |
@@ -774,3 +773,17 @@ These tests fail if a future change wires a tmux `kill-session` into either path
 |---|---|---|
 | `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | New test: `TuiAgentsRuntime.dispose()` on a tmux-backed session kills the pty client but never calls `tmux kill-session` | Locks in that quit detaches, not destroys, the tmux server so the agent keeps working while the app is closed or updating |
 | `apps/emdash-desktop/src/main/bootstrap/shutdown.test.ts` | New test + a `vi.mock` of `@emdash/core/services/pty/api`'s `killTmuxSession`: `runQuitCleanup()` never calls it | Guards the shutdown phase list itself, in case a future phase reaches for a direct tmux kill instead of delegating to `runtimes.dispose()` |
+
+## 49. Brain reachable before its lanes; Planner has a way back (`ninebrains/issues-dro93`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/lanes/browser/grid/lanes-view.tsx` | The Brain drawer's `projects` prop falls back to every open, available project (new `openProjects()`) when no lane has named one | The prop was derived from lanes in the current tab, so on a fresh install it was empty and every Brain action — Start Brain, Plan — was disabled. The orchestrator was gated behind the lanes it exists to hand work to |
+| `src/core/features/brain/browser/brain-drawer.tsx` | The two disabled-state tooltips say "Open a project first", not "Add a lane to this tab first" | A lane is no longer what the buttons are waiting for |
+| `src/core/features/brain/browser/titlebar-controls.tsx`, `src/core/features/brain/contributions/planner-controls.ts` | `BrainStopButton` extracted from `BrainTitlebarControls` and exported for the Planner | The STOP lived inside the lanes titlebar, so it did not exist in any other view |
+| `src/core/features/planner/browser/planner-view.tsx` | Titlebar becomes a `Lanes / Planner` breadcrumb with a working back button, plus the global STOP | Only Lanes knew how to reach the Planner, so the trip was one-way; with the sidebar collapsed it was a dead end, and a running plan had no stop control |
+| `src/core/features/arena/browser/arena-dashboard.tsx` | `sm:grid-cols-2` → `grid-cols-[repeat(auto-fill,minmax(18rem,1fr))]`, `min-w-0` on the card root; header renamed to "Activity" | The viewport breakpoint decided the track count while the panel decided the width; `PageLayout`'s scroller sets `overflow-x: hidden`, so the second column was clipped with no way to scroll to it |
+| `src/core/features/workbench/browser/sidebar/left-sidebar.tsx` | Sidebar entry renamed Arena → Activity (label and `aria-label`) | The view lists live state of every running agent; the name promised a competition. The view id stays `arena`, so telemetry's `FocusView` union and the view catalog are untouched |
+| `src/core/features/brain/node/brain-service.ts` (+ test) | `gatesConnected` is true when `verification: 'external'`, not only when a `gateRunner` is passed | The desktop composition root wires gates externally and passes no `gateRunner`, so every shipped build showed a "gates off" badge claiming finished work was unverified while verification ran fine |
+| `src/main/host/updates/feed.ts` (+ test) | New `isCanaryChannel()` replaces three `channel === 'canary'` comparisons (feed URL, list-vs-single parse, release filter); the no-digest warning logs the call's channel instead of the build constant | `UPDATE_CHANNEL` ships as `v1-canary`, which none of the three matched, so a canary build fetched `/releases/latest` (prereleases excluded), parsed that single release as a list, and would have offered itself a stable build. The tests passed because every case called the feed with the bare `canary` no build sends; the new one binds to `app-identity.canary.ts` |
+| `docs/UPSTREAM-PATCHES.md` | Removed a stray `<<<<<<< HEAD` line above section 43 | Committed to main in an earlier merge of this log; it has no matching `=======` or `>>>>>>>` |

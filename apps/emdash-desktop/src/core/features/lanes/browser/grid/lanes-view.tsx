@@ -12,7 +12,12 @@ import {
   BrainTitlebarControls,
 } from '@core/features/brain/contributions/lanes-drawer';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
-import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
+import {
+  asAvailableProject,
+  getProjectManagerStore,
+  getProjectStore,
+  projectDisplayName,
+} from '@core/features/projects/api/browser/stores/project-selectors';
 import { Titlebar } from '@core/features/workbench/contributions/browser/Titlebar';
 import { workbenchPanelLayoutsMemento } from '@core/features/workbench/contributions/mementos';
 import { createLayoutStorage } from '@core/primitives/mementos/browser/layout-storage';
@@ -96,6 +101,19 @@ const LanesMainPanel = observer(function LanesMainPanel() {
   return <LanesWithBrain tab={tab} />;
 });
 
+/** Every open, available project — the Brain drawer's fallback when no lane has named one. */
+function openProjects(): Array<{ projectId: string; name: string }> {
+  const rows: Array<{ projectId: string; name: string }> = [];
+  for (const [projectId] of getProjectManagerStore().projects) {
+    if (!asAvailableProject(getProjectStore(projectId))) continue;
+    rows.push({
+      projectId,
+      name: projectDisplayName(getProjectStore(projectId)) ?? 'Untitled project',
+    });
+  }
+  return rows;
+}
+
 /** The grid plus the collapsible Brain drawer on the right (SEAMS §3.9). */
 const LanesWithBrain = observer(function LanesWithBrain({ tab }: { tab: LaneTab }) {
   const appSpace = useSubjectSpace(appSubject);
@@ -112,9 +130,14 @@ const LanesWithBrain = observer(function LanesWithBrain({ tab }: { tab: LaneTab 
     onCloseRequest: () => setDrawerOpen(false),
   });
   const lanes = tab.slots.filter((lane): lane is Lane => lane !== null);
-  const projects = [...new Map(lanes.map((lane) => [lane.projectId, lane])).values()].map(
+  const laneProjects = [...new Map(lanes.map((lane) => [lane.projectId, lane])).values()].map(
     (lane) => ({ projectId: lane.projectId, name: lane.projectName ?? 'project' })
   );
+  // A Brain session needs a project, not a lane. Before the first lane exists `laneProjects` is
+  // empty, which left every Brain action in the drawer disabled — the orchestrator stuck behind
+  // the lanes it exists to hand work to. Fall back to the open projects so a fresh install can
+  // start a Brain first and let it plan what the lanes will run.
+  const projects = laneProjects.length > 0 ? laneProjects : openProjects();
 
   return (
     <Resizable.Group

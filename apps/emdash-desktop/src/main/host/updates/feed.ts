@@ -30,8 +30,21 @@ export function currentUpdateArch(): UpdateArchitecture {
   return process.arch === 'arm64' ? 'arm64' : 'x64';
 }
 
+/**
+ * Whether a channel name means canary, in either spelling it arrives in.
+ *
+ * The shipped constant is `UPDATE_CHANNEL` — `v1-canary` / `v1-stable`, where `v1-` versions the
+ * feed contract — but this module's callers and tests also pass the bare `canary` / `stable`.
+ * A plain `channel === 'canary'` matched only the bare form, so a real canary build fell through
+ * to the stable branch: it fetched `/releases/latest` (which omits prereleases, and so can never
+ * return a canary tag) and then accepted that stable release as its own update.
+ */
+export function isCanaryChannel(channel: string): boolean {
+  return channel === 'canary' || channel === 'v1-canary';
+}
+
 export function feedUrlForChannel(channel: string): string {
-  return channel === 'canary'
+  return isCanaryChannel(channel)
     ? `${RELEASES_API}?per_page=${CANARY_SCAN_PAGES}&exclude_drafts=true`
     : `${RELEASES_API}/latest`;
 }
@@ -50,7 +63,7 @@ function selectNewestRelease(releases: GitHubRelease[], channel: string): GitHub
   return (
     releases
       .filter((release) =>
-        channel === 'canary' ? CANARY_ID.test(release.tag_name) : !release.prerelease
+        isCanaryChannel(channel) ? CANARY_ID.test(release.tag_name) : !release.prerelease
       )
       .sort((a, b) => compareVersions(b.tag_name, a.tag_name))[0] ?? null
   );
@@ -81,7 +94,7 @@ export async function fetchLatestRelease(
   }
 
   let release: GitHubRelease | null;
-  if (channel === 'canary') {
+  if (isCanaryChannel(channel)) {
     const releases = (await response.json()) as GitHubRelease[];
     release = selectNewestRelease(releases, channel);
   } else {
@@ -98,7 +111,7 @@ export async function fetchLatestRelease(
   if (!digestPair.digestUrl || !digestPair.digestSignatureUrl) {
     log.warn('Update feed candidate has no signed digest; skipping', {
       version,
-      channel: UPDATE_CHANNEL,
+      channel,
     });
     return null;
   }

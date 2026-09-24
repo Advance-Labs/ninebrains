@@ -133,7 +133,7 @@ const ArenaTaskCard = observer(function ArenaTaskCard({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-lg border border-border bg-background-secondary p-4',
+        'flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background-secondary p-4',
         glow && status === 'working' && 'shadow-[0_0_16px_var(--em-accent-9)]'
       )}
     >
@@ -165,8 +165,10 @@ export const ArenaDashboard = observer(function ArenaDashboard() {
     <PageLayout>
       <PageLayout.Content maxWidth="4xl">
         <PageLayout.Header
-          title="Arena"
-          description={`${rows.length} active task${rows.length === 1 ? '' : 's'} across every open project.`}
+          title="Activity"
+          description={`Every agent running right now: ${rows.length} active task${
+            rows.length === 1 ? '' : 's'
+          } across every open project.`}
         />
         <BrainSection />
         {rows.length === 0 ? (
@@ -175,7 +177,11 @@ export const ArenaDashboard = observer(function ArenaDashboard() {
             description="Provisioned tasks will show up here with their live lifecycle and diff activity."
           />
         ) : (
-          <div className="grid grid-cols-1 gap-3 py-4 sm:grid-cols-2">
+          // Track count follows the column's own width, not the viewport's. `sm:grid-cols-2`
+          // asked a viewport media query how wide this column is; with the sidebar open, a
+          // narrow window or UI zoom the two disagree, and PageLayout's scroller sets
+          // `overflow-x: hidden`, so the second column was clipped with no way to scroll to it.
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3 py-4">
             {rows.map(({ projectId, projectName, task }) => (
               <ArenaTaskCard
                 key={`${projectId}:${task.data.id}`}
