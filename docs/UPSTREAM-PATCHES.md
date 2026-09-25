@@ -854,3 +854,30 @@ Ninebrains-only files are recorded here too.
 | `docs/strategy/briefs/*.md` | One copy-paste dispatch brief per lane, plus the R1/R2/R3 reviewer briefs | The exact text handed to a spawned agent. When a brief and a workstream page disagree, the workstream page wins |
 | `docs/strategy/dag.md` | L0's dispatch-level job list: one row per job with hard edges, risk tier and state, plus the human-gated items scheduled as scarce capacity | Regenerated at each wave boundary and never mid-wave. The execution plan holds the shape of the DAG; this file holds the jobs |
 | `docs/strategy/evidence/` | Per-job evidence records: the handoff report, the R1/R2/R3 verdicts, and the revision each was run against | Defines what "recorded in the deliverable's evidence record" means, which the definition of done referred to before anything implemented it |
+
+## 54. A file dropped into a terminal arrived as a lone space (`ninebrains/terminal-drop-bracketed-paste`)
+
+Dragging a file from Finder onto a terminal pane running Claude Code inserted one blank space
+and no path. Dragging the same file from the in-app editor file tree worked. The two drop
+branches built the same payload differently: the in-app branch sent plain text, the external
+branch wrapped it in bracketed paste, the pane consumed the wrapped portion, and the only
+byte left was the trailing space the caller appends. Reported as #84.
+
+The trailing space is what makes the diagnosis certain: an empty path list returns before
+`sendInput` in both `handleDrop` and `injectTerminalImagePaths`, so "no paths, space anyway"
+cannot happen. A lone space proves the full wrapped payload was written.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/terminals/api/browser/pty/terminal-image-paths.ts` | `buildTerminalImageInjection` returns `formatTerminalImagePaths` directly instead of wrapping it in `wrapAsBracketedPaste`; the reasoning is a `Ninebrains:` docblock on the function | Each path is already escaped into a single shell token, so there is nothing for paste protection to protect. This matches `core/primitives/prompt-injection/api/prompt-injection.ts`, which uses bracketed paste only for a multi-line payload going to a non-Claude provider — neither condition holds for a path. `wrapAsBracketedPaste` stays exported because `core/features/brain/node/attended.ts` still wraps the multi-line prompts it pastes into attended lanes, which is correct and unaffected |
+| `src/core/features/terminals/contributions/browser/pty/pty-pane.tsx` | `injectTerminalImagePaths` gains an optional `platform`; the in-app file-tree branch now calls `injectImagePaths(paths, targetPlatform)` instead of formatting and sending the payload itself. `formatTerminalImagePaths` is no longer imported here | The bug existed because two branches did the same job in two places and drifted. One helper now serves both, so they cannot drift again. The optional `platform` preserves the in-app branch's `targetPlatform` override, which matters because a remote workspace is a Linux target even when the renderer is not |
+| `src/renderer/tests/terminal-image-injection.test.ts` | Six cases under `path injection is never bracketed paste (#84)`: no markers on POSIX or Windows, the reported repro path with two consecutive spaces, multi-file separation, byte-for-byte equality with what the in-app branch produces across all three platforms, and the empty-list case | Verified to fail against the pre-fix function and pass after, so they fail for the reason they claim. The equality case is the regression guard for the unification, not for the wrapping |
+
+No new Ninebrains-only files.
+
+**What this does not establish.** The precise mechanism by which the pane consumed the wrapped
+payload is still open, and #84 says so. `core/features/brain/node/attended.ts` writes
+marker-wrapped payloads into attended Claude lanes unconditionally — including single-line
+ones, asserted in `attended.test.ts` — and that is a working feature, so "Claude Code discards
+marker-wrapped payloads" is not a sufficient explanation. The fix is justified by differential
+evidence: the external branch now emits the same bytes as the in-app branch, which works.

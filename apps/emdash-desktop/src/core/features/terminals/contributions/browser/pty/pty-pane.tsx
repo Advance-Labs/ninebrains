@@ -12,7 +12,6 @@ import {
   buildTerminalImageInjection,
   clipboardDataMayContainImage,
   extractClipboardImageFiles,
-  formatTerminalImagePaths,
   isNearDuplicatePaste,
 } from '@core/features/terminals/api/browser/pty/terminal-image-paths';
 import {
@@ -24,6 +23,7 @@ import {
   usePaneSizingContext,
 } from '@core/features/terminals/contributions/browser/pty/pane-sizing-context';
 import { terminalInputScope } from '@core/features/workbench/contributions/scopes';
+import type { NodePlatform } from '@core/primitives/desktop-host/api/host-contract';
 import { getHostClient } from '@core/primitives/desktop-host/browser/host-client';
 import { getDraggedWorkspaceFile } from '@core/primitives/drag-files/browser/drag-files';
 import { log } from '@core/primitives/logging/browser/logger';
@@ -62,16 +62,27 @@ type Props = {
 
 type TerminalInputHelpers = Parameters<PasteFromClipboardHandler>[0];
 
+/**
+ * Ninebrains: the one place a path is written into a terminal.
+ *
+ * Both drop paths — an OS drag from Finder/Explorer and an in-app drag from the
+ * editor file tree — go through here, so they cannot drift apart again. They
+ * had, which is what #84 was: the in-app branch sent plain text and the
+ * external branch wrapped the same payload in bracketed paste, which a Claude
+ * Code pane swallowed whole and left only the trailing space below.
+ */
 async function injectTerminalImagePaths(args: {
   paths: string[];
   sessionId: string;
   remoteConnectionId: string | undefined;
+  /** A remote workspace is a Linux target even when the renderer is not. */
+  platform?: NodePlatform;
   sendInput: TerminalInputHelpers['sendInput'];
   focus: TerminalInputHelpers['focus'];
 }): Promise<void> {
   if (args.paths.length === 0) return;
 
-  const platform = await (await getHostClient()).getPlatform();
+  const platform = args.platform ?? (await (await getHostClient()).getPlatform());
   const payload = buildTerminalImageInjection(args.paths, platform);
   args.sendInput(`${payload} `, { track: false });
   args.focus();
@@ -215,11 +226,12 @@ const PtyPaneInner = forwardRef<{ focus: () => void }, Props>(
     useImperativeHandle(ref, () => ({ focus }), [focus]);
 
     const injectImagePaths = useCallback(
-      async (paths: string[]) => {
+      async (paths: string[], platform?: NodePlatform) => {
         await injectTerminalImagePaths({
           paths,
           sessionId,
           remoteConnectionId,
+          platform,
           focus,
           sendInput,
         });
@@ -305,19 +317,12 @@ const PtyPaneInner = forwardRef<{ focus: () => void }, Props>(
 
           void (async () => {
             try {
-              const platform =
-                draggedWorkspaceFile.targetPlatform ??
-                (await (await getHostClient()).getPlatform());
-              // Plain text, not bracketed paste: Claude Code swallows externally
-              // injected paste markers, and the escaped single-line path needs
-              // no paste protection in shells or other agent TUIs.
-              sendInput(
-                `${formatTerminalImagePaths(draggedWorkspaceFile.targetPaths, platform)} `,
-                {
-                  track: false,
-                }
+              // Same helper as the external-drop branch below, so the two cannot
+              // produce different bytes for the same path (#84).
+              await injectImagePaths(
+                draggedWorkspaceFile.targetPaths,
+                draggedWorkspaceFile.targetPlatform
               );
-              focus();
             } catch (error) {
               log.warn('Terminal drop failed', { error });
             }
