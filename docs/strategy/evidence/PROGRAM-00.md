@@ -11,7 +11,12 @@
 
 ## What changed
 
-Thirty-two files under `docs/strategy/`, plus section 52 of `docs/UPSTREAM-PATCHES.md`.
+Thirty-two files under `docs/strategy/`, plus section 53 of `docs/UPSTREAM-PATCHES.md`.
+
+The section was numbered 52 when first written and renumbered to 53 on rebase, because #83
+took 52 on main first. The commit message of `6b3f18b05` still says 52; that is the standing
+cost of the patch-log convention, and the mechanical resolution is to renumber rather than
+merge hunks.
 
 - Four program-level pages: north star, swarm charter, execution plan, definition of done.
 - Eleven workstream pages (W1–W11), each with intent, a "where the code is today" section
