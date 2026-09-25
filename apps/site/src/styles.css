@@ -589,6 +589,13 @@ h1 {
   background: var(--pass);
   color: #06210f;
 }
+/* Nothing was copied: a content blocker took the write, or the browser refused it. The command
+   next to the button is selected and the label names the keys that finish the job, so this state
+   has to read as unfinished rather than borrow the green of a copy that happened. */
+.cmd .copy[data-copied='manual'] {
+  background: var(--warn);
+  color: #2a1400;
+}
 
 .install-note {
   margin: 8px 0 0;
@@ -2669,7 +2676,8 @@ h1 .ln {
 
 .nav,
 .rail,
-footer {
+footer,
+.hms-slot {
   --d: 60ms;
 }
 h1 .ln:nth-child(1) {
@@ -2701,6 +2709,7 @@ html.intro-reveal
     .nav,
     .rail,
     footer,
+    .hms-slot,
     .panel:not([hidden]) :is(.eyebrow, .lede, .install, .works-with, .stats, .side),
     h1 .ln
   ) {
@@ -2717,6 +2726,7 @@ html.intro:not(.intro-reveal)
     .nav,
     .rail,
     footer,
+    .hms-slot,
     .panel:not([hidden]) :is(.eyebrow, .lede, .install, .works-with, .stats, .side),
     h1 .ln
   ) {
@@ -2747,6 +2757,10 @@ html.intro-reveal .panel:not([hidden]) .win {
   animation-delay: calc(250ms * var(--k, 1));
 }
 
+/* ── The Human/Machine swapper (advancelabs.dev/hms) ──────────────────────────
+   The component is a fixed control from another origin, and it exposes its edges so the
+   host decides where it sits. This site has to, twice over. */
+
 /* The swapper is a custom element defined by a script from another origin. Until that
    script arrives, or if it never does, the browser treats the tag as an unknown element
    and lays it out in flow: measured at 50px tall, which is enough to push this one-screen
@@ -2755,25 +2769,28 @@ human-machine-swapper:not(:defined) {
   display: none;
 }
 
-/* ── The Human/Machine swapper (advancelabs.dev/hms) ──────────────────────────
-   The component is a fixed control from another origin, and it exposes its edges so the
-   host decides where it sits. This site has to, twice over. */
+/* The slot is the site's own handle on a control it does not own, and it is what makes the
+   pill part of this page rather than a late arrival on top of it: it carries --d and joins
+   the nav, the rail and the footer in the opening's reveal, so the pill comes up with the
+   rest of the chrome the moment the mark hands over.
 
-/* Until the script loads, the browser lays the unknown element out in flow at about 50px
-   tall, which on a one-screen page pushes the rail and the footer into each other. */
-human-machine-swapper:not(:defined) {
-  display: none;
+   The fade has to live here, not on the element. When an outer rule and a :host rule set the
+   SAME property the shadow tree wins, so even an inline opacity:0 on the swapper still
+   computes to 1 against the component's own :host opacity; a group opacity on this wrapper
+   composes with that opacity instead of fighting it.
+
+   Fixed and zero-sized so it adds nothing to a layout measured to the pixel, and fixed rather
+   than transformed so the reader inside the shadow root still measures its inset:0 against
+   the viewport and not against this box. */
+.hms-slot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 60;
 }
-
-/* Not during the opening. The pill is chrome, and chrome arriving on top of the mark while
-   the cubes are still flying reads as a page that has not settled.
-
-   visibility, not opacity. When an outer rule and a :host rule set the SAME property, the
-   shadow tree wins: outer opacity:0 measured as a computed 1 against the component's own
-   :host opacity. The component never sets visibility, so that is the property the host is
-   allowed to have. */
-html.intro human-machine-swapper {
-  visibility: hidden;
+html.intro:not(.intro-reveal) .hms-slot {
   pointer-events: none;
 }
 
