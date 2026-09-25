@@ -121,6 +121,15 @@ The same four tiers the product applies to user jobs, applied to our own.
 
 A lane may raise its own job's tier. A lane may never lower one.
 
+**Two-person approval, when there is only one person.** Advance Labs is a single operator,
+so "two-person approval" on a Critical item is often not available. It is never satisfied by
+one person twice. Where a second approver genuinely cannot be found, the item ships as
+`verified-with-waiver` — never `verified` — and the waiver names the missing approval as its
+reason. Two Critical actions have no waiver path at all, because the waiver would defeat the
+point: publishing a benchmark result that names a competitor, and cutting AVES 1.0. Those
+wait for a second person. See
+[`01-swarm-charter.md`](./01-swarm-charter.md#h1--the-human-and-what-only-they-can-supply).
+
 ## What "verified" means for a program deliverable
 
 The four states the product exposes, used here too:

@@ -215,6 +215,10 @@ install.
 
 **Trust strip:** `Open source · Apache-2.0 · Local first · No telemetry · macOS, Windows, Linux`
 
+**Supporting line (ships with the above, not optional):** Local-first and source-available
+under Apache-2.0. Ninebrains preserves the evidence, failed attempts, and remaining risks,
+and reduces unverified agent output reaching human review.
+
 "Run four agents without collisions" becomes a supporting benefit — one line, below the
 fold work, never the headline and never a CTA. Several competing products use the same
 worktree mechanism; leading with it forfeits the claim that is actually ours. Where this
@@ -284,7 +288,7 @@ AI-specific text file is not a substitute for getting those right.
 
 ## Acceptance criteria
 
-- [ ] Homepage carries the exact headline, subheadline, CTAs, and trust strip above, with
+- [ ] Homepage carries the exact headline, subheadline, supporting line, CTAs, and trust strip above, with
       "run four agents without collisions" as a supporting line, never the lead, and never
       unqualified.
 - [ ] `/limitations/` exists, is linked from the homepage, and states what gates do and do

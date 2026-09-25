@@ -198,7 +198,11 @@ different things and the benchmark's entire value is in keeping them apart.
 3. **Verdict reconciliation.** Mechanical and rubric outcomes are compared. Agreement is the
    verdict. Disagreement escalates.
 
-**Judging cannot be "the tests passed."** This is not caution, it is the documented finding.
+**Judging cannot be "the tests passed."** This is not caution, it is the documented finding
+([UTBoost: Rigorous Evaluation of Coding Agents on SWE-Bench](https://aclanthology.org/2025.acl-long.189.pdf),
+[SWE-Bench Pro Verified](https://arxiv.org/html/2609.08149v1), and OpenAI's
+[Introducing SWE-bench Verified](https://openai.com/index/introducing-swe-bench-verified/),
+all checked 2026-09-25).
 SWE-bench research has shown that narrow or flawed test suites misclassify patches in both
 directions — insufficient tests accept wrong patches, and over-specific tests reject correct
 ones — which is why a human-validated subset had to be constructed at all. A benchmark whose
@@ -330,6 +334,20 @@ trips a stop condition in
    accept it applied to Ninebrains by a competitor running our tool. If not, rewrite it.
 
 ## Acceptance criteria
+
+These three come from the program's own conflict-of-interest mitigations
+([`01-swarm-charter.md`](../01-swarm-charter.md#h1--the-human-and-what-only-they-can-supply)).
+They are criteria here so that the mitigation is enforced at the gate where it matters, not
+only declared in the charter.
+
+- [ ] The blind rubric reviewer is not the person who owns L0 for this workstream. If no
+      second person is available, every rubric score is published labelled **self-scored**,
+      and the comparative claim is not made.
+- [ ] No result naming a competitor is published on self-review alone. This has no waiver
+      path; it waits for a second person.
+- [ ] Every published number states how many repetitions produced it, and the minimum is
+      three per `(task, tool, model, configuration)` cell.
+
 
 - [ ] `bench/tasks/` contains 20–30 tasks across at least four real open-source applications,
       with per-archetype counts published and every archetype represented at least three times.

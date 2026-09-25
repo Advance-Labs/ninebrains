@@ -15,20 +15,65 @@ Format:
 
 ---
 
+## 2026-09-25 — The word "independent" is a per-run property, never blanket copy
+
+**Context:** the claims audit found "independent" in four places that ship to every install
+regardless of configuration: the product descriptor used in metadata and page titles, the
+homepage subheadline, the sentence we most want answer engines to repeat, and the
+design-partner recruitment email. [W4](./workstreams/W4-independent-review.md) defines four
+independence axes and states the UI must not print the word below the `full` level, and
+`PROVIDERS` in `packages/brain-core/src/types.ts` is `['claude', 'codex']` — so a
+one-provider machine, which is the common case, can never reach `full`.
+
+**Decision:** blanket copy uses the approved phrasings — "blocks completion until configured
+checks pass", "separates generation from review". The word "independent" appears only where
+the level can be qualified: the evidence bundle, the badge, and the app's review surface,
+all rendering W4's canonical level strings from one module.
+
+**Alternatives:** (a) keep the strategy's literal wording, which reads better and would be
+false on most installs; (b) print "independent" and footnote it, which is the badge pattern
+the strategy explicitly rejects.
+
+**Why:** this is the one claim the entire category position rests on. A product that
+overstates it in its own headline has already lost the argument it is trying to win.
+
+**Reversibility:** cheap now, one-way once the copy is indexed and quoted.
+
+**Owners:** L8 for copy, L1 and L3 for the badge and the level strings, R2 at every review.
+
+---
+
+## 2026-09-25 — Branch naming for the founding commit
+
+**Context:** the charter requires lane branches to be named `strategy/<workstream>-<slug>`.
+This program's own branch is `strategy/verified-multi-agent-program`, which does not match.
+
+**Decision:** leave it. The rule did not exist when the branch was cut — this commit is what
+creates it. Every branch cut after this one is held to the rule.
+
+**Alternatives:** rename the branch, which would invalidate the review record already
+attached to it.
+
+**Reversibility:** cheap.
+
+**Owners:** R3 enforces from the next branch onward.
+
+---
+
 ## 2026-09-25 — Append-only gate registration is pre-authorised for L4
 
-**Context:** W5 requires L4 to register sixteen new gate ids, which means touching
+**Context:** W5 requires L4 to register seventeen new gate ids, which means touching
 `GATE_IDS` in `packages/gates-core/src/rigor.ts`, `defaultBuiltInGates` in
 `apps/emdash-desktop/src/core/features/gates/node/runner/gate-registry.ts`, and
 `apps/emdash-desktop/src/core/features/gates/api/contract.ts` — files the charter assigned
-to L2. As written, L4's brief forbade exactly what its workstream required, sixteen times.
+to L2. As written, L4's brief forbade exactly what its workstream required, seventeen times.
 
 **Decision:** Split by operation rather than by file. **Additions** to those three
 registration points are pre-authorised for L4. **Changes** to `RIGOR_THRESHOLDS`,
 `rigorToGates`, or any existing entry remain L2's and go through L0. Exporting a
 module-private helper such as `withSetupFailures` is a contract change request.
 
-**Alternatives:** (a) a contract change request per gate — sixteen serialisation points on
+**Alternatives:** (a) a contract change request per gate — seventeen serialisation points on
 the highest-volume lane, which would make L4 the program's bottleneck; (b) moving `GATE_IDS`
 into L4's surface — but the thresholds that read it are genuinely L2's, and splitting them
 across lanes is worse than splitting by operation.
@@ -56,7 +101,11 @@ independence cannot be built by a process that quietly lacks it.
 
 **Reversibility:** cheap to change, expensive to have skipped.
 
-**Owners:** L0, with W7 and W8 enforcing at their publication gates.
+**Owners:** L0. Enforced, not merely declared: the mitigations appear as acceptance criteria
+in [W7](./workstreams/W7-verified-delivery-bench.md) and
+[W8](./workstreams/W8-open-evidence-standard.md), and as a named exception to two-person
+approval in [`03-definition-of-done.md`](./03-definition-of-done.md#risk-tiers-for-program-jobs).
+A mitigation that lives only in the charter is advisory; these do not.
 
 ---
 

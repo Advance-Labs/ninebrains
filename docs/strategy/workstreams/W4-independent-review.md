@@ -122,10 +122,20 @@ Rules that make the ladder mean something:
 - **The level is recorded in the bundle on every review, including `full`.** A bundle that
   records the level only when degraded teaches readers that silence means full, which is
   exactly the inference we do not want them making from an absent field.
-- **The UI must not say "independent" below `full`.** Say what held. `model-only` renders as
-  "Reviewed by a different model (same provider)". `context-only` renders as "Reviewed in a
-  fresh context (same model and provider)". Neither is dressed up; both are honest and both
-  are still worth something.
+- **The UI must not say "independent" below `full`.** Say what held. These are the canonical
+  strings; they live in one module and every surface — the app, the HTML export, the GitHub
+  Check, the badge in [W2](./W2-evidence-viewer-and-exports.md) — renders them rather than
+  composing its own.
+
+  | Level | String |
+  |---|---|
+  | `full` | Independently reviewed (fresh context, different provider) |
+  | `model-only` | Reviewed by a different model (same provider) |
+  | `context-only` | Reviewed in a fresh context (same model and provider) |
+
+  Neither degraded string is dressed up; both are honest and both are still worth something.
+  The badge in W2 concatenates the level string, so there is exactly one place to change the
+  wording.
 - **A policy may require a level.** [W3](./W3-verification-policy-engine.md)'s `models`
   block already carries `require_different_provider` per tier. A tier that requires an axis
   it cannot get **blocks** — it does not silently degrade. This mirrors SEC-42's rule for a

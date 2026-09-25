@@ -38,10 +38,21 @@ Job {{JOB_ID}}: {{JOB_TITLE}}
 - **Monotonicity is already a security property here.** `AGENT_GATE_KINDS` exists so an
   agent can add verification and never drop it (SEC-08). Risk tiers must inherit that: a job
   may raise its own tier, never lower it. Preserve the existing tests that prove it.
-- **Precedence must match what the repo already does.** `projectConfig` resolves
-  personal > workspace `.emdash.json` > host default > built-in, and arrays replace rather
-  than merge. Inventing a different precedence for `.ninebrains/` gives the product two
-  contradictory mental models.
+- **Precedence splits by what is being resolved. This is settled; do not re-open it.**
+  [`decisions.md`](../decisions.md) of 2026-09-25 rules that *ergonomic* settings keep
+  nearest-layer-wins — personal > workspace `.emdash.json` > `.ninebrains/` > host default >
+  built-in, arrays replacing rather than merging — while *verification policy* resolves
+  **strictest-layer-wins**: the effective requirement is the union, and no layer can lower a
+  tier, remove a required gate, or widen a model restriction.
+
+  An earlier version of this brief told you to make one chain serve both. That instruction
+  was wrong and is withdrawn. One chain would make every gate advisory, because any layer
+  nearer the developer could switch it off. The asymmetry already exists in the codebase:
+  `AGENT_GATE_KINDS` and `checkGateKind` let an agent add verification and never drop it
+  (SEC-08). You are extending that from agents to config layers.
+
+  What still holds from the old instruction: do not invent a *third* model. Two rules,
+  clearly documented at the point of use, and a test for each.
 - **Deterministic CI is the immovable boundary.** Write the invariant as a test, not a
   comment: no policy configuration, tier, or waiver can let an AI verdict override a failed
   executable check.

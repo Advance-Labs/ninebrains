@@ -9,7 +9,7 @@ Briefs are derived from the workstream pages. When a brief and a workstream page
 | File | Lane | Model | Workstreams |
 |---|---|---|---|
 | [`L0-brain.md`](./L0-brain.md) | Brain / orchestrator | Opus | all |
-| [`L1-evidence.md`](./L1-evidence.md) | Evidence architect | Opus | W1, W2 |
+| [`L1-evidence.md`](./L1-evidence.md) | Evidence architect | Opus (W1), Sonnet (W2) | W1, W2 |
 | [`L2-policy.md`](./L2-policy.md) | Policy engine architect | Opus | W3 |
 | [`L3-review.md`](./L3-review.md) | Independent review architect | Opus | W4 |
 | [`L4-gates.md`](./L4-gates.md) | Gate adapter builder | Sonnet | W5 |

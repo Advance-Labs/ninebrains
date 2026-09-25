@@ -39,8 +39,8 @@ Use for outreach to prospective partners. CASL rules in
 > Subject: Design partner for a verification-first coding-agent workbench
 >
 > Hi [name]. I am building Ninebrains, an open-source tool that runs Claude Code and Codex
-> in parallel worktrees and blocks a job from counting as done until independent gates and
-> a fresh reviewer verify it. I am looking for ten small engineering teams to run it for 30
+> in parallel worktrees and blocks a job from counting as done until configured checks pass
+> and a fresh reviewer verifies it. I am looking for ten small engineering teams to run it for 30
 > days, tell me honestly where it breaks, and let me publish what you found, good or bad.
 > No cost, no obligation to keep using it. If your team runs Claude Code or Codex and has
 > more parallel work than review capacity, I would like to talk.
@@ -96,7 +96,7 @@ Advance Labs. This is non-negotiable because independent reports and hands-on wa
 matter precisely because the current category leaders already appear in third-party
 recommendation articles and Ninebrains does not yet.
 
-What we may and may not edit in a partner-authored piece:
+### What we may and may not edit in a partner-authored piece
 
 **May do:**
 
@@ -207,7 +207,7 @@ they are missed.
 
 ## Acceptance criteria
 
-- [ ] Ten design partners recruited, matching the ICP in
+- [ ] **Outcome target, not a lane criterion.** Ten design partners recruited, matching the ICP in
       [00-north-star.md](../00-north-star.md#ideal-customer-profile), each with a logged
       recruitment source (site or listing, date, reason).
 - [ ] Each active partner has completed at least the day-0 onboarding and day-30 exit
@@ -217,13 +217,13 @@ they are missed.
       [Metrics each partner agrees to provide](#metrics-each-partner-agrees-to-provide) are
       collected for every partner who completes the program, anonymized by default per
       their exit-interview answer to question 6.
-- [ ] At least three case studies are authored or co-authored by partner users, published
+- [ ] **Outcome target, not a lane criterion.** At least three case studies are authored or co-authored by partner users, published
       with their explicit sign-off, and satisfy every rule in
       [The hard rule: partner-authored case studies](#the-hard-rule-partner-authored-case-studies).
 - [ ] At least three published demo repositories exist with a real brief, a failing first
       attempt, and the evidence bundle showing the retry, independently reproducible by a
       stranger.
-- [ ] At least five independent technical reviews or livestreams are arranged and at least
+- [ ] **Outcome target, not a lane criterion.** At least five independent technical reviews or livestreams are arranged and at least
       one includes a published failure or limitation not chosen by us.
 - [ ] Submissions are filed to relevant curated agent-orchestrator repositories and
       open-source directories, with listing status tracked monthly.

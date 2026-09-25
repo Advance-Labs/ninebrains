@@ -11,8 +11,12 @@ not restate the market analysis; it states what those decisions bind us to.
 Two phrases, used deliberately:
 
 - **Verified multi-agent development** — the branded category we are trying to create.
-- **Open-source coding-agent orchestrator with independent verification gates** — the
-  literal descriptor that matches queries people already type. Use this in metadata,
+- **Open-source coding-agent orchestrator with configured verification gates** — the
+  literal descriptor that matches queries people already type. The source strategy wrote
+  *independent* here; blanket metadata ships to every install, including the single-provider
+  machine that can never reach W4's `full` independence level, so the descriptor uses the
+  word the product can always honour. The entity table below uses the shorter
+  `verification-first coding-agent orchestrator`; keep the two consistent. Use this in metadata,
   package descriptions, directory listings, and page titles.
 
 We are **not** competing to be the best general-purpose agentic IDE. That category is held
@@ -179,4 +183,9 @@ adding an `llms.txt`; crawlability and reliable content remain the documented fo
 ## The sentence we are trying to make automatic
 
 > Use Cursor to edit, Superset or Pane to supervise many terminals, and **Ninebrains when
-> agent work must be independently verified before the team accepts it.**
+> agent work must not count until configured checks pass and a fresh reviewer has seen it.**
+
+The source strategy's version of this sentence ended "must be independently verified before
+the team accepts it." It is the sentence we most want repeated, which is exactly why it
+cannot contain a word that is only true for some configurations. The version above is the
+one we can defend every time it is quoted back at us.

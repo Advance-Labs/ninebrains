@@ -328,6 +328,14 @@ specification makes step 2 very hard to take at the moment it becomes correct.
 
 ## Acceptance criteria
 
+- [ ] AVES 1.0 is not cut on a single approver. Two-person approval has no waiver path for
+      this action, per
+      [`03-definition-of-done.md`](../03-definition-of-done.md#risk-tiers-for-program-jobs)
+      and the charter's
+      [H1 section](../01-swarm-charter.md#h1--the-human-and-what-only-they-can-supply). If a
+      second approver is unavailable, 1.0 waits; the draft stays at 0.x and says so.
+
+
 - [ ] `spec/aves/` contains a prose specification with normative MUST/SHOULD/MAY language, a
       stated scope and non-scope, and a section per top-level object.
 - [ ] The schema validates with a standard draft 2020-12 validator that has **no Ninebrains

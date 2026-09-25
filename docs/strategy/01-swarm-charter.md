@@ -218,7 +218,7 @@ The swarm runs many lanes at once, so file ownership is assigned, not negotiated
 |---|---|
 | `packages/gates-core/src/evidence-*`, new `packages/evidence-*`; `spec/evidence-bundle/v0.1/` until it lands | L1 |
 | `packages/gates-core/src/rigor.ts` (structure), new `packages/gates-core/src/policy.ts`, the `.ninebrains/` schema | L2 |
-| `packages/gates-core/src/gates/reviewer-gate.ts`, `reviewer-verdict.ts`; `apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/reviewer-route.ts` | L3 |
+| `packages/gates-core/src/gates/reviewer-gate.ts`, `packages/gates-core/src/reviewer-verdict.ts`; `apps/emdash-desktop/src/main/bootstrap/boot/ninebrains/reviewer-route.ts` | L3 |
 | `packages/gates-core/src/gates/*` (new adapters); **append-only** registration entries (see below) | L4 |
 | `packages/brain-core/src/store/`, team config surfaces | L5 |
 | `bench/` (new top-level) | L6 |
@@ -229,8 +229,11 @@ The swarm runs many lanes at once, so file ownership is assigned, not negotiated
 
 **Append-only registration is pre-authorised for L4.** Adding a gate means adding an id to
 `GATE_IDS` in `packages/gates-core/src/rigor.ts`, an entry to `defaultBuiltInGates` in
-`apps/emdash-desktop/src/core/features/gates/node/runner/gate-registry.ts`, and a case to
-`apps/emdash-desktop/src/core/features/gates/api/contract.ts`. L4 may make those three
+`apps/emdash-desktop/src/core/features/gates/node/runner/gate-registry.ts`, and, **only when the gate
+needs project config**, an additive field on `gatesProjectPrefsViewSchema` in
+`apps/emdash-desktop/src/core/features/gates/api/contract.ts` — that file is a Wire zod
+contract, not a switch, so most gates touch it not at all. W5's authoring guide is the
+detailed version; this table is the summary. L4 may make those three
 **additions** without a contract change request. L4 may not change `RIGOR_THRESHOLDS`,
 `rigorToGates`, or any existing entry — those are L2's, and they go through L0. Exporting a
 currently module-private helper such as `withSetupFailures` is a contract change request,

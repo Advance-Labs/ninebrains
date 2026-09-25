@@ -20,7 +20,7 @@ registered; `packages/gates-core/src/run-gates.ts` does not learn about `typeche
 the design is wrong, not the runner.
 
 This is the highest-volume lane in the program: one gate id, one deliverable, repeated
-sixteen-plus times. The adapter authoring guide below exists so that volume does not become
+seventeen times. The adapter authoring guide below exists so that volume does not become
 inconsistency.
 
 ## Where the code is today
@@ -85,8 +85,7 @@ gate, control over the sandbox, the scrubbed environment, process-group teardown
 High-tier finding on review, not a style note.
 
 `apps/emdash-desktop/src/core/features/gates/node/runner/gate-registry.ts`'s
-`withSetupFailures` wrapper — note it is module-private today, so reuse means asking L0 to
-export it, not copying it is the existing pattern for the "the sandbox refused to start
+`withSetupFailures` wrapper is the existing pattern for the "the sandbox refused to start
 the command" case (Linux without `bwrap`, Windows, tool missing): it distinguishes that from
 an ordinary non-zero exit and marks it with `CONFIGURATION_ERROR_METRIC` so the run isn't
 charged against the worker's retries. New adapters that shell out should be wrapped the same
@@ -306,7 +305,7 @@ backing tool is configuration.
 
 ## Limitations
 
-- A passing gate set does not establish correctness. Sixteen more gates check sixteen more
+- A passing gate set does not establish correctness. Seventeen more gates check seventeen more
   configured properties; none of them, individually or together, prove the change does what
   it was meant to do.
 - `coverage-delta` is a proxy for test thoroughness, not a measure of it. A delta can rise

@@ -159,19 +159,20 @@ The strategy's exact requirement, quoted in full because the wording is load-bea
 
 Ship it with one word changed, for the reason below:
 
-> `Ninebrains: 8/8 configured checks passed · review passed (fresh context, different
-> provider) · 1 retry · 2 residual risks disclosed`
+> `Ninebrains: 8/8 configured checks passed · Independently reviewed (fresh context,
+> different provider) · 1 retry · 2 residual risks disclosed`
 
 **The word "independent" is conditional and the badge must treat it that way.**
 [W4](./W4-independent-review.md) defines four independence axes and a degradation ladder,
 and states that the UI must not print "independent" below the `full` level. `PROVIDERS` in
 `packages/brain-core/src/types.ts` is `['claude', 'codex']`, so a one-provider machine is
 the common case, not the edge case. The badge therefore renders W4's per-level sentence —
-`review passed (fresh context, different provider)`, `review passed (fresh context,
-different model)`, `review passed (fresh context)` — never a bare "independent review
-passed". A badge that prints a stronger word than the run earned is the failure this whole
+the canonical level strings defined in
+[W4](./W4-independent-review.md) — `Independently reviewed (fresh context, different
+provider)`, `Reviewed by a different model (same provider)`, `Reviewed in a fresh context
+(same model and provider)`. The badge concatenates that string; it never composes its own
+wording, and it never emits a bare "independent review A badge that prints a stronger word than the run earned is the failure this whole
 export exists to prevent.
-
 
 Binding rules:
 

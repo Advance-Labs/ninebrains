@@ -85,6 +85,7 @@ terminal states rather than a boolean.
 | Risk tiers wired to gate selection, replacing raw rigor sliders | W3 | L2 | Opus |
 | Opt-in local metrics export, no telemetry contradiction | W11 | L10 | Sonnet |
 | AVES draft 0.1 published for comment | W8 | L7 | Opus |
+| Design-partner recruitment brief and first partner conversations (pulled forward from Wave 3) | W10 | L9 | Sonnet |
 | Comparison pages: Superset, Pane, Cursor, manual worktrees | W9 | L8 | Opus |
 
 **Wave 2 exit criterion.** A standard-tier job cannot reach `verified` unless deterministic
@@ -101,7 +102,7 @@ checkout, with read-only tools, returns a recorded verdict.
 | Version-controlled shared policy, named waivers, approvals, audit log | W6 | L5 | Sonnet |
 | Team templates: Next.js/Supabase, React/Vite, Node API, Python service, monorepo | W6 | L5 | Sonnet |
 | Verified Delivery Bench methodology and first task set | W7 | L6 | Opus |
-| Recruit first five design partners | W10 | L9 | Sonnet |
+| Continue partner recruitment (started in Wave 2, see the sequencing mitigation) | W10 | L9 | Sonnet |
 | Three demo repositories with intentionally failing first attempts | W10 | L9 | Sonnet |
 
 **Wave 3 exit criterion.** A five-person team can clone a repository and inherit the same

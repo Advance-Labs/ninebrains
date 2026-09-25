@@ -39,5 +39,9 @@ for a human go decision. Do not publish on your own authority.
   these because they make our own numbers worse.
 - **Run competitors on their documented recommended configuration**, cite it with the date
   checked, give right of reply before publication, and re-verify before each republication.
+- **You are not allowed to be the only reviewer.** If no second person scores the blind
+  rubric, the scores publish labelled *self-scored* and the comparative claim is withheld. A
+  result naming a competitor never publishes on self-review alone, and there is no waiver
+  for that one. See the H1 section of the charter.
 - **Publish the losses.** Our false positives, inconclusive runs, and cases where another
   tool did better. This is the rule, not a judgement call per result.

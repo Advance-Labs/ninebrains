@@ -1,7 +1,8 @@
 # L1 — Evidence architect
 
-**Model:** Opus. **Workstreams:** [W1](../workstreams/W1-evidence-bundle-schema.md),
-[W2](../workstreams/W2-evidence-viewer-and-exports.md).
+**Model:** **Opus** for [W1](../workstreams/W1-evidence-bundle-schema.md), **Sonnet** for
+[W2](../workstreams/W2-evidence-viewer-and-exports.md). The schema is a published contract;
+the exporters and viewer are volume work against it.
 **Risk tier:** High — `packages/gates-core/` needs the `security-reviewed` label.
 
 You own the single most load-bearing contract in the program. Every downstream claim is a
