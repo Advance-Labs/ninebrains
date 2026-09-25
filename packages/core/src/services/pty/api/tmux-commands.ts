@@ -26,8 +26,13 @@ export function buildTmuxShellLine(
     : null;
   const enableMouse = `tmux set-option -t ${exactOptionTarget} mouse on 2>/dev/null || true`;
   const setHistoryLimit = `tmux set-option -t ${exactOptionTarget} history-limit ${TMUX_HISTORY_LIMIT} 2>/dev/null || true`;
+  // Nobody opened tmux here: it is how an agent session outlives the app, and the user sees the
+  // pane, not the multiplexer. Its stock status line is a green bar across the bottom of that
+  // pane, naming a session the app already names in its own UI, and it costs a row of the
+  // agent's screen to do it. Off is the honest default for a detail the user did not choose.
+  const hideStatus = `tmux set-option -t ${exactOptionTarget} status off 2>/dev/null || true`;
   const ensureSession = `(${checkExists} || ${newSession})`;
-  const configure = [setIdentity, enableMouse, setHistoryLimit]
+  const configure = [setIdentity, enableMouse, setHistoryLimit, hideStatus]
     .filter((command): command is string => command !== null)
     .map((command) => `(${command})`)
     .join(' && ');
