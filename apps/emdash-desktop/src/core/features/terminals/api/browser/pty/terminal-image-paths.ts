@@ -88,7 +88,23 @@ export function wrapAsBracketedPaste(text: string): string {
   return `\x1b[200~${text}\x1b[201~`;
 }
 
+/**
+ * Ninebrains: path injection is plain text, never bracketed paste.
+ *
+ * `formatTerminalImagePaths` already escapes each path into a single shell
+ * token, so there is nothing for paste protection to protect. Wrapping it
+ * anyway lost the whole payload in a Claude Code pane and left only the
+ * trailing space the caller appends (#84).
+ *
+ * This matches the rule the rest of the app already applies in
+ * `@core/primitives/prompt-injection/api/prompt-injection.ts`, where bracketed
+ * paste is used only for a multi-line payload going to a non-Claude provider.
+ * The in-app file-tree drag has always sent plain text for the same reason; the
+ * external OS-drop path did not, which is the entire bug.
+ *
+ * `wrapAsBracketedPaste` stays exported: `brain/node/attended.ts` still wraps
+ * the multi-line prompts it pastes into attended lanes, and that is correct.
+ */
 export function buildTerminalImageInjection(paths: string[], platform: NodePlatform): string {
-  const formatted = formatTerminalImagePaths(paths, platform);
-  return wrapAsBracketedPaste(formatted);
+  return formatTerminalImagePaths(paths, platform);
 }
