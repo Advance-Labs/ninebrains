@@ -25,8 +25,10 @@ decision of 2026-09-25 in [`decisions.md`](../decisions.md).
 
 ## Paths you must not touch
 
-`packages/gates-core/src/types.ts` (L1/L3 contract). `reviewer-gate.ts` and
-`packages/gates-core/src/reviewer-verdict.ts` (L3). `packages/gates-core/src/policy.ts`
+`packages/gates-core/src/types.ts` (L1/L3 contract).
+`packages/gates-core/src/gates/reviewer-gate.ts` and
+`packages/gates-core/src/reviewer-verdict.ts` (L3) — note the first of those sits **inside**
+the `gates/` directory you otherwise own, so it is the one exception to read carefully. `packages/gates-core/src/policy.ts`
 (L2's, and it does not exist yet).
 
 In the three registration files above, everything except your own added entry:

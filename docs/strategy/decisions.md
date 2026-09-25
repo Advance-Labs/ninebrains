@@ -51,9 +51,15 @@ neither breaks the per-run rule as that decision scopes it — but they are the 
 most likely to be lifted into copy.
 
 **Decision:** They stay as internal prose, and the per-run decision is hereby extended to
-say so explicitly: **the unqualified word is permitted only in `docs/strategy/`, and any
-sentence containing it that moves to a customer-readable surface must be requalified first.**
-R2 checks this on every copy deliverable, not only on the four surfaces originally named.
+say so explicitly: **an unqualified claim that a review was independent is permitted only in
+`docs/strategy/`, and any sentence making one that moves to a customer-readable surface must
+be requalified first.** R2 checks this on every copy deliverable, not only on the four
+surfaces originally named.
+
+The rule attaches to the *claim*, not to the string. "Three reviewers caught it
+independently" is the ordinary English adverb about people working separately, not an
+assertion about W4's four axes, and it is not in scope. A sentence that says or implies a
+*reviewer was independent* is.
 
 **Alternatives:** rewrite them too. Rejected — the thesis is the thesis, and weakening its
 internal statement would make the program harder to reason about without making any shipped

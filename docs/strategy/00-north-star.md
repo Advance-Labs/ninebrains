@@ -188,6 +188,11 @@ adding an `llms.txt`; crawlability and reliable content remain the documented fo
 > Use Cursor to edit, Superset or Pane to supervise many terminals, and **Ninebrains when
 > agent work must not count until configured checks pass and a fresh reviewer has seen it.**
 
+`[cite before publishing]` — the first two clauses describe what three named competitors are
+for. This is the sentence most destined for public copy, so it carries the marker most
+visibly: before it ships anywhere, each product's role needs a dated link to that product's
+own documentation.
+
 The source strategy's version of this sentence ended "must be independently verified before
 the team accepts it." It is the sentence we most want repeated, which is exactly why it
 cannot contain a word that is only true for some configurations. The version above is the

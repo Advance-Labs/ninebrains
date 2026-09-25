@@ -233,17 +233,17 @@ Copy-paste steps for a new gate. Follow `tests-gate.ts` as the deterministic tem
 ## Integration examples
 
 The strategy names these explicitly; each is a thin adapter over the injected capabilities,
-not a new capability of its own:
+not a new capability of its own.
 
-- **GitHub Actions** — the `dependency-audit`, `sast`, and `secret-scan` gates are natural
-  candidates to also run as a GitHub Actions step for defense in depth; the local gate and
-  the Action should read the same configuration so they cannot silently diverge.
-Every product named below is described from its role in our pipeline, not from a verified
+Every product named here is described from its role in our pipeline, not from a verified
 reading of its current documentation. `[cite before publishing]` applies to all of them: an
 integration page or a README that describes what one of these tools does needs a dated link
 to that tool's own docs first. See
 [`03-definition-of-done.md`](../03-definition-of-done.md#where-the-citation-rule-attaches).
 
+- **GitHub Actions** — the `dependency-audit`, `sast`, and `secret-scan` gates are natural
+  candidates to also run as a GitHub Actions step for defense in depth; the local gate and
+  the Action should read the same configuration so they cannot silently diverge.
 - **CodeRabbit** — a PR-level review layer that runs after Ninebrains's own `reviewer` gate,
   not a replacement for it; document the ordering, do not build an adapter that pretends
   CodeRabbit's verdict is a Ninebrains reviewer verdict.
