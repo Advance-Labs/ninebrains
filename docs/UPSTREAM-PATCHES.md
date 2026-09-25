@@ -835,3 +835,22 @@ screen to do it. tmux here is how a session outlives the app, not something the 
 | `packages/core/src/services/pty/api/tmux.test.ts` | New unit case asserting the built shell line carries `mouse on`, `history-limit` and `status off` | The configure chain had no assertion that its steps survive; the existing case only covered targets and quoting |
 
 No new Ninebrains-only files.
+
+## 53. Verified multi-agent development build program (`ninebrains/plan-2wsgy`)
+
+New Ninebrains-only files. Nothing inherited from Emdash is touched, so there is no upstream
+rebase cost from this section; it is listed because the file's rule is that new
+Ninebrains-only files are recorded here too.
+
+| File | What | Why |
+|---|---|---|
+| `docs/strategy/README.md` | Index of the program: eleven workstreams, the agent roster, and the reading order | One entry point so a dispatched agent does not have to reconstruct the program from fragments |
+| `docs/strategy/00-north-star.md` | Category, ICP, positioning, north-star metric, claims discipline, and the explicit "what we do not build" list | The decisions from the 2026-09-25 strategy document, condensed to what they bind us to. Everything else in the program cites this page rather than re-deriving it |
+| `docs/strategy/01-swarm-charter.md` | Lane roster and Opus/Sonnet assignment, the three standing reviewers, the job envelope, retry and escalation, repo mechanics, path ownership, the H1 human dependencies, and the stop conditions | The swarm runs many lanes at once against one repository. File ownership is assigned rather than negotiated, and `packages/brain-core/src/types.ts`, `packages/gates-core/src/types.ts` and this file are serialised through L0 |
+| `docs/strategy/02-execution-plan.md` | The dependency DAG, five waves mapped onto the strategy's 30/60/90, L0's scheduling rules, and three declared program risks | A wave opens when its inputs exist, not when a date arrives. The risks section exists because a program whose thesis is "declare what you did not establish" cannot ship a roadmap with undeclared ones |
+| `docs/strategy/03-definition-of-done.md` | The universal bar, the claims gate, the four program risk tiers, and the four terminal states | The bar is the same one the product applies to user jobs, applied to the program that builds it |
+| `docs/strategy/decisions.md` | L0's decision log: context, decision, alternatives, reversibility, owners | Append-only, newest first. Covers the split precedence rule, the program's own conflict-of-interest mitigations, and a correction of a commit message whose diff did not support it |
+| `docs/strategy/workstreams/W1..W11*.md` | One page per workstream: intent, "where the code is today" with verified paths, deliverables, acceptance criteria, evidence required, declared limitations, follow-ups | A lane can be handed one page plus the definition of done and produce mergeable work. The "where the code is today" sections are deltas against the real `packages/gates-core/`, `packages/brain-core/` and `apps/emdash-desktop/` surfaces, not greenfield specs |
+| `docs/strategy/briefs/*.md` | One copy-paste dispatch brief per lane, plus the R1/R2/R3 reviewer briefs | The exact text handed to a spawned agent. When a brief and a workstream page disagree, the workstream page wins |
+| `docs/strategy/dag.md` | L0's dispatch-level job list: one row per job with hard edges, risk tier and state, plus the human-gated items scheduled as scarce capacity | Regenerated at each wave boundary and never mid-wave. The execution plan holds the shape of the DAG; this file holds the jobs |
+| `docs/strategy/evidence/` | Per-job evidence records: the handoff report, the R1/R2/R3 verdicts, and the revision each was run against | Defines what "recorded in the deliverable's evidence record" means, which the definition of done referred to before anything implemented it |
