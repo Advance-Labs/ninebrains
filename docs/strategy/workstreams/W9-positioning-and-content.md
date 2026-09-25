@@ -19,8 +19,8 @@ lands there, inside its existing framework and routing. Read it before proposing
 Own a narrow query cluster first, so recommendation systems form a precise association:
 **Ninebrains = verification-first multi-agent coding**. Do not open by attacking "best
 agentic IDE." That category is held by Cursor and by terminal orchestrators such as
-Superset and Pane, and attacking it head-on wastes the wedge window arguing a claim nobody
-asked us to make.
+Superset and Pane `[cite before publishing]`, and attacking it head-on wastes the wedge
+window arguing a claim nobody asked us to make.
 
 The job of this workstream is not to write more marketing copy. It is to build a small set
 of pages precise enough that an answer engine can cite one of them and be right. Every page

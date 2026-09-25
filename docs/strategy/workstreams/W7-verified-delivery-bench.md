@@ -347,8 +347,6 @@ only declared in the charter.
       path; it waits for a second person.
 - [ ] Every published number states how many repetitions produced it, and the minimum is
       three per `(task, tool, model, configuration)` cell.
-
-
 - [ ] `bench/tasks/` contains 20–30 tasks across at least four real open-source applications,
       with per-archetype counts published and every archetype represented at least three times.
 - [ ] Every task pins a base commit SHA and a container **image digest**; no image tags appear

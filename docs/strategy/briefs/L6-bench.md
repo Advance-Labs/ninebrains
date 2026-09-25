@@ -30,7 +30,10 @@ for a human go decision. Do not publish on your own authority.
 - **One run is a demonstration, not a reliability estimate.** Minimum three repetitions per
   tool/model configuration, always. R2 blocks anything reported from fewer.
 - **"The tests passed" is not a grade.** Narrow or flawed tests misclassify patches — that is
-  documented in the SWE-bench literature and it is the reason false-verification rate is our
+  documented in the SWE-bench literature ([UTBoost](https://aclanthology.org/2025.acl-long.189.pdf),
+  [SWE-Bench Pro Verified](https://arxiv.org/html/2609.08149v1), and OpenAI's
+  [Introducing SWE-bench Verified](https://openai.com/index/introducing-swe-bench-verified/),
+  all checked 2026-09-25) and it is the reason false-verification rate is our
   core trust metric. Judging must be able to catch a patch that satisfies the tests and not
   the brief.
 - **Two of the task archetypes exist to catch us, not them.** The deliberately

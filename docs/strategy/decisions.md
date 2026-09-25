@@ -15,6 +15,78 @@ Format:
 
 ---
 
+## 2026-09-25 — The headline stays "Ship agent-written code you can prove"
+
+**Context:** R2 flagged that the headline sits beside a claims table banning "proves the code
+is correct", and asked for a deliberate decision rather than inheritance from the source
+strategy.
+
+**Decision:** Keep it. "Code you can prove" is a claim about what the *user* can do — hand
+someone the evidence and let them check it — not a claim that the tool establishes
+correctness. The subheadline immediately below it says what is actually enforced ("blocks
+completion until configured checks pass"), and the limitations page says what the gates do
+not establish.
+
+**Alternatives:** (a) "Ship agent-written code you can check", which is more literally
+accurate and considerably weaker; (b) "Ship agent-written code with the evidence attached",
+accurate but a description rather than a promise.
+
+**The line we will not cross:** the headline may promise provability to the reader. No copy
+anywhere may claim the *tool* proves correctness. If usage testing shows readers hear the
+second thing, the headline changes — that is a falsifiable condition, and R2 should raise it
+if the evidence appears.
+
+**Reversibility:** cheap until indexed; costly after.
+
+**Owners:** L8, with R2 holding the line on the distinction.
+
+---
+
+## 2026-09-25 — "Independent" in internal thesis prose is in scope, and stays
+
+**Context:** two sentences state the program's thesis using the unqualified word:
+"parallel agents whose work does not count until independent evidence verifies it"
+(`00-north-star.md`) and its echo in W7. Neither is metadata, UI, homepage or email, so
+neither breaks the per-run rule as that decision scopes it — but they are the two sentences
+most likely to be lifted into copy.
+
+**Decision:** They stay as internal prose, and the per-run decision is hereby extended to
+say so explicitly: **the unqualified word is permitted only in `docs/strategy/`, and any
+sentence containing it that moves to a customer-readable surface must be requalified first.**
+R2 checks this on every copy deliverable, not only on the four surfaces originally named.
+
+**Alternatives:** rewrite them too. Rejected — the thesis is the thesis, and weakening its
+internal statement would make the program harder to reason about without making any shipped
+claim more honest.
+
+**Reversibility:** cheap.
+
+**Owners:** R2.
+
+---
+
+## 2026-09-25 — Correcting the record on commit dab15c727
+
+**Context:** the message of commit `dab15c727` states that L2's and L4's briefs "both now
+match" the append-only gate-registration decision. L2's brief was rewritten. **L4's was
+not** — the edit was attempted against a mis-remembered version of the text, the replacement
+silently matched nothing, and the commit message was written from the intent rather than
+from the diff. R1, R2 and R3 each caught it independently on the next round.
+
+**Decision:** Record the correction here rather than rewriting history. The claims gate
+covers commit messages, so a false one is a finding, and the honest remedy for a published
+record is a superseding record that says what was wrong.
+
+**What changed as a result:** every subsequent programmatic edit in this program asserts that
+its search pattern matched before writing, and the resulting diff is checked before the
+claim is made. A fix is not "landed" because it was attempted.
+
+**Reversibility:** n/a.
+
+**Owners:** L0. R3 verifies claimed fixes against `git diff`, not against the commit message.
+
+---
+
 ## 2026-09-25 — The word "independent" is a per-run property, never blanket copy
 
 **Context:** the claims audit found "independent" in four places that ship to every install
@@ -91,9 +163,10 @@ human, and that every one of them resolves to the *same* human — who is also t
 author, L0's owner, and the party most interested in favourable numbers.
 
 **Decision:** Add an explicit H1 section to the charter listing what only a human can
-supply, and bind three mitigations: the benchmark's blind rubric reviewer must not own L0
-for that workstream; two-person approval is never one person twice; W7 may not publish a
-competitor-naming result on self-review alone.
+supply, and bind these mitigations: the benchmark's blind rubric reviewer must not own L0
+for that workstream; two-person approval is never one person twice; and two actions have no
+waiver path at all — publishing a competitor-naming benchmark result, and cutting AVES 1.0.
+Both wait for a second person.
 
 **Alternatives:** leave it implicit and handle it per item. Rejected — this is the exact
 correlated-assumption failure the product exists to prevent, and a category built on

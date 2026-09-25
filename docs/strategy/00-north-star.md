@@ -21,6 +21,9 @@ Two phrases, used deliberately:
 
 We are **not** competing to be the best general-purpose agentic IDE. That category is held
 by editors (Cursor) and terminal orchestrators (Superset, Pane, Conductor-style tools).
+`[cite before publishing]` — that is a positioning judgement about named third parties. It
+needs a dated source the moment it appears anywhere a customer can read it. See
+[`03-definition-of-done.md`](./03-definition-of-done.md#where-the-citation-rule-attaches).
 
 ## The defensible claim
 

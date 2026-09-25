@@ -91,6 +91,11 @@ an ordinary non-zero exit and marks it with `CONFIGURATION_ERROR_METRIC` so the 
 charged against the worker's retries. New adapters that shell out should be wrapped the same
 way, not reinvent the distinction.
 
+One practical catch: `withSetupFailures` is **not exported**. `gate-registry.ts:64` declares
+it without `export`, so L4 cannot import it. Reusing it means asking L0 to export it — a
+contract change request, not one of L4's pre-authorised additions. Do not work around it by
+copying the body into an adapter; that is how the two definitions drift.
+
 ### `GatePreconditionError`, and why it must not consume a self-heal attempt
 
 `GatePreconditionError` (`packages/gates-core/src/types.ts`) is thrown by a **capability**,
@@ -233,6 +238,12 @@ not a new capability of its own:
 - **GitHub Actions** — the `dependency-audit`, `sast`, and `secret-scan` gates are natural
   candidates to also run as a GitHub Actions step for defense in depth; the local gate and
   the Action should read the same configuration so they cannot silently diverge.
+Every product named below is described from its role in our pipeline, not from a verified
+reading of its current documentation. `[cite before publishing]` applies to all of them: an
+integration page or a README that describes what one of these tools does needs a dated link
+to that tool's own docs first. See
+[`03-definition-of-done.md`](../03-definition-of-done.md#where-the-citation-rule-attaches).
+
 - **CodeRabbit** — a PR-level review layer that runs after Ninebrains's own `reviewer` gate,
   not a replacement for it; document the ordering, do not build an adapter that pretends
   CodeRabbit's verdict is a Ninebrains reviewer verdict.

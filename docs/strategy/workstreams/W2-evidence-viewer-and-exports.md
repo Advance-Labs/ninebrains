@@ -157,22 +157,29 @@ The strategy's exact requirement, quoted in full because the wording is load-bea
 > `Ninebrains: 8/8 configured checks passed · independent review passed · 1 retry ·
 > 2 residual risks disclosed`
 
-Ship it with one word changed, for the reason below:
+Ship it with the review clause replaced, for the reason below. On a run where all four
+independence axes held, that reads:
 
 > `Ninebrains: 8/8 configured checks passed · Independently reviewed (fresh context,
 > different provider) · 1 retry · 2 residual risks disclosed`
 
-**The word "independent" is conditional and the badge must treat it that way.**
+**The review clause is conditional and the badge must treat it that way.**
 [W4](./W4-independent-review.md) defines four independence axes and a degradation ladder,
 and states that the UI must not print "independent" below the `full` level. `PROVIDERS` in
 `packages/brain-core/src/types.ts` is `['claude', 'codex']`, so a one-provider machine is
-the common case, not the edge case. The badge therefore renders W4's per-level sentence —
-the canonical level strings defined in
-[W4](./W4-independent-review.md) — `Independently reviewed (fresh context, different
-provider)`, `Reviewed by a different model (same provider)`, `Reviewed in a fresh context
-(same model and provider)`. The badge concatenates that string; it never composes its own
-wording, and it never emits a bare "independent review A badge that prints a stronger word than the run earned is the failure this whole
-export exists to prevent.
+the common case, not the edge case.
+
+The badge therefore concatenates W4's canonical level string, whichever one the run earned:
+
+| Level | Clause the badge prints |
+|---|---|
+| `full` | `Independently reviewed (fresh context, different provider)` |
+| `model-only` | `Reviewed by a different model (same provider)` |
+| `context-only` | `Reviewed in a fresh context (same model and provider)` |
+
+The badge never composes its own wording and never emits a bare "independent review passed".
+A badge that prints a stronger word than the run earned is the failure this whole export
+exists to prevent.
 
 Binding rules:
 

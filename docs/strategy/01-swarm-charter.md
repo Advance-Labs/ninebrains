@@ -111,8 +111,10 @@ Mitigations, all of which are binding:
 - "Two-person approval" is never satisfied by one person twice. Where a second person is
   genuinely unavailable, the item ships as `verified-with-waiver` with the waiver naming the
   missing approval — never as `verified`.
-- W7 may not publish a result that names a competitor on self-review alone. That is a stop
-  condition, not a judgement call.
+- **Two actions have no waiver path at all**, because a waiver would defeat the point:
+  publishing a benchmark result that names a competitor ([W7](./workstreams/W7-verified-delivery-bench.md)),
+  and cutting AVES 1.0 ([W8](./workstreams/W8-open-evidence-standard.md)). Both wait for a
+  second person. These are stop conditions, not judgement calls.
 
 If these three cannot be honoured, the honest move is to publish the product work and
 withhold the comparative claims, not to publish comparative claims with a thin process

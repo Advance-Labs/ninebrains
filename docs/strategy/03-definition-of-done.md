@@ -104,6 +104,22 @@ website copy, and benchmark write-ups alike.
 | Benchmark overreach | reporting a single run as a reliability estimate; minimum three repetitions per configuration |
 | One-off AI answer as ranking | citing a single answer-engine response as a stable position, without query, mode, location, and date |
 
+### Where the citation rule attaches
+
+A third-party claim needs its link and date **before it is published** — on a page, in an
+email, in a benchmark write-up, in a release note, in a public repository. Internal planning
+prose in `docs/strategy/` may state a competitor's behaviour without a citation **only when
+the sentence carries a `[cite before publishing]` marker**, so the debt is visible and
+greppable rather than forgotten.
+
+Two consequences worth stating, because both have already bitten this program:
+
+- A sentence that migrates from a planning page to a public page brings the debt with it.
+  Check the marker before copying anything into copy.
+- Positioning claims count. "The agentic-IDE category is held by Cursor, Superset and Pane"
+  is a claim about named third parties, and it becomes blocking the moment it appears
+  anywhere a customer can read it.
+
 **Approved phrasings** are in
 [`00-north-star.md`](./00-north-star.md#claims-discipline). Use them verbatim where they
 fit; they are load-bearing, not boilerplate.
