@@ -5,6 +5,9 @@ import { notifications } from '@core/services/app-db/node/schema';
 import type { AppNotification } from '../api';
 import type { NotificationStore } from '../api/ports';
 
+/** Drizzle drops `.limit(-1)`, so this stands in for SQLite's "no limit" inside an OFFSET query. */
+const NO_LIMIT = Number.MAX_SAFE_INTEGER;
+
 export class SqliteNotificationStore implements NotificationStore {
   constructor(private readonly db: AppDb) {}
 
@@ -119,6 +122,12 @@ export class SqliteNotificationStore implements NotificationStore {
         .select({ id: notifications.id })
         .from(notifications)
         .orderBy(desc(notifications.createdAt))
+        // SQLite only accepts OFFSET as part of a LIMIT clause, so a bare `.offset()` compiled to
+        // `ORDER BY … OFFSET ?` and threw `near "offset": syntax error` on every call — prune has
+        // never once run. SQLite's own "no limit" spelling, LIMIT -1, is not reachable from here
+        // either: Drizzle omits a negative limit and emits the same bare offset. A limit past any
+        // real row count is what is left to say "every row after the newest `maxRows`".
+        .limit(NO_LIMIT)
         .offset(options.maxRows);
       await this.remove(overflow.map((row) => row.id));
       return ok<void>();
