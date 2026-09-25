@@ -881,3 +881,14 @@ marker-wrapped payloads into attended Claude lanes unconditionally — including
 ones, asserted in `attended.test.ts` — and that is a working feature, so "Claude Code discards
 marker-wrapped payloads" is not a sufficient explanation. The fix is justified by differential
 evidence: the external branch now emits the same bytes as the in-app branch, which works.
+## 55. A closed transport is not a failed disposal (`ninebrains/wire-shutdown-warn`)
+
+Every quit logged `scope cleanup failed` with a full `WireError: Wire transport failed permanently`
+stack under `state-expose:attachments/attachments.state:…`. Nothing broke — cleanup errors are
+caught and the quit completed — but a warning on every shutdown is what hides the one that matters.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/projects/node/project-attachment-manager.ts` | `disposeEntry` swallows a `DISCONNECTED` `WireError` (logging it at debug) and rethrows everything else | Releasing the last lease at quit disposes the project provider, and provider disposal still talks over Wire. The worker link closes first, so that call ends DISCONNECTED on every shutdown. Rethrowing it reached the scope's cleanup handler, which is where the warning came from |
+| `packages/wire/src/rpc/index.ts` | Re-export `isWireError` from the `./rpc` subpath | It already existed in the package's api but was not reachable from an exported subpath; `WireError` alone would have meant an `instanceof` across bundle boundaries |
+| `src/core/features/projects/node/project-attachment-manager.test.ts` | Two cases: a provider whose `dispose()` rejects DISCONNECTED reports no cleanup error, and one that rejects for any other reason still does | The first fails against the previous `disposeEntry`. An earlier draft asserted that `owner.dispose()` did not throw, which passed either way — the scope catches cleanup errors and routes them to `onCleanupError`, so that handler is the only observable |

@@ -4,7 +4,7 @@ import { RuntimeBroker, type HostRuntimesClient } from '@emdash/core/services/ru
 import { err, ok } from '@emdash/shared';
 import { createScope } from '@emdash/shared/concurrency';
 import { deferred } from '@emdash/shared/testing';
-import type { Connection } from '@emdash/wire/rpc';
+import { WireError, type Connection } from '@emdash/wire/rpc';
 import { peek } from '@emdash/wire/state';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectProvider } from '@core/features/projects/api/node/project-provider';
@@ -1093,6 +1093,77 @@ describe('ProjectAttachmentManager', () => {
 
     await manager.dispose();
     await owner.dispose();
+    await scope.dispose();
+  });
+
+  // Releasing the last lease at quit disposes the provider, and provider disposal still talks over
+  // Wire after the worker link has closed. That DISCONNECTED failure used to be rethrown out of
+  // the cleanup, so every ordinary quit logged `scope cleanup failed` with a WireError stack.
+  it('does not fail a lease release when the transport is already gone', async () => {
+    const scope = createScope({ label: 'project-attachment-manager-test' });
+    const availability = createWorkerHostAvailability({
+      scope,
+      readiness: { prepare: async () => ok() },
+    });
+    const project = localProject();
+    const provider = projectProvider();
+    vi.mocked(provider.dispose).mockRejectedValue(
+      new WireError('DISCONNECTED', 'Wire transport failed permanently')
+    );
+    const manager = createProjectAttachmentManager({
+      scope,
+      availability,
+      adapter: {
+        loadProject: async () => project,
+        statRepository: async () => ok({ type: 'directory' as const }),
+        open: async () => ok(provider),
+      },
+    });
+    // The failure never reaches a caller: the scope catches it and reports it here, which is the
+    // `scope cleanup failed` warning seen on every quit. So this handler, not a rejection, is the
+    // thing to assert on.
+    const onCleanupError = vi.fn();
+    const owner = createScope({ label: 'project-owner', onCleanupError });
+    const state = manager.track(project.id, owner);
+    await vi.waitFor(() => expect(peek(state)).toMatchObject({ kind: 'attached' }));
+
+    await owner.dispose();
+    expect(provider.dispose).toHaveBeenCalled();
+    expect(onCleanupError).not.toHaveBeenCalled();
+
+    await scope.dispose();
+  });
+
+  it('still reports a lease release that failed for any other reason', async () => {
+    const scope = createScope({ label: 'project-attachment-manager-test' });
+    const availability = createWorkerHostAvailability({
+      scope,
+      readiness: { prepare: async () => ok() },
+    });
+    const project = localProject();
+    const provider = projectProvider();
+    vi.mocked(provider.dispose).mockRejectedValue(new Error('disk on fire'));
+    const manager = createProjectAttachmentManager({
+      scope,
+      availability,
+      adapter: {
+        loadProject: async () => project,
+        statRepository: async () => ok({ type: 'directory' as const }),
+        open: async () => ok(provider),
+      },
+    });
+    const onCleanupError = vi.fn();
+    const owner = createScope({ label: 'project-owner', onCleanupError });
+    const state = manager.track(project.id, owner);
+    await vi.waitFor(() => expect(peek(state)).toMatchObject({ kind: 'attached' }));
+
+    await owner.dispose();
+    expect(provider.dispose).toHaveBeenCalled();
+    expect(onCleanupError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'disk on fire' }),
+      expect.anything()
+    );
+
     await scope.dispose();
   });
 });

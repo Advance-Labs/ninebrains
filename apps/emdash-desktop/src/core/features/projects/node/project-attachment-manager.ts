@@ -8,6 +8,7 @@ import {
 import { err, ok, type Result } from '@emdash/shared';
 import { type Scope } from '@emdash/shared/concurrency';
 import { log } from '@emdash/shared/logger';
+import { isWireError } from '@emdash/wire/rpc';
 import { cell, observe, peek, type Cell } from '@emdash/wire/state';
 import type {
   AttachmentInvalidationCause,
@@ -519,7 +520,20 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
       await entry.scope.dispose();
     }
     const failure = results.find((result) => result.status === 'rejected');
-    if (failure?.status === 'rejected') throw failure.reason;
+    if (!failure || failure.status !== 'rejected') return;
+    // Releasing the last lease at quit disposes the provider, and provider disposal still talks
+    // over Wire. The worker link closes first, so that call ends in a DISCONNECTED WireError on
+    // every shutdown. The transport being already gone is not a disposal that failed: rethrowing
+    // it reached the scope's cleanup handler and printed `scope cleanup failed` with a full
+    // WireError stack on every quit, which is exactly the noise that hides a real one. Every
+    // other reason still propagates.
+    if (isWireError(failure.reason, 'DISCONNECTED')) {
+      log.debug('project attachment disposed after its transport closed', {
+        projectId: entry.projectId,
+      });
+      return;
+    }
+    throw failure.reason;
   }
 }
 
