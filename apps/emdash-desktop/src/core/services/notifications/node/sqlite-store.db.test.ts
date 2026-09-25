@@ -44,4 +44,57 @@ describe('SqliteNotificationStore', () => {
     expect(await store.remove(['n-1'])).toEqual({ success: true, data: undefined });
     expect(await store.loadRecent({ since: 0, maxRows: 10 })).toEqual([]);
   });
+
+  // prune had no coverage here, which is how `ORDER BY … OFFSET ?` — invalid in SQLite without a
+  // LIMIT — shipped and silently turned every prune into a logged `near "offset": syntax error`.
+  // The service swallows that into a warn, so the table just grew forever.
+  it('drops rows older than the cutoff', async () => {
+    fixture = await openFixture('empty');
+    const store = new SqliteNotificationStore(fixture.db);
+
+    await store.insert({ ...notification, id: 'old', createdAt: 1_000 });
+    await store.insert({ ...notification, id: 'new', createdAt: 5_000 });
+
+    expect(await store.prune({ olderThan: 4_000, maxRows: 100 })).toEqual({
+      success: true,
+      data: undefined,
+    });
+    expect((await store.loadRecent({ since: 0, maxRows: 10 })).map((row) => row.id)).toEqual([
+      'new',
+    ]);
+  });
+
+  it('drops everything past maxRows, newest kept', async () => {
+    fixture = await openFixture('empty');
+    const store = new SqliteNotificationStore(fixture.db);
+
+    for (let i = 0; i < 5; i++) {
+      await store.insert({ ...notification, id: `n-${i}`, createdAt: 1_000 + i });
+    }
+
+    expect(await store.prune({ olderThan: 0, maxRows: 2 })).toEqual({
+      success: true,
+      data: undefined,
+    });
+    // prune keeps the newest `maxRows`; loadRecent hands them back oldest-first.
+    expect((await store.loadRecent({ since: 0, maxRows: 10 })).map((row) => row.id)).toEqual([
+      'n-3',
+      'n-4',
+    ]);
+  });
+
+  it('keeps every row when maxRows is not reached', async () => {
+    fixture = await openFixture('empty');
+    const store = new SqliteNotificationStore(fixture.db);
+
+    await store.insert({ ...notification, id: 'only', createdAt: 1_000 });
+
+    expect(await store.prune({ olderThan: 0, maxRows: 50 })).toEqual({
+      success: true,
+      data: undefined,
+    });
+    expect((await store.loadRecent({ since: 0, maxRows: 10 })).map((row) => row.id)).toEqual([
+      'only',
+    ]);
+  });
 });
