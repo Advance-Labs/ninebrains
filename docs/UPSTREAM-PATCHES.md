@@ -822,3 +822,16 @@ reporter's machine). Deterministic on every Mac, not a race.
 |---|---|---|
 | `src/core/services/notifications/node/sqlite-store.ts` | `prune`'s overflow query gains an explicit `.limit(NO_LIMIT)` before `.offset(maxRows)` | SQLite accepts OFFSET only inside a LIMIT clause, so the bare `.offset()` compiled to `ORDER BY … OFFSET ?` and threw `near "offset": syntax error` on every call. `NotificationService.prune` turns a store failure into a `warn`, so the only symptom was one log line at boot and a `notifications` table that grew forever. SQLite's own `LIMIT -1` is unreachable through Drizzle, which omits a negative limit and re-emits the bare offset; a sentinel past any real row count is what remains |
 | `src/core/services/notifications/node/sqlite-store.db.test.ts` | Three `prune` cases against real SQLite: the age cutoff, the `maxRows` overflow, and a table under the cap | `prune` had no coverage here at all, which is how a SQL syntax error shipped. All three fail against the previous query with the same error the running app logged |
+
+## 52. tmux's status bar does not belong in the agent pane (`ninebrains/tmux-status-bar`)
+
+With tmux enabled, every agent pane gained a green bar across its bottom: tmux's stock status
+line, naming a session the app already names in its own UI, and spending a row of the agent's
+screen to do it. tmux here is how a session outlives the app, not something the user opened.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-commands.ts` | `buildTmuxShellLine` gains a `hideStatus` step (`tmux set-option -t <session> status off`), appended to the existing `configure` chain next to `mouse on` and `history-limit`; same `2>/dev/null \|\| true` guard as its neighbours, so an old tmux that rejects the option cannot fail the attach | The status line is tmux naming itself inside a pane opened to watch an agent. Configuring it belongs with the other session options the app already sets on the way in |
+| `packages/core/src/services/pty/api/tmux.test.ts` | New unit case asserting the built shell line carries `mouse on`, `history-limit` and `status off` | The configure chain had no assertion that its steps survive; the existing case only covered targets and quoting |
+
+No new Ninebrains-only files.

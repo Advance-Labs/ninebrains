@@ -95,6 +95,15 @@ describe('buildTmuxShellLine', () => {
     expect(line).not.toContain('"workspace-$12"');
   });
 
+  it('configures the embedded session and hides tmux chrome from the pane', () => {
+    const line = buildTmuxShellLine('workspace', 'sleep 1', 'project:task:leaf');
+
+    expect(line).toContain('mouse on');
+    expect(line).toContain('history-limit');
+    // The status line is tmux naming itself inside a pane the user opened to see an agent.
+    expect(line).toContain('status off');
+  });
+
   it.skipIf(!TMUX_AVAILABLE)(
     'creates metadata-backed sessions and reattaches legacy sessions without replacing them',
     async () => {
