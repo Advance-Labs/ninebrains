@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://ninebrains.runs-on.dev"><img src="docs/brand/ninebrains-banner.png" alt="Ninebrains: run a grid of AI coding agents, each in its own git worktree, with verification gates" width="100%"></a>
+  <a href="https://ninebrains.dev"><img src="docs/brand/ninebrains-banner.png" alt="Ninebrains: run a grid of AI coding agents, each in its own git worktree, with verification gates" width="100%"></a>
 </p>
 
 <h1 align="center">Ninebrains</h1>
@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ninebrains.runs-on.dev">Website</a> ·
+  <a href="https://ninebrains.dev">Website</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="docs/guide/README.md">Documentation</a> ·
   <a href="#how-it-compares">Compare</a> ·
@@ -170,12 +170,12 @@ installs nothing if that fails.
 
 ```bash
 # macOS and Linux
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://ninebrains.runs-on.dev/install.ps1 | iex
+irm https://ninebrains.dev/install.ps1 | iex
 ```
 
 Read the script first if you like: open the same URL in a browser. What the checksum check does
@@ -223,7 +223,7 @@ The one-line installer above is still there for manual installs, if you prefer i
 - **Windows** always installs for the current user. An all-users install makes the script stop
   with a message, unless you pass `-Force`.
 - **Options** go after `sh -s --` (for example `--require-attestation`), or on Windows use
-  `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation`,
+  `& ([scriptblock]::Create((irm https://ninebrains.dev/install.ps1))) -RequireAttestation`,
   because `irm ... | iex` takes no arguments. All options:
   [Verify a download → Installer options](docs/guide/verify-download.md#installer-options).
 
@@ -394,7 +394,7 @@ Yes, with one config directory per account. See [Accounts](docs/guide/accounts.m
 ## Documentation
 
 The [user guide](docs/guide/README.md) lives in `docs/guide/` and is published at
-`docs.advancelabs.dev/ninebrains`.
+`ninebrains.dev/docs`.
 
 ## Contributing
 

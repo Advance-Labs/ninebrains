@@ -1,6 +1,6 @@
 # @ninebrains/site
 
-The landing page at [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev). One static page, no
+The landing page at [ninebrains.dev](https://ninebrains.dev). One static page, no
 framework, and a build that is a file copy.
 
 ```bash
@@ -33,7 +33,20 @@ rather than editing a copy here — `build.mjs` fails loudly if one is missing.
 ## Deploying
 
 Vercel project `ninebrains` (team `advancelabs`), Root Directory `apps/site`, connected to this
-repository: a push to `main` deploys production, and a pull request gets a preview. It also has
-the domain `ninebrains.runs-on.dev`, which is claimed in the registry at
-[zordhalo/runs-on.dev](https://github.com/zordhalo/runs-on.dev) rather than left as a bare DNS
-record, so the name cannot be claimed out from under it.
+repository: a push to `main` deploys production, and a pull request gets a preview.
+
+The canonical domain is `ninebrains.dev`, registered to Advance Labs Inc. through Cloudflare on
+2026-09-25 and served from Cloudflare nameservers. Point it at this Vercel project with a
+DNS-only (grey-cloud) record — proxying Cloudflare in front of Vercel breaks Vercel's
+certificate issuance and gives you two CDNs in series for no benefit.
+
+`/docs` and `/docs/*` are rewritten to the `ninebrains-docs` Vercel project
+(`apps/docs`), so the documentation serves from this domain while staying its own deployment.
+Astro emits `ninebrains.dev/docs/…` canonicals for it via `DOCS_SITE_URL` and `DOCS_BASE_PATH`.
+
+`ninebrains.runs-on.dev` stays attached to the same Vercel project purely as a 301 redirect, so
+the install URLs already published in release notes keep working. It is never a second live
+surface: `vercel.json` redirects every request on that host, and the canonical tag on every page
+points at `ninebrains.dev`. The subdomain remains claimed in the registry at
+[zordhalo/runs-on.dev](https://github.com/zordhalo/runs-on.dev) so it cannot be taken over while
+old links still point at it.

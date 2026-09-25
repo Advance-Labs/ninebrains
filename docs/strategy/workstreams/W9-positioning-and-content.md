@@ -272,15 +272,21 @@ profile Advance Labs controls. This workstream's job includes auditing every one
 surfaces and filing a correction for each mismatch found — do not assume they already
 agree.
 
-**Domain.** A dedicated branded domain is stronger than treating
-`ninebrains.runs-on.dev` as the permanent canonical address, because `runs-on.dev` is a
-separate Advance Labs product, not a Ninebrains-owned namespace. If a dedicated domain is
-adopted, the existing subdomain becomes a 301 redirect, not a second live surface — two live
-canonical URLs for the same product is exactly the entity-inconsistency failure this section
-exists to prevent. Adopting a domain is a decision for L0/Lucas, not something this
-workstream does unilaterally; this workstream's job is to make the migration mechanically
-ready (redirect map, updated metadata everywhere) so the switch is a redirect, not a
-rewrite.
+**Domain — decided 2026-09-25.** The canonical product URL is `https://ninebrains.dev/`,
+registered to Advance Labs Inc. It replaces `ninebrains.runs-on.dev`, which was a subdomain
+of a separate Advance Labs product, not a Ninebrains-owned namespace. See
+[decisions.md](../decisions.md). The old hostname is a 301 redirect and never a second live
+surface — two live canonical URLs for the same product is exactly the entity-inconsistency
+failure this section exists to prevent.
+
+The product documentation moved with it, from `docs.advancelabs.dev/ninebrains` to
+`ninebrains.dev/docs` — 24 pages of depth-of-topic content now on the canonical domain rather
+than under the parent company's. See [decisions.md](../decisions.md).
+
+This workstream owns keeping that true: every page it publishes carries a `ninebrains.dev`
+canonical, and the entity audit below treats any surviving `runs-on.dev` or
+`docs.advancelabs.dev` reference outside the two redirects as a mismatch to fix, not a
+cosmetic issue.
 
 Entity consistency matters more than adding an `llms.txt` file. Standard crawlability,
 correct canonical tags, and reliably fresh content are the documented foundation; an

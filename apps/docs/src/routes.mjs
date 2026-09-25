@@ -39,7 +39,7 @@ export function routeFor(rel) {
 
 /**
  * @param {string} id a page id from routeFor
- * @param {string} base the site base path, e.g. `/ninebrains`
+ * @param {string} base the site base path, e.g. `/docs`
  */
 export function hrefFor(id, base) {
   const slug = id.replace(/(^|\/)index$/, '');

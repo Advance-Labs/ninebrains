@@ -10,9 +10,9 @@ Ninebrains is a desktop application, a fork of Emdash, published by Advance Labs
 Apache-2.0. It runs Claude Code, Codex and Freebuff side by side. It runs the CLIs you are
 already logged in to and never handles your credentials.
 
-- Site: https://ninebrains.runs-on.dev/
+- Site: https://ninebrains.dev/
 - Source: https://github.com/Advance-Labs/ninebrains
-- Docs: https://docs.advancelabs.dev/ninebrains
+- Docs: https://ninebrains.dev/docs
 - Downloads: https://github.com/Advance-Labs/ninebrains/releases/latest
 - Licence: Apache-2.0
 - Platforms: macOS, Windows, Linux
@@ -20,10 +20,10 @@ already logged in to and never handles your credentials.
 
 ## Install
 
-    curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+    curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 
 Installs or updates. Checks the SHA256 first. No Gatekeeper warning on macOS. A PowerShell
-installer is at https://ninebrains.runs-on.dev/install.ps1, and signed installers, .dmg and
+installer is at https://ninebrains.dev/install.ps1, and signed installers, .dmg and
 .exe downloads are on the releases page.
 
 ## How it works

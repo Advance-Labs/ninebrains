@@ -255,3 +255,64 @@ the way the product argues against would be indefensible in a case study.
 **Reversibility:** cheap.
 
 **Owners:** L0.
+
+---
+
+## 2026-09-25 — `ninebrains.dev` is the canonical product domain
+
+**Context:** the site shipped on `ninebrains.runs-on.dev`, a subdomain of runs-on.dev, which
+is a separate Advance Labs product (free subdomains for developer projects) rather than a
+Ninebrains-owned namespace. [00-north-star.md](./00-north-star.md#entity-consistency) and
+[W9](./workstreams/W9-positioning-and-content.md#entity-consolidation) both flagged this and
+both explicitly reserved the decision for L0.
+
+**Decision:** `https://ninebrains.dev/` is the canonical product URL. Registered to Advance
+Labs Inc. through Cloudflare on 2026-09-25, on Cloudflare nameservers. `ninebrains.runs-on.dev`
+stays attached to the same Vercel project as a 301 redirect and is never a second live surface.
+
+**Alternatives:** keep the subdomain permanently; or move later, after the content
+architecture publishes.
+
+**Why:** entity resolution is the mechanism the whole recommendation strategy depends on, and
+a subdomain of a differently-named product is the weakest possible signal for it. `runs-on.dev`
+is not on the Public Suffix List (checked 2026-09-25), so the subdomain shared site-level
+signals with a product Ninebrains has nothing to do with. Moving later costs strictly more:
+a 301 carries crawler authority, but it does not correct an answer engine whose corpus already
+learned the old hostname, and it does not rewrite install commands already pasted into
+third-party writeups. The cost today is one find-and-replace; after W10 lands ten independent
+citing domains it is not.
+
+**Reversibility:** cheap now, expensive after the W9 content architecture publishes. That
+asymmetry is the reason for deciding before Wave 1 content rather than after.
+
+**Owners:** L0 (decision), L8 (keeping every published canonical pointing at it).
+
+---
+
+## 2026-09-25 — Docs move to `ninebrains.dev/docs`
+
+**Context:** the docs were served at `docs.advancelabs.dev/ninebrains`, an umbrella docs domain
+shared across Advance Labs projects. They are 24 pages of depth-of-topic content — the strongest
+crawlable material the product has, and the material an answer engine is most likely to cite.
+
+**Decision:** the docs mount at `https://ninebrains.dev/docs/`. `apps/docs` stays its own Astro
+project and its own Vercel deployment; `apps/site/vercel.json` rewrites `/docs` and `/docs/:path*`
+to it, which is Vercel's documented pattern for serving multiple projects under one domain. The
+mount point was already parameterised (`DOCS_SITE_URL`, `DOCS_BASE_PATH`), so this is a default
+change, not a rewrite.
+
+**Alternatives:** leave the docs on the umbrella domain; or `docs.ninebrains.dev`.
+
+**Why:** a subdirectory consolidates signals onto the canonical domain more completely than a
+subdomain does, and leaving them split meant the marketing pages and the substance behind them
+resolved to two different entities under two different organisation names. This follows the
+canonical-domain decision above for the same reason and at the same time, so there is one
+migration rather than two.
+
+**Reversibility:** cheap — the mount point is two environment variables and two rewrite blocks.
+
+**Owners:** L0 (decision), L8 (link hygiene and the redirect from the old path).
+
+**Open, not owned by this repo:** `docs.advancelabs.dev/ninebrains/*` must 301 to
+`ninebrains.dev/docs/*`. That redirect lives in the `docs-index` Vercel project, which is not in
+this repository.

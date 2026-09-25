@@ -74,7 +74,7 @@ no warning for an app it installs. That is not a bypass: macOS only quarantines 
 mail app downloads, and the installer downloads with `curl`.
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 For a `.dmg` you downloaded in a browser:
@@ -144,13 +144,13 @@ The same line that installs Ninebrains updates it, and still works if you prefer
 macOS and Linux:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://ninebrains.runs-on.dev/install.ps1 | iex
+irm https://ninebrains.dev/install.ps1 | iex
 ```
 
 Your projects, settings and history live in the app's data folder, which the installer does not
@@ -172,7 +172,7 @@ If you installed the `.deb`, update it with the `.deb` too. The default line ins
 AppImage alongside it instead:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh -s -- --deb
 ```
 
 That runs `sudo apt install`, so it asks for your password.
@@ -200,7 +200,7 @@ A piped script needs `sh -s --` (macOS, Linux) or the scriptblock form (Windows)
 
 | What | macOS, Linux | Windows |
 |---|---|---|
-| Require the attestation check (fail if `gh` is missing or signed out) | `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install \| sh -s -- --require-attestation` | `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation` |
+| Require the attestation check (fail if `gh` is missing or signed out) | `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install \| sh -s -- --require-attestation` | `& ([scriptblock]::Create((irm https://ninebrains.dev/install.ps1))) -RequireAttestation` |
 | Skip the attestation check | `… \| sh -s -- --no-attestation` | `… -NoAttestation` |
 | Update a `.deb` install (Linux) | `… \| sh -s -- --deb` | |
 | Install over a running app or a same-version install | `… \| sh -s -- --force` | `… -Force` |

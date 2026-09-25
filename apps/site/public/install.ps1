@@ -1,10 +1,10 @@
 # Ninebrains installer and updater for Windows.
 #
-#   irm https://ninebrains.runs-on.dev/install.ps1 | iex
+#   irm https://ninebrains.dev/install.ps1 | iex
 #
 # With options (the scriptblock form passes them through):
 #
-#   & ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -Version 0.2.0 -DryRun
+#   & ([scriptblock]::Create((irm https://ninebrains.dev/install.ps1))) -Version 0.2.0 -DryRun
 #
 # Options: -Version X.Y.Z (or env NINEBRAINS_VERSION), -DryRun, -Force, -RequireAttestation,
 # -NoAttestation, -Help.
@@ -36,7 +36,7 @@ function Install-Ninebrains {
   $WebLatest = "https://github.com/$Repo/releases/latest"
   $DownloadBase = "https://github.com/$Repo/releases/download"
   $SignerWorkflow = "$Repo/.github/workflows/release.yml"
-  $VerifyDocs = 'https://docs.advancelabs.dev/ninebrains/verify-download/'
+  $VerifyDocs = 'https://ninebrains.dev/docs/verify-download/'
   # The signing certificate must name release.yml run from main or a release/* branch.
   $CertIdentityRegex = '^https://github\.com/Advance-Labs/ninebrains/\.github/workflows/release\.yml@refs/heads/(main|release/[^@]+)$'
   $VersionPattern = '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
@@ -48,8 +48,8 @@ function Install-Ninebrains {
     @"
 Install or update Ninebrains on Windows (x64; Windows on Arm runs it under emulation).
 
-  irm https://ninebrains.runs-on.dev/install.ps1 | iex
-  & ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) [options]
+  irm https://ninebrains.dev/install.ps1 | iex
+  & ([scriptblock]::Create((irm https://ninebrains.dev/install.ps1))) [options]
 
 Options:
   -Version X.Y.Z        Install this release instead of the latest (env NINEBRAINS_VERSION).

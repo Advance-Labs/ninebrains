@@ -53,8 +53,8 @@ When Claude Code or Codex runs out of usage mid-task, the conversation now offer
 Freebuff, free, in the same worktree, with a handoff note on your clipboard. Installing and
 updating is one line:
 
-- macOS and Linux: `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh`
-- Windows: `irm https://ninebrains.runs-on.dev/install.ps1 | iex`
+- macOS and Linux: `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh`
+- Windows: `irm https://ninebrains.dev/install.ps1 | iex`
 
 The installer checks the download against this release's `SHA256SUMS` and, when `gh` is signed in,
 verifies its build provenance before installing. Run the same line again to update.
@@ -153,6 +153,6 @@ the two apps can otherwise share state on one machine:
   share a database, a worktree or a remote server.
 - No calls to Emdash-hosted infrastructure, and no update feed pointing at it.
 - Its own brand throughout: a black-and-white identity, the nine-square mark, and a landing page at
-  [ninebrains.runs-on.dev](https://ninebrains.runs-on.dev).
+  [ninebrains.dev](https://ninebrains.dev).
 
-Full documentation is at [docs.advancelabs.dev/ninebrains](https://docs.advancelabs.dev/ninebrains/).
+Full documentation is at [ninebrains.dev/docs](https://ninebrains.dev/docs/).
