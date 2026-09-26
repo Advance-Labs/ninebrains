@@ -14,12 +14,13 @@ import {
   resolveTmuxSession,
   tmuxIdentityActivityKey,
 } from './tmux';
-import { buildTmuxShellLine } from './tmux-commands';
+import { buildTmuxShellLine, DEFAULT_TMUX_HISTORY_LIMIT } from './tmux-commands';
 import {
   decodeLegacyTmuxSessionName,
   makeLegacyTmuxSessionName,
   makeTmuxSessionName,
 } from './tmux-identity';
+import { tmuxArgs } from './tmux-socket';
 
 const TMUX_AVAILABLE = spawnSync('tmux', ['-V']).status === 0;
 
@@ -67,7 +68,13 @@ describe('resolveTmuxSession', () => {
 
     await expect(
       resolveTmuxSession(stubExecContext(exec), { identity, label: 'new-label' })
-    ).resolves.toEqual({ name: 'renamed', exists: true, writeIdentity: true });
+    ).resolves.toEqual({
+      name: 'renamed',
+      exists: true,
+      writeIdentity: true,
+      serverState: 'running',
+      serverPid: null,
+    });
   });
 
   it('falls back to the exact legacy name without backfilling metadata', async () => {
@@ -80,7 +87,13 @@ describe('resolveTmuxSession', () => {
 
     await expect(
       resolveTmuxSession(stubExecContext(exec), { identity, label: 'workspace' })
-    ).resolves.toEqual({ name: legacyName, exists: true, writeIdentity: false });
+    ).resolves.toEqual({
+      name: legacyName,
+      exists: true,
+      writeIdentity: false,
+      serverState: 'running',
+      serverPid: null,
+    });
   });
 });
 
@@ -104,6 +117,32 @@ describe('buildTmuxShellLine', () => {
     expect(line).toContain('status off');
   });
 
+  it("runs every tmux command on the app's own socket, never the user's default server", () => {
+    const line = buildTmuxShellLine('workspace-abc', 'agent run', 'project:task:terminal');
+
+    // Every verb in the line is socket-scoped; a bare `tmux ` would address the default
+    // server, which is the shared-blast-radius bug this socket exists to end.
+    for (const verb of ['has-session', 'new-session', 'set-option', 'attach-session']) {
+      expect(line).toContain(`tmux -L ninebrains`);
+      expect(line).not.toMatch(new RegExp(`(?<!-L ninebrains )(?<!\\w)tmux ${verb}`, 'u'));
+    }
+  });
+
+  it('applies the requested scrollback limit, and a sane default when none is given', () => {
+    expect(buildTmuxShellLine('w', 'cmd', undefined, 500)).toContain('history-limit 500');
+    expect(buildTmuxShellLine('w', 'cmd')).toContain(`history-limit ${DEFAULT_TMUX_HISTORY_LIMIT}`);
+  });
+
+  it('clamps a limit tmux could not parse, so the option cannot silently fail', () => {
+    // The value lands in the shell line as a bare word under `|| true`, so a NaN would
+    // configure nothing and say nothing.
+    expect(buildTmuxShellLine('w', 'cmd', undefined, Number.NaN)).toContain(
+      `history-limit ${DEFAULT_TMUX_HISTORY_LIMIT}`
+    );
+    expect(buildTmuxShellLine('w', 'cmd', undefined, -5)).toContain('history-limit 0');
+    expect(buildTmuxShellLine('w', 'cmd', undefined, 12.7)).toContain('history-limit 12');
+  });
+
   it.skipIf(!TMUX_AVAILABLE)(
     'creates metadata-backed sessions and reattaches legacy sessions without replacing them',
     async () => {
@@ -123,40 +162,38 @@ describe('buildTmuxShellLine', () => {
         await expect(
           resolveTmuxSession(ctx, { identity, label: 'renamed-workspace' })
         ).resolves.toMatchObject({ name: created.name, exists: true });
-        await tmux.exec(['rename-session', '-t', `=${created.name}`, 'manually-renamed']);
+        await tmux.exec(tmuxArgs(['rename-session', '-t', `=${created.name}`, 'manually-renamed']));
         await expect(
           resolveTmuxSession(ctx, { identity, label: 'renamed-workspace' })
         ).resolves.toMatchObject({ name: 'manually-renamed', exists: true });
-        await tmux.exec(['kill-session', '-t', '=manually-renamed']);
+        await tmux.exec(tmuxArgs(['kill-session', '-t', '=manually-renamed']));
 
         const legacyName = makeLegacyTmuxSessionName(identity);
-        await tmux.exec(['new-session', '-d', '-s', legacyName, 'sleep 30']);
-        const before = await tmux.exec([
-          'display-message',
-          '-p',
-          '-t',
-          `=${legacyName}`,
-          '#{pane_pid}',
-        ]);
+        await tmux.exec(tmuxArgs(['new-session', '-d', '-s', legacyName, 'sleep 30']));
+        const before = await tmux.exec(
+          tmuxArgs(['display-message', '-p', '-t', `=${legacyName}`, '#{pane_pid}'])
+        );
         const legacy = await resolveTmuxSession(ctx, { identity, label: 'Fix login' });
         await shell.exec(['-c', buildTmuxShellLine(legacy.name, 'exit 99')]).catch(() => {});
-        const after = await tmux.exec([
-          'display-message',
-          '-p',
-          '-t',
-          `=${legacyName}`,
-          '#{pane_pid}',
-        ]);
-        const sessions = await tmux.exec(['list-sessions', '-F', '#{session_name}']);
+        const after = await tmux.exec(
+          tmuxArgs(['display-message', '-p', '-t', `=${legacyName}`, '#{pane_pid}'])
+        );
+        const sessions = await tmux.exec(tmuxArgs(['list-sessions', '-F', '#{session_name}']));
 
-        expect(legacy).toEqual({ name: legacyName, exists: true, writeIdentity: false });
+        // serverPid is the live server's pid, so match identity rather than exact shape.
+        expect(legacy).toMatchObject({
+          name: legacyName,
+          exists: true,
+          writeIdentity: false,
+          serverState: 'running',
+        });
         expect(after.stdout).toBe(before.stdout);
         expect(sessions.stdout.trim().split('\n')).toEqual([legacyName]);
 
-        await tmux.exec(['kill-session', '-t', `=${legacyName}`]);
+        await tmux.exec(tmuxArgs(['kill-session', '-t', `=${legacyName}`]));
         const prefixIdentity = 'project:task:prefix-target';
         const prefixName = makeTmuxSessionName(prefixIdentity, 'prefix');
-        await tmux.exec(['new-session', '-d', '-s', `${prefixName}-sibling`, 'sleep 30']);
+        await tmux.exec(tmuxArgs(['new-session', '-d', '-s', `${prefixName}-sibling`, 'sleep 30']));
         const missingExact = await resolveTmuxSession(ctx, {
           identity: prefixIdentity,
           label: 'prefix',
@@ -164,12 +201,12 @@ describe('buildTmuxShellLine', () => {
         await shell
           .exec(['-c', buildTmuxShellLine(missingExact.name, 'sleep 30', prefixIdentity)])
           .catch(() => {});
-        const exactSessions = await tmux.exec(['list-sessions', '-F', '#{session_name}']);
+        const exactSessions = await tmux.exec(tmuxArgs(['list-sessions', '-F', '#{session_name}']));
         expect(exactSessions.stdout.trim().split('\n').sort()).toEqual(
           [prefixName, `${prefixName}-sibling`].sort()
         );
       } finally {
-        await tmux.exec(['kill-server']).catch(() => {});
+        await tmux.exec(tmuxArgs(['kill-server'])).catch(() => {});
         await rm(cwd, { recursive: true, force: true });
       }
     }
@@ -204,9 +241,11 @@ describe('listTmuxSessionActivity', () => {
     const activity = await listTmuxSessionActivity(ctx);
 
     expect(exec).toHaveBeenCalledWith('tmux', [
+      '-L',
+      'ninebrains',
       'list-sessions',
       '-F',
-      '#{session_name}\t#{session_activity}\t#{@emdash_identity}',
+      '#{session_name}\t#{session_activity}\t#{@emdash_identity}\t#{pid}',
     ]);
     expect(activity).toEqual(new Map([['name', 42_000]]));
   });
@@ -302,3 +341,34 @@ function stubExecContext(exec: IExecutionContext['exec']): IExecutionContext {
     dispose() {},
   };
 }
+
+describe('end-to-end against a real tmux server', () => {
+  it.skipIf(!TMUX_AVAILABLE)('applies the history limit on the app socket', async () => {
+    const cwd = await mkdtemp('/tmp/nb-e2e-');
+    const env = { ...process.env, TMUX_TMPDIR: cwd };
+    const shell = createBoundExec({ file: '/bin/sh', cwd, env });
+    const tmux = createBoundExec({ file: 'tmux', cwd, env });
+    try {
+      await shell
+        .exec(['-c', buildTmuxShellLine('e2e-probe', 'sleep 60', 'p:t:e2e', 4321)])
+        .catch(() => {});
+      const limit = await tmux.exec(
+        tmuxArgs(['show-options', '-t', '=e2e-probe:', 'history-limit'])
+      );
+      const names = await tmux.exec(tmuxArgs(['list-sessions', '-F', '#{session_name}']));
+      expect(limit.stdout.trim()).toBe('history-limit 4321');
+      expect(names.stdout.trim()).toBe('e2e-probe');
+      // The socket really is separate: the default server in this TMUX_TMPDIR has nothing.
+      const onDefault = await tmux
+        .exec(['list-sessions'])
+        .then(() => ({ stderr: '<unexpectedly succeeded>' }))
+        .catch((error: { stderr?: string }) => error);
+      expect(onDefault.stderr ?? '').toMatch(
+        /no server running|failed to connect|error connecting/iu
+      );
+    } finally {
+      await tmux.exec(tmuxArgs(['kill-server'])).catch(() => {});
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});

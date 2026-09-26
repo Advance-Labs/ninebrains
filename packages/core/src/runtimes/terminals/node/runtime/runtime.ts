@@ -37,7 +37,10 @@ import {
   killTmuxSession,
   makeLegacyTmuxSessionName,
   makeTmuxSessionName,
+  findLegacyDefaultSocketSessions,
   resolveTmuxSession,
+  TmuxServerSupervisor,
+  isTmuxServerLoss,
   resolveLocalPtySpawn,
   PtyRegistry,
   type PtySession,
@@ -119,6 +122,17 @@ export class TerminalsRuntime {
   private readonly interactiveConfigs = new Map<string, InteractiveTerminalConfig>();
   private readonly startCounts = new Map<string, number>();
   private readonly previewSources = new Map<string, PreviewOutputSource>();
+  /**
+   * Attributes a tmux-backed terminal's exit to the tmux server's own lifecycle.
+   *
+   * Without this the app cannot tell a session that finished from one destroyed when the
+   * server underneath it died, because the spawn line is fail-open: a dead server is
+   * silently replaced by a fresh one on the next start, and the user just sees empty
+   * panes. This is the only place that difference is recorded.
+   */
+  private readonly tmuxSupervisor: TmuxServerSupervisor;
+  /** Guards the one-shot legacy-socket report; the answer cannot change usefully. */
+  private reportedLegacyTmuxSessions = false;
 
   constructor(options: TerminalsRuntimeOptions) {
     this.registry = new PtyRegistry(options.spawner, {
@@ -133,6 +147,20 @@ export class TerminalsRuntime {
     this.shellResolver = options.shellResolver;
     this.createShellResolver = options.createShellResolver;
     this.logger = options.logger ?? noopLogger;
+    this.tmuxSupervisor = new TmuxServerSupervisor({
+      // The runtime's own context path, so a context it had to build is disposed on the
+      // way out instead of outliving the probe that borrowed it.
+      exec: (operation) => this.withExecutionContext(operation),
+      // warn, not info: the desktop file logger keeps warn and above, so a server death
+      // survives into the log a user can actually send back after the fact.
+      onServerChange: (change) =>
+        this.logger.warn('terminals: tmux server changed underneath live sessions', {
+          change: change.type,
+          ...('previousServerPid' in change ? { previousServerPid: change.previousServerPid } : {}),
+          ...('serverPid' in change ? { serverPid: change.serverPid } : {}),
+          ...('lostSessions' in change ? { lostSessions: change.lostSessions.length } : {}),
+        }),
+    });
     this.lifecycle = createSessionLifecycle({
       name: 'TerminalsRuntime',
       logger: this.logger,
@@ -346,9 +374,12 @@ export class TerminalsRuntime {
       overrides: spec.env,
       gitCredentials: spec.gitCredentials,
     });
-    let tmux: { name: string; identity?: string } | undefined;
+    let tmux: { name: string; identity?: string; historyLimit?: number } | undefined;
     if (spec.tmux && process.platform === 'win32') {
-      tmux = { name: makeTmuxSessionName(sessionKey, workspaceLabel(spec.cwd)) };
+      tmux = {
+        name: makeTmuxSessionName(sessionKey, workspaceLabel(spec.cwd)),
+        historyLimit: spec.tmuxHistoryLimit,
+      };
     } else if (spec.tmux) {
       const resolvedTmux = await this.withExecutionContext((exec) =>
         resolveTmuxSession(exec, { identity: sessionKey, label: workspaceLabel(spec.cwd) })
@@ -357,7 +388,10 @@ export class TerminalsRuntime {
       tmux = {
         name: resolvedTmux.name,
         identity: resolvedTmux.writeIdentity ? sessionKey : undefined,
+        historyLimit: spec.tmuxHistoryLimit,
       };
+      this.tmuxSupervisor.recordSpawn(sessionKey, resolvedTmux.serverPid);
+      void this.reportLegacyTmuxSessions();
     }
     const resolved = resolveLocalPtySpawn({
       intent: {
@@ -391,8 +425,61 @@ export class TerminalsRuntime {
     );
   }
 
+  /**
+   * Name, once, any sessions still running on the user's default tmux socket.
+   *
+   * Ninebrains used to create sessions there. After moving to its own socket those are
+   * invisible to the app, which would otherwise look exactly like having lost them. They
+   * are still running and still attachable with `tmux attach`, so this reports them and
+   * deliberately does not touch them: killing a user's live agents to tidy up a socket
+   * migration would destroy the work tmux is here to protect.
+   */
+  private async reportLegacyTmuxSessions(): Promise<void> {
+    if (this.reportedLegacyTmuxSessions) return;
+    this.reportedLegacyTmuxSessions = true;
+    try {
+      const legacy = await this.withExecutionContext((exec) =>
+        findLegacyDefaultSocketSessions(exec)
+      );
+      if (!legacy || legacy.length === 0) return;
+      this.logger.warn(
+        'terminals: found Ninebrains tmux sessions on the default socket; they are still ' +
+          'running but this app now uses its own socket and will not manage them',
+        { count: legacy.length, names: legacy.map((session) => session.name) }
+      );
+    } catch (error) {
+      this.logger.debug('terminals: legacy tmux socket probe failed', { error: String(error) });
+    }
+  }
+
   private handleInteractiveExit(sessionKey: string): void {
     this.closePreviewSource(sessionKey);
+    void this.reportTmuxExit(sessionKey);
+  }
+
+  /**
+   * Say, in the log, whether a tmux-backed terminal was destroyed or simply finished.
+   *
+   * Best-effort and deliberately non-blocking: the diagnosis costs a `tmux list-sessions`
+   * and the exit path must not wait on it or fail because of it. A session the supervisor
+   * never recorded, or a tmux it cannot reach, diagnoses as `unknown` and stays silent
+   * rather than reporting a crash it cannot evidence.
+   */
+  private async reportTmuxExit(sessionKey: string): Promise<void> {
+    if (!this.interactiveConfigs.get(sessionKey)?.spec.tmux) return;
+    try {
+      const diagnosis = await this.tmuxSupervisor.diagnose(sessionKey);
+      if (isTmuxServerLoss(diagnosis)) {
+        this.logger.warn('terminals: tmux session was destroyed by a server loss', {
+          sessionKey,
+          diagnosis: diagnosis.kind,
+        });
+      }
+    } catch (error) {
+      this.logger.debug('terminals: tmux exit diagnosis failed', { error: String(error) });
+    } finally {
+      this.tmuxSupervisor.forget(sessionKey);
+    }
   }
 
   private async resolveShellProfile(

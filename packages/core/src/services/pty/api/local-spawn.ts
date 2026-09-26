@@ -27,7 +27,7 @@ export type PtySpawnIntent =
       cwd: string;
       shellProfile?: ResolvedPtyShellProfile;
       shellSetup?: string;
-      tmux?: { name: string; identity?: string };
+      tmux?: { name: string; identity?: string; historyLimit?: number };
     }
   | {
       kind: 'run-command';
@@ -35,7 +35,7 @@ export type PtySpawnIntent =
       command: PtyCommandSpec;
       shellProfile?: ResolvedPtyShellProfile;
       shellSetup?: string;
-      tmux?: { name: string; identity?: string };
+      tmux?: { name: string; identity?: string; historyLimit?: number };
     };
 
 export type LocalPtySpawnWarning = 'tmux_unsupported_on_windows' | 'tmux_missing';
@@ -256,7 +256,12 @@ function resolvePosixSpawn(
       return {
         invocation: argvInvocation(shell, [
           ...(intent.shellSetup ? setupWrapperArgs : commandArgs),
-          buildTmuxShellLine(intent.tmux.name, commandLine, intent.tmux.identity),
+          buildTmuxShellLine(
+            intent.tmux.name,
+            commandLine,
+            intent.tmux.identity,
+            intent.tmux.historyLimit
+          ),
         ]),
         cwd: intent.cwd,
         warnings: [],
@@ -314,7 +319,12 @@ function resolvePosixSpawn(
     return {
       invocation: argvInvocation(shell, [
         ...commandArgs,
-        buildTmuxShellLine(intent.tmux.name, fullCommandLine, intent.tmux.identity),
+        buildTmuxShellLine(
+          intent.tmux.name,
+          fullCommandLine,
+          intent.tmux.identity,
+          intent.tmux.historyLimit
+        ),
       ]),
       cwd: intent.cwd,
       warnings: [],

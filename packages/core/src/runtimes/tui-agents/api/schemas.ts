@@ -29,7 +29,13 @@ export const tuiAgentStartInputSchema = z.object({
   cols: z.number().int(),
   rows: z.number().int(),
   shellSetup: z.string().optional(),
-  tmux: z.object({ identity: z.string().min(1) }).optional(),
+  tmux: z
+    .object({
+      identity: z.string().min(1),
+      /** Scrollback lines for this agent's pane; unset uses DEFAULT_TMUX_HISTORY_LIMIT. */
+      historyLimit: z.number().int().min(0).optional(),
+    })
+    .optional(),
 });
 
 export type TuiAgentStartInput = z.infer<typeof tuiAgentStartInputSchema>;

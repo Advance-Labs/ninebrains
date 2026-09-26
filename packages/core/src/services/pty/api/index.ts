@@ -34,10 +34,22 @@ export { PtySession } from './pty-session';
 export type { PtySessionOptions } from './pty-session';
 export {
   buildTmuxShellLine,
+  DEFAULT_TMUX_HISTORY_LIMIT,
+  findLegacyDefaultSocketSessions,
+  inspectTmuxSessions,
   killTmuxSession,
   listTmuxSessions,
+  type TmuxInventory,
+  type TmuxServerState,
   type TmuxSessionInventoryEntry,
 } from './tmux-commands';
+export { NINEBRAINS_TMUX_SOCKET, tmuxArgs, tmuxShellCommand } from './tmux-socket';
+export {
+  isTmuxServerLoss,
+  TmuxServerSupervisor,
+  type TmuxExitDiagnosis,
+} from './tmux-server-supervisor';
+export { isTmuxSessionLoss, TmuxServerWatch, type TmuxServerChange } from './tmux-server-watch';
 export {
   decodeLegacyTmuxSessionName,
   LEGACY_TMUX_SESSION_PREFIX,

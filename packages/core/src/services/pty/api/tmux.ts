@@ -1,31 +1,43 @@
 import type { IExecutionContext } from '#primitives/exec/api';
-import { listTmuxSessions, parseTmuxSessionInventory } from './tmux-commands';
+import {
+  inspectTmuxSessions,
+  parseTmuxSessionInventory,
+  type TmuxServerState,
+} from './tmux-commands';
 import { makeLegacyTmuxSessionName, makeTmuxSessionName } from './tmux-identity';
 
 export type ResolvedTmuxSession = {
   name: string;
   exists: boolean;
   writeIdentity: boolean;
+  /**
+   * The tmux server generation this resolution saw. Recording it at spawn is what later
+   * lets an exit be attributed to the server dying rather than to the session ending:
+   * `exists: false` alone cannot tell a dead server from a name that simply missed.
+   */
+  serverState: TmuxServerState;
+  serverPid: number | null;
 };
 
 export async function resolveTmuxSession(
   ctx: IExecutionContext,
   input: { identity: string; label: string }
 ): Promise<ResolvedTmuxSession> {
-  const sessions = await listTmuxSessions(ctx);
+  const { server: serverState, serverPid, sessions } = await inspectTmuxSessions(ctx);
+  const generation = { serverState, serverPid };
   const metadataMatch = sessions.find((session) => session.identity === input.identity);
   if (metadataMatch) {
-    return { name: metadataMatch.name, exists: true, writeIdentity: true };
+    return { name: metadataMatch.name, exists: true, writeIdentity: true, ...generation };
   }
 
   const legacyName = makeLegacyTmuxSessionName(input.identity);
   if (sessions.some((session) => session.name === legacyName)) {
-    return { name: legacyName, exists: true, writeIdentity: false };
+    return { name: legacyName, exists: true, writeIdentity: false, ...generation };
   }
 
   const name = makeTmuxSessionName(input.identity, input.label);
   const namedSession = sessions.find((session) => session.name === name);
-  return { name, exists: namedSession !== undefined, writeIdentity: true };
+  return { name, exists: namedSession !== undefined, writeIdentity: true, ...generation };
 }
 
 export async function findTmuxSessionNamesByIdentity(
@@ -34,7 +46,7 @@ export async function findTmuxSessionNamesByIdentity(
 ): Promise<Map<string, string>> {
   const requested = new Set(identities);
   const found = new Map<string, string>();
-  for (const session of await listTmuxSessions(ctx)) {
+  for (const session of (await inspectTmuxSessions(ctx)).sessions) {
     if (!session.identity || !requested.has(session.identity)) continue;
     if (!found.has(session.identity)) found.set(session.identity, session.name);
   }
@@ -44,7 +56,7 @@ export async function findTmuxSessionNamesByIdentity(
 export async function listTmuxSessionActivity(
   ctx: IExecutionContext
 ): Promise<Map<string, number>> {
-  return activityByHandle(await listTmuxSessions(ctx));
+  return activityByHandle((await inspectTmuxSessions(ctx)).sessions);
 }
 
 export function parseTmuxSessionActivity(output: string): Map<string, number> {
