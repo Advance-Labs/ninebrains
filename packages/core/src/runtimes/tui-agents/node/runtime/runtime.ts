@@ -654,7 +654,7 @@ export class TuiAgentsRuntime {
               void this.launchCurrentConfig(config.input.conversationId);
               return;
             }
-            if (config.input.tmux) void this.reportTmuxExit(config.input.tmux.identity);
+            if (config.input.tmux) void this.reportTmuxExit(config.input.tmux.identity, info);
             this.markExited(config.input.conversationId, info);
             this.agentStates.resetToIdle(config.input.conversationId);
             if (this.maybeRespawnAfterUnexpectedExit(session, config, generation, info)) {
@@ -1032,7 +1032,11 @@ export class TuiAgentsRuntime {
         identity: resolvedTmux.writeIdentity ? input.tmux.identity : undefined,
         historyLimit: input.tmux.historyLimit,
       };
-      this.tmuxSupervisor.recordSpawn(input.tmux.identity, resolvedTmux.serverPid);
+      this.tmuxSupervisor.recordSpawn(
+        input.tmux.identity,
+        resolvedTmux.serverPid,
+        resolvedTmux.name
+      );
     }
     const resolved = resolveLocalPtySpawn({
       intent: {
@@ -1104,13 +1108,18 @@ export class TuiAgentsRuntime {
    * generation, or a tmux that cannot be reached — stays silent rather than reporting a
    * crash it cannot evidence.
    */
-  private async reportTmuxExit(identity: string): Promise<void> {
+  private async reportTmuxExit(identity: string, info?: PtyExitInfo): Promise<void> {
     try {
       const diagnosis = await this.tmuxSupervisor.diagnose(identity);
       if (isTmuxServerLoss(diagnosis)) {
+        // exitCode/signal are what separate an agent that finished from one that was
+        // killed. A loss without them reads identically either way, which is the exact
+        // ambiguity that left the first real occurrence undiagnosable.
         this.deps.logger.warn('tui-agents: agent session was destroyed by a tmux server loss', {
           identity,
           diagnosis: diagnosis.kind,
+          exitCode: info?.exitCode ?? null,
+          signal: info?.signal ?? null,
         });
       }
     } catch (error) {

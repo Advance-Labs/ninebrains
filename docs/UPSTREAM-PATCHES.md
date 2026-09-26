@@ -968,3 +968,41 @@ No new Ninebrains-only files.
 **What this does not establish.** Nothing here bears on patch 55's open root cause. It also does
 not migrate anyone: a profile with no stored value keeps getting the pty default, which is the
 same 10k it already got.
+
+## 57. The first tmux server loss was reported at session level only (`ninebrains/tmux-loss-evidence`)
+
+Patch 55's supervisor met its first real occurrence and came back half-legible. Three agent
+sessions were diagnosed `server-gone` within one millisecond of each other, and the
+server-level report — the one that says the *server* went, not just a session — never fired.
+
+The cause is in this repo's own code, not upstream's. `recordSpawn` stashed a generation and
+nothing else, while `TmuxServerWatch` was fed only from inside `diagnose()`, which runs on pty
+*exit*. So the first death reached a watch whose `running` was still false, and a watch that
+never saw the server running cannot call its absence a loss: `server-lost` returned null and
+the transition was dropped. The watch's own docblock claimed it could be driven from "a
+spawn-time resolve"; nothing did.
+
+The occurrence also could not be read. `server-gone` means "no server was reachable when this
+pty exited", which is the same observation whether the server died under three live sessions or
+those three sessions ended and the server exited after its last one, as tmux always does. The
+pty's own exit code and signal are what separate those, and they were not recorded.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-server-watch.ts` | New `noteRunningServer(serverPid, sessionNames)`: records a live server seen outside a full inventory probe, keeps a known pid when handed null, and copies the session list | Seeding is what makes a first loss legible. It deliberately reports no change, because presence is not a transition; a generation replaced between two spawns is still caught per session, since each session's recorded generation is compared on its own exit |
+| `packages/core/src/services/pty/api/tmux-server-supervisor.ts` | `recordSpawn` takes an optional `sessionName`, tracks it per key, and seeds the watch on every spawn; `forget` drops the name too | The server-level report exists to say what went down with the server, so it needs the names. Seeding on every spawn rather than the first keeps the list current as sessions come and go |
+| `packages/core/src/runtimes/terminals/node/runtime/runtime.ts`, `.../tui-agents/node/runtime/runtime.ts` | Pass the resolved tmux session name at spawn; thread `PtyExitInfo` from `onExit` into the diagnosis and log `exitCode` and `signal` beside it | Without the signal a loss reads identically whether the agent finished or was killed, which is the ambiguity that made the first occurrence undiagnosable |
+| `packages/core/src/services/pty/api/tmux-server-supervisor.test.ts` | Three cases: the first loss is announced, every seeded session is named, and a forgotten one is not | All three were verified to fail with the seeding line removed, so they fail for the reason they claim rather than passing by construction |
+| `agents/risky-areas/pty.md` | A "The First Recorded Loss" section: the occurrence, what the surrounding evidence rules out, why `server-gone` is not the same claim as "the server crashed", and the three lines to read together next time | The eliminated-hypotheses list above it exists so the same ground is not re-covered; the first real datapoint belongs beside it |
+| `packages/core/src/services/pty/api/tmux-server-watch.test.ts` | Four cases for `noteRunningServer`: a seeded sighting makes a later absence a loss, seeding reports nothing itself, a null pid preserves the known generation, and the seeded list is copied | The null-pid and copy cases mirror guarantees `observe` already had |
+
+No new Ninebrains-only files.
+
+**What this does not establish.** Still no root cause, and this patch deliberately does not claim
+one. It also does not settle the occurrence that prompted it: that evidence is already written,
+and `exitCode`/`signal` were not part of it. What the surrounding record does show is no tmux
+crash report, no jetsam entry, 67% free memory, no kernel kill at that instant, the app alive
+throughout — and two `caffeinate` power assertions dying 11ms *earlier* with `ClientDied`, which
+is what an agent CLI exiting looks like. That points at the sessions ending first and tmux
+exiting behind them, which would mean the "crash" was never one. The next occurrence is what
+decides it.

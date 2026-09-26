@@ -56,3 +56,41 @@ reports a loss at `warn`. **The next investigation should start from those log l
 Two changes narrowed the blast radius while the cause is still unknown: Ninebrains now runs
 on its own tmux socket (`tmux-socket.ts`) rather than sharing the user's default server, and
 `history-limit` defaults to 10k rather than 100k lines per pane, held in the server's memory.
+
+## The First Recorded Loss (2026-09-25 22:58 EDT)
+
+The supervisor's first real occurrence, and what it did and did not settle.
+
+Three agent sessions were diagnosed `server-gone` within one millisecond. Around it:
+
+- No tmux crash report, and none has ever existed on this machine.
+- No new JetsamEvent; 67% system memory free at the time.
+- No kernel kill or jetsam entry at that instant.
+- The desktop app stayed running throughout.
+- No successor server was created, and none existed afterwards.
+- **11ms earlier**, two `caffeinate` processes died with
+  `ClientDied PreventUserIdleSystemSleep` (one aged 2m27s). That is what an agent CLI
+  holding a sleep assertion looks like when it exits.
+
+**`server-gone` does not mean the server crashed.** It means no server was reachable when
+that pty exited. A tmux server exits the moment its last session ends, so three sessions
+ending together produces this signature exactly as a server death would. The `caffeinate`
+deaths landing *first* point at the sessions ending and tmux exiting behind them — which
+would mean the "crash" was never one. That is not yet proven.
+
+What was missing, and is now fixed: the server-level `server-lost` report never fired,
+because `recordSpawn` did not tell the watch the server was alive (the watch was fed only
+on pty exit, so `running` was still false and the transition was dropped). And the pty's
+`exitCode`/`signal` were not logged, which is the one bit that separates an agent that
+finished from one that was killed.
+
+**The next occurrence is the decisive one.** Read all three together:
+
+```
+grep -E "tmux server changed underneath|destroyed by a tmux server loss" \
+  ~/Library/Application\ Support/ninebrains/logs/ninebrains.log
+```
+
+- A `server-lost` / `server-restarted` line now accompanies the per-session lines.
+- `signal` on the session lines names a kill; a clean `exitCode` with no signal means the
+  agent ended on its own and tmux exited behind it — not a crash.

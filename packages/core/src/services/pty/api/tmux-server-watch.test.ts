@@ -27,6 +27,47 @@ const ABSENT: TmuxInventory = { server: 'absent', serverPid: null, sessions: [] 
 const UNAVAILABLE: TmuxInventory = { server: 'unavailable', serverPid: null, sessions: [] };
 
 describe('inspectTmuxSessions', () => {
+  it('treats a seeded sighting as a live server, so a later absence is a loss', () => {
+    const watch = new TmuxServerWatch();
+
+    watch.noteRunningServer(100, ['a', 'b']);
+
+    expect(watch.observe(ABSENT)).toEqual({
+      type: 'server-lost',
+      previousServerPid: 100,
+      lostSessions: ['a', 'b'],
+    });
+  });
+
+  it('seeding reports nothing itself, because presence is not a transition', () => {
+    const watch = new TmuxServerWatch();
+
+    watch.noteRunningServer(100, ['a']);
+
+    expect(watch.snapshot()).toMatchObject({ serverPid: 100, running: true });
+  });
+
+  it('a seed with no pid keeps the generation already known', () => {
+    const watch = new TmuxServerWatch();
+    watch.noteRunningServer(100, ['a']);
+
+    watch.noteRunningServer(null, ['a']);
+
+    // Same reason observe() keeps it: a server that declines to report its pid tells us
+    // nothing new, and must not make the next read look like a first sighting.
+    expect(watch.snapshot().serverPid).toBe(100);
+  });
+
+  it('does not leak the seeded session list to callers', () => {
+    const watch = new TmuxServerWatch();
+    const names = ['a'];
+    watch.noteRunningServer(100, names);
+
+    names.push('mutated');
+
+    expect(watch.snapshot().sessionNames).toEqual(['a']);
+  });
+
   it('reports the hosting server pid alongside the sessions', async () => {
     const exec = vi.fn(async () => ({ stdout: 'a\t42\t\t93738\nb\t43\t\t93738\n', stderr: '' }));
 

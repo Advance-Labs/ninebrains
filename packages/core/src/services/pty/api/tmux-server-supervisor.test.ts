@@ -36,6 +36,58 @@ function noServerError(): Error {
 }
 
 describe('TmuxServerSupervisor', () => {
+  it('announces the very first loss, because a spawn already told it the server was alive', async () => {
+    const onServerChange = vi.fn();
+    const exec = scriptedExec([noServerError()]);
+    const supervisor = new TmuxServerSupervisor({ exec: exec.run, onServerChange });
+
+    // The regression this locks in: recordSpawn used to only stash a generation, so the
+    // watch never saw a running server and the first death was dropped on the floor —
+    // three real sessions were lost in production with nothing reported at server level.
+    supervisor.recordSpawn('agent', 1111, 'workspace-agent');
+
+    const diagnosis = await supervisor.diagnose('agent');
+
+    expect(diagnosis).toEqual({ kind: 'server-gone', previousServerPid: 1111 });
+    expect(onServerChange).toHaveBeenCalledTimes(1);
+    expect(onServerChange).toHaveBeenCalledWith({
+      type: 'server-lost',
+      previousServerPid: 1111,
+      lostSessions: ['workspace-agent'],
+    });
+  });
+
+  it('names every session that went down with the server, not just the one that exited', async () => {
+    const onServerChange = vi.fn();
+    const exec = scriptedExec([noServerError()]);
+    const supervisor = new TmuxServerSupervisor({ exec: exec.run, onServerChange });
+    supervisor.recordSpawn('a', 1111, 'workspace-a');
+    supervisor.recordSpawn('b', 1111, 'workspace-b');
+
+    await supervisor.diagnose('a');
+
+    expect(onServerChange).toHaveBeenCalledWith(
+      expect.objectContaining({ lostSessions: ['workspace-a', 'workspace-b'] })
+    );
+  });
+
+  it('stops naming a session it was told to forget', async () => {
+    const onServerChange = vi.fn();
+    const exec = scriptedExec([noServerError()]);
+    const supervisor = new TmuxServerSupervisor({ exec: exec.run, onServerChange });
+    supervisor.recordSpawn('a', 1111, 'workspace-a');
+    supervisor.recordSpawn('b', 1111, 'workspace-b');
+    supervisor.forget('b');
+    // Re-seed so the watch's session list reflects the removal.
+    supervisor.recordSpawn('a', 1111, 'workspace-a');
+
+    await supervisor.diagnose('a');
+
+    expect(onServerChange).toHaveBeenCalledWith(
+      expect.objectContaining({ lostSessions: ['workspace-a'] })
+    );
+  });
+
   it('reports a session that outlived its server as a loss, not a normal end', async () => {
     const exec = scriptedExec([row('agent', 4242)]);
     const supervisor = new TmuxServerSupervisor({ exec: exec.run });
