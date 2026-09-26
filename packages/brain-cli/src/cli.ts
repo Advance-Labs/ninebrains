@@ -26,6 +26,8 @@ export interface CliDeps {
   io: CliIo;
   /** Overridden in tests to avoid a real endpoint. */
   connect?: (env: NodeJS.ProcessEnv) => ReturnType<typeof connect>;
+  /** Launches the interactive TUI when no command is given. */
+  launchTui?: (connection: Connection, projectId: string | undefined) => void;
 }
 
 export async function runCli(deps: CliDeps): Promise<number> {
@@ -35,6 +37,15 @@ export async function runCli(deps: CliDeps): Promise<number> {
   const name = args.positionals[0];
 
   if (name === undefined || args.flags.has('help') || name === 'help') {
+    if (name === undefined && !args.flags.has('help') && deps.launchTui) {
+      const connection = (deps.connect ?? connect)(env);
+      if (!connection.ok) {
+        io.err(connection.message);
+        return EXIT.unreachable;
+      }
+      deps.launchTui(connection.connection, env.NINEBRAINS_PROJECT);
+      return EXIT.ok;
+    }
     io.out(helpText());
     // Asking for help is success; not saying what you wanted is not.
     return name === undefined && !args.flags.has('help') ? EXIT.usage : EXIT.ok;
@@ -112,6 +123,7 @@ function helpText(): string {
     'brain - drive a running Ninebrains Brain from the shell.',
     '',
     'Usage: brain <command> [arguments] [--project ID] [--json] [--dry-run]',
+    '       brain                   launch interactive TUI',
     '',
     'Commands:',
     ...rows,
