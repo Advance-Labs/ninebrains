@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One entry, because the site is one page. Every URL in
+  docs/strategy/workstreams/W9-positioning-and-content.md is added here as it publishes, and
+  W9's answer-ready checklist treats sitemap inclusion as a publish gate.
+
+  No <lastmod>: a hand-maintained date that stops matching the page is worse than no date at
+  all. Generate it from the build when this file grows past a handful of URLs.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://ninebrains.dev/</loc>
+  </url>
+</urlset>

@@ -22,13 +22,13 @@ plan or key charges. Ninebrains makes no claim about which quota its runs draw f
 On macOS or Linux, in a terminal:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 On Windows, in PowerShell:
 
 ```powershell
-irm https://ninebrains.runs-on.dev/install.ps1 | iex
+irm https://ninebrains.dev/install.ps1 | iex
 ```
 
 The script picks the file for your OS and CPU (the `.zip` on macOS, the AppImage into
@@ -40,7 +40,7 @@ checks prove, are in [Verify a download → Updating](verify-download.md#updatin
 ### From a release
 
 Download the build for your OS from
-[ninebrains.runs-on.dev](https://ninebrains.runs-on.dev/#download) or
+[ninebrains.dev](https://ninebrains.dev/#download) or
 [GitHub Releases](https://github.com/Advance-Labs/ninebrains/releases).
 
 Builds are **not code-signed** yet. Before you open one, check it against the release's
@@ -59,7 +59,7 @@ nothing ever downgrades you.
 
 The one-line installer above still updates a manual install too, for anyone who prefers it. If you
 installed the `.deb`, update with
-`curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
+`curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh -s -- --deb`
 (it runs `sudo apt install`); the plain line would add an AppImage instead. On macOS the installer
 asks you to quit Ninebrains first; on Windows, quit it before you run the line.
 [Verify a download → Updating](verify-download.md#updating) has the details.

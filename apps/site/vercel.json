@@ -3,6 +3,18 @@
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm --filter @ninebrains/site build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "ninebrains.runs-on.dev" }],
+      "destination": "https://ninebrains.dev/:path*",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    { "source": "/docs", "destination": "https://ninebrains-docs.vercel.app/docs" },
+    { "source": "/docs/:path*", "destination": "https://ninebrains-docs.vercel.app/docs/:path*" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

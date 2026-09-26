@@ -49,8 +49,8 @@ test('every image has alt text', () => {
 });
 
 test('points at the install scripts and offers a direct download fallback', () => {
-  assert.match(flat, /https:\/\/ninebrains\.runs-on\.dev\/install \| sh/);
-  assert.match(flat, /https:\/\/ninebrains\.runs-on\.dev\/install\.ps1 \| iex/);
+  assert.match(flat, /https:\/\/ninebrains\.dev\/install \| sh/);
+  assert.match(flat, /https:\/\/ninebrains\.dev\/install\.ps1 \| iex/);
   assert.match(flat, /href="https:\/\/github\.com\/Advance-Labs\/ninebrains\/releases\/latest"/);
 });
 
@@ -60,8 +60,8 @@ test('each copy button copies exactly the one-line command it sits next to', () 
     (m) => m[1].replace(/\s+/g, ' ').trim()
   );
   assert.deepEqual(commands, [
-    "curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh",
-    'irm https://ninebrains.runs-on.dev/install.ps1 | iex',
+    "curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh",
+    'irm https://ninebrains.dev/install.ps1 | iex',
   ]);
 });
 
@@ -239,4 +239,31 @@ test('the loading mark paints before any script and can never strand the page', 
   // The overlap audit's page never shows it.
   const site = readFileSync(join(DIST, 'site.js'), 'utf8');
   assert.match(site, /if \(!introEl \|\| debug \|\|/);
+});
+
+/**
+ * The domain move (docs/strategy/decisions.md, 2026-09-25) is only worth anything if every
+ * built surface agrees on one hostname. `ninebrains.runs-on.dev` 301s here from vercel.json,
+ * so nothing the build emits should still name it.
+ */
+test('every built surface names ninebrains.dev and nothing names the old subdomain', () => {
+  const robots = readFileSync(join(DIST, 'robots.txt'), 'utf8');
+  const sitemap = readFileSync(join(DIST, 'sitemap.xml'), 'utf8');
+  const llms = readFileSync(join(DIST, 'llms.txt'), 'utf8');
+
+  assert.match(flat, /<link rel="canonical" href="https:\/\/ninebrains\.dev\/" \/>/);
+  assert.equal((flat.match(/rel="canonical"/g) ?? []).length, 1, 'exactly one canonical');
+  assert.match(robots, /^Sitemap: https:\/\/ninebrains\.dev\/sitemap\.xml$/m);
+  assert.match(sitemap, /<loc>https:\/\/ninebrains\.dev\/<\/loc>/);
+
+  for (const [name, text] of [
+    ['index.html', html],
+    ['robots.txt', robots],
+    ['sitemap.xml', sitemap],
+    ['llms.txt', llms],
+    ['install', readFileSync(join(DIST, 'install'), 'utf8')],
+    ['install.ps1', readFileSync(join(DIST, 'install.ps1'), 'utf8')],
+  ]) {
+    assert.doesNotMatch(text, /ninebrains\.runs-on\.dev/, `${name} still names the old host`);
+  }
 });

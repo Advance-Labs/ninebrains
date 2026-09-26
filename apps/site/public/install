@@ -1,8 +1,8 @@
 #!/bin/sh
 # Ninebrains installer and updater for macOS and Linux.
 #
-#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
-#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --help
+#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
+#   curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh -s -- --help
 #
 # Run it again to update. It downloads one release from
 # https://github.com/Advance-Labs/ninebrains/releases, checks the file against that release's
@@ -20,9 +20,9 @@ SIGNER_WORKFLOW="$REPO/.github/workflows/release.yml"
 # run from any other ref (a PR branch, a fork, a tag someone pushed) does not count.
 CERT_IDENTITY_REGEX='^https://github\.com/Advance-Labs/ninebrains/\.github/workflows/release\.yml@refs/heads/(main|release/[^@]+)$'
 BUNDLE_ID='dev.advancelabs.ninebrains'
-SITE='https://ninebrains.runs-on.dev'
-SOURCE_DOCS='https://docs.advancelabs.dev/ninebrains/install-from-source/'
-VERIFY_DOCS='https://docs.advancelabs.dev/ninebrains/verify-download/'
+SITE='https://ninebrains.dev'
+SOURCE_DOCS='https://ninebrains.dev/docs/install-from-source/'
+VERIFY_DOCS='https://ninebrains.dev/docs/verify-download/'
 
 say() { printf 'ninebrains: %s\n' "$*"; }
 warn() { printf 'ninebrains: warning: %s\n' "$*" >&2; }

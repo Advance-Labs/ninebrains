@@ -590,8 +590,8 @@ describe('install (sh): script hygiene', () => {
       /^https:\/\/github\\\.com\/Advance-Labs\/ninebrains\//,
       // Built from the REPO / $Repo constant, pinned below.
       /^https:\/\/(api\.)?github\.com\/(repos\/)?\$(REPO|Repo)\//,
-      /^https:\/\/ninebrains\.runs-on\.dev\b/,
-      /^https:\/\/docs\.advancelabs\.dev\/ninebrains\//,
+      // Site and docs are one origin now: /docs is rewritten to the docs project.
+      /^https:\/\/ninebrains\.dev\b/,
     ];
     assert.match(sh, /^REPO='Advance-Labs\/ninebrains'$/m);
     assert.match(ps1, /^ {2}\$Repo = 'Advance-Labs\/ninebrains'$/m);

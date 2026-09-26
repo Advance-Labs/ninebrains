@@ -5,7 +5,7 @@ import path from 'node:path';
 import { after, test } from 'node:test';
 import { checkSite, collectHrefs, collectIds } from './check-links.mjs';
 
-const OPTIONS = { base: '/ninebrains', site: 'https://docs.advancelabs.dev' };
+const OPTIONS = { base: '/docs', site: 'https://ninebrains.dev' };
 const dirs = [];
 after(() => dirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
@@ -28,18 +28,18 @@ test('collects hrefs and ids, decoding entities', () => {
 
 test('passes when every internal link and fragment resolves', () => {
   const dir = site({
-    'index.html': '<a href="/ninebrains/gates/#rigor">g</a><a href="gates/">rel</a><a href="#_top">top</a>',
+    'index.html': '<a href="/docs/gates/#rigor">g</a><a href="gates/">rel</a><a href="#_top">top</a>',
     'gates/index.html': '<h2 id="rigor">Rigor</h2><a href="../">home</a><a href="#rigor">self</a>',
     'favicon.svg': '<svg/>',
   });
-  writeFileSync(path.join(dir, 'gates/index.html'), '<h2 id="rigor"></h2><a href="/ninebrains/favicon.svg">i</a>', { flag: 'a' });
+  writeFileSync(path.join(dir, 'gates/index.html'), '<h2 id="rigor"></h2><a href="/docs/favicon.svg">i</a>', { flag: 'a' });
   assert.deepEqual(checkSite(dir, OPTIONS), []);
 });
 
 test('reports a missing page, a missing fragment and a link outside the base', () => {
   const dir = site({
     'index.html':
-      '<a href="/ninebrains/nope/">a</a><a href="/ninebrains/gates/#missing">b</a><a href="/elsewhere/">c</a>',
+      '<a href="/docs/nope/">a</a><a href="/docs/gates/#missing">b</a><a href="/elsewhere/">c</a>',
     'gates/index.html': '<h2 id="rigor"></h2>',
   });
   const errors = checkSite(dir, OPTIONS);
@@ -55,7 +55,7 @@ test('reports links into private repo files, and checks the site own absolute UR
       '<a href="https://github.com/Advance-Labs/ninebrains/blob/main/docs/RELEASING.md">r</a>',
       '<a href="https://github.com/Advance-Labs/ninebrains/tree/main/packages/brain-mcp">t</a>',
       '<a href="https://example.com/page">ok</a>',
-      '<a href="https://docs.advancelabs.dev/ninebrains/missing/">self</a>',
+      '<a href="https://ninebrains.dev/docs/missing/">self</a>',
     ].join(''),
   });
   const errors = checkSite(dir, OPTIONS);
