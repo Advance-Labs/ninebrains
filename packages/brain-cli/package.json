@@ -1,6 +1,6 @@
 {
   "name": "@ninebrains/brain-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Command-line interface to a running Ninebrains Brain: jobs, lanes, messages, dispatch and STOP.",
   "license": "Apache-2.0",
   "author": {
