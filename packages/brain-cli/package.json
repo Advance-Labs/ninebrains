@@ -33,10 +33,13 @@
   },
   "dependencies": {
     "@ninebrains/brain-core": "workspace:*",
+    "ink": "^5.0.0",
+    "react": "^19.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.1",
+    "@types/react": "^19.0.0",
     "@typescript/native-preview": "7.0.0-dev.20260609.1",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
