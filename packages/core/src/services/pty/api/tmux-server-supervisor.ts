@@ -54,6 +54,8 @@ const DEFAULT_PROBE_WINDOW_MS = 250;
 export class TmuxServerSupervisor {
   private readonly watch = new TmuxServerWatch();
   private readonly generations = new Map<string, number | null>();
+  /** tmux session name per tracked key, so a loss can name what went with it. */
+  private readonly sessionNames = new Map<string, string>();
   private readonly probeWindowMs: number;
   private readonly now: () => number;
   private inFlight: { at: number; promise: Promise<TmuxInventory | null> } | null = null;
@@ -63,14 +65,23 @@ export class TmuxServerSupervisor {
     this.now = deps.now ?? (() => Date.now());
   }
 
-  /** Remember which server generation a session was spawned into. */
-  recordSpawn(key: string, serverPid: number | null): void {
+  /**
+   * Remember which server generation a session was spawned into, and tell the watch the
+   * server was alive at that moment.
+   *
+   * The seeding is not incidental: without it the watch never sees a running server, so
+   * the first loss is dropped instead of reported (see `noteRunningServer`).
+   */
+  recordSpawn(key: string, serverPid: number | null, sessionName?: string): void {
     this.generations.set(key, serverPid);
+    if (sessionName !== undefined) this.sessionNames.set(key, sessionName);
+    this.watch.noteRunningServer(serverPid, [...this.sessionNames.values()]);
   }
 
   /** Drop a session the runtime no longer tracks. */
   forget(key: string): void {
     this.generations.delete(key);
+    this.sessionNames.delete(key);
   }
 
   /**

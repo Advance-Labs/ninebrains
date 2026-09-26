@@ -87,6 +87,29 @@ export class TmuxServerWatch {
     return { type: 'server-started', serverPid: inventory.serverPid };
   }
 
+  /**
+   * Record a server seen alive outside a full inventory probe — at spawn, for instance.
+   *
+   * Without this the watch only ever hears about a server from {@link observe}, which the
+   * supervisor calls on pty *exit*. The first death then arrives at a watch whose
+   * `running` is still false, and a watch that never saw the server running cannot call
+   * its absence a loss: the transition is dropped and nothing is reported. Seeding at
+   * spawn is what makes the first loss legible.
+   *
+   * Seeding never reports a change, because it is an observation of presence, not of
+   * absence. A generation that was replaced between two spawns is therefore not announced
+   * here; per-session attribution still catches it, because each session's own recorded
+   * generation is compared on exit.
+   */
+  noteRunningServer(serverPid: number | null, sessionNames: readonly string[]): void {
+    this.state = {
+      // An unknown pid must not erase the one we hold, for the same reason observe() keeps it.
+      serverPid: serverPid ?? this.state.serverPid,
+      running: true,
+      sessionNames: [...sessionNames],
+    };
+  }
+
   /** Last observed server generation, for diagnostics and tests. */
   snapshot(): WatchState {
     return { ...this.state, sessionNames: [...this.state.sessionNames] };

@@ -38,6 +38,7 @@ import {
   makeLegacyTmuxSessionName,
   makeTmuxSessionName,
   findLegacyDefaultSocketSessions,
+  type PtyExitInfo,
   resolveTmuxSession,
   TmuxServerSupervisor,
   isTmuxServerLoss,
@@ -390,7 +391,7 @@ export class TerminalsRuntime {
         identity: resolvedTmux.writeIdentity ? sessionKey : undefined,
         historyLimit: spec.tmuxHistoryLimit,
       };
-      this.tmuxSupervisor.recordSpawn(sessionKey, resolvedTmux.serverPid);
+      this.tmuxSupervisor.recordSpawn(sessionKey, resolvedTmux.serverPid, resolvedTmux.name);
       void this.reportLegacyTmuxSessions();
     }
     const resolved = resolveLocalPtySpawn({
@@ -420,7 +421,7 @@ export class TerminalsRuntime {
           this.lifecycle.recordOutput(sessionKey);
           this.previewSourceFor(sessionKey, key).emitData(chunk);
         },
-        onExit: () => this.handleInteractiveExit(sessionKey),
+        onExit: (info) => this.handleInteractiveExit(sessionKey, info),
       }
     );
   }
@@ -452,9 +453,9 @@ export class TerminalsRuntime {
     }
   }
 
-  private handleInteractiveExit(sessionKey: string): void {
+  private handleInteractiveExit(sessionKey: string, info?: PtyExitInfo): void {
     this.closePreviewSource(sessionKey);
-    void this.reportTmuxExit(sessionKey);
+    void this.reportTmuxExit(sessionKey, info);
   }
 
   /**
@@ -465,14 +466,19 @@ export class TerminalsRuntime {
    * never recorded, or a tmux it cannot reach, diagnoses as `unknown` and stays silent
    * rather than reporting a crash it cannot evidence.
    */
-  private async reportTmuxExit(sessionKey: string): Promise<void> {
+  private async reportTmuxExit(sessionKey: string, info?: PtyExitInfo): Promise<void> {
     if (!this.interactiveConfigs.get(sessionKey)?.spec.tmux) return;
     try {
       const diagnosis = await this.tmuxSupervisor.diagnose(sessionKey);
       if (isTmuxServerLoss(diagnosis)) {
+        // exitCode/signal are the bit that separates "the process ended" from "something
+        // killed it". Without them a loss reads the same either way, which is exactly the
+        // ambiguity that made the first real occurrence undiagnosable.
         this.logger.warn('terminals: tmux session was destroyed by a server loss', {
           sessionKey,
           diagnosis: diagnosis.kind,
+          exitCode: info?.exitCode ?? null,
+          signal: info?.signal ?? null,
         });
       }
     } catch (error) {
