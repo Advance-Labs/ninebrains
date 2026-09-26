@@ -30,6 +30,7 @@ function buildResolver(options: {
   host: { type: 'local' | 'remote'; id: string };
   tmuxRequested: boolean;
   resolveTmuxDependency?: () => Promise<unknown>;
+  appDefaultTmuxHistoryLimit?: number;
 }) {
   const identity = {
     workspaceId: 'workspace-1',
@@ -51,6 +52,9 @@ function buildResolver(options: {
       homeDirectory: '/tmp',
       hostTmux: null,
       appDefaultTmux: false,
+      ...(options.appDefaultTmuxHistoryLimit === undefined
+        ? {}
+        : { appDefaultTmuxHistoryLimit: options.appDefaultTmuxHistoryLimit }),
     })),
   };
   const repoFacts = { get: vi.fn(async () => ({ remotes: [], localBranches: ['main'] })) };
@@ -235,6 +239,34 @@ describe('TaskSessionLaunchContextResolver', () => {
       },
     });
     expect(requireAttached).not.toHaveBeenCalled();
+  });
+
+  describe('tmux scrollback', () => {
+    it('carries the configured scrollback depth to the session', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+        appDefaultTmuxHistoryLimit: 50_000,
+      });
+
+      const result = await source.resolve();
+
+      expect(result).toMatchObject({ success: true, data: { tmuxHistoryLimit: 50_000 } });
+    });
+
+    it('omits the depth when unset, so the pty layer default applies', async () => {
+      const source = buildResolver({
+        host: { type: 'local', id: 'local' },
+        tmuxRequested: true,
+      });
+
+      const result = await source.resolve();
+
+      // Absent rather than a restated default: this layer must not have to know what the
+      // pty layer's default is, or the two could drift apart.
+      expect(result.success).toBe(true);
+      if (result.success) expect('tmuxHistoryLimit' in result.data).toBe(false);
+    });
   });
 
   describe('tmux availability gate', () => {

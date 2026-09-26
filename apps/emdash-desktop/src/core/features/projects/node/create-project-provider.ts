@@ -1,5 +1,6 @@
 import { createPathProfile } from '@emdash/core/primitives/path/api';
 import type { FsError } from '@emdash/core/runtimes/files/api';
+import { DEFAULT_TMUX_HISTORY_LIMIT } from '@emdash/core/services/pty/api';
 import {
   isRuntimeResolveError,
   runtimeResolveErrorAsError,
@@ -71,6 +72,7 @@ export type CreateProjectProviderDependencies = {
   runtimes: Pick<RuntimeBroker, 'client'>;
   getProjectDefaults(): Promise<{
     tmuxByDefault: boolean;
+    tmuxHistoryLimit?: number;
   }>;
   taskSessions: Pick<TaskSessionManager, 'teardownAllForProject'>;
   /**
@@ -149,6 +151,7 @@ export async function createProvider(
             pathProfile,
             hostTmux: hostDefaults.tmux ?? null,
             appDefaultTmux: appDefaults.tmuxByDefault,
+            appDefaultTmuxHistoryLimit: appDefaults.tmuxHistoryLimit ?? DEFAULT_TMUX_HISTORY_LIMIT,
           };
         },
         worktreeDirectoryFileSystem: {

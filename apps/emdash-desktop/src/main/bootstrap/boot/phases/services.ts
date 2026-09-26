@@ -297,9 +297,10 @@ export async function bootServices(
     ensureAbsoluteDir: (client, rootPath, absolutePath, options) =>
       ensureAbsoluteDir(async () => client, rootPath, absolutePath, options),
     runtimes,
-    getProjectDefaults: async () => ({
-      tmuxByDefault: (await appSettingsService.get('project')).tmuxByDefault,
-    }),
+    getProjectDefaults: async () => {
+      const project = await appSettingsService.get('project');
+      return { tmuxByDefault: project.tmuxByDefault, tmuxHistoryLimit: project.tmuxHistoryLimit };
+    },
     migrateAppWorktreeRoot: async () => {
       const local = await runtimes.client(LOCAL_HOST_REF);
       if (!local.success) throw new Error('local host runtime unavailable');

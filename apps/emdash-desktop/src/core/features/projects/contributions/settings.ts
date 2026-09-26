@@ -12,6 +12,11 @@ const projectSettingsSchema = z.object({
   branchPrefix: z.string().transform(normalizeBranchPrefix),
   appendRandomBranchSuffix: z.boolean(),
   tmuxByDefault: z.boolean(),
+  /**
+   * Scrollback lines per tmux pane. Unset means "use the pty layer's default", which is
+   * where that number lives; restating it here would be a second source of truth.
+   */
+  tmuxHistoryLimit: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 const localProjectSettingsSchema = z.object({

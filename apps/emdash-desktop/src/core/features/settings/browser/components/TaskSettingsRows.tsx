@@ -1,4 +1,4 @@
-import { Switch, Tooltip } from '@emdash/ui/react/primitives';
+import { Select, Switch, Tooltip } from '@emdash/ui/react/primitives';
 import { Info } from 'lucide-react';
 import React from 'react';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
@@ -6,6 +6,25 @@ import { useTaskSettings } from '@core/features/tasks/api/browser/hooks/useTaskS
 import { detectPlatformContext } from '@core/primitives/keybindings/api';
 import { ResetToDefaultButton } from './ResetToDefaultButton';
 import { SettingRow } from './SettingRow';
+
+/**
+ * Scrollback choices, in lines per pane.
+ *
+ * Presets rather than a free number field on purpose: tmux keeps scrollback in the
+ * server's own address space, so the cost of a large value is paid in live memory,
+ * multiplied by every open agent pane. A menu makes the shape of that trade visible
+ * where a text box invites a number nobody costed.
+ *
+ * The default is deliberately not among them. It lives in the pty layer
+ * (DEFAULT_TMUX_HISTORY_LIMIT), which this browser surface cannot import, so "Default"
+ * clears the setting instead of restating a number that could drift out of step.
+ */
+const TMUX_HISTORY_PRESETS = [2_000, 10_000, 50_000, 100_000] as const;
+const TMUX_HISTORY_DEFAULT = 'default';
+
+function formatScrollbackLines(lines: number): string {
+  return `${lines.toLocaleString()} lines`;
+}
 
 function InfoTooltip({ label, content }: { label: string; content: React.ReactNode }) {
   return (
@@ -278,6 +297,73 @@ export const EnableTmuxRow: React.FC = () => {
             disabled={loading || saving || !tmuxSupported}
             onCheckedChange={(checked) => update({ tmuxByDefault: checked })}
           />
+        </>
+      }
+    />
+  );
+};
+
+/**
+ * Scrollback depth for tmux-backed panes.
+ *
+ * Only meaningful when tmux is on, and only on platforms where tmux runs, so it follows
+ * the same support and disabled rules as the switch above rather than offering a control
+ * that cannot take effect.
+ */
+export const TmuxScrollbackSettingRow: React.FC = () => {
+  const {
+    value: projects,
+    update,
+    isLoading: loading,
+    isSaving: saving,
+    isFieldOverridden,
+    resetField,
+  } = useAppSettingsKey('project');
+
+  const tmuxSupported = detectPlatformContext().os !== 'windows';
+  const tmuxEnabled = projects?.tmuxByDefault ?? false;
+  const stored = projects?.tmuxHistoryLimit;
+  const disabled = loading || saving || !tmuxSupported || !tmuxEnabled;
+
+  return (
+    <SettingRow
+      title="tmux scrollback"
+      description={
+        tmuxEnabled
+          ? "Lines of history each tmux pane keeps. Held in the tmux server's memory for as long as the session exists, so a large value costs memory across every open pane."
+          : 'Enable tmux to choose how much scrollback each pane keeps.'
+      }
+      control={
+        <>
+          <ResetToDefaultButton
+            visible={isFieldOverridden('tmuxHistoryLimit')}
+            defaultLabel="default"
+            onReset={() => resetField('tmuxHistoryLimit')}
+            disabled={disabled}
+          />
+          <Select.Root
+            value={stored === undefined ? TMUX_HISTORY_DEFAULT : String(stored)}
+            onValueChange={(next) =>
+              update({
+                tmuxHistoryLimit: next === TMUX_HISTORY_DEFAULT ? undefined : Number(next),
+              })
+            }
+            disabled={disabled}
+          >
+            <Select.Trigger className="w-[183px] shrink-0 gap-2">
+              <Select.Value>
+                {stored === undefined ? 'Default' : formatScrollbackLines(stored)}
+              </Select.Value>
+            </Select.Trigger>
+            <Select.Content align="end" className="min-w-max">
+              <Select.Item value={TMUX_HISTORY_DEFAULT}>Default</Select.Item>
+              {TMUX_HISTORY_PRESETS.map((lines) => (
+                <Select.Item key={lines} value={String(lines)}>
+                  {formatScrollbackLines(lines)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
         </>
       }
     />

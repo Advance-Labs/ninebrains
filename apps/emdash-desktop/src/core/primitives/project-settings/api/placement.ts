@@ -10,4 +10,10 @@ export type PlacementContext = WorktreeRootContext & {
   hostTmux: boolean | null;
   /** Desktop-wide fallback used when the host has no tmux default. */
   appDefaultTmux: boolean;
+  /**
+   * Desktop-wide tmux scrollback lines per pane. Optional, unlike `appDefaultTmux`:
+   * absent means "leave the pty layer's own default in place", so this layer never has
+   * to restate what that default is, and older contexts stay valid.
+   */
+  appDefaultTmuxHistoryLimit?: number;
 };
