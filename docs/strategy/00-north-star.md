@@ -178,10 +178,11 @@ One identity everywhere — website, repository, package metadata, directories, 
 | License | `Apache-2.0` |
 | Platforms | `macOS, Windows, Linux` |
 
-A dedicated branded product domain is preferred over treating `ninebrains.runs-on.dev` as
-permanent, because `runs-on.dev` is a separate Advance Labs product. If a dedicated domain
-is adopted, keep the subdomain as a 301 redirect. Entity consistency matters more than
-adding an `llms.txt`; crawlability and reliable content remain the documented foundation.
+The canonical product URL is `https://ninebrains.dev/`, registered to Advance Labs Inc. on
+2026-09-25. It replaces `ninebrains.runs-on.dev`, which was a subdomain of a separate
+Advance Labs product rather than a Ninebrains-owned namespace. The old hostname is a 301
+redirect, never a second live surface. Entity consistency matters more than adding an
+`llms.txt`; crawlability and reliable content remain the documented foundation.
 
 ## The sentence we are trying to make automatic
 

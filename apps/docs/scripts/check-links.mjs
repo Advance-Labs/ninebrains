@@ -78,7 +78,7 @@ function htmlFiles(dir) {
 
 /**
  * @param {string} distDir
- * @param {{ base: string, site: string }} options base path such as `/ninebrains`; site origin
+ * @param {{ base: string, site: string }} options base path such as `/docs`; site origin
  * @returns {string[]} one message per broken link
  */
 export function checkSite(distDir, { base, site }) {
@@ -152,8 +152,8 @@ function main() {
     process.exit(1);
   }
   const errors = checkSite(distDir, {
-    base: process.env.DOCS_BASE_PATH ?? '/ninebrains',
-    site: process.env.DOCS_SITE_URL ?? 'https://docs.advancelabs.dev',
+    base: process.env.DOCS_BASE_PATH ?? '/docs',
+    site: process.env.DOCS_SITE_URL ?? 'https://ninebrains.dev',
   });
   if (errors.length > 0) {
     console.error(`check-links: ${errors.length} broken link(s):`);

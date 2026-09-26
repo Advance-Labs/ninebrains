@@ -1079,3 +1079,14 @@ The CLI needs the app running. `brain-cli/test/cli.test.ts` drives a real endpoi
 with a real token and a real handshake, but the host half is a fake in that test —
 process control, gates and session launching are still only exercised through the
 desktop's own suites. Nothing here has been run against a packaged build.
+
+## 59. ninebrains.dev is the canonical domain (`ninebrains/pane-undermine-bvpav`)
+
+| File | Change | Why |
+|---|---|---|
+| `README.md` | Banner link, Website link, both installer one-liners, the `-RequireAttestation` PowerShell example and the published-docs line → `https://ninebrains.dev` and `ninebrains.dev/docs` (were `ninebrains.runs-on.dev` and `docs.advancelabs.dev/ninebrains`) | `ninebrains.dev` was registered to Advance Labs Inc. on 2026-09-25 so the product stops splitting its authority between a subdomain of a differently-named product and a parent-company docs umbrella (docs/strategy/decisions.md). The README is the most-copied source of the install command, so a stale host here outlives every other reference |
+
+The rest of the migration touches Ninebrains-only files and needs no rows: the site and docs apps,
+their Vercel configs, both installers, `llms.txt`, the release workflow and notes, `CHANGELOG.md`
+and the strategy docs. `ninebrains.runs-on.dev` 301s to the new host from `apps/site/vercel.json`,
+so upstream's README URL is the only inherited surface that had to change.

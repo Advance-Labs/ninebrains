@@ -4,7 +4,7 @@
   "buildCommand": "cd ../.. && pnpm --filter @ninebrains/docs build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/ninebrains", "destination": "/" },
-    { "source": "/ninebrains/(.*)", "destination": "/$1" }
+    { "source": "/docs", "destination": "/" },
+    { "source": "/docs/(.*)", "destination": "/$1" }
   ]
 }

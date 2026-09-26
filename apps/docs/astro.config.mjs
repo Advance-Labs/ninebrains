@@ -6,15 +6,19 @@ import starlight from '@astrojs/starlight';
 import { visit } from 'unist-util-visit';
 import { hrefFor, routeFor } from './src/routes.mjs';
 
-const SITE = process.env.DOCS_SITE_URL ?? 'https://docs.advancelabs.dev';
+const SITE = process.env.DOCS_SITE_URL ?? 'https://ninebrains.dev';
 const REPO = 'https://github.com/Advance-Labs/ninebrains';
 
 /**
- * `docs.advancelabs.dev` is the umbrella docs domain for every Advance Labs project, so this site
- * is mounted at its own path. Astro prefixes the links it generates, but not the root-absolute
- * hrefs the rewriter below produces, so those apply BASE themselves.
+ * The docs are mounted at `/docs` on the product's own domain, so the whole product resolves to one
+ * entity rather than splitting its depth-of-topic content onto a parent-company domain
+ * (docs/strategy/decisions.md, 2026-09-25). This project still deploys on its own, and
+ * `apps/site/vercel.json` rewrites `/docs/*` to it, so the two stay independently deployable.
+ *
+ * Astro prefixes the links it generates, but not the root-absolute hrefs the rewriter below
+ * produces, so those apply BASE themselves.
  */
-const BASE = process.env.DOCS_BASE_PATH ?? '/ninebrains';
+const BASE = process.env.DOCS_BASE_PATH ?? '/docs';
 const DOCS_ROOT = fileURLToPath(new URL('../../docs/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 

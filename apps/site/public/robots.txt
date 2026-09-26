@@ -1,0 +1,9 @@
+# https://ninebrains.dev/
+# The former subdomain 301s here, so this file is only ever served for the canonical host.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://ninebrains.dev/sitemap.xml
+# The docs are a separate Vercel project rewritten in at /docs, so they carry their own sitemap.
+Sitemap: https://ninebrains.dev/docs/sitemap-index.xml

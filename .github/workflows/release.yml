@@ -368,7 +368,7 @@ jobs:
               echo "**Canary build.** A prerelease with its own app identity (Ninebrains Canary) and data directory. Expect rough edges."
               echo
             fi
-            echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn. The steps to open it are under **How to install** below. Full docs: [docs.advancelabs.dev/ninebrains](https://docs.advancelabs.dev/ninebrains/)."
+            echo "Ninebrains $VERSION. **Unsigned build.** macOS will say the app is from an unidentified developer and Windows SmartScreen will warn. The steps to open it are under **How to install** below. Full docs: [ninebrains.dev/docs](https://ninebrains.dev/docs/)."
             echo
             # The one-line installer only installs stable, so canary notes drop the stable-only block.
             if [ "$CHANNEL" = canary ]; then only='/<!-- stable-only -->/,/<!-- \/stable-only -->/d'

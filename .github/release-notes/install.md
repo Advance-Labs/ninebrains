@@ -9,12 +9,12 @@ latest stable release, not canary builds.
 
 ```sh
 # macOS and Linux
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://ninebrains.runs-on.dev/install.ps1 | iex
+irm https://ninebrains.dev/install.ps1 | iex
 ```
 
 Prefer to do it by hand? Follow the steps below.
@@ -24,7 +24,7 @@ Prefer to do it by hand? Follow the steps below.
 **1. Check the download.** Compare your file against the `SHA256SUMS` block at the bottom of this
 page before you open it. Only bypass the warnings below for a file whose hash matches and that you
 downloaded from this page. More detail, including every step below:
-[Verify and open a download](https://docs.advancelabs.dev/ninebrains/verify-download/).
+[Verify and open a download](https://ninebrains.dev/docs/verify-download/).
 
 **2. Open it on your platform.**
 
@@ -36,7 +36,7 @@ downloaded from this page. More detail, including every step below:
 warning, because only files a browser or mail app downloads get quarantined. Run it again to update.
 
 ```sh
-curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh
 ```
 
 **Or download the disk image.**
@@ -76,7 +76,7 @@ chmod +x {{FILE_PREFIX}}-linux-x86_64.AppImage && ./{{FILE_PREFIX}}-linux-x86_64
 sudo apt install ./{{FILE_PREFIX}}-linux-amd64.deb
 ```
 
-Stuck? See [Troubleshooting](https://docs.advancelabs.dev/ninebrains/troubleshooting/).
+Stuck? See [Troubleshooting](https://ninebrains.dev/docs/troubleshooting/).
 
 ## Updating
 
@@ -90,7 +90,7 @@ installer at quit and relaunches. Your projects and settings are kept.
 The one-line installer above also still updates a running install, same checks and same versions:
 
 - **Installed the `.deb`?** Update with
-  `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.runs-on.dev/install | sh -s -- --deb`
+  `curl --proto '=https' --tlsv1.2 -fsSL https://ninebrains.dev/install | sh -s -- --deb`
   (it runs `sudo apt install`). The plain line installs the AppImage instead.
 - **App running?** macOS asks you to quit it; Windows stops unless you pass `-Force`; the Linux
   AppImage is swapped in place, so restart it.
@@ -98,17 +98,17 @@ The one-line installer above also still updates a running install, same checks a
   a message unless you pass `-Force`.
 - **Options** (`--require-attestation`, `--no-attestation`, `--dry-run`): add them after
   `sh -s --` in the curl line. On Windows, `irm … | iex` takes no options; use
-  `& ([scriptblock]::Create((irm https://ninebrains.runs-on.dev/install.ps1))) -RequireAttestation`.
+  `& ([scriptblock]::Create((irm https://ninebrains.dev/install.ps1))) -RequireAttestation`.
 
 Canary builds update from canary releases only, and an update never downgrades you: after a bad
 release, update to the next good one rather than back to an older version.
 
 ## Documentation
 
-- [Getting started](https://docs.advancelabs.dev/ninebrains/getting-started/): install, add a project, start agents in lanes, hand the Brain its first brief
-- [First run](https://docs.advancelabs.dev/ninebrains/first-run/): the import step, the hooks added to Claude Code and Codex, connecting GitHub
-- [Verify and open a download](https://docs.advancelabs.dev/ninebrains/verify-download/): checksums, then getting past Gatekeeper and SmartScreen
-- [Troubleshooting](https://docs.advancelabs.dev/ninebrains/troubleshooting/): fixes for common problems, including unsigned-build and Keychain prompts
-- [Security overview](https://docs.advancelabs.dev/ninebrains/security/): how Ninebrains contains agents that run commands on your machine
-- [Install from source](https://docs.advancelabs.dev/ninebrains/install-from-source/): build it yourself instead
-- [All docs](https://docs.advancelabs.dev/ninebrains/)
+- [Getting started](https://ninebrains.dev/docs/getting-started/): install, add a project, start agents in lanes, hand the Brain its first brief
+- [First run](https://ninebrains.dev/docs/first-run/): the import step, the hooks added to Claude Code and Codex, connecting GitHub
+- [Verify and open a download](https://ninebrains.dev/docs/verify-download/): checksums, then getting past Gatekeeper and SmartScreen
+- [Troubleshooting](https://ninebrains.dev/docs/troubleshooting/): fixes for common problems, including unsigned-build and Keychain prompts
+- [Security overview](https://ninebrains.dev/docs/security/): how Ninebrains contains agents that run commands on your machine
+- [Install from source](https://ninebrains.dev/docs/install-from-source/): build it yourself instead
+- [All docs](https://ninebrains.dev/docs/)
