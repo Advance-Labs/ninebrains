@@ -47,6 +47,7 @@ title starts with the SEC ID, so a grep for the ID finds its proof.
 |---|---|---|
 | SEC-01 | brain-mcp never opens the DB. It only forwards over HTTP. | `packages/brain-mcp/test/sec-01.test.ts`, stdio test |
 | SEC-02 | Identity and role come only from the token (`TokenRegistry`). The lane hint is cross-checked and can only cause a 401. | `http.test.ts`, brain-mcp `stdio.test.ts` |
+| SEC-47 | The user role: `USER_OPS` and the host ops, reachable only by a grant main marked `user: true`. | `user-role.test.ts`, `handshake.test.ts` |
 | SEC-03 | 256-bit base64url tokens. Only SHA-256 digests are stored, compared with `timingSafeEqual`. | `tokens.test.ts` |
 | SEC-04 | The endpoint binds `127.0.0.1` only. The client accepts only `http://127.0.0.1:<port>`. | `http.test.ts` |
 | SEC-05 | Browser-shaped requests are rejected. | `http.test.ts` |
@@ -59,6 +60,45 @@ title starts with the SEC ID, so a grep for the ID finds its proof.
 **SEC-06 body cap:** the threat model says 256 KiB, but this package uses
 **64 KiB**, the stricter limit from the security review. A 32 KB job body
 plus 20 attachment paths still fits.
+
+### The user role (SEC-47, M5)
+
+The desktop app has no Brain UI. The operator drives the Brain with `brain`
+(`packages/brain-cli`), which is a third role on this endpoint rather than a second
+door: same bind, same `Host` pin, same constant-time compare, same limits.
+
+A user token is a **brain grant with `user: true`**, set only by main when minting:
+
+```ts
+const token = server.issueToken({
+  identity: { role: 'brain', brainId: USER_BRAIN_ID },
+  projectId: null,       // the CLI's default only; a user token is not project-pinned
+  attachmentRoots: [],
+  user: true,
+});
+```
+
+`Identity` stays a two-member union on purpose: to the DAG the operator **is** a
+Brain, so `authz.ts` needs no new case. "User" is a fact about the token.
+
+- `USER_OPS` = `BRAIN_OPS` + `HOST_OPS`. `HOST_OPS` (`list_done`, `list_notes`,
+  `dispatcher_status`, `set_dispatcher_paused`, `set_lane_mode`, `list_sessions`,
+  `start_brain`, `stop_brain`, `stop_all`, `clear_stop`) spawn provider CLIs and kill
+  runs, which this package does not do. It declares and authorizes them; the host
+  implements `BrainHostOps` and passes it as `ExecuteOptions.host`. With no host they
+  answer `UNAVAILABLE`.
+- Host ops are async, so the endpoint runs `executeBrainRequestAsync` /
+  `handleBrainHttpRequestAsync`. The sync `executeBrainRequest` and
+  `handleBrainHttpRequest` still exist, share the same transport checks and
+  authorization, and refuse host ops.
+- `authorizeUserRequest` in `scope.ts` holds the whole policy and argues each
+  widening (no project pin, no gate-kind limit) in its docblock. `claim_job` stays
+  lane-only.
+- `handshake.ts` is how the CLI finds a Brain: `<userData>/ninebrains/brain-cli.json`,
+  0600 in a 0700 directory, with a schema that refuses any url that is not
+  `http://127.0.0.1:<port>`.
+- **brain-mcp refuses a user token.** A `user` answer from `whoami` means a misrouted
+  token, so the shim throws rather than pick a tool list.
 
 ### Identity (SEC-02, SEC-03)
 

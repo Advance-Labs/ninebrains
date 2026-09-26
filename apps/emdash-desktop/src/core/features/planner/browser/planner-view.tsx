@@ -1,7 +1,6 @@
 import { Button } from '@emdash/ui/react/primitives';
 import type { Viewport } from '@xyflow/react';
 import { useCallback, type ReactNode } from 'react';
-import { BrainStopButton } from '@core/features/brain/contributions/planner-controls';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import {
   plannerCanvasSubject,
@@ -51,11 +50,6 @@ function PlannerTitlebar() {
             Planner
           </span>
         </nav>
-      }
-      rightSlot={
-        <div className="flex items-center pr-2">
-          <BrainStopButton />
-        </div>
       }
     />
   );

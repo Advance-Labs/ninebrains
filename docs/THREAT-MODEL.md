@@ -244,6 +244,42 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   never concatenates inbox bodies into a lane's instructions. Messages from lanes to a Brain are
   marked `untrusted: true`.
   Test `SEC-09 inbox is structured`.
+- **SEC-47 The user role (M5).** The Brain has no UI in the app any more; the operator drives it
+  with `brain`, the CLI in `packages/brain-cli`. The CLI is a third role on this same endpoint, not
+  a second door: same loopback bind, same `Host` pin, same constant-time bearer compare, same body
+  cap and rate limit. A user token is a **brain grant with `user: true`**, and only main sets that
+  flag when it mints the token — nothing in a request can reach it, exactly as for `role` (SEC-02).
+
+  What the flag changes, and why each widening is the latitude the deleted UI already had:
+  - The op allowlist becomes `USER_OPS` = `BRAIN_OPS` + `HOST_OPS`. `HOST_OPS` are the controls
+    brain-core cannot implement, because they spawn provider CLIs and kill runs: `list_done`,
+    `list_notes`, `dispatcher_status`, `set_dispatcher_paused`, `set_lane_mode`, `list_sessions`,
+    `start_brain`, `stop_brain`, `stop_all`, `clear_stop`. brain-core declares and authorizes them;
+    the app implements them through `ExecuteOptions.host` (`BrainHostOps`), so the privileged code
+    stays in the app while the boundary stays in `scope.ts`. With no host wired they answer
+    `UNAVAILABLE`, never a silent success.
+  - No project pin. M3 pins an agent's brain token to `grant.projectId`; a user token is not pinned,
+    and `projectId` is only the CLI's default when a command omits `--project`.
+  - No gate-kind limit. SEC-08 restricts *agents* to `code` and `ui` because a weaker kind lowers the
+    floor. Lowering rigor is the user's call and always was. The floor itself still holds: gates stay
+    `union(floor, requested)` inside `Brain`, so this path cannot strip a project's minimum either.
+
+  What it does not change: `claim_job` stays lane-only (claiming is a lane's move and would corrupt
+  job ownership), recipients must still exist, and brain-mcp **refuses a user token outright** — a
+  `user` answer from `whoami` means a misrouted token, so the shim fails closed rather than pick a
+  tool list.
+
+  The handshake applies SEC-10's rule to the CLI: `<userData>/ninebrains/brain-cli.json`, mode `0600`
+  in a `0700` directory, holding the loopback url and that launch's token. It is removed before the
+  endpoint closes and its token is revoked, so a stale file fails closed (401, or "no Brain
+  running"), and its schema refuses any url that is not `http://127.0.0.1:<port>` — SEC-04 at rest.
+
+  Tests `packages/brain-core/src/protocol/user-role.test.ts` (every host op reached; `UNAVAILABLE`
+  with no host; `FORBIDDEN` for an agent brain token; `claim_job` refused; both widenings asserted
+  *by contrast* with an agent token, so the test fails if the agent path is ever widened to match),
+  `handshake.test.ts` (mode bits, loopback-only url, stale detection), and
+  `packages/brain-cli/test/cli.test.ts` (every command end to end against a real endpoint with a real
+  minted token and a real handshake on disk).
 
 ### Launch config (LC, Phase 2)
 
@@ -537,7 +573,7 @@ the agents or slices expected to close the gap.
 | SEC-07 | Done | `boundary.test.ts` |
 | SEC-08 | Done, extended | `gate-floor.test.ts`; the kind rule: `SEC-08 agents cannot declare a weaker kind` (brain-core `execute.test.ts`), `SEC-08 ui kind adds the screenshot floor` (gates `rigor.test.ts`), and drafts in `planner-service.test.ts` [w7/self-heal-e2e] |
 | SEC-09 | Done, extended | `boundary.test.ts`; L1: recipients must exist and share the sender's project (`project-scope.test.ts`); gate feedback is persisted `untrusted` (`gate-feedback.test.ts`) and brain-mcp fences every untrusted body it hands a lane (`fence.test.ts`, `stdio.test.ts`) |
-| SEC-10 | Open | Lane config writer [w5-brain-wiring] |
+| SEC-10 | Partial | The lane config writer is open [w5-brain-wiring]. The CLI handshake follows the same rule and is done: `handshake.test.ts` checks 0600 inside a 0700 directory, that an earlier launch's looser mode is tightened, and that a non-loopback url is refused |
 | SEC-11 | Partial | Settings are generated and tested (`sandbox-settings.test.ts`). M4 widened the deny list to one shared list plus all of `<userData>`. T36 adds a write deny on the lane repo's `config`, `config.worktree`, `info/attributes` and `hooks` (`T36` snapshot, `lane-git-paths.test.ts`). **Manual pre-release e2e with the real CLI:** the live read deny, and the T36 write deny. The e2e must check that `git config`, `echo > .git/info/attributes` and a new hook fail from a lane while `git commit` still works, including on Linux for paths that do not exist yet (`info/attributes`, `config.worktree`) |
 | SEC-12 | Done for unattended and reviewer runs | `argv-guard.test.ts` (SEC-12 and M2 normalisation). Attended launches must call `assertSafeArgv` on their full argv [w5-brain-wiring] |
 | SEC-13 | Done | `run-env.test.ts` |
@@ -575,6 +611,7 @@ the agents or slices expected to close the gap.
 | SEC-44 | Done [w7-routing] | `profile.test.ts`, `vendors.test.ts`, `routing-service.test.ts`, `profiles-repo.db.test.ts` |
 | SEC-45 | Done for unattended claude [w7-routing] | `routing-launch.e2e.test.ts`. Attended lanes have no egress list (as today) |
 | SEC-46 | N/A in wave 1 | No gateway exists |
+| SEC-47 | Done | The user role (M5). `user-role.test.ts`, `handshake.test.ts`, `brain-cli/test/cli.test.ts`. brain-mcp fails closed on a user token (`session.ts`), and typing `tools.ts`'s descriptions as `Record<Exclude<BrainOp, 'whoami' \| BrainHostOp>, …>` makes "agents never see host ops" a compile error rather than a convention. The Brain UI is gone, so the app's STOP surfaces are now the app menu and tray (main process, `Mod+Shift+Backspace`, still working when the window has hung) and `brain stop`; see SEC-30 |
 
 ## 6. Where the current design already breaks a requirement
 

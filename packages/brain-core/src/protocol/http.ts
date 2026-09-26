@@ -6,7 +6,12 @@ import {
   RESPONSE_HEADERS,
   isBrowserHeader,
 } from './endpoint';
-import { type BrainGrant, type ExecuteOptions, executeBrainRequest } from './execute';
+import {
+  type BrainGrant,
+  type ExecuteOptions,
+  executeBrainRequest,
+  executeBrainRequestAsync,
+} from './execute';
 import { type BrainResponse, type BrainResponseErrorCode, brainFailure } from './ops';
 import type { RateLimiter } from './rate-limit';
 
@@ -51,10 +56,39 @@ const PRE_AUTH_KEY = Object.freeze({ scope: 'pre-auth' });
  * mount it on any Node HTTP server. Checks run cheapest and most hostile
  * first; nothing reaches the Brain until the caller is authenticated.
  */
+/**
+ * The synchronous handler. Every transport check and every DAG operation runs
+ * here. Host operations (`HOST_OPS`) need `await`, so this form answers them
+ * UNAVAILABLE; a server that wires `options.host` uses
+ * `handleBrainHttpRequestAsync` instead. Both share one code path, so the
+ * SEC-04..SEC-06 checks cannot drift apart between them.
+ */
 export function handleBrainHttpRequest(
   request: BrainHttpRequest,
   options: BrainHttpOptions
 ): BrainHttpResponse {
+  return check(request, options, (grant, payload) =>
+    executeBrainRequest(options.brain, grant, payload, options)
+  ) as BrainHttpResponse;
+}
+
+/** As above, and additionally serves the host operations through `options.host`. */
+export function handleBrainHttpRequestAsync(
+  request: BrainHttpRequest,
+  options: BrainHttpOptions
+): Promise<BrainHttpResponse> {
+  return Promise.resolve(
+    check(request, options, (grant, payload) =>
+      executeBrainRequestAsync(options.brain, grant, payload, options)
+    )
+  );
+}
+
+function check<R extends BrainResponse | Promise<BrainResponse>>(
+  request: BrainHttpRequest,
+  options: BrainHttpOptions,
+  execute: (grant: BrainGrant, payload: unknown) => R
+): BrainHttpResponse | Promise<BrainHttpResponse> {
   const headers = lowercase(request.headers);
   const reject = (status: number, code: BrainResponseErrorCode, message: string) =>
     reply(status, brainFailure(code, message));
@@ -103,8 +137,10 @@ export function handleBrainHttpRequest(
   } catch {
     return reject(400, 'BAD_REQUEST', 'request body is not valid JSON');
   }
-  const response = executeBrainRequest(options.brain, grant, payload, options);
-  return reply(!response.ok && response.error.code === 'BAD_REQUEST' ? 400 : 200, response);
+  const settle = (response: BrainResponse): BrainHttpResponse =>
+    reply(!response.ok && response.error.code === 'BAD_REQUEST' ? 400 : 200, response);
+  const response = execute(grant, payload);
+  return response instanceof Promise ? response.then(settle) : settle(response);
 }
 
 export function reply(status: number, response: BrainResponse): BrainHttpResponse {

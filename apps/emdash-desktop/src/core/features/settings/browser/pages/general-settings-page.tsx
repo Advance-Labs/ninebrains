@@ -5,7 +5,6 @@ import {
   UPDATES_ENABLED,
 } from '@core/primitives/app-identity/api/fork-flags';
 import { AccountTab } from '../components/AccountTab';
-import { BrainSettingsCard } from '../components/BrainSettingsCard';
 import NotificationSettingsCard from '../components/NotificationSettingsCard';
 import {
   AutoApproveByDefaultRow,
@@ -29,7 +28,7 @@ export function GeneralSettingsPage() {
         sticky
         draggable
         title="General"
-        description="Manage notifications, the Brain, and task preferences."
+        description="Manage notifications and task preferences."
       />
       {HOSTED_ACCOUNT_ENABLED && (
         <SettingsSection>
@@ -42,9 +41,6 @@ export function GeneralSettingsPage() {
       </SettingsSection>
       <SettingsSection title="Notifications" bare>
         <NotificationSettingsCard />
-      </SettingsSection>
-      <SettingsSection title="Brain">
-        <BrainSettingsCard />
       </SettingsSection>
       <SettingsSection title="Preferences">
         <AutoGenerateTaskNamesRow />

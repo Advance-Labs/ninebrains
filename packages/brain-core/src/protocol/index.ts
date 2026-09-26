@@ -1,11 +1,14 @@
 export * from './ops';
 export * from './results';
 export * from './endpoint';
+export * from './handshake';
 export {
   type BrainGrant,
+  type BrainHostOps,
   type ExecuteOptions,
   errorResponse,
   executeBrainRequest,
+  executeBrainRequestAsync,
 } from './execute';
 export {
   type BrainHttpOptions,
@@ -13,6 +16,7 @@ export {
   type BrainHttpResponse,
   type TokenResolver,
   handleBrainHttpRequest,
+  handleBrainHttpRequestAsync,
 } from './http';
 export {
   type BrainHttpServer,

@@ -70,7 +70,7 @@ export const jobEdgeSchema = z.object({
 
 /** Who the token says the caller is. The shim uses it to decide which tools to expose. */
 export const whoamiSchema = z.object({
-  role: z.enum(['lane', 'brain']),
+  role: z.enum(['lane', 'brain', 'user']),
   laneId: z.string().optional(),
   brainId: z.string().optional(),
   projectId: z.string().nullable(),
@@ -92,6 +92,19 @@ export const opResults = {
   requeue_job: jobSummarySchema,
   list_lanes: z.array(laneSchema),
   broadcast: z.array(addressSchema),
+  // Host operations: the app owns these shapes, so brain-core does not pin them.
+  // The CLI prints them as JSON; adding schemas here would make brain-core depend
+  // on the desktop's view types, which is what `BrainHostOps` exists to avoid.
+  list_done: z.unknown(),
+  list_notes: z.unknown(),
+  dispatcher_status: z.unknown(),
+  set_dispatcher_paused: z.unknown(),
+  set_lane_mode: z.unknown(),
+  list_sessions: z.unknown(),
+  start_brain: z.unknown(),
+  stop_brain: z.unknown(),
+  stop_all: z.unknown(),
+  clear_stop: z.unknown(),
 } as const satisfies Record<BrainOp, z.ZodType>;
 
 export type BrainOpResult<O extends BrainOp> = z.output<(typeof opResults)[O]>;

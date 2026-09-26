@@ -6,7 +6,15 @@ import { BRAIN, makeBrain } from '../../test/helpers';
 import type { Brain } from '../brain/brain';
 import { InMemoryBrainStore } from '../store/memory-store';
 import { type BrainGrant, executeBrainRequest } from './execute';
-import { BRAIN_OPS, type BrainOp, type BrainOpInput, LANE_OPS, SESSION_OPS, opArgs } from './ops';
+import {
+  BRAIN_OPS,
+  type BrainOp,
+  type BrainOpInput,
+  HOST_OPS,
+  LANE_OPS,
+  SESSION_OPS,
+  opArgs,
+} from './ops';
 import { opResults } from './results';
 
 let dir: string;
@@ -135,7 +143,9 @@ describe('executeBrainRequest', () => {
     expect([...covered].sort()).toEqual(
       [...new Set([...LANE_OPS, ...BRAIN_OPS, ...SESSION_OPS])].sort()
     );
-    expect(Object.keys(opArgs).sort()).toEqual([...covered].sort());
+    // Host ops run on the async executor (see the HOST_OPS describe below), so the
+    // two sets together must still account for every op in the contract.
+    expect(Object.keys(opArgs).sort()).toEqual([...covered, ...HOST_OPS].sort());
   });
 
   it('returns claimed:null when nothing is ready', () => {

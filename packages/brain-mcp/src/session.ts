@@ -39,7 +39,15 @@ export async function discoverSession(
       const parsed = whoamiSchema.safeParse(response.result);
       if (!parsed.success)
         throw new SessionError('the Brain endpoint returned a malformed whoami result');
-      return parsed.data;
+      // SEC-01/SEC-02: the shim serves agents. A user token belongs to the operator's
+      // CLI and carries the host ops, which no agent may reach, so a user answer means
+      // the wrong token reached this launch. Fail closed rather than pick a tool list.
+      if (parsed.data.role === 'user') {
+        throw new SessionError(
+          'this token is a user token; brain-mcp serves lanes and Brains only'
+        );
+      }
+      return { ...parsed.data, role: parsed.data.role };
     }
     last = `${response.error.code}: ${response.error.message}`;
     if (!RETRYABLE.has(response.error.code)) break;

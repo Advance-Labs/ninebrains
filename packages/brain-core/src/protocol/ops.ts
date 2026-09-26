@@ -40,6 +40,9 @@ export const attachmentSchema = z.discriminatedUnion('kind', [
 
 export const jobStateSchema = z.enum(JOB_STATES);
 
+/** Mirrors the app's `laneRunModeSchema`. Duplicated, not imported: brain-core has no app deps. */
+export const LANE_RUN_MODES = ['attended', 'unattended'] as const;
+
 /** Argument schema per operation. The `describe()` texts double as MCP parameter docs. */
 export const opArgs = {
   whoami: z.object({}),
@@ -137,6 +140,33 @@ export const opArgs = {
     projectId: idSchema.optional().describe("Defaults to this session's project."),
     attachments: z.array(attachmentSchema).max(LIMITS.attachments).default([]),
   }),
+
+  // --- Host operations (user role only) -------------------------------------
+  //
+  // These are the controls the desktop UI used to own. brain-core declares and
+  // authorizes them but cannot implement them: they spawn provider CLIs and
+  // kill runs, which live in the app. `ExecuteOptions.host` supplies the
+  // implementation, the way `resolveBrainProject` already supplies lookup. When
+  // no host is wired the endpoint answers UNAVAILABLE, never a silent success.
+  list_done: z.object({
+    projectId: idSchema.optional().describe("Defaults to this session's project."),
+    limit: z.number().int().min(1).max(500).default(100),
+  }),
+  list_notes: z.object({
+    projectId: idSchema.optional().describe("Defaults to this session's project."),
+    limit: z.number().int().min(1).max(500).default(100),
+  }),
+  dispatcher_status: z.object({}),
+  set_dispatcher_paused: z.object({ paused: z.boolean() }),
+  set_lane_mode: z.object({ laneId: idSchema, mode: z.enum(LANE_RUN_MODES) }),
+  list_sessions: z.object({}),
+  start_brain: z.object({
+    projectId: idSchema.optional().describe("Defaults to this session's project."),
+  }),
+  stop_brain: z.object({ brainId: idSchema }),
+  /** SEC-30 global STOP. Latches: nothing dispatches until `clear_stop`. */
+  stop_all: z.object({}),
+  clear_stop: z.object({}),
 } as const;
 
 export type BrainOp = keyof typeof opArgs;
@@ -170,6 +200,36 @@ export const BRAIN_OPS = [
   'broadcast',
 ] as const satisfies readonly BrainOp[];
 
+/**
+ * Host-implemented operations. Only a user-role token may call them, and only
+ * when `ExecuteOptions.host` is wired. They replace the desktop UI's controls.
+ */
+export const HOST_OPS = [
+  'list_done',
+  'list_notes',
+  'dispatcher_status',
+  'set_dispatcher_paused',
+  'set_lane_mode',
+  'list_sessions',
+  'start_brain',
+  'stop_brain',
+  'stop_all',
+  'clear_stop',
+] as const satisfies readonly BrainOp[];
+
+export type BrainHostOp = (typeof HOST_OPS)[number];
+
+export function isHostOp(op: BrainOp): op is BrainHostOp {
+  return (HOST_OPS as readonly string[]).includes(op);
+}
+
+/**
+ * Operations a user-role token may call: everything a Brain session may call,
+ * plus the host controls. The user is the human operator driving the CLI, so
+ * unlike a brain token it is not pinned to one project (see `scope.ts`).
+ */
+export const USER_OPS = [...BRAIN_OPS, ...HOST_OPS] as const satisfies readonly BrainOp[];
+
 /** Session operations: the shim calls these itself; they are not MCP tools. */
 export const SESSION_OPS = ['whoami'] as const satisfies readonly BrainOp[];
 
@@ -198,6 +258,16 @@ export const brainRequestSchema = z.discriminatedUnion('op', [
   request('requeue_job'),
   request('list_lanes'),
   request('broadcast'),
+  request('list_done'),
+  request('list_notes'),
+  request('dispatcher_status'),
+  request('set_dispatcher_paused'),
+  request('set_lane_mode'),
+  request('list_sessions'),
+  request('start_brain'),
+  request('stop_brain'),
+  request('stop_all'),
+  request('clear_stop'),
 ]);
 
 /** What a sender builds (defaults may be omitted). */

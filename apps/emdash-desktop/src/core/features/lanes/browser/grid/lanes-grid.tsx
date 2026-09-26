@@ -12,7 +12,6 @@ import { useViewScope, ViewScopeInstanceProvider } from '@core/primitives/view-s
 import { LANE_SLOT_COUNT, type LaneSlot, type LaneTab } from '../../api';
 import { lanesViewScope } from '../../contributions/scopes';
 import { useLaneStatuses } from '../use-lanes';
-import { openBrainDrawer } from './brain-drawer-state';
 import { LaneCell } from './lane-cell';
 import { LanesGridLayout } from './lanes-grid-layout';
 
@@ -101,16 +100,11 @@ export function LanesIntro({ onAddLane }: { onAddLane: () => void }) {
     <div data-testid="lanes-empty-intro" className="flex h-full w-full flex-col">
       <EmptyState
         label="Lanes run agents in parallel"
-        description="Each lane runs one agent in its own copy of the project. The Planner draws the job plan, the Brain dispatches the jobs, and each lane works its own — start with a lane, then add more."
+        description="Each lane runs one agent in its own copy of the project. The Planner draws the job plan, the Brain dispatches the jobs (drive it with the `brain` CLI), and each lane works its own — start with a lane, then add more."
         action={
-          <div className="flex items-center gap-2">
-            <Button data-testid="lanes-add-first" onClick={onAddLane}>
-              Add a lane
-            </Button>
-            <Button data-testid="lanes-intro-open-brain" variant="ghost" onClick={openBrainDrawer}>
-              What does the Brain do?
-            </Button>
-          </div>
+          <Button data-testid="lanes-add-first" onClick={onAddLane}>
+            Add a lane
+          </Button>
         }
       />
     </div>
