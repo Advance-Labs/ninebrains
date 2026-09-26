@@ -18,7 +18,7 @@ import type {
   TerminalShellResolver,
 } from '#primitives/terminal-shell/api';
 import type { TerminalSessionState } from '#runtimes/terminals/api';
-import { makeLegacyTmuxSessionName, makeTmuxSessionName } from '#services/pty/api';
+import { makeLegacyTmuxSessionName, makeTmuxSessionName, tmuxArgs } from '#services/pty/api';
 import { FakePtySpawner } from '#services/pty/testing';
 import {
   expectNoSessionResidue,
@@ -378,16 +378,14 @@ describe('TerminalsRuntime', () => {
 
     expect(result).toEqual({ success: true, data: undefined });
     expect(exec.exec).toHaveBeenCalledTimes(3);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeLegacyTmuxSessionName('session1')}`,
-    ]);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeLegacyTmuxSessionName('session2')}`,
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeLegacyTmuxSessionName('session1')}`])
+    );
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeLegacyTmuxSessionName('session2')}`])
+    );
     await scope.dispose();
   });
 
@@ -416,17 +414,18 @@ describe('TerminalsRuntime', () => {
     });
 
     expect(result).toEqual({ success: true, data: undefined });
-    expect(exec.exec).toHaveBeenCalledWith('tmux', ['kill-session', '-t', '=manually-renamed']);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeTmuxSessionName(identity, 'workspace')}`,
-    ]);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeLegacyTmuxSessionName(identity)}`,
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', '=manually-renamed'])
+    );
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeTmuxSessionName(identity, 'workspace')}`])
+    );
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeLegacyTmuxSessionName(identity)}`])
+    );
     await scope.dispose();
   });
 
@@ -448,16 +447,14 @@ describe('TerminalsRuntime', () => {
     });
 
     expect(result).toEqual({ success: true, data: undefined });
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeTmuxSessionName(identity, 'Fix login')}`,
-    ]);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeLegacyTmuxSessionName(identity)}`,
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeTmuxSessionName(identity, 'Fix login')}`])
+    );
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeLegacyTmuxSessionName(identity)}`])
+    );
     await scope.dispose();
   });
 
@@ -482,16 +479,14 @@ describe('TerminalsRuntime', () => {
     });
 
     expect(result).toEqual({ success: true, data: undefined });
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeTmuxSessionName(identity, 'workspace')}`,
-    ]);
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'kill-session',
-      '-t',
-      `=${makeLegacyTmuxSessionName(identity)}`,
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeTmuxSessionName(identity, 'workspace')}`])
+    );
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs(['kill-session', '-t', `=${makeLegacyTmuxSessionName(identity)}`])
+    );
     expect(logger.warn).toHaveBeenCalledOnce();
     await scope.dispose();
   });
@@ -551,11 +546,14 @@ describe('TerminalsRuntime', () => {
     if (invocation.kind !== 'argv') throw new Error('Expected argv invocation');
     expect(invocation.argv[1]).toMatch(/fix-login-[a-f0-9]{10}/u);
     expect(invocation.argv[1]).toContain('@emdash_identity');
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'list-sessions',
-      '-F',
-      '#{session_name}\t#{session_activity}\t#{@emdash_identity}',
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs([
+        'list-sessions',
+        '-F',
+        '#{session_name}\t#{session_activity}\t#{@emdash_identity}\t#{pid}',
+      ])
+    );
     await scope.dispose();
   });
 

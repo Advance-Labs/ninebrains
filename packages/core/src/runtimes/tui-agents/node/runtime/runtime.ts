@@ -49,6 +49,8 @@ import {
   PtyRegistry,
   resolveLocalPtySpawn,
   resolveTmuxSession,
+  TmuxServerSupervisor,
+  isTmuxServerLoss,
   tmuxIdentityActivityKey,
   type PtyExitInfo,
   type PtySession,
@@ -100,6 +102,11 @@ export class TuiAgentsRuntime {
   private readonly agentStates: TuiAgentStates;
   private readonly hookInstaller: AgentHookInstaller;
   private readonly hookServer: TuiHookServer;
+  /**
+   * Attributes a tmux-backed agent pty's exit to the tmux server's own lifecycle, so a
+   * session destroyed by a server death is distinguishable from an agent that finished.
+   */
+  private readonly tmuxSupervisor: TmuxServerSupervisor;
   private readonly hookPipeline: TuiHookPipeline;
   private readonly workspaceTrust: TuiWorkspaceTrust;
   private readonly clock: Clock;
@@ -161,6 +168,19 @@ export class TuiAgentsRuntime {
       logger: deps.logger,
     });
     this.hookServer = new TuiHookServer((raw) => this.hookPipeline.handle(raw), deps.logger);
+    this.tmuxSupervisor = new TmuxServerSupervisor({
+      exec: (operation) => operation(deps.exec),
+      // These are the sessions tmux exists to protect — they are meant to outlive the app
+      // itself — so a server dying underneath them is the loudest thing this runtime can
+      // discover. warn keeps it in the desktop file log the user can send back.
+      onServerChange: (change) =>
+        deps.logger.warn('tui-agents: tmux server changed underneath live agent sessions', {
+          change: change.type,
+          ...('previousServerPid' in change ? { previousServerPid: change.previousServerPid } : {}),
+          ...('serverPid' in change ? { serverPid: change.serverPid } : {}),
+          ...('lostSessions' in change ? { lostSessions: change.lostSessions.length } : {}),
+        }),
+    });
     const sessionPolicy = deps.lifecycle?.session ?? { kind: 'always' as const };
     this.tmuxKeepAliveMs =
       sessionPolicy.kind === 'idle-after' ? sessionPolicy.outputMs : SESSION_IDLE_MS;
@@ -634,6 +654,7 @@ export class TuiAgentsRuntime {
               void this.launchCurrentConfig(config.input.conversationId);
               return;
             }
+            if (config.input.tmux) void this.reportTmuxExit(config.input.tmux.identity);
             this.markExited(config.input.conversationId, info);
             this.agentStates.resetToIdle(config.input.conversationId);
             if (this.maybeRespawnAfterUnexpectedExit(session, config, generation, info)) {
@@ -1000,7 +1021,7 @@ export class TuiAgentsRuntime {
       platform,
       env: await this.deps.env(),
     });
-    let tmux: { name: string; identity?: string } | undefined;
+    let tmux: { name: string; identity?: string; historyLimit?: number } | undefined;
     if (input.tmux) {
       const resolvedTmux = await resolveTmuxSession(this.deps.exec, {
         identity: input.tmux.identity,
@@ -1009,7 +1030,9 @@ export class TuiAgentsRuntime {
       tmux = {
         name: resolvedTmux.name,
         identity: resolvedTmux.writeIdentity ? input.tmux.identity : undefined,
+        historyLimit: input.tmux.historyLimit,
       };
+      this.tmuxSupervisor.recordSpawn(input.tmux.identity, resolvedTmux.serverPid);
     }
     const resolved = resolveLocalPtySpawn({
       intent: {
@@ -1071,6 +1094,28 @@ export class TuiAgentsRuntime {
 
   private isUnexpectedExit(info: PtyExitInfo): boolean {
     return info.exitCode !== 0 || info.signal !== null;
+  }
+
+  /**
+   * Say, in the log, whether a tmux-backed agent session was destroyed or simply ended.
+   *
+   * Fire-and-forget: the exit path drives respawn decisions and must not wait on a
+   * `tmux list-sessions`, nor fail because of one. A diagnosis of `unknown` — no recorded
+   * generation, or a tmux that cannot be reached — stays silent rather than reporting a
+   * crash it cannot evidence.
+   */
+  private async reportTmuxExit(identity: string): Promise<void> {
+    try {
+      const diagnosis = await this.tmuxSupervisor.diagnose(identity);
+      if (isTmuxServerLoss(diagnosis)) {
+        this.deps.logger.warn('tui-agents: agent session was destroyed by a tmux server loss', {
+          identity,
+          diagnosis: diagnosis.kind,
+        });
+      }
+    } catch (error) {
+      this.deps.logger.debug('tui-agents: tmux exit diagnosis failed', { error: String(error) });
+    }
   }
 
   private async killTmuxForConfig(config: TuiSessionConfig | undefined): Promise<void> {

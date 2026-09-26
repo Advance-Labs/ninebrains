@@ -881,3 +881,59 @@ marker-wrapped payloads into attended Claude lanes unconditionally — including
 ones, asserted in `attended.test.ts` — and that is a working feature, so "Claude Code discards
 marker-wrapped payloads" is not a sufficient explanation. The fix is justified by differential
 evidence: the external branch now emits the same bytes as the in-app branch, which works.
+
+## 55. A tmux server loss was invisible, total, and unexplained (`ninebrains/server-crash-l4w34`)
+
+Three sessions chased "the tmux server keeps crashing" without finding a cause. The reason none
+could is that nothing in the app ever recorded tmux: a full desktop log had zero tmux lines. The
+following were each tested and eliminated, and `agents/risky-areas/pty.md` now carries the list so
+they are not chased a fourth time.
+
+- Segfault or abort. macOS writes a `.ips` crash report for CLI binaries (there are `node` ones);
+  there has never been a tmux report on this machine.
+- OOM or jetsam. tmux appears in none of the JetsamEvent files, including a 397-process snapshot.
+- SIGKILL from `PosixPtyTerminator`'s process-group kill. The tmux server reparents to `ppid=1`
+  with its own pgid within 50ms of `new-session`, so `kill(-rootPid)` cannot reach it, and it is
+  never a descendant in the `ps` snapshot.
+- "A stale socket means an unclean death." It does not: tmux leaves its socket behind after a
+  clean `kill-server` too, so a socket with no server is not evidence either way.
+- The test suite killing the live server. `tmux.test.ts` isolates through `TMUX_TMPDIR` and scopes
+  its `kill-server` there.
+
+What remains is that a tmux server exits when its last session ends, and `buildTmuxShellLine` is
+fail-open: `has-session || new-session` cannot tell a dead server from a name that missed, so a
+fresh server is created silently and the user is left looking at empty panes. That is
+indistinguishable from a crash without a record of which server generation a session was spawned
+into, which is what this patch adds.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-commands.ts` | `inspectTmuxSessions` returns server liveness *and* inventory from one call, with the server pid via `#{pid}`; `listTmuxSessions` becomes a wrapper over it. Every tmux invocation goes through `tmuxArgs`. `TMUX_HISTORY_LIMIT` becomes the exported `DEFAULT_TMUX_HISTORY_LIMIT` (100k → 10k) and a `buildTmuxShellLine` parameter, clamped by `resolveHistoryLimit`. New `findLegacyDefaultSocketSessions` | `listTmuxSessions` collapsed "the server is gone" into an empty array, which is exactly the knowledge a loss handler needs and the only place it is free. The limit lands in the shell line as a bare word under `|| true`, so an unparseable value would configure nothing and say nothing |
+| `packages/core/src/services/pty/api/tmux.ts` | `resolveTmuxSession` also returns `serverState` and `serverPid`. `findTmuxSessionNamesByIdentity` now reads `inspectTmuxSessions(ctx).sessions` | Recording the generation at spawn is what later lets an exit be attributed: `exists: false` alone cannot tell a dead server from a name that missed. The second is a bug fix — see below |
+| `packages/core/src/services/pty/api/local-spawn.ts` | The tmux spawn intent carries an optional `historyLimit`, passed to `buildTmuxShellLine` | Lets the host choose the per-pane scrollback cost |
+| `packages/core/src/services/pty/api/index.ts` | Exports the socket helpers, the watch, the supervisor, `DEFAULT_TMUX_HISTORY_LIMIT` and `findLegacyDefaultSocketSessions` | Barrel for the new files |
+| `packages/core/src/runtimes/terminals/node/runtime/runtime.ts` | Owns a `TmuxServerSupervisor`, records the generation at spawn, diagnoses on interactive exit (`reportTmuxExit`), reports legacy default-socket sessions once (`reportLegacyTmuxSessions`), and threads `spec.tmuxHistoryLimit` | The supervisor's `exec` is a *runner*, not a context: `withExecutionContext` disposes a context it had to build, so a context handed out would be dead by the time the probe used it |
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.ts` | The same supervisor wiring, keyed by tmux identity, plus `input.tmux.historyLimit` | These are the sessions tmux exists to protect — they outlive the app — so a server dying underneath them is the loudest thing this runtime can discover |
+| `packages/core/src/runtimes/terminals/api/schemas.ts` | `tmuxHistoryLimit` on both interactive spec shapes | Host-settable scrollback |
+| `packages/core/src/runtimes/tui-agents/api/schemas.ts` | `historyLimit` inside the `tmux` object | Kept with the identity it configures |
+| `packages/core/src/services/pty/api/tmux.test.ts` | Assertions follow the socket and the `#{pid}` field; the legacy-reattach case matches on identity rather than exact shape because `serverPid` is live; new cases for socket scoping, the history limit and its clamping; an end-to-end case that runs the built shell line against a real tmux and asserts the limit landed and the default socket stayed empty | The socket case was verified to fail against a reintroduced bare `tmux`, so it is a real guard rather than a vacuous one |
+| `packages/core/src/runtimes/terminals/node/runtime/runtime.test.ts`, `packages/core/src/runtimes/tui-agents/node/runtime/runtime.test.ts` | argv expectations go through `tmuxArgs` instead of re-pinning literals; list-format expectations gain `#{pid}` | Follows patch 49's instinct: match the verb and target, not one exact argv |
+| `agents/risky-areas/pty.md` | A "What has been ruled out" section | So a fourth session starts from the supervisor's log lines instead of the eliminated hypotheses |
+
+**A bug this surfaced.** `findTmuxSessionNamesByIdentity` called `listTmuxSessions` after that
+import was dropped from `tmux.ts`, so it threw a `ReferenceError` that `killTmuxSessions`'
+warn-only catch swallowed: tmux cleanup had silently stopped discovering renamed sessions and
+fell back to deterministic names. It went unseen because the repo's `typecheck` target runs
+`tsgo`, and a stray local `tsc` run crashes with a `Debug Failure` on this tree under Node 25,
+which is easy to mistake for "typechecking is broken here".
+
+New Ninebrains-only files: `packages/core/src/services/pty/api/tmux-socket.ts` (+ test),
+`tmux-server-watch.ts` (+ test), `tmux-server-supervisor.ts` (+ test).
+
+**What this does not establish.** The root cause is still unknown. Nothing here explains *why* the
+last session ends; it makes the loss observable, attributable and no longer shared with the user's
+own tmux server, and it lowers the per-pane memory a single server holds. The next investigation
+should start from `tmux server changed underneath live sessions` in the desktop log. The socket
+move also means sessions created by earlier builds are no longer managed by the app; they are
+reported rather than killed, because destroying a user's live agents to tidy up a socket migration
+would wreck exactly what the tmux design protects.

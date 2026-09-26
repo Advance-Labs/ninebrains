@@ -19,6 +19,7 @@ import type {
 import type { ConversationLifecycleReporter } from '#services/conversation-reports/node';
 import { createRecordingConversationLifecycleReporter } from '#services/conversation-reports/node/testing';
 import type { IExecutionContext } from '#services/exec/api';
+import { tmuxArgs } from '#services/pty/api';
 import { makeLegacyTmuxSessionName, makeTmuxSessionName } from '#services/pty/api';
 import { FakePtySpawner } from '#services/pty/testing';
 import { createMemorySessionIntentStore } from '#services/session-intents/api';
@@ -433,7 +434,7 @@ describe('TuiAgentsRuntime', () => {
     if (invocation.kind !== 'argv') throw new Error('Expected argv invocation');
     expect(invocation.executable).toBe('/bin/bash');
     expect(invocation.argv[0]).toBe('-lc');
-    expect(invocation.argv[1]).toContain('tmux -u attach-session');
+    expect(invocation.argv[1]).toContain('tmux -L ninebrains -u attach-session');
     expect(invocation.argv[1]).toMatch(/workspace-[a-f0-9]{10}/u);
     expect(invocation.argv[1]).toContain('source ~/.profile && agent run');
     expect(invocation.argv[1]).toContain('hello world');
@@ -454,11 +455,14 @@ describe('TuiAgentsRuntime', () => {
     if (invocation.kind !== 'argv') throw new Error('Expected argv invocation');
     expect(invocation.argv[1]).toMatch(/fix-login-[a-f0-9]{10}/u);
     expect(invocation.argv[1]).toContain('@emdash_identity');
-    expect(exec.exec).toHaveBeenCalledWith('tmux', [
-      'list-sessions',
-      '-F',
-      '#{session_name}\t#{session_activity}\t#{@emdash_identity}',
-    ]);
+    expect(exec.exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs([
+        'list-sessions',
+        '-F',
+        '#{session_name}\t#{session_activity}\t#{@emdash_identity}\t#{pid}',
+      ])
+    );
   });
 
   it('resolves the Windows default shell, applies setup, and removes tmux intent', async () => {
@@ -565,13 +569,16 @@ describe('TuiAgentsRuntime', () => {
 
     expect(spawner.processes[0]!.killCount).toBeGreaterThan(0);
     await vi.waitFor(() => {
-      expect(exec).toHaveBeenCalledWith('tmux', ['kill-session', '-t', `=${sessionName}`]);
+      expect(exec).toHaveBeenCalledWith(
+        'tmux',
+        tmuxArgs(['kill-session', '-t', `=${sessionName}`])
+      );
     });
 
     await runtime.startSession(startInput({ tmux: { identity } }));
     await runtime.deleteSession('conversation-1');
     await vi.waitFor(() =>
-      expect(exec).toHaveBeenCalledWith('tmux', ['kill-session', '-t', `=${sessionName}`])
+      expect(exec).toHaveBeenCalledWith('tmux', tmuxArgs(['kill-session', '-t', `=${sessionName}`]))
     );
   });
 
@@ -683,11 +690,14 @@ describe('TuiAgentsRuntime', () => {
 
     await clock.advanceBy(1_200);
 
-    expect(exec).toHaveBeenCalledWith('tmux', [
-      'list-sessions',
-      '-F',
-      '#{session_name}\t#{session_activity}\t#{@emdash_identity}',
-    ]);
+    expect(exec).toHaveBeenCalledWith(
+      'tmux',
+      tmuxArgs([
+        'list-sessions',
+        '-F',
+        '#{session_name}\t#{session_activity}\t#{@emdash_identity}\t#{pid}',
+      ])
+    );
     expect(spawner.processes[0]!.killCount).toBe(0);
     expect(peek(runtime.sessionsLiveModel.get(undefined)!.states.list)).toHaveProperty(
       'conversation-1'

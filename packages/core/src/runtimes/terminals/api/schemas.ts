@@ -84,6 +84,12 @@ export const startTerminalSpecSchema = z
     shellSetup: z.string().optional(),
     tmux: z.boolean().optional(),
     /**
+     * Scrollback lines tmux keeps for this session's pane. Unset uses
+     * DEFAULT_TMUX_HISTORY_LIMIT. tmux holds scrollback in the server's memory, so this is
+     * a live per-pane cost for as long as the session exists.
+     */
+    tmuxHistoryLimit: z.number().int().min(0).optional(),
+    /**
      * Per-session git credential behavior, resolved desktop-side from project
      * settings (spec: github-git-settings §4). Absent = native behavior.
      */
@@ -105,6 +111,12 @@ export const terminalSessionStateSchema = z.object({
   status: z.enum(['running', 'exited']),
   startCount: z.number().int().nonnegative(),
   tmux: z.boolean().optional(),
+  /**
+   * Scrollback lines tmux keeps for this session's pane. Unset uses
+   * DEFAULT_TMUX_HISTORY_LIMIT. tmux holds scrollback in the server's memory, so this is
+   * a live per-pane cost for as long as the session exists.
+   */
+  tmuxHistoryLimit: z.number().int().min(0).optional(),
   pid: z.number().int().positive().optional(),
   cols: z.number().int().positive(),
   rows: z.number().int().positive(),
