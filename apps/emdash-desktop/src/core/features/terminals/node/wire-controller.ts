@@ -68,6 +68,7 @@ type TerminalContext = Readonly<{
   workspace: HostFileRef;
   key: TerminalKey;
   tmuxEnabled: boolean;
+  tmuxHistoryLimit?: number;
   shellSetup?: string;
   taskEnvVars: Record<string, string>;
   gitCredentials?: GitCredentialsSessionSpec;
@@ -270,6 +271,7 @@ async function startRuntimeTerminal(
         shellIntent: terminal.shellId,
         shellSetup: context.data.shellSetup,
         tmux: context.data.tmuxEnabled,
+        tmuxHistoryLimit: context.data.tmuxHistoryLimit,
         env: {
           ...context.data.taskEnvVars,
           ...colorEnv,
@@ -312,6 +314,7 @@ async function resolveTerminalContext(
       makePtySessionId(terminal.projectId, terminal.taskId, terminal.id)
     ),
     tmuxEnabled: launchContext.data.tmux,
+    tmuxHistoryLimit: launchContext.data.tmuxHistoryLimit,
     shellSetup: launchContext.data.shellSetup,
     taskEnvVars: launchContext.data.env,
     gitCredentials,

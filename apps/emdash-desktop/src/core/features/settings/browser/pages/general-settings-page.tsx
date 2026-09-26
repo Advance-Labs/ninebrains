@@ -15,6 +15,7 @@ import {
   CreateBranchAndWorktreeRow,
   DeleteBranchByDefaultRow,
   EnableTmuxRow,
+  TmuxScrollbackSettingRow,
   IncludeIssueContextByDefaultRow,
   PreserveTaskNameCapitalizationRow,
 } from '../components/TaskSettingsRows';
@@ -55,6 +56,7 @@ export function GeneralSettingsPage() {
         <PreserveTaskNameCapitalizationRow />
         <IncludeIssueContextByDefaultRow />
         <EnableTmuxRow />
+        <TmuxScrollbackSettingRow />
       </SettingsSection>
     </div>
   );

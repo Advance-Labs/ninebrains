@@ -16,6 +16,8 @@ import { tasks } from '@core/services/app-db/node/schema';
 export type TaskSessionLaunchContext = Readonly<{
   workspace: WorkspaceIdentity;
   tmux: boolean;
+  /** Scrollback lines for this session's pane; undefined leaves the pty default in place. */
+  tmuxHistoryLimit?: number;
   tmuxWarning?: LocalPtySpawnWarning;
   shellSetup?: string;
   env: Readonly<Record<string, string>>;
@@ -94,12 +96,13 @@ export class TaskSessionLaunchContextResolver {
     const runtime = await this.dependencies.runtimes.client(identity.host);
     if (!runtime.success) return runtime;
 
-    const [effective, tmux, projectConfig, tmuxAvailable] = await Promise.all([
+    const [effective, tmux, placement, projectConfig, tmuxAvailable] = await Promise.all([
       resolveProjectEffectiveSettings({
         settings: project.data.settings,
         repoFacts: project.data.repoFacts,
       }),
       project.data.settings.resolveTmux(),
+      project.data.settings.getPlacementContext(),
       runtime.data.workspaceRegistry.getProjectConfig({ workspaceId: identity.workspaceId }),
       resolveTmuxAvailability(runtime.data.hostDependencies),
     ]);
@@ -121,6 +124,11 @@ export class TaskSessionLaunchContextResolver {
     return ok({
       workspace: identity,
       tmux: resolveSessionTmux(identity.host, tmux.value && tmuxAvailable, platform),
+      // Omitted when unset so the pty layer's own default applies, rather than this
+      // layer having to know what that default is.
+      ...(placement.appDefaultTmuxHistoryLimit === undefined
+        ? {}
+        : { tmuxHistoryLimit: placement.appDefaultTmuxHistoryLimit }),
       tmuxWarning,
       shellSetup: projectConfig.data.resolved.shellSetup?.value,
       env: {

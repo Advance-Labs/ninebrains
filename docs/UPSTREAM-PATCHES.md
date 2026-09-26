@@ -937,3 +937,34 @@ should start from `tmux server changed underneath live sessions` in the desktop 
 move also means sessions created by earlier builds are no longer managed by the app; they are
 reported rather than killed, because destroying a user's live agents to tidy up a socket migration
 would wreck exactly what the tmux design protects.
+
+## 56. tmux scrollback is reachable from Settings (`ninebrains/tmux-scrollback-setting`)
+
+Patch 55 lowered `history-limit` from 100k to 10k lines and made it a `buildTmuxShellLine`
+parameter threaded through both runtime schemas, but nothing set it, so in practice every
+pane got the default and the parameter was unreachable. This exposes it.
+
+The value is an **app** setting rather than a host one. Host settings are edited through the
+Machines surface, while the tmux toggle this sits beside lives in Settings → General and is
+backed by the `project` app-settings contribution; putting the two controls in different
+places to honour a per-machine distinction that a single-machine user never sees would have
+been the worse trade.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/primitives/app-settings/api/app-settings.ts`, `src/core/features/projects/contributions/settings.ts` | `tmuxHistoryLimit?: number` on `ProjectSettings`, schema `z.number().int().min(0).max(1_000_000).optional()`, and **no default** | Unset means "use the pty layer's default", which is where that number already lives. A default here would be a second source of truth that could drift from `DEFAULT_TMUX_HISTORY_LIMIT` |
+| `src/core/primitives/project-settings/api/placement.ts` | `appDefaultTmuxHistoryLimit?: number` | Optional unlike its `appDefaultTmux` neighbour, so the ten existing `PlacementContext` fixtures stay valid and absence keeps meaning "leave the pty default alone" |
+| `src/core/features/projects/node/create-project-provider.ts` | Supplies `appDefaultTmuxHistoryLimit: appDefaults.tmuxHistoryLimit ?? DEFAULT_TMUX_HISTORY_LIMIT` | The fallback is applied on a **feature node surface**, which is the only layer the core module-boundary rule lets import `services/pty` — the reason the default cannot live in the contribution or the UI |
+| `src/main/bootstrap/boot/phases/services.ts` | `getProjectDefaults` reads the `project` settings once and returns both `tmuxByDefault` and `tmuxHistoryLimit` | One read instead of two for the pair |
+| `src/core/features/tasks/api/node/task-session-launch-context.ts` | The context gains `tmuxHistoryLimit?: number`, reads `getPlacementContext()` alongside `resolveTmux()`, and omits the field when unset | Omitted rather than defaulted so this layer never has to restate the pty default |
+| `src/core/features/terminals/node/wire-controller.ts` | Carries `tmuxHistoryLimit` from the launch context onto the terminal spec beside `tmuxEnabled` | The last hop to `buildTmuxShellLine` |
+| `src/core/features/settings/browser/components/TaskSettingsRows.tsx` | New `TmuxScrollbackSettingRow`: a `Select` offering Default / 2,000 / 10,000 / 50,000 / 100,000 lines, disabled unless tmux is on and supported, with the standard reset affordance | Presets, not a free number field: the cost of a large value is live memory in one tmux server multiplied by every open pane, and a menu makes that trade visible where a text box invites a number nobody costed. "Default" clears the setting rather than writing a number, which is what keeps the browser surface free of the constant it cannot import |
+| `src/core/features/settings/browser/pages/general-settings-page.tsx` | Renders the row under `EnableTmuxRow` | Beside the toggle it depends on |
+| `src/core/features/settings/browser/search/settings-search.ts` | A `tmux-scrollback` entry with `history`, `history-limit`, `buffer`, `memory`, `multiplexer` keywords | Findable by the words someone would actually search after noticing tmux memory use |
+| `src/core/features/tasks/node/task-session-launch-context.test.ts` | Two cases: a configured depth reaches the session, and an unset one is absent from the context | The first was verified to fail with the launch-context spread removed, so it fails for the reason it claims |
+
+No new Ninebrains-only files.
+
+**What this does not establish.** Nothing here bears on patch 55's open root cause. It also does
+not migrate anyone: a profile with no stored value keeps getting the pty default, which is the
+same 10k it already got.

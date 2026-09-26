@@ -106,6 +106,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = withoutForkHiddenEnt
     keywords: ['multiplexer'],
   },
   {
+    id: 'tmux-scrollback',
+    label: 'tmux scrollback',
+    tab: 'general',
+    description: 'Lines of history each tmux pane keeps.',
+    keywords: ['history', 'history-limit', 'buffer', 'memory', 'multiplexer'],
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     tab: 'general',

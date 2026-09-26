@@ -12,6 +12,12 @@ export type ProjectSettings = {
   branchPrefix: string;
   appendRandomBranchSuffix: boolean;
   tmuxByDefault: boolean;
+  /**
+   * Scrollback lines tmux keeps per pane; unset uses the pty layer's default. tmux holds
+   * scrollback in the server's own address space, so this is a live memory cost per pane
+   * for as long as the session exists, and agent panes produce a lot of output.
+   */
+  tmuxHistoryLimit?: number;
 };
 
 export type NotificationSettings = {
