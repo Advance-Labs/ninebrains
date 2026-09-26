@@ -70,11 +70,10 @@ jobs:
           node-version: '24'
 
       # The exact commit being built must have passed CI, not just its branch.
-      # TEMPORARILY BYPASSED: pre-existing brain-cli TUI test failure unrelated to release.
-      # - name: Require ci-ok on this commit
-      #   env:
-      #     GH_TOKEN: ${{ github.token }}
-      #   run: node tooling/scripts/require-green.mjs "$GITHUB_SHA"
+      - name: Require ci-ok on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tooling/scripts/require-green.mjs "$GITHUB_SHA"
 
       - name: Resolve the version
         id: version
@@ -303,10 +302,9 @@ jobs:
   release:
     name: Upload to draft release
     needs: [preflight, e2e, build, attest]
-    # attest is skipped on a private repo; that must not block the draft.
-    # TEMPORARILY BYPASSED E2E: UI removal changes break existing E2E tests.
+    # attest is skipped on a private repo; that must not block the draft. e2e must pass.
     if: >-
-      ${{ !cancelled() && needs.build.result == 'success' &&
+      ${{ !cancelled() && needs.e2e.result == 'success' && needs.build.result == 'success' &&
       (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
