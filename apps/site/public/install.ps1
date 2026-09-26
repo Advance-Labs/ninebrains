@@ -120,8 +120,27 @@ CLI signed in, the installer also runs 'gh attestation verify'. More: $VerifyDoc
       if (-not $tag) {
         Fail 'could not find the latest release. Check your connection, or pass -Version X.Y.Z'
       }
-      if (-not $tag.StartsWith('v', [StringComparison]::Ordinal)) {
-        Fail "unexpected release tag '$tag'"
+      # Monorepo releases may publish scoped tags (e.g. brain-cli@0.2.0) or canaries as the
+      # GitHub "latest". When the tag is not a stable vX.Y.Z release, fall back to the releases
+      # list and pick the first one that is.
+      if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+        Write-Warning "ninebrains: latest release '$tag' is not a stable app release; checking the release list"
+        $tag = $null
+        try {
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=20" -UseBasicParsing -TimeoutSec 30 `
+            -Headers @{ 'User-Agent' = 'ninebrains-installer'; 'Accept' = 'application/vnd.github+json' }
+          foreach ($r in $releases) {
+            if ($r.tag_name -match '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+              $tag = [string]$r.tag_name
+              break
+            }
+          }
+        } catch {
+          $tag = $null
+        }
+      }
+      if (-not $tag) {
+        Fail 'could not find the latest release. Check your connection, or pass -Version X.Y.Z'
       }
       $Version = $tag.Substring(1)
       if ($Version -notmatch $VersionPattern) { Fail "unexpected release tag '$tag'" }

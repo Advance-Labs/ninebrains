@@ -32,6 +32,7 @@ const ps1 = readFileSync(INSTALL_PS1, 'utf8');
 
 const REPO_URL = 'https://github.com/Advance-Labs/ninebrains';
 const API_LATEST = 'https://api.github.com/repos/Advance-Labs/ninebrains/releases/latest';
+const API_LIST = 'https://api.github.com/repos/Advance-Labs/ninebrains/releases?per_page=20';
 const WEB_LATEST = `${REPO_URL}/releases/latest`;
 const download = (version, file) => `${REPO_URL}/releases/download/v${version}/${file}`;
 const CERT_IDENTITY_REGEX =
@@ -121,6 +122,7 @@ function sandbox({ latest = '0.2.0', api = true, redirect = true, releases } = {
     writeFileSync(join(fixtures, url.replace(/[^A-Za-z0-9]/g, '_')), body);
 
   if (api) serve(API_LATEST, JSON.stringify({ tag_name: `v${latest}`, name: `v${latest}` }));
+  if (api) serve(API_LIST, JSON.stringify([{ tag_name: `v${latest}`, name: `v${latest}` }]));
   if (redirect) {
     serve(WEB_LATEST, `HTTP/2 302\r\nlocation: ${REPO_URL}/releases/tag/v${latest}\r\n\r\n`);
   }
@@ -322,11 +324,37 @@ describe('install (sh): platform and release resolution', () => {
         join(box.root, 'fixtures', API_LATEST.replace(/[^A-Za-z0-9]/g, '_')),
         JSON.stringify({ tag_name: tag })
       );
+      // Serve an empty releases list so the fallback finds no valid stable release.
+      writeFileSync(
+        join(box.root, 'fixtures', API_LIST.replace(/[^A-Za-z0-9]/g, '_')),
+        JSON.stringify([])
+      );
       const r = await run(box, ['--dry-run'], LINUX_X64);
       assert.notEqual(r.code, 0, `accepted tag ${tag}`);
-      assert.match(r.stderr, /unexpected release tag/);
-      assert.deepEqual(box.requests(), [API_LATEST]);
+      assert.match(r.stderr, /could not find the latest release/);
+      assert.ok(box.requests().includes(API_LATEST));
     }
+  });
+
+  test('falls back to the release list when the latest tag is not a stable v* release', async () => {
+    const box = sandbox({ redirect: false, releases: { '0.2.1': {} } });
+    writeFileSync(
+      join(box.root, 'fixtures', API_LATEST.replace(/[^A-Za-z0-9]/g, '_')),
+      JSON.stringify({ tag_name: 'brain-cli@0.2.0', name: 'brain-cli 0.2.0' })
+    );
+    writeFileSync(
+      join(box.root, 'fixtures', API_LIST.replace(/[^A-Za-z0-9]/g, '_')),
+      JSON.stringify([
+        { tag_name: 'brain-cli@0.2.0', name: 'brain-cli 0.2.0' },
+        { tag_name: 'v0.2.2-canary.9', name: 'Ninebrains 0.2.2-canary.9' },
+        { tag_name: 'v0.2.1', name: 'Ninebrains 0.2.1' },
+      ])
+    );
+    const r = await run(box, ['--dry-run'], LINUX_X64);
+    assert.equal(r.code, 0, r.all);
+    assert.match(r.stdout, /release {3}v0\.2\.1/);
+    assert.ok(box.requests().includes(API_LATEST));
+    assert.ok(box.requests().includes(API_LIST));
   });
 
   test('--help prints usage and exits 0; unknown options fail', async () => {

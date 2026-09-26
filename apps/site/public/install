@@ -142,6 +142,16 @@ latest_version() {
         head -n 1)
     fi
   fi
+  # Monorepo releases may publish scoped tags (e.g. brain-cli@0.2.0) or canaries as the
+  # GitHub "latest". When the tag is not a stable vX.Y.Z release, fall back to the releases
+  # list and pick the first one that is.
+  if [ -n "$tag" ] && ! printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    warn "latest release '$tag' is not a stable app release; checking the release list"
+    tag=''
+    if fetch "https://api.github.com/repos/$REPO/releases?per_page=20" "$TMPD/releases.json" 2>/dev/null; then
+      tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' "$TMPD/releases.json" | head -n 1)
+    fi
+  fi
   [ -n "$tag" ] || die "could not find the latest release. Check your connection, or pass --version X.Y.Z"
   case $tag in
     v*) tag=${tag#v} ;;
