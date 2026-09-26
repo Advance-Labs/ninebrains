@@ -4,12 +4,16 @@ import { useBrainStore } from '../store';
 import { COLORS, laneStatusColor, SYMBOLS } from '../theme';
 
 export function LanesView() {
-  const { lanes, setLaneMode, jobs } = useBrainStore();
+  const { lanes, setLaneMode, jobs, dispatcherStatus } = useBrainStore();
   const [cursor, setCursor] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  const laneModes = dispatcherStatus?.laneModes ?? {};
 
   useInput((input, key) => {
+    if (isPending) return;
     setActionError(null);
     setActionSuccess(null);
 
@@ -26,10 +30,12 @@ export function LanesView() {
     if (!lane) return;
 
     if (input === 'm') {
-      const newMode =
-        lane.status === 'idle' || lane.status === 'asleep' ? 'unattended' : 'attended';
+      const currentMode = laneModes[lane.id] ?? 'attended';
+      const newMode = currentMode === 'attended' ? 'unattended' : 'attended';
       void (async () => {
+        setIsPending(true);
         const res = await setLaneMode(lane.id, newMode);
+        setIsPending(false);
         if (!res.ok) setActionError(res.error.message);
         else setActionSuccess(`Set ${lane.id} to ${newMode}`);
       })();
@@ -75,9 +81,7 @@ export function LanesView() {
                 </Text>
               </Box>
               <Box width={12}>
-                <Text>
-                  {lane.status === 'idle' || lane.status === 'asleep' ? 'attended' : 'unattended'}
-                </Text>
+                <Text>{laneModes[lane.id] ?? 'attended'}</Text>
               </Box>
               <Text color={COLORS.secondary}>{lane.activeJobId ?? `${laneJobs.length} jobs`}</Text>
             </Box>

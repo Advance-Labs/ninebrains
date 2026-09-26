@@ -18,6 +18,7 @@ export function JobsView() {
   const [cursor, setCursor] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
 
   const sortedJobs = [...jobs].sort((a, b) => {
     const stateOrder: Record<string, number> = {
@@ -42,6 +43,7 @@ export function JobsView() {
   }, [selectedJob, selectedJobId, setSelectedJobId]);
 
   useInput((input, key) => {
+    if (isPending) return;
     setActionError(null);
     setActionSuccess(null);
 
@@ -59,7 +61,9 @@ export function JobsView() {
 
     if (input === 'b') {
       void (async () => {
+        setIsPending(true);
         const res = await blockJob(job.id, 'Blocked from TUI');
+        setIsPending(false);
         if (!res.ok) setActionError(res.error.message);
         else setActionSuccess(`Blocked ${job.id}`);
       })();
@@ -67,7 +71,9 @@ export function JobsView() {
     }
     if (input === 'c') {
       void (async () => {
+        setIsPending(true);
         const res = await completeJob(job.id, 'Completed from TUI');
+        setIsPending(false);
         if (!res.ok) setActionError(res.error.message);
         else setActionSuccess(`Completed ${job.id}`);
       })();
@@ -75,7 +81,9 @@ export function JobsView() {
     }
     if (input === 'R') {
       void (async () => {
+        setIsPending(true);
         const res = await requeueJob(job.id);
+        setIsPending(false);
         if (!res.ok) setActionError(res.error.message);
         else setActionSuccess(`Requeued ${job.id}`);
       })();
@@ -86,7 +94,9 @@ export function JobsView() {
       const targetLane = lanes.find((l) => l.status === 'idle') ?? lanes[0];
       if (targetLane) {
         void (async () => {
+          setIsPending(true);
           const res = await assignJob(job.id, targetLane.id);
+          setIsPending(false);
           if (!res.ok) setActionError(res.error.message);
           else setActionSuccess(`Assigned ${job.id} to ${targetLane.id}`);
         })();
@@ -161,7 +171,11 @@ export function JobsView() {
                 </Text>
               )}
               <Box marginTop={1}>
-                <Text color={COLORS.secondary}>[b]lock [c]omplete [a]ssign [R]equeue</Text>
+                {isPending ? (
+                  <Text color={COLORS.warning}>Working...</Text>
+                ) : (
+                  <Text color={COLORS.secondary}>[b]lock [c]omplete [a]ssign [R]equeue</Text>
+                )}
               </Box>
             </Box>
           ) : (

@@ -82,14 +82,17 @@ export function useBrainStore() {
 interface BrainStoreProviderProps {
   client: HttpBrainClient;
   projectId: string | undefined;
-  children: React.ReactNode;
 }
 
 function makeRequest(op: BrainRequest['op'], args: unknown): BrainRequest {
   return { v: 1, op, args } as BrainRequest;
 }
 
-export function BrainStoreProvider({ client, projectId, children }: BrainStoreProviderProps) {
+export function BrainStoreProvider({
+  client,
+  projectId,
+  children,
+}: React.PropsWithChildren<BrainStoreProviderProps>) {
   const [state, setState] = useState<TuiState>({
     view: 'dashboard',
     previousView: null,
