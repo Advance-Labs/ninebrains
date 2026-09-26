@@ -1,14 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  One entry, because the site is one page. Every URL in
-  docs/strategy/workstreams/W9-positioning-and-content.md is added here as it publishes, and
-  W9's answer-ready checklist treats sitemap inclusion as a publish gate.
+  Every URL on the canonical host. Docs pages are a separate Vercel project rewritten in at
+  /docs, but search engines discover them fastest when they are also claimed here.
 
   No <lastmod>: a hand-maintained date that stops matching the page is worse than no date at
   all. Generate it from the build when this file grows past a handful of URLs.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://ninebrains.dev/</loc>
-  </url>
+  <url><loc>https://ninebrains.dev/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/accounts/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/architecture/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/brain-and-jobs/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/configuration/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/contributing/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/files-outside-data-folder/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/first-run/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/gates/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/getting-started/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/ide-workflow/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/install-from-source/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/keyboard-shortcuts/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/lanes/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/models/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/packs/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/planner/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/security-policy/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/security/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/threat-model/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/troubleshooting/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/unattended-runs/</loc></url>
+  <url><loc>https://ninebrains.dev/docs/verify-download/</loc></url>
 </urlset>
