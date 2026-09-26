@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { assertId } from '../ids';
-import type { ProjectId } from '../types';
+import { type ProjectId, USER_BRAIN_ID } from '../types';
 import type { BrainGrant } from './execute';
 
 /** 32 random bytes, base64url without padding: 43 characters, 256 bits. */
@@ -28,8 +28,12 @@ export class TokenRegistry {
     if (identity.role === 'lane') {
       assertId('laneId', identity.laneId);
       assertId('projectId', identity.projectId);
+      if (grant.user) throw new Error('a user grant must be a brain grant, not a lane grant');
     } else {
       assertId('brainId', identity.brainId);
+      if (grant.user && identity.brainId !== USER_BRAIN_ID) {
+        throw new Error(`a user grant must use brainId "${USER_BRAIN_ID}"`);
+      }
     }
     if (grant.projectId !== null) assertId('projectId', grant.projectId);
     if (grant.runId !== undefined) assertId('runId', grant.runId);

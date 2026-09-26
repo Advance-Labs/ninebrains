@@ -1,6 +1,5 @@
 import { toast } from '@emdash/ui/react/primitives';
 import { useLayoutEffect, type ReactNode } from 'react';
-import { stopAllAgentWork } from '@core/features/brain/contributions/stop-action';
 import { captureDevPerfTrace } from '@core/features/dev-perf/api/browser/capture-trace';
 import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
@@ -150,9 +149,6 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
       execute: (input) => {
         if (input?.jobId) void openModal('jobVerificationModal', { jobId: input.jobId });
       },
-    }),
-    'brain.stopAll': () => ({
-      execute: () => void stopAllAgentWork(),
     }),
     // Ninebrains: the planner canvas for the given, current or first project.
     'planner.open': () => ({

@@ -11,6 +11,7 @@ import {
   type BrainLaneInfo,
   type BrainLanesPort,
 } from '@core/features/brain/node/brain-service';
+import { createBrainHostOps } from '@core/features/brain/node/cli-host';
 import { startBrainEndpoint } from '@core/features/brain/node/endpoint';
 import { createMementoBrainSessionsPersistence } from '@core/features/brain/node/sessions-persistence';
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
@@ -143,6 +144,7 @@ export async function createNinebrainsServices(
   });
   const endpoint = await startBrainEndpoint({
     brain,
+    userDataDir,
     onInternalError: (error) => onError('brain: endpoint internal error', error),
   });
 
@@ -300,6 +302,13 @@ export async function createNinebrainsServices(
   // T47: the same live setting read `routing` and the reviewer route use, so a lane's
   // client-side check (LaneService.createLane/setLaneRouting) can't accept an authProfileId that
   // prepareLaunch would then refuse at launch time.
+  // M5: the operator's CLI reaches the controls the Brain drawer used to own. The
+  // host half must be attached before the handshake is published, so no CLI can
+  // read a token for an endpoint that would answer UNAVAILABLE.
+  endpoint.attachHost(createBrainHostOps(brainService));
+  const handshakeFile = endpoint.publishCliHandshake();
+  if (handshakeFile) deps.logger.info('brain: CLI handshake published', { file: handshakeFile });
+
   lanes = createLaneService(
     { ...deps, modelProfilesEnabled: profilesEnabled },
     brainService.laneBrainPort()

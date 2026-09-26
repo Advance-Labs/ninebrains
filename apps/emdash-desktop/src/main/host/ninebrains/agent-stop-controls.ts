@@ -1,10 +1,22 @@
 import type { MenuItemConstructorOptions } from 'electron';
-import { brainStopAllCommand } from '@core/features/brain/contributions/commands';
 import {
+  keybinding,
   resolveEffectiveChord,
   toElectronAccelerator,
   type PlatformContext,
 } from '@core/primitives/keybindings/api';
+
+/**
+ * The STOP chord, owned by Electron rather than a renderer command.
+ *
+ * It was `brain.stopAll`'s keybinding until the Brain UI was removed (M5). Main
+ * keeps it because the app menu is now the app's only STOP surface, and a chord
+ * on a menu item still fires when the window has hung. The other surface is
+ * `brain stop` in the CLI.
+ */
+const STOP_ALL_KEYBINDING = keybinding.fixed('Mod+Shift+Backspace', {
+  allowWhenTerminalFocused: true,
+});
 
 /**
  * Global STOP from the main process (SEC-30): the app menu and the tray call the Brain here
@@ -85,9 +97,7 @@ const platform: PlatformContext = {
 };
 
 function stopAccelerator(): string | undefined {
-  const chord = brainStopAllCommand.keybinding
-    ? resolveEffectiveChord(brainStopAllCommand.keybinding, {}, platform)
-    : null;
+  const chord = resolveEffectiveChord(STOP_ALL_KEYBINDING, {}, platform);
   return chord ? toElectronAccelerator(chord) : undefined;
 }
 

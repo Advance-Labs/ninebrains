@@ -199,6 +199,13 @@ export type Identity =
   | { role: 'lane'; laneId: LaneId; projectId: ProjectId }
   | { role: 'brain'; brainId: BrainId };
 
+/**
+ * The brainId the human operator acts under. A user token is a brain grant with
+ * `user: true` (see `BrainGrant`): to the DAG the operator is a Brain, so replies
+ * route back to `{"kind":"brain","id":"user"}` with no special case anywhere.
+ */
+export const USER_BRAIN_ID = 'user' as const;
+
 export function laneAddress(id: LaneId): Address {
   return { kind: 'lane', id };
 }

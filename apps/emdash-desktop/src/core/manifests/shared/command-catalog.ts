@@ -1,4 +1,3 @@
-import { BRAIN_COMMAND_DEFS } from '@core/features/brain/contributions/commands';
 import { DEV_PERF_COMMAND_DEFS } from '@core/features/dev-perf/contributions/commands';
 import { EDITOR_FILE_TREE_COMMAND_DEFS } from '@core/features/editor/contributions/commands';
 import { GATES_COMMAND_DEFS } from '@core/features/gates/contributions/commands';
@@ -21,7 +20,6 @@ export const COMMAND_CATALOG = defineCommandCatalog([
   ...TASK_LIST_COMMAND_DEFS,
   ...LANES_COMMAND_DEFS,
   ...GATES_COMMAND_DEFS,
-  ...BRAIN_COMMAND_DEFS,
   ...PLANNER_COMMAND_DEFS,
 ] as const);
 

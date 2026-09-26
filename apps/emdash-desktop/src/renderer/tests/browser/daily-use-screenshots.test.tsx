@@ -1,6 +1,5 @@
 import '@emdash/ui/style.css';
 import { ok } from '@emdash/shared';
-import { SettingsSection } from '@emdash/ui/react/patterns';
 import { createEventStreamHost } from '@emdash/wire/live';
 import { createInProcessWire, defineContract } from '@emdash/wire/rpc';
 import { cell, expose } from '@emdash/wire/state';
@@ -10,7 +9,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { agentsContract, agentsDomain } from '@core/features/agents/api/contract';
-import { BrainSection } from '@core/features/arena/browser/arena-dashboard';
 import {
   brainContract,
   brainDomain,
@@ -18,7 +16,6 @@ import {
   type BrainJobView,
   type BrainSessionView,
 } from '@core/features/brain/api';
-import { BrainDrawer } from '@core/features/brain/contributions/lanes-drawer';
 import type { Lane } from '@core/features/lanes/api';
 import { AddLaneFields } from '@core/features/lanes/browser/grid/add-lane-form';
 import { LaneHeader } from '@core/features/lanes/browser/grid/lane-header';
@@ -30,12 +27,11 @@ import {
 } from '@core/features/packs/api';
 import { PacksPanel } from '@core/features/packs/browser/packs-view';
 import { routingContract, routingDomain } from '@core/features/routing/api';
-import { BrainSettingsCard } from '@core/features/settings/browser/components/BrainSettingsCard';
 import { ThemeProvider } from '@core/primitives/theme/browser/theme-provider';
 import { resetWireConnection, seedWireConnection } from '@core/primitives/wire/browser/connection';
 
-// First renders of the daily-use fixes (lane run mode, the add-lane role picker, pack secrets,
-// the Brain drawer's Plan button) with the app's real CSS, written to docs/screenshots. Opt-in,
+// First renders of the daily-use fixes (the add-lane role picker, pack secrets) with the app's
+// real CSS, written to docs/screenshots. The Brain's own shots went with its UI (M5). Opt-in,
 // so ordinary runs never touch tracked files. Compile the stylesheet into the untracked
 // __generated__/daily-tailwind.css first (features/gates/README.md, "Screenshots").
 import.meta.glob('./__generated__/daily-tailwind.css', { eager: true });
@@ -90,15 +86,6 @@ const JOBS = [
   job('j2', 'Wire the quote form', 'running'),
   job('j3', 'Add form validation', 'verifying'),
   job('j4', 'Write the FAQ copy', 'ready'),
-];
-
-// No 'blocked' jobs: Arena's blocked-job list resolves each job's project name
-// through the (unmocked, in this file) project stores, so this stays in states
-// that only feed the dispatcher/state badges.
-const ARENA_JOBS: BrainJobView[] = [
-  { ...job('aj1', 'Wire the checkout flow', 'running'), projectId: 'p1' },
-  { ...job('aj2', 'Draft the SEO audit report', 'verifying'), projectId: 'p2' },
-  { ...job('aj3', 'Fix the sitemap crawl errors', 'ready'), projectId: 'p2', laneId: null },
 ];
 
 const allJobsCell = cell<BrainJobView[]>([]);
@@ -223,53 +210,6 @@ function Lanes() {
           branch: 'lanes/8e21d0aa',
         })}
         text="› Ready for the next job."
-      />
-    </div>
-  );
-}
-
-// The real lane grid is a fixed 2x2 of slots (lanes-grid-layout.tsx), not a
-// responsive column count. Four lanes here, not two, is what the app actually
-// shows at this width; two would leave half the grid empty. At a real 2x2
-// cell's width the header has little room beside its badges and icons, so
-// (unlike the wider lanes-run-mode-1440 cells) these use short project/branch
-// names that actually fit instead of truncating to a couple of characters.
-function FourLanes() {
-  return (
-    <div className="grid h-full grid-cols-2 grid-rows-2 gap-2 p-2">
-      <LaneShell
-        lane={lane({ projectName: 'shop', branch: 'main' })}
-        text="› Building the pricing page."
-        height="h-full"
-      />
-      <LaneShell
-        lane={lane({
-          laneId: 'lane-b',
-          slot: 1,
-          provider: 'codex',
-          status: 'idle',
-          projectName: 'docs',
-          branch: 'main',
-        })}
-        text="› Ready for the next job."
-        height="h-full"
-      />
-      <LaneShell
-        lane={lane({ laneId: 'lane-c', slot: 2, projectName: 'api', branch: 'main' })}
-        text="› Running the payments migration."
-        height="h-full"
-      />
-      <LaneShell
-        lane={lane({
-          laneId: 'lane-d',
-          slot: 3,
-          provider: 'codex',
-          status: 'idle',
-          projectName: 'web',
-          branch: 'main',
-        })}
-        text="› Ready for the next job."
-        height="h-full"
       />
     </div>
   );
@@ -483,68 +423,5 @@ describe.skipIf(!import.meta.env.VITE_DAILY_SCREENSHOTS)('daily-use screenshots'
         throw new Error('no secrets yet');
     });
     await page.screenshot({ path: `${SHOTS}/packs-secrets-390.png` });
-  });
-
-  it('Brain drawer with the Plan button, light, 1440', async () => {
-    await show(
-      'emlight',
-      1440,
-      900,
-      <div className="flex h-full">
-        <div className="flex-1">
-          <FourLanes />
-        </div>
-        <div className="w-[30rem] border-l border-border">
-          <BrainDrawer
-            projects={[{ projectId: 'p1', name: 'acme-site' }]}
-            lanes={[
-              { laneId: 'lane-a', label: 'Lane 1' },
-              { laneId: 'lane-b', label: 'Lane 2' },
-            ]}
-            renderTerminal={() => (
-              <div className="h-full bg-background p-3 font-mono text-xs text-foreground-muted">
-                Brain 1 · planning the pricing page in jobs j1–j4
-              </div>
-            )}
-          />
-        </div>
-      </div>
-    );
-    await vi.waitFor(() => {
-      if (!document.querySelector('[data-testid="brain-open-planner"]'))
-        throw new Error('not rendered');
-    });
-    await page.screenshot({ path: `${SHOTS}/brain-drawer-plan-1440.png` });
-  });
-
-  it('Brain settings card, light, 1440', async () => {
-    await show(
-      'emlight',
-      1440,
-      170,
-      <div className="p-6">
-        <SettingsSection title="Brain">
-          <BrainSettingsCard />
-        </SettingsSection>
-      </div>
-    );
-    await page.screenshot({ path: `${SHOTS}/brain-settings-card-1440.png` });
-  });
-
-  it('Arena, Brain section across projects, light, 1440', async () => {
-    allJobsCell.set(ARENA_JOBS);
-    await show(
-      'emlight',
-      1440,
-      110,
-      <div className="p-6">
-        <BrainSection />
-      </div>
-    );
-    await vi.waitFor(() => {
-      if (!document.body.textContent?.includes('dispatching')) throw new Error('not rendered');
-    });
-    await page.screenshot({ path: `${SHOTS}/arena-brain-section-1440.png` });
-    allJobsCell.set([]);
   });
 });

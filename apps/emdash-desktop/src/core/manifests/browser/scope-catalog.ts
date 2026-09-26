@@ -1,4 +1,3 @@
-import { BRAIN_WINDOW_COMMAND_DEFS } from '@core/features/brain/contributions/commands';
 import { DEV_PERF_COMMAND_DEFS } from '@core/features/dev-perf/contributions/commands';
 import { fileTreeScope } from '@core/features/editor/contributions/scopes';
 import { GATES_WINDOW_COMMAND_DEFS } from '@core/features/gates/contributions/commands';
@@ -21,7 +20,6 @@ export const windowScope = defineWindowScope([
   ...DEV_PERF_COMMAND_DEFS,
   ...LANES_WINDOW_COMMAND_DEFS,
   ...GATES_WINDOW_COMMAND_DEFS,
-  ...BRAIN_WINDOW_COMMAND_DEFS,
   ...PLANNER_WINDOW_COMMAND_DEFS,
 ]);
 

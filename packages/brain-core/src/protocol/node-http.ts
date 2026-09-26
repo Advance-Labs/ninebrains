@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import type { Brain } from '../brain/brain';
 import { BRAIN_ENDPOINT, LANE_HINT_HEADER } from './endpoint';
 import type { BrainGrant, ExecuteOptions } from './execute';
-import { type BrainHttpResponse, handleBrainHttpRequest, reply } from './http';
+import { type BrainHttpResponse, handleBrainHttpRequestAsync, reply } from './http';
 import { type BrainRequest, type BrainResponse, brainFailure, brainResponseSchema } from './ops';
 import { type RateLimiter, createTokenBucketLimiter } from './rate-limit';
 import { TokenRegistry } from './tokens';
@@ -105,25 +105,34 @@ export async function startBrainHttpServer(
       });
       req.on('end', () => {
         if (aborted) return;
-        send(
-          handleBrainHttpRequest(
-            {
-              method: req.method ?? '',
-              path: new URL(req.url ?? '/', 'http://127.0.0.1').pathname,
-              headers: req.headers,
-              body: Buffer.concat(chunks).toString('utf8'),
-            },
-            {
-              brain: options.brain,
-              tokens,
-              limiter,
-              preAuthLimiter,
-              expectedHost,
-              onInternalError: options.onInternalError,
-              resolveBrainProject:
-                options.resolveBrainProject ?? ((brainId) => tokens.brainProject(brainId)),
-            }
-          )
+        void handleBrainHttpRequestAsync(
+          {
+            method: req.method ?? '',
+            path: new URL(req.url ?? '/', 'http://127.0.0.1').pathname,
+            headers: req.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          },
+          {
+            brain: options.brain,
+            tokens,
+            limiter,
+            preAuthLimiter,
+            expectedHost,
+            onInternalError: options.onInternalError,
+            host: options.host,
+            resolveBrainProject:
+              options.resolveBrainProject ?? ((brainId) => tokens.brainProject(brainId)),
+          }
+        ).then(
+          (response) => {
+            if (!aborted) send(response);
+          },
+          // SEC-07: the async executor never rejects, but a bug in the host half
+          // must still close the socket with a bare INTERNAL rather than hang it.
+          (error: unknown) => {
+            options.onInternalError?.(error);
+            if (!aborted) send(reply(500, brainFailure('INTERNAL', 'internal error')));
+          }
         );
       });
     }

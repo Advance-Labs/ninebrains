@@ -1006,3 +1006,76 @@ throughout — and two `caffeinate` power assertions dying 11ms *earlier* with `
 is what an agent CLI exiting looks like. That points at the sessions ending first and tmux
 exiting behind them, which would mean the "crash" was never one. The next occurrence is what
 decides it.
+## 58. The Brain loses its UI and gains a CLI (`ninebrains/hydra-integration`)
+
+The Brain is now driven from the shell. `packages/brain-cli` adds `brain`, a
+command-line client, and every Brain surface in the desktop window is removed. The
+prompt for this was whether to adopt the harness from
+[ndunl075/hydra](https://github.com/ndunl075/hydra); the answer was no — `brain-core`
+already covers what hydra's `src/core` does and adds the token model, the gate floor
+and the DAG hardening hydra has no equivalent for — so only the CLI half was built.
+
+The CLI is a third role on the existing endpoint, not a second door. See
+`docs/THREAT-MODEL.md` SEC-47 (M5) for the security argument and
+`docs/plans/brain-headless-cli.md` for what a Brain that runs without the app needs.
+
+### Patched Emdash files
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/workbench/browser/window-scope.tsx` | `brain.stopAll` implementation and its `stop-action` import removed | The command no longer exists. STOP is the app menu, the tray and `brain stop` |
+| `src/core/features/settings/browser/pages/general-settings-page.tsx` | "Brain" section and `BrainSettingsCard` removed; header description no longer mentions the Brain | `brain status`, `brain pause`, `brain resume` replace the card |
+
+### Patched Ninebrains-only files
+
+| File | Change | Why |
+|---|---|---|
+| `packages/brain-core/src/protocol/ops.ts` | `HOST_OPS` (10 ops), `USER_OPS`, `isHostOp`, `LANE_RUN_MODES`; each op added to `brainRequestSchema` | The contract has to name the controls the UI used to own before anything can authorize them |
+| `packages/brain-core/src/protocol/execute.ts` | `BrainGrant.user?: true`; `ExecuteOptions.host`; `BrainHostOps`; `executeBrainRequestAsync`; parse and authorize factored into `prepare()` | Host ops are async and app-implemented. The sync executor still refuses them, so both executors share one authorization path |
+| `packages/brain-core/src/protocol/scope.ts` | `grant.user` selects `USER_OPS`; `authorizeUserRequest` | One function holds the whole user-role policy, with each widening argued in its docblock |
+| `packages/brain-core/src/protocol/http.ts` | Split into `handleBrainHttpRequest` (sync) and `handleBrainHttpRequestAsync` over a shared `check()` | Every SEC-04..SEC-06 transport check stays in one place, and `http.test.ts` needed no edit — the file that proves the endpoint is hard to attack was not touched for an unrelated reason |
+| `packages/brain-core/src/protocol/node-http.ts` | Serves the async handler; forwards `options.host`; a rejection still closes the socket with a bare `INTERNAL` | SEC-07 must hold for the host half too, and a bug there must not hang a connection |
+| `packages/brain-core/src/protocol/tokens.ts` | `issue()` refuses a `user` grant that is not brain `"user"`, or is a lane grant | The flag cannot be attached to the wrong identity |
+| `packages/brain-core/src/protocol/results.ts` | `whoami.role` gains `user`; host ops map to `z.unknown()` | Their shapes belong to the app; pinning them here would drag desktop view types into brain-core |
+| `packages/brain-core/src/types.ts` | `USER_BRAIN_ID` | `Identity` stays a two-member union: to the DAG the operator *is* a Brain, which is what the app's own `USER_IDENTITY` already assumed |
+| `packages/brain-mcp/src/session.ts` | A `user` answer from `whoami` throws `SessionError` | A user token reaching an agent's shim is a misrouted token. Fail closed rather than pick a tool list |
+| `packages/brain-mcp/src/tools.ts` | `DESCRIPTIONS` retyped to `Record<Exclude<BrainOp, 'whoami' \| BrainHostOp>, …>` | "Agents never see host ops" becomes a compile error instead of a convention |
+| `src/core/features/brain/node/endpoint.ts` | `attachHost`, `publishCliHandshake`, `USER_LAUNCH_KEY`; `userDataDir` option; `mint` extracted; the handshake is removed before the endpoint closes | The endpoint starts before `BrainService` exists, so the host is late-bound. Removing the file first means a CLI racing shutdown hears "no Brain", not a 401 |
+| `src/main/bootstrap/boot/ninebrains/create-ninebrains-services.ts` | Passes `userDataDir`; attaches the host, then publishes the handshake | In that order, so no token is readable for an endpoint that would answer `UNAVAILABLE` |
+| `src/main/host/ninebrains/agent-stop-controls.ts` | `STOP_ALL_KEYBINDING` defined locally instead of read off `brainStopAllCommand` | The chord moves to the process that owns the only remaining in-app STOP, so it survives a hung window |
+| `src/core/manifests/shared/command-catalog.ts`, `browser/scope-catalog.ts`, `shared/command-palette-catalog.ts` | `BRAIN_*` command and palette entries removed | The commands are gone |
+| `src/core/features/lanes/browser/grid/lanes-view.tsx` | Drawer, titlebar controls, `LanesWithBrain` and `openProjects()` removed; the main panel is the grid | The drawer was the Brain's main surface |
+| `src/core/features/lanes/browser/grid/lanes-grid.tsx` | "What does the Brain do?" button removed; the empty state points at the `brain` CLI | It opened a drawer that no longer exists |
+| `src/core/features/lanes/browser/grid/lane-header.tsx` | `LaneRunModeControl` removed | `brain mode <lane> <attended\|unattended>` replaces it |
+| `src/core/features/lanes/browser/grid/lane-cell.tsx` | The Brain-backed side-panel source is gone; the panel falls back to `emptyLaneSidePanelSource` | `brain jobs --lane <id>` replaces it |
+| `src/core/features/arena/browser/arena-dashboard.tsx` | `BrainSection` and `projectNameOf` removed | `brain status` and `brain jobs` replace the cross-project panel |
+| `src/core/features/planner/browser/planner-view.tsx` | `BrainStopButton` and the now-empty right slot removed | `brain stop` replaces it |
+| `src/renderer/tests/browser/daily-use-screenshots.test.tsx` | Three Brain screenshot cases, their imports and `ARENA_JOBS` removed | Their components are gone |
+
+### Deleted
+
+`src/core/features/brain/browser/` entirely (`brain-drawer.tsx`, `titlebar-controls.tsx`,
+`lane-run-mode.tsx`, `use-brain.ts`); `contributions/{arena,settings,palette,planner-controls,lanes-drawer,stop-action,commands}.ts`;
+`api/browser/{client,side-panel-source}.ts`; `api/side-panel-items.ts` and its test;
+`src/core/features/settings/browser/components/BrainSettingsCard.tsx`;
+`src/core/features/lanes/browser/grid/brain-drawer-state.ts`.
+
+`contributions/mementos.ts` **stays**: it is the versioned schema that persists Brain
+sessions across restarts, not UI.
+
+### New Ninebrains-only files
+
+| File | What |
+|---|---|
+| `packages/brain-cli/` | The `brain` CLI: `args.ts` (parser), `commands.ts` (one request per verb), `connect.ts` (handshake discovery), `cli.ts` (`runCli`, exit codes 0/1/2/3), `bin.ts`, `README.md`, `test/cli.test.ts` |
+| `packages/brain-core/src/protocol/handshake.ts` | The handshake: 0600 in a 0700 dir, loopback-only url schema, channel-aware discovery (`ninebrains`, `-canary`, `-dev`), pid liveness. `handshake.test.ts` |
+| `packages/brain-core/src/protocol/user-role.test.ts` | The M5 proofs, including both widenings asserted by contrast with an agent token |
+| `src/core/features/brain/node/cli-host.ts` | `BrainHostOps` over `BrainService`; the one place the app's `Result<T, BrainError>` meets brain-core's error codes |
+| `docs/plans/brain-headless-cli.md` | What a Brain that runs without the desktop app would need |
+
+### What this does not establish
+
+The CLI needs the app running. `brain-cli/test/cli.test.ts` drives a real endpoint
+with a real token and a real handshake, but the host half is a fake in that test —
+process control, gates and session launching are still only exercised through the
+desktop's own suites. Nothing here has been run against a packaged build.

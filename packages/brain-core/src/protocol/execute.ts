@@ -7,6 +7,7 @@ import {
   type ParsedBrainRequest,
   brainFailure,
   brainRequestSchema,
+  isHostOp,
 } from './ops';
 import { resolveAttachmentPath } from './paths';
 import { jobDetail, jobSummary, messageView } from './results';
@@ -27,6 +28,13 @@ export interface BrainGrant {
    * `scope.ts`). The field exists as a type only; `false` is its one legal value.
    */
   global?: false;
+  /**
+   * M5: this token belongs to the human operator's CLI, not to an agent. Only main
+   * sets it, when it mints the token; nothing in a request can reach it. It widens
+   * the op allowlist to `USER_OPS` and lifts the project pin (see `scope.ts`).
+   * A user grant is always a brain grant with `brainId` `USER_BRAIN_ID`.
+   */
+  user?: true;
 }
 
 export interface ExecuteOptions {
@@ -38,6 +46,32 @@ export interface ExecuteOptions {
    * `startBrainHttpServer` derives it from its token registry.
    */
   resolveBrainProject?: (brainId: string) => ProjectId | null | undefined;
+  /**
+   * Implements the host operations (`HOST_OPS`): the controls that spawn provider
+   * CLIs, pause dispatch and latch the global STOP. brain-core owns the DAG and
+   * the store, not processes, so the app supplies these. Absent means the ops
+   * answer UNAVAILABLE; they are never silently skipped.
+   */
+  host?: BrainHostOps;
+}
+
+/**
+ * The app-side half of the user-role surface. Every method may throw a
+ * `BrainError` for an expected failure; anything else becomes a bare INTERNAL
+ * (SEC-07), as it does for the DAG ops. Results are passed through to the
+ * caller as-is, so their shapes stay owned by the app, not by brain-core.
+ */
+export interface BrainHostOps {
+  listDone(projectId: ProjectId, limit: number): Promise<unknown>;
+  listNotes(projectId: ProjectId, limit: number): Promise<unknown>;
+  dispatcherStatus(): Promise<unknown>;
+  setDispatcherPaused(paused: boolean): Promise<unknown>;
+  setLaneMode(laneId: string, mode: 'attended' | 'unattended'): Promise<unknown>;
+  listSessions(): Promise<unknown>;
+  startBrain(projectId: ProjectId): Promise<unknown>;
+  stopBrain(brainId: string): Promise<unknown>;
+  stopAll(): Promise<unknown>;
+  clearStop(): Promise<unknown>;
 }
 
 /**
@@ -51,13 +85,104 @@ export function executeBrainRequest(
   input: unknown,
   options: ExecuteOptions = {}
 ): BrainResponse {
-  const parsed = brainRequestSchema.safeParse(input);
-  if (!parsed.success) return brainFailure('BAD_REQUEST', z.prettifyError(parsed.error));
+  const prepared = prepare(brain, grant, input, options);
+  if ('response' in prepared) return prepared.response;
+  if (isHostOp(prepared.request.op)) {
+    return brainFailure('UNAVAILABLE', `${prepared.request.op} needs the async executor`);
+  }
   try {
-    authorizeRequest(brain, grant, parsed.data, options);
-    return { ok: true, result: run(brain, grant, parsed.data) };
+    return { ok: true, result: run(brain, grant, prepared.request) };
   } catch (error) {
     return errorResponse(error, options);
+  }
+}
+
+/**
+ * The executor the endpoint uses. Identical to `executeBrainRequest` for every
+ * DAG operation, and additionally serves the host operations through
+ * `options.host`. Like the sync form, it never throws.
+ */
+export async function executeBrainRequestAsync(
+  brain: Brain,
+  grant: BrainGrant,
+  input: unknown,
+  options: ExecuteOptions = {}
+): Promise<BrainResponse> {
+  const prepared = prepare(brain, grant, input, options);
+  if ('response' in prepared) return prepared.response;
+  const request = prepared.request;
+  if (!isHostOp(request.op)) {
+    try {
+      return { ok: true, result: run(brain, grant, request) };
+    } catch (error) {
+      return errorResponse(error, options);
+    }
+  }
+  const host = options.host;
+  if (!host) {
+    return brainFailure('UNAVAILABLE', `${request.op} is not available on this endpoint`);
+  }
+  try {
+    return { ok: true, result: await runHost(host, grant, request) };
+  } catch (error) {
+    return errorResponse(error, options);
+  }
+}
+
+/** Parses and authorizes, or yields the response to send. Shared by both executors. */
+function prepare(
+  brain: Brain,
+  grant: BrainGrant,
+  input: unknown,
+  options: ExecuteOptions
+): { request: ParsedBrainRequest } | { response: BrainResponse } {
+  const parsed = brainRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { response: brainFailure('BAD_REQUEST', z.prettifyError(parsed.error)) };
+  }
+  try {
+    authorizeRequest(brain, grant, parsed.data, options);
+  } catch (error) {
+    return { response: errorResponse(error, options) };
+  }
+  return { request: parsed.data };
+}
+
+async function runHost(
+  host: BrainHostOps,
+  grant: BrainGrant,
+  request: ParsedBrainRequest
+): Promise<unknown> {
+  const project = (requested: ProjectId | undefined): ProjectId => {
+    const projectId = requested ?? grant.projectId;
+    if (!projectId) {
+      throw new InvalidInputError('projectId is required: this session has no default project');
+    }
+    return projectId;
+  };
+  switch (request.op) {
+    case 'list_done':
+      return host.listDone(project(request.args.projectId), request.args.limit);
+    case 'list_notes':
+      return host.listNotes(project(request.args.projectId), request.args.limit);
+    case 'dispatcher_status':
+      return host.dispatcherStatus();
+    case 'set_dispatcher_paused':
+      return host.setDispatcherPaused(request.args.paused);
+    case 'set_lane_mode':
+      return host.setLaneMode(request.args.laneId, request.args.mode);
+    case 'list_sessions':
+      return host.listSessions();
+    case 'start_brain':
+      return host.startBrain(project(request.args.projectId));
+    case 'stop_brain':
+      return host.stopBrain(request.args.brainId);
+    case 'stop_all':
+      return host.stopAll();
+    case 'clear_stop':
+      return host.clearStop();
+    default:
+      throw new InvalidInputError(`${request.op} is not a host operation`);
   }
 }
 
@@ -90,9 +215,11 @@ function run(brain: Brain, grant: BrainGrant, request: ParsedBrainRequest): unkn
   switch (request.op) {
     case 'whoami': {
       const run = grant.runId ? { runId: grant.runId } : {};
-      return me.role === 'lane'
-        ? { role: 'lane', laneId: me.laneId, projectId: grant.projectId, ...run }
-        : { role: 'brain', brainId: me.brainId, projectId: grant.projectId, ...run };
+      if (me.role === 'lane') {
+        return { role: 'lane', laneId: me.laneId, projectId: grant.projectId, ...run };
+      }
+      if (grant.user) return { role: 'user', brainId: me.brainId, projectId: null, ...run };
+      return { role: 'brain', brainId: me.brainId, projectId: grant.projectId, ...run };
     }
     case 'claim_job': {
       const { jobId } = request.args;

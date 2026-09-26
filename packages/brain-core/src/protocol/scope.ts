@@ -2,12 +2,13 @@ import type { Brain } from '../brain/brain';
 import { ForbiddenError, NotFoundError } from '../errors';
 import { AGENT_GATE_KINDS, type Address, type GateKind, type ProjectId } from '../types';
 import type { BrainGrant, ExecuteOptions } from './execute';
-import { BRAIN_OPS, LANE_OPS, type ParsedBrainRequest, SESSION_OPS } from './ops';
+import { BRAIN_OPS, LANE_OPS, type ParsedBrainRequest, SESSION_OPS, USER_OPS } from './ops';
 
 /**
  * Request-level authorization for the forwarding contract, run before any op executes.
  *
- * - L2: a token may call only its role's ops (`LANE_OPS` or `BRAIN_OPS`, plus `whoami`).
+ * - L2: a token may call only its role's ops (`LANE_OPS`, `BRAIN_OPS` or `USER_OPS`, plus
+ *   `whoami`). Only a user token reaches `HOST_OPS`.
  * - M3: a brain-role grant acts only inside `grant.projectId`, for every op: create, link,
  *   assign, requeue, complete, block, notes, listings, broadcast and reading inboxes. v0.1 has no
  *   global Brain grant, so a brain grant without a project may touch no project at all.
@@ -16,6 +17,9 @@ import { BRAIN_OPS, LANE_OPS, type ParsedBrainRequest, SESSION_OPS } from './ops
  * - SEC-08: a token may declare `gateKind` "code" or "ui" only. Every other kind has a weaker gate
  *   floor, so it is refused, never coerced. The app's own identities call `Brain` directly and may
  *   set any kind.
+ *
+ * - M5: a user token is the human operator. See `authorizeUserRequest` for what that means and
+ *   what it deliberately does not constrain.
  *
  * The domain layer (`Brain`) stays unscoped for the brain role on purpose: main's own identity uses
  * it directly. Scoping is a property of tokens, so it lives here.
@@ -27,10 +31,16 @@ export function authorizeRequest(
   options: ExecuteOptions
 ): void {
   const me = grant.identity;
-  const allowed: readonly string[] = me.role === 'lane' ? LANE_OPS : BRAIN_OPS;
+  const allowed: readonly string[] = grant.user
+    ? USER_OPS
+    : me.role === 'lane'
+      ? LANE_OPS
+      : BRAIN_OPS;
   if (!(SESSION_OPS as readonly string[]).includes(request.op) && !allowed.includes(request.op)) {
     throw new ForbiddenError(`${request.op} is not available to a ${me.role} session`);
   }
+
+  if (grant.user) return authorizeUserRequest(brain, request);
 
   const home = me.role === 'lane' ? me.projectId : grant.projectId;
   if (request.op === 'send_message') checkRecipient(brain, grant, home, request.args.to, options);
@@ -125,4 +135,36 @@ function laneInProject(brain: Brain, laneId: string, home: ProjectId | null): vo
   if (home === null || lane.projectId !== home) {
     throw new ForbiddenError(`lane ${laneId} belongs to another project`);
   }
+}
+
+/**
+ * M5: what a user-role token may do.
+ *
+ * A user token is minted for the human operator's CLI and written to a 0600 file
+ * under userData, so holding it already means holding that OS account. It is the
+ * successor to the desktop UI, which had no project boundary and no gate-kind
+ * limit, so pinning the CLI tighter than the window it replaces would only push
+ * the operator back to a second tool.
+ *
+ * What it therefore does NOT do:
+ * - It does not pin the caller to `grant.projectId`. That field is only the CLI's
+ *   default project when a command omits `--project`.
+ * - It does not apply `checkGateKind`. SEC-08 restricts *agents* to "code" and
+ *   "ui" because a weaker kind lowers the gate floor; lowering rigor is the
+ *   user's call, and always was.
+ *
+ * What it still does:
+ * - The op allowlist above (L2) still applies, so a user token cannot call
+ *   `claim_job`: claiming is a lane's move and would corrupt job ownership.
+ * - Recipients must exist. A typo'd lane id is a NOT_FOUND, not a silent drop.
+ * - The gate floor itself is still `union(floor, requested)` in `Brain`, so even
+ *   the user cannot strip a project's floor through this path (SEC-08).
+ */
+function authorizeUserRequest(brain: Brain, request: ParsedBrainRequest): void {
+  const exists = (address: Address): void => {
+    if (address.kind !== 'lane') return;
+    if (!brain.store.getLane(address.id)) throw new NotFoundError('lane', address.id);
+  };
+  if (request.op === 'send_message') exists(request.args.to);
+  if (request.op === 'read_inbox' && request.args.address) exists(request.args.address);
 }
