@@ -6,6 +6,22 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-26
+
+This release removes the Arena, Lanes, and Automations views from the app UI in favour of the Planner and Brain CLI. The Brain CLI is now bundled with the app and can be launched from any project's workspace menu. The Freebuff fallback feature has been archived and removed from active UI.
+
+Also fixes the one-line installer so it correctly falls back to the latest stable release when GitHub's `latest` tag points to a monorepo-scoped tag (e.g. `brain-cli@0.2.0`).
+
+### Features
+
+- **app:** bundle brain-cli with the app build and add "Open Brain CLI" to project workspaces (#114) (cf25b27)
+- **app:** remove Arena, Lanes, and Automations from the UI (#114) (cf25b27)
+- **site:** archive Freebuff panel and references from the landing page (#114) (cf25b27)
+
+### Fixes
+
+- **site:** fall back to releases list when latest tag is not a stable v* release (#114) (8bb3155)
+
 ## [0.2.1] - 2026-09-23
 
 Ninebrains can now update itself. The app checks GitHub for a newer release, tells you what
