@@ -179,15 +179,8 @@ export const ConversationsPanel = observer(function ConversationsPanel() {
                       workspaceId={workspaceId}
                     />
                   </div>
-                  {activeConversation && activeUsageLimit && !disabledReason && (
-                    <UsageLimitBanner
-                      projectId={projectId}
-                      taskId={taskId}
-                      conversation={activeConversation}
-                      manager={conversations}
-                      usageLimit={activeUsageLimit}
-                      connectionId={remoteConnectionId ?? undefined}
-                    />
+                  {activeUsageLimit && !disabledReason && (
+                    <UsageLimitBanner usageLimit={activeUsageLimit} />
                   )}
                   {disabledReason && (
                     <div

@@ -52,7 +52,7 @@ export function McpToolbar({
             variant="secondary"
             onClick={onSeedFromClaude}
             disabled={isSeeding || !canSeedFromClaude}
-            title="Copy Claude-synced MCP servers to Freebuff and Codebuff"
+            title="Copy Claude-synced MCP servers to Codebuff"
           >
             {isSeeding ? (
               <Loader2 className="size-4 animate-spin" />

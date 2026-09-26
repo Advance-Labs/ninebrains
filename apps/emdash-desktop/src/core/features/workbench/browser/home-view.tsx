@@ -1,9 +1,8 @@
 import { menuItemBase } from '@emdash/ui/styles/recipes/menu-item';
-import { Columns2, FolderOpen, Github, Network, Plus, Server, type LucideIcon } from 'lucide-react';
+import { FolderOpen, Github, Network, Plus, Server, type LucideIcon } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import { motion } from 'motion/react';
 import { Fragment } from 'react';
-import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
 import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
 import { homeViewDef } from '@core/features/workbench/contributions/views';
@@ -46,12 +45,6 @@ const PROJECT_ACTIONS = [
 const HOME_ACTIONS = [
   ...PROJECT_ACTIONS.map((action) => ({ ...action, kind: 'project' as const })),
   {
-    kind: 'lanes' as const,
-    label: 'Open Lanes',
-    description: 'Run four agents side by side, each in its own worktree',
-    icon: Columns2,
-  },
-  {
     kind: 'planner' as const,
     label: 'Open Planner',
     description: 'Draw a job plan, then run it across the lanes',
@@ -71,8 +64,6 @@ export const HomeMainPanel = observer(function HomeMainPanel() {
   const run = (action: (typeof HOME_ACTIONS)[number]) => {
     if (action.kind === 'project') {
       void openAddProjectModal(action.modalArgs);
-    } else if (action.kind === 'lanes') {
-      navigate(lanesViewDef({}));
     } else if (firstProjectId) {
       navigate(plannerViewDef({ projectId: firstProjectId }));
     }
@@ -126,7 +117,7 @@ export const HomeMainPanel = observer(function HomeMainPanel() {
             data-testid="home-first-run-hint"
             className="mx-auto mt-6 max-w-md text-center text-xs text-foreground-passive"
           >
-            New here? Add a project, then open Lanes and click a slot to start your first agent.
+            New here? Add a project, then open the Planner to start your first agent.
           </p>
         )}
       </div>

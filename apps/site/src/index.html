@@ -290,26 +290,6 @@
           <span class="rail-caption">Off until you turn them on</span>
           <span class="rail-progress" aria-hidden="true"></span>
         </button>
-        <button
-          type="button"
-          role="tab"
-          id="tab-06"
-          aria-controls="panel-06"
-          aria-selected="false"
-          tabindex="-1"
-          data-panel="06"
-          data-entry="1.5"
-          data-duration="13"
-        >
-          <span class="rail-num">06</span>
-          <svg class="rail-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <path d="M2 5h10.5M10 2.5 12.5 5 10 7.5" />
-            <path d="M14 11H3.5M6 8.5 3.5 11 6 13.5" />
-          </svg>
-          <span class="rail-label">Freebuff</span>
-          <span class="rail-caption">A usage limit is a handoff</span>
-          <span class="rail-progress" aria-hidden="true"></span>
-        </button>
       </div>
 
       <div class="stage" id="stage">
@@ -330,7 +310,7 @@
               >
             </h1>
             <p class="lede">
-              Claude Code, Codex and Freebuff side by side, each in its own git worktree. A central
+              Claude Code, Codex and OpenCode side by side, each in its own git worktree. A central
               Brain hands out the work. Verification gates prove it before it counts as done.
             </p>
 
@@ -434,7 +414,6 @@
               <span class="works-label">Works with</span>
               <span class="badge">Claude Code</span>
               <span class="badge">Codex</span>
-              <span class="badge">Freebuff</span>
               <span class="badge">OpenCode</span>
             </div>
 
@@ -491,7 +470,7 @@
                   </div>
                   <div class="mini-lane">
                     <p class="lane-head">
-                      <i class="orb run"></i><b>Freebuff</b><span>lanes/c9ba2b08</span>
+                      <i class="orb run"></i><b>OpenCode</b><span>lanes/c9ba2b08</span>
                     </p>
                     <p class="t" data-at="1.2">&gt; job j3 search-api</p>
                     <p class="t" data-at="3">read git status, git diff</p>
@@ -601,10 +580,10 @@
                 <div class="lane">
                   <p class="lane-head">
                     <i class="orb run"></i><b>docs-site</b><span>lanes/c9ba2b08</span
-                    ><em>Freebuff</em>
+                    ><em>OpenCode</em>
                   </p>
                   <div class="term">
-                    <p class="t dim" data-at="0.4">freebuff · job j3 search-api</p>
+                    <p class="t dim" data-at="0.4">opencode · job j3 search-api</p>
                     <p class="t type" data-at="1.2" style="--n: 32">
                       &gt; add /api/search on the index
                     </p>
@@ -710,7 +689,7 @@
                   <div class="bl">
                     <p class="lane-head">
                       <i class="orb idle" data-at="8.8" data-swap="run"></i><b>lane 3</b
-                      ><em>Freebuff</em>
+                      ><em>OpenCode</em>
                     </p>
                     <p class="t dim" data-at="0">› Ready for the next job.</p>
                     <p class="t" data-at="8.8">› j3 search-api</p>
@@ -1174,137 +1153,7 @@
           </div>
         </section>
 
-        <!-- 06 Freebuff -->
-        <section
-          class="panel"
-          role="tabpanel"
-          id="panel-06"
-          aria-labelledby="tab-06"
-          data-panel="06"
-          hidden
-        >
-          <div class="text">
-            <p class="kicker"><span>06</span> Freebuff fallback</p>
-            <h2>A usage limit does not end the lane.</h2>
-            <p class="feature-copy">
-              <span class="copy-full"
-                >When Claude Code or Codex hits its usage limit mid-task, the conversation offers to
-                continue in Freebuff, free, in the same worktree. One click opens it and copies a
-                handoff note.</span
-              >
-              <span class="copy-short"
-                >When Claude Code or Codex hits its usage limit, one click continues the lane in
-                Freebuff, free, in the same worktree.</span
-              >
-            </p>
-            <div class="cube-slot" data-slot aria-hidden="true"></div>
-          </div>
-          <div class="win-fit" data-fit data-demo aria-hidden="true">
-            <div class="win">
-              <div class="win-title">
-                <svg class="mark" viewBox="0 0 70 70"><use href="#mark"></use></svg>
-                <span>Ninebrains</span><span class="win-sub">docs-site</span>
-                <span class="win-live">LIVE · FREEBUFF</span>
-              </div>
-              <div class="win-tabs">
-                <span class="wt-title">lane 3</span>
-                <span class="wt is-on" data-off="5.4"
-                  ><i class="orb run" data-at="2.6" data-swap="warn"></i>Claude Code</span
-                >
-                <span class="wt" data-at="5.4"><i class="orb warn"></i>Claude Code</span>
-                <span class="wt is-on" data-at="5.4"
-                  ><i class="orb idle" data-at="7.8" data-swap="run"></i>Freebuff</span
-                >
-                <span class="wt-plus">+</span>
-                <span class="grow"></span>
-                <span class="wt-right">⎇ lanes/c9ba2b08</span>
-              </div>
-              <div class="win-body freebuff">
-                <div class="fb-term fb-claude" data-off="5.4">
-                  <p class="t dim" data-at="0.1">✻ Claude Code · job j3 search-api</p>
-                  <p class="t type" data-at="0.3" style="--n: 36">
-                    &gt; add /api/search backed by the index
-                  </p>
-                  <p class="t" data-at="0.9">
-                    ⏺ <b>Read</b>(src/server/routes.ts) <span class="dim">64 lines</span>
-                  </p>
-                  <p class="t" data-at="1.2">⏺ <b>Write</b>(src/server/search.ts)</p>
-                  <p class="t" data-at="1.4">
-                    &nbsp; ⎿ <span class="add">+61</span> <span class="del">-4</span>
-                  </p>
-                  <p class="t" data-at="1.7">⏺ <b>Bash</b>(pnpm test server)</p>
-                  <p class="t pass" data-at="2">&nbsp; ⎿ 18 passed</p>
-                  <p class="t" data-at="2.2">
-                    ⏺ Now wiring the route into the router<i class="caret" data-off="2.6"></i>
-                  </p>
-                  <p class="t warn" data-at="2.6">⎿ 5-hour limit reached ∙ resets 7pm</p>
-                  <p class="t dim" data-at="2.8">
-                    &nbsp;&nbsp; /upgrade to increase your usage limit.
-                  </p>
-                </div>
-                <div class="banner" data-at="3.4" data-off="5.4">
-                  <i class="bi">!</i>
-                  <div class="bt">
-                    <p><b>Usage limit reached</b></p>
-                    <p>
-                      5-hour limit reached ∙ resets 7pm. Keep going for free in Freebuff, in this
-                      same worktree.
-                    </p>
-                  </div>
-                  <span class="btn" data-at="4.8">Continue in Freebuff</span>
-                  <span class="btn btn-idle" data-off="4.8">Continue in Freebuff</span>
-                  <span class="x">×</span>
-                </div>
-                <div class="fb-term fb-free" data-at="5.4">
-                  <p class="t dim">freebuff · same worktree, lanes/c9ba2b08</p>
-                  <p class="t paste" data-at="6.2">
-                    &gt; I'm continuing a task that claude was working on in this worktree until it
-                    hit its usage limit ("5-hour limit reached ∙ resets 7pm").
-                  </p>
-                  <p class="t paste" data-at="6.2">&nbsp; The task: search-api.</p>
-                  <p class="t paste" data-at="6.2">
-                    &nbsp; Start by reading `git status` and `git diff` to see what has been done so
-                    far, then carry on from there.
-                  </p>
-                  <p class="t" data-at="7">▸ <b>Bash</b> git status --short</p>
-                  <p class="t dim" data-at="7.3">&nbsp; M src/server/search.ts</p>
-                  <p class="t" data-at="7.8">
-                    ▸ <b>Read</b> src/server/search.ts <span class="add">+61</span>
-                    <span class="del">-4</span>
-                  </p>
-                  <p class="t" data-at="8.5">▸ <b>Edit</b> src/server/router.ts</p>
-                  <p class="t add" data-at="8.8">&nbsp; + import { search } from './search';</p>
-                  <p class="t add" data-at="9">&nbsp; + router.get('/api/search', search);</p>
-                  <p class="t" data-at="9.8">▸ <b>Bash</b> pnpm test server</p>
-                  <p class="t pass" data-at="10.8">&nbsp; ✓ 20 passed</p>
-                  <p class="t pass" data-at="11.6">
-                    ✓ /api/search is wired in; handing j3 back to verifying<i class="caret"></i>
-                  </p>
-                </div>
-                <div class="toast" data-at="5.6" data-off="8.4">
-                  <i class="ti ok">✓</i>
-                  <div>
-                    <p>
-                      Handoff note copied. Paste it into Freebuff to pick up where you left off.
-                    </p>
-                  </div>
-                </div>
-                <svg class="cursor" viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M2 1.5v12l3.2-3 2.1 4.8 2-.9-2.1-4.7h4.3Z" />
-                </svg>
-              </div>
-              <div class="win-status">
-                <span data-off="5.4">Claude Code</span>
-                <span data-at="5.4">Freebuff · free</span>
-                <span>⎇ lanes/c9ba2b08</span>
-                <span>job j3 · running</span>
-                <span class="meter"><i style="--p: var(--tp)"></i></span>
-                <span class="grow"></span>
-                <span data-clock>00:00</span>
-              </div>
-            </div>
-          </div>
-        </section>
+
       </div>
     </main>
 

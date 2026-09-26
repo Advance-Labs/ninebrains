@@ -7,7 +7,7 @@ function fakeServer(name: string, providers: string[]): McpServer {
 }
 
 describe('seedCliOverridesForClaude', () => {
-  it('unions freebuff and codebuff into every Claude-synced server', () => {
+  it('unions codebuff into every Claude-synced server', () => {
     const seeded = seedCliOverridesForClaude([
       fakeServer('context7', ['claude']),
       fakeServer('notion', ['claude', 'opencode']),
@@ -24,7 +24,7 @@ describe('seedCliOverridesForClaude', () => {
       fakeServer('shared', ['claude', 'codex', 'codebuff']),
     ]);
 
-    expect(seeded[0]!.providers).toEqual(['claude', 'codex', 'codebuff', 'freebuff']);
+    expect(seeded[0]!.providers).toEqual(['claude', 'codex', 'codebuff']);
   });
 
   it('returns [] when no server is synced with Claude', () => {

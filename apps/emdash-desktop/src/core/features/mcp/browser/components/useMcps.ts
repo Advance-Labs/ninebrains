@@ -139,10 +139,10 @@ export function useMcps(host: HostRef) {
         return;
       }
       captureTelemetry('mcp_seeded_from_claude', { count });
-      toast.success(`${count} server${count === 1 ? '' : 's'} seeded for Freebuff and Codebuff`);
+      toast.success(`${count} server${count === 1 ? '' : 's'} seeded for Codebuff`);
     },
     onError: (error) => {
-      toast.error('Failed to seed servers for Freebuff and Codebuff', {
+      toast.error('Failed to seed servers for Codebuff', {
         description: error instanceof Error ? error.message : String(error),
       });
     },

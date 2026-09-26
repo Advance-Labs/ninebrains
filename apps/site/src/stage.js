@@ -807,49 +807,6 @@ const SCENES = [
     };
   },
 
-  // 06 Freebuff: one agent hits its limit and dims; a glowing token carries the lane across.
-  (t) => {
-    const cubes = new Array(9);
-    const a = [-1.9, 0, 0];
-    const b = [1.9, 0, 0];
-    const dimA = ramp(t, 2.6, 1);
-    cubes[3] = actor(a, 1.25, {
-      r: [0.15, 0.5 + t * 0.5 * (1 - dimA), 0],
-      b: (0.95 + 0.1 * Math.sin(t * 3)) * (1 - 0.72 * dimA),
-      // The limit is a state, so it flashes amber, then the cube settles to plain dark grey.
-      tint: tinted('warn', 0.85 * ramp(t, 2.6, 0.15) * flash(t, 2.75, 1.3)),
-    });
-    const litB = ramp(t, 6.2, 0.5);
-    cubes[5] = actor(b, 1.25, {
-      r: [0.15, -0.5 - t * 0.5 * litB, 0],
-      b: 0.3 + 0.7 * litB + 0.08 * Math.sin(t * 3) * litB,
-      tint: tinted('run', 0.35 * flash(t, 6.2, 0.9)),
-    });
-    const small = [0, 1, 2, 4, 6, 7, 8];
-    small.forEach((i, k) => {
-      cubes[i] = actor([-2.4 + k * 0.8, -1.25, -2.2], 0.4, { b: 0.3, r: [0, t * 0.3 + k, 0] });
-    });
-    const sparks = [hidden(), hidden(), hidden()];
-    const from = [a[0] + 0.3, a[1] + 0.2, 0];
-    const to = [b[0] - 0.3, b[1] + 0.2, 0];
-    if (t >= 4.3 && t < 4.8) {
-      sparks[0] = actor(from, 0.28 * ramp(t, 4.3, 0.5), { b: 1.9 });
-    } else if (t >= 4.8 && t < 6.3) {
-      const e = easeInOut(clamp01((t - 4.8) / 1.4));
-      sparks[0] = actor(arcPoint(from, to, 1.7, e), 0.28, { b: 1.9, r: [t * 2, t * 3, 0] });
-    }
-    const lines = [];
-    if (t >= 4.3 && t < 7.4) {
-      const alpha = 0.3 * ramp(t, 4.3, 0.4) * (1 - ramp(t, 6.8, 0.6));
-      lines.push(...arc(from, to, 1.7, [1, 1, 1, alpha], 22));
-    }
-    return {
-      cubes,
-      sparks,
-      lines,
-      cam: { yaw: 0.26, pitch: 0.18, target: [0.9, -0.1, 0], radius: 3.6 },
-    };
-  },
 ];
 
 // --- shader plumbing -----------------------------------------------------------------------------

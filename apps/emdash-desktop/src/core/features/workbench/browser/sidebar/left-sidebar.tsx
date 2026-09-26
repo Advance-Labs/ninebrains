@@ -1,9 +1,6 @@
-import { Activity, Clock, Columns2, FolderInput, MessageSquareShare, Settings } from 'lucide-react';
+import { FolderInput, MessageSquareShare, Settings } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
-import { arenaViewDef } from '@core/features/arena/contributions/views';
-import { automationsViewDef } from '@core/features/automations/contributions/views';
-import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { settingsViewDef } from '@core/features/settings/contributions/views';
 import { openExternal } from '@core/primitives/desktop-host/browser/host-client';
 import { BoundShortcut } from '@core/primitives/keybindings/browser/shortcut';
@@ -73,39 +70,6 @@ export const LeftSidebar: React.FC = observer(function LeftSidebar() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarSearchTrigger />
-            <SidebarMenuButton
-              isActive={isCurrentView(currentView, 'arena')}
-              onClick={() => navigate(arenaViewDef())}
-              aria-label="Activity"
-              className="w-full justify-between"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Activity className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-                <span className="truncate">Activity</span>
-              </span>
-            </SidebarMenuButton>
-            <SidebarMenuButton
-              isActive={isCurrentView(currentView, 'lanes')}
-              onClick={() => navigate(lanesViewDef({}))}
-              aria-label="Lanes"
-              className="w-full justify-between"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Columns2 className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-                <span className="truncate">Lanes</span>
-              </span>
-            </SidebarMenuButton>
-            <SidebarMenuButton
-              isActive={isCurrentView(currentView, 'automations')}
-              onClick={() => navigate(automationsViewDef())}
-              aria-label="Automations"
-              className="w-full justify-between"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Clock className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-                <span className="truncate">Automations</span>
-              </span>
-            </SidebarMenuButton>
             <SidebarMenuButton
               isActive={isCurrentView(currentView, 'settings')}
               onClick={() => navigate(settingsViewDef())}

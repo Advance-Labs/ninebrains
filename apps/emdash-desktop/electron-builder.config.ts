@@ -24,6 +24,7 @@ const config: Configuration = {
   asarUnpack: [
     'out/main/adapters/**',
     'out/main/brain-mcp/**',
+    'out/main/brain-cli/**',
     'node_modules/better-sqlite3/**',
     'node_modules/node-pty/**',
     'node_modules/@parcel/watcher/**',

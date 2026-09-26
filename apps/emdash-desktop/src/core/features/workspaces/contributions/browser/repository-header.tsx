@@ -1,8 +1,9 @@
 import { WorkspaceIcon, type WorkspaceIconStatus } from '@emdash/ui/react/components';
-import { Button, DropdownMenu } from '@emdash/ui/react/primitives';
-import { AlertTriangleIcon, EllipsisIcon, Trash2Icon } from 'lucide-react';
+import { Button, DropdownMenu, useToast } from '@emdash/ui/react/primitives';
+import { AlertTriangleIcon, EllipsisIcon, Terminal, Trash2Icon } from 'lucide-react';
 import { useId } from 'react';
 import { formatBytes } from '@core/primitives/formatting/browser/formatBytes';
+import { getHostClient } from '@core/primitives/desktop-host/browser/host-client';
 import type {
   ProjectWorkspaceGitStats,
   ProjectWorkspaceRow,
@@ -38,6 +39,7 @@ export function RepositoryHeader({
 }) {
   const healthStatus = status;
   const disabledReasonId = useId();
+  const { toast } = useToast();
 
   return (
     <section className="rounded-lg border border-border bg-background-secondary/40 px-4 py-3">
@@ -74,6 +76,31 @@ export function RepositoryHeader({
             </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end">
+            <DropdownMenu.Item
+              onClick={async () => {
+                try {
+                  const res = await (
+                    await getHostClient()
+                  ).openIn({
+                    app: 'terminal',
+                    path: rootRow.path,
+                  });
+                  if (!res?.success) {
+                    toast.error('Could not open Brain CLI', {
+                      description: res?.error || 'Terminal unavailable.',
+                    });
+                  }
+                } catch (e: unknown) {
+                  toast.error('Could not open Brain CLI', {
+                    description: e instanceof Error ? e.message : String(e),
+                  });
+                }
+              }}
+            >
+              <Terminal aria-hidden className="size-4" />
+              Open Brain CLI
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
             <DropdownMenu.Item
               variant="destructive"
               disabled={!!actionDisabledReason}

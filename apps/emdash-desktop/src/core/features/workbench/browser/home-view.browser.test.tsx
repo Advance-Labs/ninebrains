@@ -1,7 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { lanesViewDef } from '@core/features/lanes/contributions/views';
 import { plannerViewDef } from '@core/features/planner/contributions/views';
 import { HomeMainPanel } from './home-view';
 
@@ -60,18 +59,10 @@ describe('home view lanes and planner discovery', () => {
   const button = (label: string) =>
     host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
 
-  it('renders Open Lanes and Open Planner tiles', async () => {
+  it('renders Open Planner tile', async () => {
     projectState.size = 1;
     await render();
-    expect(button('Open Lanes')).toBeTruthy();
     expect(button('Open Planner')).toBeTruthy();
-  });
-
-  it('navigates to the lanes view', async () => {
-    projectState.size = 1;
-    await render();
-    button('Open Lanes')?.click();
-    expect(navigateSpy).toHaveBeenCalledWith(lanesViewDef({}));
   });
 
   it('navigates to the planner view for the first project', async () => {
