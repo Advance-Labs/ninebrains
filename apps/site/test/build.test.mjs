@@ -67,10 +67,10 @@ test('each copy button copies exactly the one-line command it sits next to', () 
 
 test('the demo windows and cube slots are decoration only, hidden from assistive tech', () => {
   const fits = [...flat.matchAll(/<div class="win-fit[^"]*"[^>]*>/g)].map((m) => m[0]);
-  assert.equal(fits.length, 7, 'one demo window per scene');
+  assert.equal(fits.length, 6, 'one demo window per scene');
   for (const tag of fits) assert.match(tag, /aria-hidden="true"/, `not hidden: ${tag}`);
   const slots = [...flat.matchAll(/<div class="cube-slot"[^>]*>/g)].map((m) => m[0]);
-  assert.equal(slots.length, 7, 'one cube slot per scene');
+  assert.equal(slots.length, 6, 'one cube slot per scene');
   for (const tag of slots) assert.match(tag, /aria-hidden="true"/);
 });
 
@@ -84,7 +84,7 @@ test('the page is one screen: the root never scrolls', () => {
 
 test('each rail tab carries an icon, a caption and a scene length for auto-advance', () => {
   const tabs = [...flat.matchAll(/<button[^>]*role="tab"[^>]*id="tab-\d\d"[\s\S]*?<\/button>/g)];
-  assert.equal(tabs.length, 7);
+  assert.equal(tabs.length, 6);
   for (const [tab] of tabs) {
     assert.match(tab, /<svg class="rail-icon"/);
     assert.match(tab, /class="rail-caption">[^<]+</);
@@ -97,7 +97,7 @@ test('every timeline mark in a demo lands inside its scene', () => {
   const lengths = Object.fromEntries(
     [...flat.matchAll(/id="tab-(\d\d)"[^>]*data-duration="(\d+)"/g)].map((m) => [m[1], +m[2]])
   );
-  assert.equal(Object.keys(lengths).length, 7);
+  assert.equal(Object.keys(lengths).length, 6);
   for (const [num, length] of Object.entries(lengths)) {
     const panel = html.match(new RegExp(`id="panel-${num}"[\\s\\S]*?(?=id="panel-|</main>)`));
     assert.ok(panel, `panel-${num} not found`);
@@ -132,7 +132,7 @@ test('says plainly that builds are unsigned, and how that is checked', () => {
 
 test('the feature rail is a real tablist: one tab per panel, one selected by default', () => {
   const railTabs = [...html.matchAll(/role="tab"[^>]*id="tab-(\d\d)"/g)].map((m) => m[1]);
-  assert.deepEqual(railTabs, ['00', '01', '02', '03', '04', '05', '06']);
+  assert.deepEqual(railTabs, ['00', '01', '02', '03', '04', '05']);
   for (const num of railTabs) {
     assert.match(flat, new RegExp(`id="panel-${num}"`), `missing panel-${num}`);
     assert.match(
@@ -147,7 +147,7 @@ test('the feature rail is a real tablist: one tab per panel, one selected by def
 });
 
 test('every rail panel past the overview has a LIVE feature demo', () => {
-  for (const num of ['01', '02', '03', '04', '05', '06']) {
+  for (const num of ['01', '02', '03', '04', '05']) {
     const panel = html.match(new RegExp(`id="panel-${num}"[\\s\\S]*?(?=id="panel-|</main>)`));
     assert.ok(panel, `panel-${num} not found`);
     assert.match(panel[0], /LIVE ·/, `panel-${num} is missing its LIVE kicker`);
@@ -195,7 +195,7 @@ test('every scene opens on a populated entry frame inside its run', () => {
   const tabs = [
     ...flat.matchAll(/id="tab-(\d\d)"[^>]*data-entry="([^"]+)"[^>]*data-duration="(\d+)"/g),
   ];
-  assert.equal(tabs.length, 7, 'every rail tab needs data-entry before data-duration');
+  assert.equal(tabs.length, 6, 'every rail tab needs data-entry before data-duration');
   for (const [, num, entry, duration] of tabs) {
     const t = Number(entry);
     assert.ok(t > 0 && t < Number(duration) / 3, `tab-${num}: entry ${entry} out of range`);
@@ -204,9 +204,9 @@ test('every scene opens on a populated entry frame inside its run', () => {
 
 test('phones read a short version of each feature, four lines at most', () => {
   const shorts = [...flat.matchAll(/<span class="copy-short" ?>([^<]+)<\/span/g)].map((m) => m[1]);
-  assert.equal(shorts.length, 6, 'one short copy per feature');
+  assert.equal(shorts.length, 5, 'one short copy per feature');
   for (const text of shorts) assert.ok(text.length <= 140, `too long for four lines: ${text}`);
-  assert.equal([...flat.matchAll(/<span class="copy-full" ?>/g)].length, 6);
+  assert.equal([...flat.matchAll(/<span class="copy-full" ?>/g)].length, 5);
 });
 
 test('the cubes are framed into a measured safe area, and the audit hook stays opt-in', () => {

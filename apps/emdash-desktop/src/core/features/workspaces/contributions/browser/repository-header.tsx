@@ -2,8 +2,8 @@ import { WorkspaceIcon, type WorkspaceIconStatus } from '@emdash/ui/react/compon
 import { Button, DropdownMenu, useToast } from '@emdash/ui/react/primitives';
 import { AlertTriangleIcon, EllipsisIcon, Terminal, Trash2Icon } from 'lucide-react';
 import { useId } from 'react';
-import { formatBytes } from '@core/primitives/formatting/browser/formatBytes';
 import { getHostClient } from '@core/primitives/desktop-host/browser/host-client';
+import { formatBytes } from '@core/primitives/formatting/browser/formatBytes';
 import type {
   ProjectWorkspaceGitStats,
   ProjectWorkspaceRow,
