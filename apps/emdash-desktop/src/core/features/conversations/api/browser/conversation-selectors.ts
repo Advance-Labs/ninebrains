@@ -8,6 +8,21 @@ export function getConversationsForTask(taskId: string) {
   return conversationRegistry.get(taskId);
 }
 
+/**
+ * Ninebrains: resolves the workbench tab kind for a conversation the caller only knows by
+ * (taskId, conversationId) — e.g. the notification open handler, which has no conversation
+ * store in scope. Panes are keyed by (kind, conversationId), so opening the wrong kind
+ * ('conversation' for an ACP chat) misses the existing 'acp-chat' tab and spawns a new one.
+ * Falls back to 'conversation' when the conversation is not loaded yet.
+ */
+export function conversationTabKindForTask(
+  taskId: string,
+  conversationId: string
+): 'conversation' | 'acp-chat' {
+  const type = conversationRegistry.get(taskId)?.conversations.get(conversationId)?.data.type;
+  return type === 'acp' ? 'acp-chat' : 'conversation';
+}
+
 export function taskAgentStatus(store: TaskStore): AgentStatus | null {
   return conversationRegistry.get(store.data.id)?.taskStatus ?? null;
 }

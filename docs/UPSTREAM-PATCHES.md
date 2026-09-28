@@ -1105,3 +1105,10 @@ so upstream's README URL is the only inherited surface that had to change.
 | `packages/core/src/runtimes/tui-agents/node/runtime/runtime.ts` | `AGENT_STATUS_IDLE_MS` (15s) and a per-conversation output-silence timer: `onData` calls `markOutputActivity` and (re)arms the timer; on silence it fires `resetIdleIfWorking`. Timer cleared on stop, process exit, evict and dispose. Tests in `runtime.test.ts` | Interactive TUIs repaint ~1/s while working, so silence reliably means the turn ended. This clears a stuck spinner when a stop hook is dropped (a `claude --resume` session-id change misroutes it, #92) and provides the idle edge for providers with no stop hook. Fixes #118 |
 | `packages/core/src/runtimes/tui-agents/api/schemas.ts` | `tuiAgentState.source` enum gains `output` | Distinguishes output-inferred `working` from `hook`/`input` sources |
 | `src/core/primitives/agents/api/agent-events.ts` | `AgentEvent.source` union gains `output` | The desktop signal type must accept the new source the transition forwards from the TUI state |
+
+## 62. A notification opens the conversation it belongs to (`ninebrains/install-zuk6j`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/conversations/api/browser/conversation-selectors.ts` | New `conversationTabKindForTask(taskId, conversationId)`: resolves `acp-chat` vs `conversation` from the conversation's type via the registry, falling back to `conversation` | The notification open handler knows a conversation only by id and had no way to pick the right tab kind |
+| `src/core/features/workbench/contributions/browser/notification-open-handlers.ts` | The `task` open handler waits for the conversation to load and opens `conversationTabKindForTask(...)` instead of a hardcoded `'conversation'` | Panes key by `(kind, conversationId)`; opening `'conversation'` for an ACP chat missed the existing `'acp-chat'` tab and spawned a new/mismatched one, so clicking a notification opened a new conversation instead of the associated one (#118 sibling) |

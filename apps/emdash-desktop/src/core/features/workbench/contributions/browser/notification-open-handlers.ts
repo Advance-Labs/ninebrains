@@ -1,6 +1,10 @@
 import { createScope } from '@emdash/shared/concurrency';
 import { when } from 'mobx';
 import { useEffect } from 'react';
+import {
+  conversationTabKindForTask,
+  getConversationsForTask,
+} from '@core/features/conversations/api/browser/conversation-selectors';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
 import { getUpdateStore } from '@core/features/updates/contributions/app-stores';
 import { getTaskComposition } from '@core/features/workbench/api/browser/task-composition-selectors';
@@ -21,10 +25,15 @@ export function useRegisterNotificationOpenHandlers(): void {
         if (!conversationId) return;
 
         const dispose = when(
-          () => !!getTaskComposition(target.projectId, target.taskId),
+          // Wait for the conversation to load too, so its type resolves and we open the
+          // matching tab kind. Panes key by (kind, conversationId): opening 'conversation'
+          // for an ACP chat misses the existing 'acp-chat' tab and spawns a new one.
+          () =>
+            !!getTaskComposition(target.projectId, target.taskId) &&
+            !!getConversationsForTask(target.taskId)?.conversations.get(conversationId),
           () => {
             getTaskComposition(target.projectId, target.taskId)?.paneLayout.open(
-              'conversation',
+              conversationTabKindForTask(target.taskId, conversationId),
               { conversationId },
               { preview: false }
             );
