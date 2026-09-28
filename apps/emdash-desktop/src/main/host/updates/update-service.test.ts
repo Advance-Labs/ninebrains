@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { UpdateService } from './update-service';
+import { CHECK_TIMEOUT_MS, RESUME_CHECK_DELAY_MS, UpdateService } from './update-service';
 
 const hoisted = vi.hoisted(() => {
   const app = {
@@ -19,6 +19,7 @@ const hoisted = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: hoisted.app,
   net: { fetch: vi.fn() },
+  powerMonitor: { on: vi.fn(), off: vi.fn() },
 }));
 vi.mock('@core/features/updates/node', () => ({ updateEvents: hoisted.updateEvents }));
 vi.mock('@main/core/app/utils', () => ({ resolveAppVersion: hoisted.resolveAppVersion }));
@@ -79,5 +80,74 @@ describe('UpdateService', () => {
     expect(service.isInstallRequested).toBe(false);
     service.dispose();
     await expect(service.fetchReleaseNotes()).resolves.toBeNull();
+  });
+
+  // The active check path is gated behind a packaged, non-dev build; force it on for these.
+  function activate(s: UpdateService): void {
+    (s as unknown as { active: boolean }).active = true;
+  }
+
+  function emittedTypes(): string[] {
+    return hoisted.updateEvents.emit.mock.calls.map((call) => (call[1] as { type: string }).type);
+  }
+
+  it('dismisses to not-available when a check fails, never stranding the UI on checking', async () => {
+    activate(service);
+    fetchImpl.mockRejectedValue(new Error('network down'));
+
+    await service.checkForUpdates();
+
+    const types = emittedTypes();
+    expect(types).toContain('checking');
+    expect(types).toContain('not-available');
+    expect(types).not.toContain('error');
+    expect(service.getState().status).toBe('idle');
+  });
+
+  it('times out a hung check and dismisses instead of hanging on checking', async () => {
+    vi.useFakeTimers();
+    try {
+      activate(service);
+      fetchImpl.mockReturnValue(new Promise(() => {})); // never resolves
+
+      const check = service.checkForUpdates();
+      await vi.advanceTimersByTimeAsync(CHECK_TIMEOUT_MS + 100);
+      await check;
+
+      const types = emittedTypes();
+      expect(types).toContain('checking');
+      expect(types).toContain('not-available');
+      expect(service.getState().status).toBe('idle');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-checks shortly after a machine resume when active', async () => {
+    vi.useFakeTimers();
+    try {
+      activate(service);
+      fetchImpl.mockResolvedValue({ status: 404 } as Response); // 404 => no release, resolves fast
+
+      service.onSystemResume();
+      expect(fetchImpl).not.toHaveBeenCalled(); // deferred, not immediate
+      await vi.advanceTimersByTimeAsync(RESUME_CHECK_DELAY_MS + 100);
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(emittedTypes()).toContain('not-available');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a resume while inactive', () => {
+    vi.useFakeTimers();
+    try {
+      service.onSystemResume();
+      vi.advanceTimersByTime(RESUME_CHECK_DELAY_MS * 2);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

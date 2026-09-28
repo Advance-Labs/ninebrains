@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Disposable } from '@emdash/shared/concurrency';
-import { app, net } from 'electron';
+import { runWithTimeout } from '@emdash/shared/scheduling';
+import { app, net, powerMonitor } from 'electron';
 import { updateEvents } from '@core/features/updates/node';
 import { UPDATE_CHANNEL } from '@core/primitives/app-identity/api/app-identity';
 import { UPDATES_ENABLED } from '@core/primitives/app-identity/api/fork-flags';
@@ -30,6 +31,10 @@ import { compareVersions } from './version';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_DELAY_MS = 30 * 1000; // 30 seconds
 const INSTALL_RESTART_GUARD_TIMEOUT_MS = 2 * 60 * 1000;
+// A single check must not hang the UI on "Checking…" forever if the feed never answers.
+export const CHECK_TIMEOUT_MS = 20 * 1000; // 20 seconds
+// A machine wake usually lands with the network still coming up; check shortly after, not at once.
+export const RESUME_CHECK_DELAY_MS = 10 * 1000; // 10 seconds
 
 export interface UpdateState {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error';
@@ -65,6 +70,7 @@ export class UpdateService implements Disposable {
   private pendingWindowsInstaller?: string;
   private notificationPublisher?: UpdateNotificationPublisher;
   private readonly fetchImpl: FeedFetcher;
+  private readonly handleSystemResume = (): void => this.onSystemResume();
 
   constructor(fetchImpl: FeedFetcher = defaultFetcher) {
     this.fetchImpl = fetchImpl;
@@ -99,6 +105,15 @@ export class UpdateService implements Disposable {
     });
 
     this.scheduleNextCheck(STARTUP_DELAY_MS);
+    // Re-check when the machine wakes: a laptop that slept for a day would otherwise wait up to an
+    // hour for the next scheduled check. onSystemResume defers slightly for the network to return.
+    powerMonitor.on('resume', this.handleSystemResume);
+  }
+
+  /** Bring the next check forward after a machine wake (network may still be coming up). */
+  onSystemResume(): void {
+    if (!this.active) return;
+    this.scheduleNextCheck(RESUME_CHECK_DELAY_MS);
   }
 
   /** Best effort, and never fatal: leftovers only cost disk, and the next boot tries again. */
@@ -222,30 +237,43 @@ export class UpdateService implements Disposable {
     this.updateState.lastCheck = new Date();
     updateEvents.emit(undefined, { type: 'checking' });
 
-    const release = await fetchLatestRelease(this.fetchImpl);
-    if (!release) {
-      this.updateState.status = 'idle';
-      updateEvents.emit(undefined, { type: 'not-available' });
-      return null;
+    try {
+      const release = await runWithTimeout(() => fetchLatestRelease(this.fetchImpl), {
+        timeoutMs: CHECK_TIMEOUT_MS,
+      });
+      if (!release) return this.settleNoUpdate();
+
+      // Only the signed digest decides what may download, so resolve it before announcing anything.
+      // Failure here (bad signature, no local installer) surfaces below as no-update, never as an
+      // update — the trust chain still fails closed.
+      const resolved = await runWithTimeout(() => resolveInstaller(release, this.fetchImpl), {
+        timeoutMs: CHECK_TIMEOUT_MS,
+      });
+
+      if (compareVersions(resolved.version, this.updateState.currentVersion) <= 0) {
+        return this.settleNoUpdate();
+      }
+
+      this.updateState.status = 'available';
+      this.updateState.availableVersion = resolved.version;
+      this.updateState.updateInfo = resolved;
+      this.updateState.releaseNotes = release.releaseNotes;
+      updateEvents.emit(undefined, { type: 'available', version: resolved.version });
+      this.publishNotification((publisher) => publisher.available(resolved.version));
+      return release;
+    } catch (error) {
+      // A failed or timed-out check must never strand the UI on "Checking…". Dismiss silently and
+      // let the scheduled retry try again; nothing in the check path downloads or applies anything.
+      log.warn('Update check did not complete; dismissing', { error: formatUpdaterError(error) });
+      return this.settleNoUpdate();
     }
+  }
 
-    // Only the signed digest decides what may download, so resolve it before announcing anything.
-    // Failure here (bad signature, no local installer) surfaces as an error, never as an update.
-    const resolved = await resolveInstaller(release, this.fetchImpl);
-
-    if (compareVersions(resolved.version, this.updateState.currentVersion) <= 0) {
-      this.updateState.status = 'idle';
-      updateEvents.emit(undefined, { type: 'not-available' });
-      return null;
-    }
-
-    this.updateState.status = 'available';
-    this.updateState.availableVersion = resolved.version;
-    this.updateState.updateInfo = resolved;
-    this.updateState.releaseNotes = release.releaseNotes;
-    updateEvents.emit(undefined, { type: 'available', version: resolved.version });
-    this.publishNotification((publisher) => publisher.available(resolved.version));
-    return release;
+  /** No update to offer: return to idle and let the pill dismiss. Does not clear a staged update. */
+  private settleNoUpdate(): null {
+    this.updateState.status = 'idle';
+    updateEvents.emit(undefined, { type: 'not-available' });
+    return null;
   }
 
   async downloadUpdate(): Promise<void> {
@@ -403,6 +431,7 @@ export class UpdateService implements Disposable {
   }
 
   dispose(): void {
+    powerMonitor.off('resume', this.handleSystemResume);
     if (this.checkTimer) {
       clearTimeout(this.checkTimer);
       this.checkTimer = undefined;
