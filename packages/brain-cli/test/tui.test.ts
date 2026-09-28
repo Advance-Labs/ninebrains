@@ -114,6 +114,12 @@ describe('brain TUI', () => {
       {
         stdout: mockStdout as unknown as NodeJS.WriteStream,
         stdin: mockStdin as unknown as NodeJS.ReadStream,
+        // Ink only writes dynamic frames to stdout while interactive, and it treats a CI
+        // environment as non-interactive (isInCi in ink/build/ink.js) regardless of isTTY,
+        // buffering the frame until unmount. That left this capture empty under CI while it
+        // passed locally. debug mode writes every frame synchronously, so the assertions below
+        // see the rendered output in both environments.
+        debug: true,
       }
     );
 
