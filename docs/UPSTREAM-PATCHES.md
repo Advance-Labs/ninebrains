@@ -1090,3 +1090,9 @@ The rest of the migration touches Ninebrains-only files and needs no rows: the s
 their Vercel configs, both installers, `llms.txt`, the release workflow and notes, `CHANGELOG.md`
 and the strategy docs. `ninebrains.runs-on.dev` 301s to the new host from `apps/site/vercel.json`,
 so upstream's README URL is the only inherited surface that had to change.
+
+## 60. A workspace can open the Brain CLI in a terminal (`ninebrains/install-zuk6j`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/workspaces/contributions/browser/repository-header.tsx` | The repository header dropdown gains an "Open Brain CLI" item (above the destructive delete, with a separator): it calls the host `openIn({ app: 'terminal', path })` on the workspace root and toasts on failure | The bundled `brain` CLI (section 58) had no in-app entry point; opening a terminal in the workspace root is where it runs. Landed unlogged in `cf25b2766` (Arena/Lanes/Automations removal) and left unlogged when `82cc2b668` reformatted the file; the upstream divergence is recorded here |
