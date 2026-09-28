@@ -22,6 +22,8 @@ test('ships every asset the page references', () => {
   for (const match of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) {
     const path = match[1];
     if (path.startsWith('//')) continue;
+    // Vercel Analytics script is served at runtime by Vercel infrastructure
+    if (path.startsWith('/_vercel/')) continue;
     assert.doesNotThrow(
       () => readFileSync(join(DIST, path.slice(1))),
       `referenced but not built: ${path}`
