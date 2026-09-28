@@ -1112,3 +1112,9 @@ so upstream's README URL is the only inherited surface that had to change.
 |---|---|---|
 | `src/core/features/conversations/api/browser/conversation-selectors.ts` | New `conversationTabKindForTask(taskId, conversationId)`: resolves `acp-chat` vs `conversation` from the conversation's type via the registry, falling back to `conversation` | The notification open handler knows a conversation only by id and had no way to pick the right tab kind |
 | `src/core/features/workbench/contributions/browser/notification-open-handlers.ts` | The `task` open handler waits for the conversation to load and opens `conversationTabKindForTask(...)` instead of a hardcoded `'conversation'` | Panes key by `(kind, conversationId)`; opening `'conversation'` for an ACP chat missed the existing `'acp-chat'` tab and spawned a new/mismatched one, so clicking a notification opened a new conversation instead of the associated one (#118 sibling) |
+
+## 63. The update check never strands the pill on "Checking…", and re-checks on wake (`ninebrains/install-zuk6j`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/main/host/updates/update-service.ts` | `performCheck` wraps the feed fetch + installer resolve in `runWithTimeout` (20s) and a try/catch that funnels any failure/timeout through a new `settleNoUpdate()` (status idle + a `not-available` event). Adds `onSystemResume()` (brings the next check forward by 10s after a wake) registered via `powerMonitor.on('resume', …)` in `initialize`, removed in `dispose`. `CHECK_TIMEOUT_MS` / `RESUME_CHECK_DELAY_MS` exported for tests | A check that threw or hung emitted `checking` but no terminal event, so the event-driven pill stuck on "Checking…" forever (common right after a wake, before the network is up). Now every check settles, the pill can dismiss, and a wake triggers a fresh check instead of waiting up to an hour. The trust chain is untouched: a failed check offers no update (fails closed). Tests in `update-service.test.ts` |
