@@ -1096,3 +1096,12 @@ so upstream's README URL is the only inherited surface that had to change.
 | File | Change | Why |
 |---|---|---|
 | `src/core/features/workspaces/contributions/browser/repository-header.tsx` | The repository header dropdown gains an "Open Brain CLI" item (above the destructive delete, with a separator): it calls the host `openIn({ app: 'terminal', path })` on the workspace root and toasts on failure | The bundled `brain` CLI (section 58) had no in-app entry point; opening a terminal in the workspace root is where it runs. Landed unlogged in `cf25b2766` (Arena/Lanes/Automations removal) and left unlogged when `82cc2b668` reformatted the file; the upstream divergence is recorded here |
+
+## 61. The sidebar working spinner is self-correcting and provider-agnostic (`ninebrains/install-zuk6j`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.ts` | `markOutputActivity` promotes idle/completed to `working` (source `output`) on raw pty output, but only for a provider without a `start` hook, and never over `awaiting-input`/`error` or an existing `working`; `resetIdleIfWorking` clears only a stale `working`. Tests in `agent-state.test.ts` | A provider with no `start` hook (e.g. codex) could never reach `working`, so its sidebar spinner never showed; and a `working` set by a hook had no idle path if the stop hook was missed |
+| `packages/core/src/runtimes/tui-agents/node/runtime/runtime.ts` | `AGENT_STATUS_IDLE_MS` (15s) and a per-conversation output-silence timer: `onData` calls `markOutputActivity` and (re)arms the timer; on silence it fires `resetIdleIfWorking`. Timer cleared on stop, process exit, evict and dispose. Tests in `runtime.test.ts` | Interactive TUIs repaint ~1/s while working, so silence reliably means the turn ended. This clears a stuck spinner when a stop hook is dropped (a `claude --resume` session-id change misroutes it, #92) and provides the idle edge for providers with no stop hook. Fixes #118 |
+| `packages/core/src/runtimes/tui-agents/api/schemas.ts` | `tuiAgentState.source` enum gains `output` | Distinguishes output-inferred `working` from `hook`/`input` sources |
+| `src/core/primitives/agents/api/agent-events.ts` | `AgentEvent.source` union gains `output` | The desktop signal type must accept the new source the transition forwards from the TUI state |

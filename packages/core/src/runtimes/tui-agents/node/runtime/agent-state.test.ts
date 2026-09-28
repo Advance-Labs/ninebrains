@@ -140,4 +140,74 @@ describe('TuiAgentStates', () => {
 
     expect(onSessionIdChanged).not.toHaveBeenCalled();
   });
+
+  it('markOutputActivity promotes idle to working for a provider without a start hook', () => {
+    const { tracker, agentStates } = createTracker();
+
+    tracker.markOutputActivity('conv-1', 'codex', { hooks: { kind: 'none' } });
+
+    expect(peek(agentStates.states.list)['conv-1']).toMatchObject({
+      status: 'working',
+      source: 'output',
+      providerId: 'codex',
+    });
+  });
+
+  it('markOutputActivity is a no-op for a provider whose start hook owns working', () => {
+    const { tracker, agentStates } = createTracker();
+
+    tracker.markOutputActivity('conv-1', 'claude', {
+      hooks: { kind: 'config', scope: 'workspace', supportedEvents: ['start'] },
+    });
+
+    expect(peek(agentStates.states.list)['conv-1']).toBeUndefined();
+  });
+
+  it('markOutputActivity never overrides awaiting-input or error', () => {
+    const { tracker, agentStates } = createTracker();
+
+    for (const status of ['awaiting-input', 'error'] as const) {
+      const conversationId = `conv-${status}`;
+      tracker.applyCanonicalEvent(conversationId, 'codex', {
+        kind: 'status',
+        type: status === 'error' ? 'error' : 'notification',
+        notificationType: status === 'awaiting-input' ? 'permission_prompt' : undefined,
+      });
+      tracker.markOutputActivity(conversationId, 'codex', { hooks: { kind: 'none' } });
+      expect(peek(agentStates.states.list)[conversationId]?.status).toBe(status);
+    }
+  });
+
+  it('markOutputActivity does not clobber an existing working state (keeps hook metadata)', () => {
+    const { tracker, agentStates } = createTracker();
+
+    tracker.applyCanonicalEvent('conv-1', 'codex', {
+      kind: 'status',
+      type: 'start',
+      title: 'Editing files',
+    });
+    tracker.markOutputActivity('conv-1', 'codex', { hooks: { kind: 'none' } });
+
+    expect(peek(agentStates.states.list)['conv-1']).toMatchObject({
+      status: 'working',
+      source: 'hook',
+      title: 'Editing files',
+    });
+  });
+
+  it('resetIdleIfWorking clears a stale working but leaves awaiting-input alone', () => {
+    const { tracker, agentStates } = createTracker();
+
+    tracker.applyCanonicalEvent('working-conv', 'claude', { kind: 'status', type: 'start' });
+    tracker.resetIdleIfWorking('working-conv');
+    expect(peek(agentStates.states.list)['working-conv']?.status).toBe('idle');
+
+    tracker.applyCanonicalEvent('await-conv', 'claude', {
+      kind: 'status',
+      type: 'notification',
+      notificationType: 'permission_prompt',
+    });
+    tracker.resetIdleIfWorking('await-conv');
+    expect(peek(agentStates.states.list)['await-conv']?.status).toBe('awaiting-input');
+  });
 });
