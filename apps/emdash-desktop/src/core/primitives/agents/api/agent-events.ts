@@ -22,7 +22,9 @@ export function isAttentionNotification(
 
 export interface AgentEvent {
   type: AgentEventType;
-  source?: 'hook' | 'input';
+  // Ninebrains: 'output' is a 'working' inferred from raw pty output (see
+  // TuiAgentStates.markOutputActivity), for providers without a start hook.
+  source?: 'hook' | 'input' | 'output';
   ptyId?: string;
   providerId?: string;
   projectId: string;

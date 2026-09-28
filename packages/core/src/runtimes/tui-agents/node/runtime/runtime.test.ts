@@ -29,7 +29,7 @@ import {
   type LeakCheckContainer,
 } from '#services/session-lifecycle/node/testing';
 import type { PromptSpillResult } from './prompt-spill';
-import { TuiAgentsRuntime } from './runtime';
+import { AGENT_STATUS_IDLE_MS, TuiAgentsRuntime } from './runtime';
 
 function createRuntime(
   options: {
@@ -115,6 +115,13 @@ function startInput(overrides: Partial<TuiAgentStartInput> = {}): TuiAgentStartI
   };
 }
 
+function readAgentStatus(
+  runtime: TuiAgentsRuntime,
+  conversationId = 'conversation-1'
+): string | undefined {
+  return peek(runtime.agentStatesLiveModel.get(undefined)!.states.list)[conversationId]?.status;
+}
+
 describe('TuiAgentsRuntime', () => {
   it.each(['fresh', 'resume'] as const)(
     'recovers a %s launch using the session id captured after switching sessions',
@@ -183,6 +190,55 @@ describe('TuiAgentsRuntime', () => {
       data: previous.data,
     });
     await runtime.dispose();
+  });
+
+  it('clears a stuck working status when output goes silent, even without a stop hook', async () => {
+    // A provider whose start hook owns 'working' (like Claude): the runtime never promotes
+    // from output for it, and its only in-session idle signal is the stop hook. If that hook
+    // is dropped, the output-silence timer is what returns the spinner to idle.
+    const clock = createManualClock(0);
+    const { runtime, spawner } = createRuntime({
+      clock,
+      hooks: { kind: 'config', scope: 'workspace', supportedEvents: ['start'] },
+    });
+    try {
+      await runtime.startSession(startInput({ initialPrompt: undefined }));
+      runtime['agentStates'].applyCanonicalEvent('conversation-1', 'test', {
+        kind: 'status',
+        type: 'start',
+      });
+      spawner.processes[0]!.emitData('working...');
+      expect(readAgentStatus(runtime)).toBe('working');
+
+      // No stop hook ever arrives; output stops.
+      await clock.advanceBy(AGENT_STATUS_IDLE_MS);
+      expect(readAgentStatus(runtime)).toBe('idle');
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it('drives working from output for a provider without a start hook, then back to idle', async () => {
+    const clock = createManualClock(0);
+    const { runtime, spawner } = createRuntime({ clock, hooks: { kind: 'none' } });
+    try {
+      await runtime.startSession(startInput({ initialPrompt: undefined }));
+      expect(readAgentStatus(runtime)).toBeUndefined();
+
+      spawner.processes[0]!.emitData('generating a reply');
+      expect(readAgentStatus(runtime)).toBe('working');
+
+      // Output keeps the timer alive; a chunk just before the deadline defers idle.
+      await clock.advanceBy(AGENT_STATUS_IDLE_MS - 1);
+      spawner.processes[0]!.emitData('more output');
+      await clock.advanceBy(AGENT_STATUS_IDLE_MS - 1);
+      expect(readAgentStatus(runtime)).toBe('working');
+
+      await clock.advanceBy(1);
+      expect(readAgentStatus(runtime)).toBe('idle');
+    } finally {
+      await runtime.dispose();
+    }
   });
 
   it('refreshes a retained Wire output follower when a process is replaced', async () => {

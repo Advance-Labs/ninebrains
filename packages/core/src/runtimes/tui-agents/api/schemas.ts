@@ -157,7 +157,9 @@ export const tuiAgentStateSchema = z.object({
   conversationId: z.string(),
   providerId: z.string().optional(),
   status: tuiAgentStateStatusSchema,
-  source: z.enum(['hook', 'input']).optional(),
+  // Ninebrains: 'output' marks 'working' inferred from raw pty output, for providers
+  // without a start hook (see TuiAgentStates.markOutputActivity).
+  source: z.enum(['hook', 'input', 'output']).optional(),
   notificationType: tuiNotificationTypeSchema.optional(),
   title: z.string().optional(),
   message: z.string().optional(),

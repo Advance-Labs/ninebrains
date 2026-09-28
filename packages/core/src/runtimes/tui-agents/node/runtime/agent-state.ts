@@ -131,6 +131,32 @@ export class TuiAgentStates {
     this.setStatus(conversationId, { providerId, status: 'working', source: 'input' });
   }
 
+  // Ninebrains: raw pty output means the agent is doing something. For a provider that
+  // has a start hook, the hook is the authoritative 'working' signal, so output only feeds
+  // the runtime's idle-timer safety net and must not promote here. For a provider without
+  // one (e.g. codex), promote idle/completed to 'working' so its spinner appears at all.
+  // Never override 'awaiting-input'/'error' (meaningful states that can sit silent), and
+  // never clobber an existing 'working' (it may carry a hook's title/message).
+  markOutputActivity(
+    conversationId: string,
+    providerId: string | undefined,
+    provider: Pick<ResolvedTuiProvider, 'hooks'> | null
+  ): void {
+    if (provider?.hooks.kind !== 'none' && provider?.hooks.supportedEvents.includes('start'))
+      return;
+    const current = this.current(conversationId)?.status;
+    if (current === 'working' || current === 'awaiting-input' || current === 'error') return;
+    this.setStatus(conversationId, { providerId, status: 'working', source: 'output' });
+  }
+
+  // Ninebrains: safety net for a missed stop/idle signal (e.g. a dropped Stop hook, or a
+  // session_id change that misroutes it). Only clears a stale 'working'; an 'awaiting-input'
+  // prompt is left alone because it can legitimately sit with no further output.
+  resetIdleIfWorking(conversationId: string): void {
+    if (this.current(conversationId)?.status !== 'working') return;
+    this.setStatus(conversationId, { status: 'idle' });
+  }
+
   setProviderSessionId(conversationId: string, providerSessionId: string): void {
     let changed = false;
     produceCell(this.sessions.states.list, (draft) => {

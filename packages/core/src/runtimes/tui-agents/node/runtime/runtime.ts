@@ -1,6 +1,6 @@
 import { err, ok, type Result, type Serializable } from '@emdash/shared';
 import { KeyedMutex } from '@emdash/shared/concurrency';
-import { systemClock, type Clock } from '@emdash/shared/scheduling';
+import { systemClock, type Clock, type TimerHandle } from '@emdash/shared/scheduling';
 import { LiveLogSource } from '@emdash/wire/live';
 import { type LiveSource } from '@emdash/wire/rpc';
 import { peek } from '@emdash/wire/state';
@@ -74,6 +74,13 @@ const RESUME_FALLBACK_WINDOW_MS = 3_000;
 const RESPAWN_DELAY_MS = 500;
 const MAX_UNEXPECTED_RESPAWNS = 1;
 const BUSY_OUTPUT_WINDOW_MS = 60_000;
+// Ninebrains: how long an agent may stay 'working' with no pty output before the status is
+// treated as idle. Interactive TUIs repaint (their elapsed-time counter, spinner) roughly once
+// a second while working, so this window of total silence reliably means the turn has ended.
+// It is the only thing that clears a stale 'working' when a provider's stop signal never
+// arrives (a dropped Claude Stop hook), and the idle side of output-driven status for providers
+// that have no stop hook at all. Generous enough not to clip a genuinely working agent.
+export const AGENT_STATUS_IDLE_MS = 15_000;
 
 type TuiAgentSession = {
   conversationId: string;
@@ -112,6 +119,9 @@ export class TuiAgentsRuntime {
   private readonly clock: Clock;
   private readonly lifecycle: ConversationSessionLifecycle;
   private tmuxActivity = new Map<string, number>();
+  // Ninebrains: per-conversation output-silence timer; fires resetIdleIfWorking (see onData
+  // and AGENT_STATUS_IDLE_MS). Keyed by conversationId; replaced on each output chunk.
+  private readonly statusIdleTimers = new Map<string, TimerHandle>();
   private readonly unexpectedRespawns = new Map<string, number>();
   private readonly promptSpills = new Map<string, PromptSpillResult>();
   /**
@@ -272,7 +282,13 @@ export class TuiAgentsRuntime {
             });
           },
         },
-        { name: 'agent-state', run: (key) => this.agentStates.clear(key) },
+        {
+          name: 'agent-state',
+          run: (key) => {
+            this.clearStatusIdleTimer(key);
+            this.agentStates.clear(key);
+          },
+        },
       ],
       conversation: {
         intents: deps.intents,
@@ -407,6 +423,7 @@ export class TuiAgentsRuntime {
     const active = this.sessions.get(conversationId);
     if (active) active.pty = null;
     this.markExited(conversationId, null);
+    this.clearStatusIdleTimer(conversationId);
     this.agentStates.resetToIdle(conversationId);
     // Suspend-but-retain: scrollback, config tombstone, and list entry survive;
     // the stopped config keeps the key sweep-inert (snapshot returns null).
@@ -485,6 +502,8 @@ export class TuiAgentsRuntime {
 
   async dispose(): Promise<void> {
     this.lifecycle.dispose();
+    for (const timer of this.statusIdleTimers.values()) timer.dispose();
+    this.statusIdleTimers.clear();
     for (const conversationId of this.sessions.keys()) {
       this.bumpGeneration(conversationId);
     }
@@ -495,6 +514,29 @@ export class TuiAgentsRuntime {
     this.logs.clear();
     this.configs.clear();
     this.usageLimits.clear();
+  }
+
+  // Ninebrains: (re)start the output-silence timer for a conversation. Each output chunk pushes
+  // the deadline out; when output finally stops for AGENT_STATUS_IDLE_MS the callback clears a
+  // still-'working' status. unref so a pending timer never keeps the worker process alive.
+  private armStatusIdleTimer(conversationId: string): void {
+    this.statusIdleTimers.get(conversationId)?.dispose();
+    this.statusIdleTimers.set(
+      conversationId,
+      this.clock.schedule(
+        AGENT_STATUS_IDLE_MS,
+        () => {
+          this.statusIdleTimers.delete(conversationId);
+          this.agentStates.resetIdleIfWorking(conversationId);
+        },
+        { unref: true }
+      )
+    );
+  }
+
+  private clearStatusIdleTimer(conversationId: string): void {
+    this.statusIdleTimers.get(conversationId)?.dispose();
+    this.statusIdleTimers.delete(conversationId);
   }
 
   private async spawnInto(
@@ -632,6 +674,15 @@ export class TuiAgentsRuntime {
           onData: (chunk) => {
             this.lifecycle.recordOutput(config.input.conversationId);
             if (!this.isCurrentGeneration(config.input.conversationId, generation)) return;
+            // Ninebrains: output is the ground truth that the agent is doing something. Mark
+            // 'working' (no-op for providers whose start hook already owns that), and (re)arm
+            // the silence timer that returns the status to idle when output stops.
+            this.agentStates.markOutputActivity(
+              config.input.conversationId,
+              config.input.providerId,
+              session.provider
+            );
+            this.armStatusIdleTimer(config.input.conversationId);
             // PtySession calls onStateChange right after onData, which publishes this.
             const usageLimit = usageLimitDetector.push(chunk);
             if (usageLimit) this.usageLimits.set(config.input.conversationId, usageLimit);
@@ -656,6 +707,7 @@ export class TuiAgentsRuntime {
             }
             if (config.input.tmux) void this.reportTmuxExit(config.input.tmux.identity, info);
             this.markExited(config.input.conversationId, info);
+            this.clearStatusIdleTimer(config.input.conversationId);
             this.agentStates.resetToIdle(config.input.conversationId);
             if (this.maybeRespawnAfterUnexpectedExit(session, config, generation, info)) {
               // The respawn will report sessionStarted again; the active intent
