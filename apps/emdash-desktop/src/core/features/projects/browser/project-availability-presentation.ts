@@ -145,7 +145,9 @@ export function classifyProjectAvailability({
             ? 'The local runtime is ready. Live Project features will be available shortly.'
             : 'The Machine is ready. Live Project features will be available shortly.',
         progress: true,
-        actions: [],
+        // An attach that wedges must stay escapable: automatic recovery is not guaranteed
+        // to finish, and without this the banner offers no way back. See #124.
+        actions: recoveryActions(host, state.recovery, ['retry']),
       };
     case 'offline':
     case 'recovering':
@@ -300,7 +302,7 @@ const issuePresentationDescriptors: Record<
         : 'Relink this Project to a Machine or remove it from Ninebrains.',
   },
   'attachment-unavailable': {
-    correctiveActions: [],
+    correctiveActions: ['retry'],
     title: (host, machineName) =>
       host.kind === 'local' ? 'Opening Project locally' : `Opening Project on ${machineName}`,
   },
