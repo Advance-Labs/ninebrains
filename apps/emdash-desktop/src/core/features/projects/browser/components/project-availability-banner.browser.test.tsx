@@ -128,7 +128,7 @@ describe('ProjectAvailabilityBanner', () => {
     ['connecting', 'Reconnecting to Orion', 'Retry now'],
     ['provisioning', 'Reconnecting to Orion', 'Retry now'],
     ['handshaking', 'Reconnecting to Orion', 'Retry now'],
-    ['attaching', 'Opening Project on Orion', null],
+    ['attaching', 'Opening Project on Orion', 'Retry now'],
   ] as const)('announces %s progress politely', async (state, title, actionLabel) => {
     await render(sshProject, {
       kind: 'degraded',

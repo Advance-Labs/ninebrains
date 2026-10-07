@@ -13,6 +13,7 @@ import {
   classifyProjectAttachmentIssue,
   classifyProjectAvailability,
   projectLiveActionDisabledReason,
+  type ProjectAvailabilityHost,
 } from './project-availability-presentation';
 
 const host = hostRef('remote', 'connection-private-id');
@@ -80,7 +81,7 @@ const expectedIssues: ExpectedIssue[] = [
   ['runtime-unavailable', 'automatic', ['retry', 'diagnostics']],
   ['not-configured', 'blocked', ['configure']],
   ['host-identity-lost', 'blocked', ['relink-project', 'remove-project']],
-  ['attachment-unavailable', 'automatic', []],
+  ['attachment-unavailable', 'automatic', ['retry']],
   ['repository-missing', 'manual', ['retry']],
   ['repository-unavailable', 'manual', ['retry', 'diagnostics']],
   ['unexpected', 'manual', ['retry', 'diagnostics']],
@@ -142,7 +143,7 @@ describe('classifyProjectAvailability', () => {
       'attaching',
       { kind: 'degraded', situation: 'attaching', recovery: 'automatic' },
       'Opening Project on Orion',
-      [],
+      ['Retry now'],
     ],
     [
       'recovering',
@@ -221,7 +222,7 @@ describe('classifyProjectAvailability', () => {
       ['Relink Project', 'Remove Project'],
       ['Relink Project', 'Remove Project'],
     ],
-    ['attachment-unavailable', 'Opening Project on Orion', [], []],
+    ['attachment-unavailable', 'Opening Project on Orion', ['Retry now'], ['Retry now']],
     ['repository-missing', 'Repository is missing', ['Retry'], ['Retry']],
     [
       'repository-unavailable',
@@ -293,6 +294,32 @@ describe('classifyProjectAvailability', () => {
     expect(presentation?.title).toBe('Local runtime is unavailable');
     expect(presentation?.actions).toEqual([{ kind: 'retry', label: 'Retry' }]);
     expect(JSON.stringify(presentation)).not.toMatch(/SSH|Machine|Open Machines|Connect/);
+  });
+});
+
+describe('a Project stuck attaching stays escapable', () => {
+  it.each<[label: string, host: ProjectAvailabilityHost]>([
+    ['local', { kind: 'local' }],
+    ['ssh', { kind: 'ssh', machineName: 'Orion' }],
+  ])('offers Retry while a %s Project sits in attaching', (_label, host) => {
+    const presentation = classifyProjectAvailability({
+      host,
+      state: { kind: 'degraded', situation: 'attaching', recovery: 'automatic' },
+    });
+    expect(presentation?.actions.map((action) => action.kind)).toEqual(['retry']);
+  });
+
+  it('offers Retry for an attachment-unavailable issue on a local Project', () => {
+    const presentation = classifyProjectAvailability({
+      host: { kind: 'local' },
+      state: {
+        kind: 'degraded',
+        situation: 'attaching',
+        recovery: 'automatic',
+        issue: issues['attachment-unavailable']!,
+      },
+    });
+    expect(presentation?.actions.map((action) => action.kind)).toEqual(['retry']);
   });
 });
 
