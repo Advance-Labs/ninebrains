@@ -1126,3 +1126,9 @@ so upstream's README URL is the only inherited surface that had to change.
 | `src/core/features/projects/browser/project-availability-presentation.ts` | `case 'attaching'` returns `recoveryActions(host, state.recovery, ['retry'])` instead of `actions: []`, and the `'attachment-unavailable'` descriptor's `correctiveActions` becomes `['retry']` | Both states rendered a spinner and zero actions, on the assumption that automatic recovery always completes. When an attach wedged (a transient 30s workspace-registry scan timeout is enough, #125) the banner offered no way back and the only fix was restarting the app. The `recover()` handler was already bound in `project-availability-boundary.tsx`; only the action list was empty. Applies to local and SSH, matching the Retry automatic SSH recovery already offers. Fixes #124 |
 | `src/core/features/projects/browser/project-availability-presentation.test.ts` | Three expectations updated for the new Retry action; new `describe` covering local + SSH `attaching` and the `attachment-unavailable` issue | Regression guard: the actionless states are what stranded the user |
 | `src/core/features/projects/browser/components/project-availability-banner.browser.test.tsx` | The `attaching` row of the progress-announcement table expects a `Retry now` button instead of `null` | The banner now renders the escape hatch in that state |
+
+## 65. Release 0.2.3 (`chore/release-0.2.3`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.2 → 0.2.3 | Written by `pnpm run release:prepare 0.2.3`; `release.yml` refuses a version that does not match |
