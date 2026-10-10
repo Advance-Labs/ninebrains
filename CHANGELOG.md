@@ -6,6 +6,25 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-10
+
+A maintenance release, all bug fixes. A Project that got stuck opening now offers a Retry button
+instead of stranding you with stale Git decorations and files that will not open. The update pill no
+longer sticks on "Checking…" when a check fails, and it re-checks after the machine wakes. Clicking a
+notification opens the conversation it belongs to rather than starting a new one. The sidebar working
+spinner now corrects itself and no longer depends on a provider sending a stop hook.
+
+### Fixes
+
+- **projects:** offer Retry while a Project is stuck attaching (#127) (b9fa7f5)
+- **updates:** dismiss the update pill when a check finds nothing, and re-check on wake (#121) (37b4dc3)
+- **workbench:** open the conversation a notification belongs to, not a new one (#120) (635a0b1)
+- **tui-agents:** make the working spinner self-correcting and provider-agnostic (#119) (d037134)
+
+### Documentation
+
+- **patches:** log the workspace Open Brain CLI action (section 60) (#115) (03bc8f9)
+
 ## [0.2.2] - 2026-09-26
 
 This release removes the Arena, Lanes, and Automations views from the app UI in favour of the Planner and Brain CLI. The Brain CLI is now bundled with the app and can be launched from any project's workspace menu. The Freebuff fallback feature has been archived and removed from active UI.
