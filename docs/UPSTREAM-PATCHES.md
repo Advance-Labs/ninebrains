@@ -1141,3 +1141,9 @@ so upstream's README URL is the only inherited surface that had to change.
 | `packages/core/src/services/pty/api/local-spawn.ts` | Both tmux call sites in `resolvePosixSpawn` pass `tmuxForwardedEnvKeys(env)` | The resolved spawn env is the only place the correct per-pane values are known |
 | `packages/core/src/services/pty/api/index.ts` | Re-exports `tmuxForwardedEnvKeys` | |
 | `packages/core/src/services/pty/api/tmux.test.ts` | Four cases: forwarding by name (never by value), the tmux < 3.2 fallback, no `-e` clause and no fallback when nothing is forwarded, and the key-selection filter | Regression guard on both the identity bug and the argv-secret property |
+
+## 67. Release 0.2.4 (`chore/release-0.2.4`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.3 → 0.2.4 | Written by `pnpm run release:prepare 0.2.4`; `release.yml` refuses a version that does not match. 0.2.3 was built to a draft but never published, so 0.2.4 is the first release to reach users since 0.2.2 and its changelog section carries 0.2.3's entries as well. The generated section also re-listed every commit back to `v0.2.2-canary.9` (#129) and was trimmed to the work that has not shipped |

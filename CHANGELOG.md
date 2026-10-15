@@ -6,6 +6,33 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-15
+
+The working spinner and the status dot now follow the conversation they belong to. tmux does not
+give a new session the environment of the terminal that created it: it reuses the environment the
+tmux server was first started with, so every agent pane opened after the first one inherited the
+first pane's identity. Provider hooks reported every agent's activity under that one conversation,
+and no other conversation ever showed that it was working. The same leak pointed one task's
+`git push` at another task's credential session.
+
+0.2.3 was prepared but never published, so this release also carries everything listed under it
+below: a Retry button for a Project stuck opening, an update pill that no longer sticks on
+"Checking…" and re-checks after your machine wakes, notifications that open the conversation they
+belong to, and a sidebar spinner that corrects itself instead of depending on a provider's stop
+hook.
+
+### Fixes
+
+- **pty:** give each tmux pane its own per-pane environment (#133) (99048c5)
+- **projects:** offer Retry while a Project is stuck attaching (#127) (b9fa7f5)
+- **updates:** dismiss the update pill when a check finds nothing, and re-check on wake (#121) (37b4dc3)
+- **workbench:** open the conversation a notification belongs to, not a new one (#120) (635a0b1)
+- **tui-agents:** make the working spinner self-correcting and provider-agnostic (#119) (d037134)
+
+### Documentation
+
+- **patches:** log the workspace Open Brain CLI action (section 60) (#115) (03bc8f9)
+
 ## [0.2.3] - 2026-10-10
 
 A maintenance release, all bug fixes. A Project that got stuck opening now offers a Retry button
