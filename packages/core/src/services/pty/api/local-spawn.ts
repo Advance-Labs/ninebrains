@@ -1,7 +1,7 @@
 import { getWindowsEnvValue } from '#primitives/agent-env/api';
 import { formatCommandLine, quoteArg, type NativeInvocation } from '#primitives/exec/api';
 import { planExecutableLaunch, type FileExists } from '#primitives/exec/node';
-import { buildTmuxShellLine } from './tmux-commands';
+import { buildTmuxShellLine, tmuxForwardedEnvKeys } from './tmux-commands';
 
 export type ResolvedPtyShellProfile = {
   id: string;
@@ -260,7 +260,8 @@ function resolvePosixSpawn(
             intent.tmux.name,
             commandLine,
             intent.tmux.identity,
-            intent.tmux.historyLimit
+            intent.tmux.historyLimit,
+            tmuxForwardedEnvKeys(env)
           ),
         ]),
         cwd: intent.cwd,
@@ -323,7 +324,8 @@ function resolvePosixSpawn(
           intent.tmux.name,
           fullCommandLine,
           intent.tmux.identity,
-          intent.tmux.historyLimit
+          intent.tmux.historyLimit,
+          tmuxForwardedEnvKeys(env)
         ),
       ]),
       cwd: intent.cwd,

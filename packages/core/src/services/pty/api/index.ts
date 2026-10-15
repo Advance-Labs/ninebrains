@@ -34,6 +34,7 @@ export { PtySession } from './pty-session';
 export type { PtySessionOptions } from './pty-session';
 export {
   buildTmuxShellLine,
+  tmuxForwardedEnvKeys,
   DEFAULT_TMUX_HISTORY_LIMIT,
   findLegacyDefaultSocketSessions,
   inspectTmuxSessions,

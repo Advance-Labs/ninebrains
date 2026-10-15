@@ -1132,3 +1132,12 @@ so upstream's README URL is the only inherited surface that had to change.
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.2 → 0.2.3 | Written by `pnpm run release:prepare 0.2.3`; `release.yml` refuses a version that does not match |
+
+## 66. Each tmux pane carries its own per-pane environment (`fix/tmux-session-env-leak`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-commands.ts` | New `TMUX_FORWARDED_ENV` / exported `tmuxForwardedEnvKeys(env)` (keys matching `EMDASH_*`, `AI_AGENT`, `GIT_CONFIG_COUNT\|KEY_n\|VALUE_n`). `buildTmuxShellLine` gains a 5th parameter `forwardEnvKeys` and emits `-e KEY="$KEY"` per key on `new-session`, re-filtered through the same regex. When any key is forwarded the ensure chain becomes `has-session \|\| new-session -e … \|\| new-session` | `tmux new-session` does not copy the client's environment: a new session gets the *server's* global environment, frozen when the server first started, plus the `update-environment` whitelist (DISPLAY, SSH_*, TERM — nothing of ours). So pane #1 defined `EMDASH_PTY_ID` for every pane after it, every provider hook POSTed `X-Emdash-Pty-Id` for pane #1's conversation, and no other conversation ever left `idle` — no working spinner, no status dot (the #119 output fallback is deliberately off for a provider that has a `start` hook, i.e. claude). The git-credential handles leaked the same way, pointing one task's `git push` at another task's credential session. Names, not values: this line is the argv of a `/bin/sh` that outlives the pane and is world-readable on Linux, so the inner shell expands each `"$KEY"` from its own correct environment at exec time. `-e` is tmux 3.2+, and Debian 11 / Ubuntu 20.04 ship 3.0-3.1c where it is a usage error, hence the plain-spawn fallback: stale env there, exactly as before, rather than a pane that refuses to open |
+| `packages/core/src/services/pty/api/local-spawn.ts` | Both tmux call sites in `resolvePosixSpawn` pass `tmuxForwardedEnvKeys(env)` | The resolved spawn env is the only place the correct per-pane values are known |
+| `packages/core/src/services/pty/api/index.ts` | Re-exports `tmuxForwardedEnvKeys` | |
+| `packages/core/src/services/pty/api/tmux.test.ts` | Four cases: forwarding by name (never by value), the tmux < 3.2 fallback, no `-e` clause and no fallback when nothing is forwarded, and the key-selection filter | Regression guard on both the identity bug and the argv-secret property |
