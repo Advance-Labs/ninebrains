@@ -14,7 +14,11 @@ import {
   resolveTmuxSession,
   tmuxIdentityActivityKey,
 } from './tmux';
-import { buildTmuxShellLine, DEFAULT_TMUX_HISTORY_LIMIT } from './tmux-commands';
+import {
+  buildTmuxShellLine,
+  DEFAULT_TMUX_HISTORY_LIMIT,
+  tmuxForwardedEnvKeys,
+} from './tmux-commands';
 import {
   decodeLegacyTmuxSessionName,
   makeLegacyTmuxSessionName,
@@ -126,6 +130,63 @@ describe('buildTmuxShellLine', () => {
       expect(line).toContain(`tmux -L ninebrains`);
       expect(line).not.toMatch(new RegExp(`(?<!-L ninebrains )(?<!\\w)tmux ${verb}`, 'u'));
     }
+  });
+
+  // Regression: tmux gives a new session the *server's* global environment, frozen when the
+  // server first started - not the client's. Without forwarding, every pane after the first
+  // inherits pane #1's EMDASH_PTY_ID, so every provider hook reports under pane #1 and no
+  // other conversation ever shows a working spinner or status dot.
+  it('forwards the per-pane environment into the new session by name, never by value', () => {
+    const line = buildTmuxShellLine('workspace', 'agent run', undefined, undefined, [
+      'EMDASH_HOOK_NONCE',
+      'EMDASH_PTY_ID',
+    ]);
+
+    expect(line).toContain('-e EMDASH_PTY_ID="$EMDASH_PTY_ID"');
+    // Names only. This line is the argv of a /bin/sh that outlives the pane, and on Linux
+    // that argv is world-readable, so a resolved nonce here would be a credential leak.
+    expect(line).toContain('-e EMDASH_HOOK_NONCE="$EMDASH_HOOK_NONCE"');
+    expect(line).toContain('new-session -d -e ');
+  });
+
+  it('falls back to a plain spawn where new-session -e is unsupported (tmux < 3.2)', () => {
+    const line = buildTmuxShellLine('workspace', 'agent run', undefined, undefined, [
+      'EMDASH_PTY_ID',
+    ]);
+
+    // Debian 11 and Ubuntu 20.04 ship tmux 3.0-3.1c, where -e is a usage error. Losing the
+    // spinner is a bug; failing to open the pane at all is a dead app.
+    expect(line).toContain('|| tmux -L ninebrains -u new-session -d -s');
+  });
+
+  it('adds no -e clause, and no fallback, when there is nothing to forward', () => {
+    const line = buildTmuxShellLine('workspace', 'agent run');
+
+    expect(line).not.toContain('-e ');
+    expect(line.match(/new-session/gu)).toHaveLength(1);
+  });
+
+  it('forwards only the app-owned per-pane keys, ignoring the inherited shell', () => {
+    expect(
+      tmuxForwardedEnvKeys({
+        EMDASH_PTY_ID: 'pty',
+        EMDASH_HOOK_NONCE: 'nonce',
+        AI_AGENT: 'claude',
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'credential.helper',
+        GIT_CONFIG_VALUE_0: 'emdash',
+        PATH: '/usr/bin',
+        HOME: '/Users/x',
+        EMDASH_UNSET: undefined,
+      })
+    ).toEqual([
+      'AI_AGENT',
+      'EMDASH_HOOK_NONCE',
+      'EMDASH_PTY_ID',
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_KEY_0',
+      'GIT_CONFIG_VALUE_0',
+    ]);
   });
 
   it('applies the requested scrollback limit, and a sane default when none is given', () => {

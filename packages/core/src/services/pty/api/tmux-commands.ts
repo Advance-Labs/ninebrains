@@ -39,11 +39,34 @@ export type TmuxInventory = {
   sessions: TmuxSessionInventoryEntry[];
 };
 
+/**
+ * Per-pane environment the app owns and tmux would otherwise not carry into a new session.
+ *
+ * `tmux new-session` does not copy the client's environment: a new session inherits the
+ * *server's* global environment, frozen when the server first started, plus whatever
+ * `update-environment` whitelists (DISPLAY, SSH_*, TERM — nothing of ours). So without this,
+ * pane #1 defines `EMDASH_PTY_ID` for every pane that follows it, every provider hook reports
+ * its event under pane #1's conversation, and the other conversations never leave 'idle':
+ * no working spinner, no status dot. The git-credential handles leak the same way, which
+ * points one task's `git push` at another task's credential session.
+ */
+const TMUX_FORWARDED_ENV =
+  /^(?:EMDASH_[A-Z0-9_]*|AI_AGENT|GIT_CONFIG_(?:COUNT|KEY_\d+|VALUE_\d+))$/u;
+
+export function tmuxForwardedEnvKeys(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>
+): string[] {
+  return Object.keys(env)
+    .filter((key) => env[key] !== undefined && TMUX_FORWARDED_ENV.test(key))
+    .sort();
+}
+
 export function buildTmuxShellLine(
   sessionName: string,
   commandLine: string,
   identity?: string,
-  historyLimit: number = DEFAULT_TMUX_HISTORY_LIMIT
+  historyLimit: number = DEFAULT_TMUX_HISTORY_LIMIT,
+  forwardEnvKeys: readonly string[] = []
 ): string {
   const tmux = tmuxShellCommand();
   const exactTarget = quoteArg(`=${sessionName}`, 'posix');
@@ -51,7 +74,19 @@ export function buildTmuxShellLine(
   const quotedName = quoteArg(sessionName, 'posix');
   const quotedCmd = quoteArg(commandLine, 'posix');
   const checkExists = `${tmux} has-session -t ${exactTarget} 2>/dev/null`;
-  const newSession = `${tmux} -u new-session -d -s ${quotedName} ${quotedCmd}`;
+  // Names only, never values: this line is the argv of a /bin/sh that outlives the pane, and
+  // on Linux that argv is world-readable. The inner shell expands each `"$KEY"` from its own
+  // (correct, per-pane) environment at exec time, so the hook nonce and the git-credential
+  // handles reach the session without ever being written down.
+  const forwardEnv = forwardEnvKeys
+    .filter((key) => TMUX_FORWARDED_ENV.test(key))
+    .map((key) => `-e ${key}="$${key}"`)
+    .join(' ');
+  const newSession = `${tmux} -u new-session -d ${forwardEnv ? `${forwardEnv} ` : ''}-s ${quotedName} ${quotedCmd}`;
+  // `new-session -e` is tmux 3.2+; Debian 11 and Ubuntu 20.04 still ship 3.0-3.1c, where the
+  // flag is a usage error and the pane would die instead of merely losing its spinner. Fall
+  // back to the plain spawn there: stale inherited env, exactly as before this forwarding.
+  const newSessionPlain = `${tmux} -u new-session -d -s ${quotedName} ${quotedCmd}`;
   const setIdentity = identity
     ? `${tmux} set-option -t ${exactOptionTarget} ${TMUX_IDENTITY_OPTION} ${quoteArg(encodeTmuxIdentity(identity), 'posix')} 2>/dev/null || true`
     : null;
@@ -62,7 +97,9 @@ export function buildTmuxShellLine(
   // pane, naming a session the app already names in its own UI, and it costs a row of the
   // agent's screen to do it. Off is the honest default for a detail the user did not choose.
   const hideStatus = `${tmux} set-option -t ${exactOptionTarget} status off 2>/dev/null || true`;
-  const ensureSession = `(${checkExists} || ${newSession})`;
+  const ensureSession = forwardEnv
+    ? `(${checkExists} || ${newSession} || ${newSessionPlain})`
+    : `(${checkExists} || ${newSession})`;
   const configure = [setIdentity, enableMouse, setHistoryLimit, hideStatus]
     .filter((command): command is string => command !== null)
     .map((command) => `(${command})`)
