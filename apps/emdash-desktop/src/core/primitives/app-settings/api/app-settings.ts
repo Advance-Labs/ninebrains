@@ -36,8 +36,12 @@ export type TaskSettings = {
   deleteBranchByDefault: boolean;
   preserveNameCapitalization: boolean;
   includeIssueContextByDefault: boolean;
-  /** Remove worktrees of tasks archived over 30 days ago; Restore recreates them. */
+  /**
+   * Delete tasks archived longer than `archivedTaskRetentionDays`, with their worktree and
+   * branch. Worktrees that are not provably clean are skipped.
+   */
   cleanUpArchivedWorktrees: boolean;
+  archivedTaskRetentionDays: number;
 };
 
 export type FilesSettings = {

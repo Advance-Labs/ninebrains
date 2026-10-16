@@ -1,9 +1,15 @@
-import { Select, Switch, Tooltip } from '@emdash/ui/react/primitives';
+import { Button, Select, Switch, Tooltip, useToast } from '@emdash/ui/react/primitives';
 import { Info } from 'lucide-react';
 import React from 'react';
 import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
+import { getTasksWireClient } from '@core/features/tasks/api/browser/client';
 import { useTaskSettings } from '@core/features/tasks/api/browser/hooks/useTaskSettings';
 import { detectPlatformContext } from '@core/primitives/keybindings/api';
+import {
+  ARCHIVED_TASK_RETENTION_PRESETS,
+  DEFAULT_ARCHIVED_TASK_RETENTION_DAYS,
+  type ArchivedTaskCleanupResult,
+} from '@core/primitives/tasks/api';
 import { ResetToDefaultButton } from './ResetToDefaultButton';
 import { SettingRow } from './SettingRow';
 
@@ -185,27 +191,120 @@ export const DeleteBranchByDefaultRow: React.FC = () => {
   );
 };
 
+function formatRetentionDays(days: number): string {
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
 export const CleanUpArchivedWorktreesRow: React.FC = () => {
   const taskSettings = useTaskSettings();
+  const disabled = taskSettings.loading || taskSettings.saving;
+  const days = taskSettings.archivedTaskRetentionDays;
 
   return (
     <SettingRow
-      title="Clean up archived worktrees"
-      description="Remove the worktree of a task archived for over 30 days. The branch is kept, and restoring the task recreates the worktree. Worktrees with uncommitted changes are never removed."
+      title="Delete archived tasks"
+      description={`Delete a task archived for over ${formatRetentionDays(days)}, with its worktree and branch, including commits that were never pushed. Worktrees with uncommitted changes are never removed.`}
       control={
         <>
           <ResetToDefaultButton
-            visible={taskSettings.isFieldOverridden('cleanUpArchivedWorktrees')}
-            defaultLabel="on"
-            onReset={taskSettings.resetCleanUpArchivedWorktrees}
-            disabled={taskSettings.loading || taskSettings.saving}
+            visible={
+              taskSettings.isFieldOverridden('cleanUpArchivedWorktrees') ||
+              taskSettings.isFieldOverridden('archivedTaskRetentionDays')
+            }
+            defaultLabel={`on, ${formatRetentionDays(DEFAULT_ARCHIVED_TASK_RETENTION_DAYS)}`}
+            onReset={() => {
+              taskSettings.resetCleanUpArchivedWorktrees();
+              taskSettings.resetArchivedTaskRetentionDays();
+            }}
+            disabled={disabled}
           />
+          <Select.Root
+            value={String(days)}
+            onValueChange={(next) => taskSettings.updateArchivedTaskRetentionDays(Number(next))}
+            disabled={disabled || !taskSettings.cleanUpArchivedWorktrees}
+          >
+            <Select.Trigger className="w-[110px] shrink-0 gap-2">
+              <Select.Value>{formatRetentionDays(days)}</Select.Value>
+            </Select.Trigger>
+            <Select.Content align="end" className="min-w-max">
+              {ARCHIVED_TASK_RETENTION_PRESETS.map((preset) => (
+                <Select.Item key={preset} value={String(preset)}>
+                  {formatRetentionDays(preset)}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
           <Switch
             checked={taskSettings.cleanUpArchivedWorktrees}
-            disabled={taskSettings.loading || taskSettings.saving}
+            disabled={disabled}
             onCheckedChange={taskSettings.updateCleanUpArchivedWorktrees}
           />
         </>
+      }
+    />
+  );
+};
+
+/**
+ * Runs the archived-task cleanup now, with the configured retention. The count comes from
+ * a dry run, and the button asks once more before deleting.
+ */
+export const CleanUpArchivedTasksNowRow: React.FC = () => {
+  const { archivedTaskRetentionDays: retentionDays } = useTaskSettings();
+  const { toast } = useToast();
+  const [preview, setPreview] = React.useState<ArchivedTaskCleanupResult | null>(null);
+  const [confirming, setConfirming] = React.useState(false);
+  const [running, setRunning] = React.useState(false);
+
+  const refreshPreview = React.useCallback(async () => {
+    const client = await getTasksWireClient();
+    setPreview(await client.cleanUpArchivedTasks({ retentionDays, dryRun: true }));
+  }, [retentionDays]);
+
+  React.useEffect(() => {
+    setConfirming(false);
+    void refreshPreview().catch(() => setPreview(null));
+  }, [refreshPreview]);
+
+  const run = async () => {
+    setRunning(true);
+    try {
+      const client = await getTasksWireClient();
+      const result = await client.cleanUpArchivedTasks({ retentionDays, dryRun: false });
+      toast(`Deleted ${result.removed} archived ${result.removed === 1 ? 'task' : 'tasks'}`, {
+        description:
+          result.skipped + result.failed > 0
+            ? `${result.skipped} skipped, ${result.failed} failed`
+            : undefined,
+      });
+    } catch (error) {
+      toast('Cleanup failed', { description: String(error) });
+    } finally {
+      setRunning(false);
+      setConfirming(false);
+      void refreshPreview().catch(() => setPreview(null));
+    }
+  };
+
+  const eligible = preview?.removed ?? 0;
+  return (
+    <SettingRow
+      title="Clean up archived tasks now"
+      description={
+        preview === null
+          ? 'Counting archived tasks…'
+          : `${eligible} ${eligible === 1 ? 'task' : 'tasks'} archived over ${formatRetentionDays(retentionDays)} can be deleted${preview.skipped > 0 ? `; ${preview.skipped} skipped (uncommitted changes, or Project not connected)` : ''}.`
+      }
+      control={
+        <Button
+          type="button"
+          size="xs"
+          variant={confirming ? 'destructive' : 'secondary'}
+          disabled={running || eligible === 0}
+          onClick={() => (confirming ? void run() : setConfirming(true))}
+        >
+          {running ? 'Deleting…' : confirming ? `Delete ${eligible}?` : 'Clean up now'}
+        </Button>
       }
     />
   );
