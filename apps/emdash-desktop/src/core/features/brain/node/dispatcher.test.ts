@@ -145,4 +145,45 @@ describe('Dispatcher', () => {
     expect(unattended).toEqual([]);
     dispatcher.dispose();
   });
+
+  describe('#140 stale Brain lanes', () => {
+    // A lane row the app no longer runs: removed while the app was down, or from an older profile.
+    const stale = (brain: Brain, id: string) =>
+      brain.upsertLane(APP_IDENTITY, { id, projectId: 'p1', provider: 'claude', status: 'idle' });
+
+    it('parks a lane with no live lane behind it, so a ready job is never planned onto it', async () => {
+      const { brain, dispatcher, pasted, job } = setup([]);
+      stale(brain, 'ghost');
+      const ready = job('check-running');
+
+      expect(await dispatcher.tick()).toEqual([]);
+      expect(brain.store.getLane('ghost')?.status).toBe('asleep');
+      expect(brain.getJob(APP_IDENTITY, ready.id).state).toBe('ready');
+      expect(pasted).toEqual([]);
+    });
+
+    it('gives the job to the live lane when a stale one is also idle', async () => {
+      const { brain, dispatcher, job } = setup([lane('A')]);
+      // Ordered so the stale lane would be the first candidate.
+      stale(brain, '0-ghost');
+      const ready = job('check-running');
+
+      const records = await dispatcher.tick();
+      expect(records.map((r) => [r.jobId, r.laneId])).toEqual([[ready.id, 'A']]);
+      expect(brain.getJob(APP_IDENTITY, ready.id).state).toBe('running');
+    });
+
+    it('makes a parked lane plannable again once it is live', async () => {
+      const lanes: DispatchLane[] = [];
+      const { brain, dispatcher, job } = setup(lanes);
+      stale(brain, 'A');
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('asleep');
+
+      lanes.push(lane('A'));
+      const ready = job('after-wake');
+      const records = await dispatcher.tick();
+      expect(records.map((r) => [r.jobId, r.laneId])).toEqual([[ready.id, 'A']]);
+    });
+  });
 });

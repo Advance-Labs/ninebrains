@@ -168,6 +168,7 @@ export class Dispatcher {
     const lanes = new Map(this.ports.lanes().map((lane) => [lane.laneId, lane]));
     this.mirrorModes(lanes.values());
     for (const lane of lanes.values()) this.syncLane(lane);
+    this.parkStaleLanes(lanes);
 
     const records: DispatchRecord[] = [];
     for (const { jobId, laneId } of brain.planDispatch(APP_IDENTITY)) {
@@ -224,6 +225,28 @@ export class Dispatcher {
   private release(laneId: string): void {
     this.inFlight.delete(laneId);
     this.schedule();
+  }
+
+  /**
+   * #140: a Brain lane row with no live lane behind it (removed while the app was down, or left
+   * from an older profile) is never synced, so it stayed `idle`. The planner kept handing it jobs
+   * that the apply loop then skipped, starving them even with a live lane free. Parking it
+   * `asleep` takes it out of planning without losing its history; `syncLane` writes the real
+   * status back as soon as the lane is live again.
+   */
+  private parkStaleLanes(live: ReadonlyMap<string, DispatchLane>): void {
+    const { brain } = this.ports;
+    for (const stored of brain.store.listLanes()) {
+      if (stored.status === 'asleep' || live.has(stored.id) || this.inFlight.has(stored.id)) {
+        continue;
+      }
+      brain.upsertLane(APP_IDENTITY, {
+        id: stored.id,
+        projectId: stored.projectId,
+        provider: stored.provider,
+        status: 'asleep',
+      });
+    }
   }
 
   /** Mirrors a lane's availability into the Brain, writing only on change. */
