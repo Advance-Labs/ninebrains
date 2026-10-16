@@ -1,6 +1,6 @@
 import type { WorkspaceRecord } from '@emdash/core/runtimes/workspace-registry/api';
 import { openFixture } from '@tooling/utils/db';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sshConnections } from '@core/services/app-db/node/schema';
 import {
   createWorkspaceRegistry,
@@ -107,6 +107,19 @@ describe('WorkspaceRegistry', () => {
       observedAt: Date.parse('2026-01-01T00:00:00.000Z'),
       updatedAt: '2026-01-02T00:00:00.000Z',
     });
+  });
+
+  it('skips the path-owner scan when a refresh keeps the same path identity', () => {
+    const registry = createWorkspaceRegistry(fixture.db);
+    registry.adopt({ id: 'a', type: 'local', kind: 'worktree', location: 'local', path: '/a' });
+    const scan = vi.spyOn(registry, 'findLiveByPath');
+
+    registry.refresh('a', { path: '/a', observedStatus: 'present' });
+    expect(scan).not.toHaveBeenCalled();
+
+    registry.refresh('a', { path: '/b', observedStatus: 'present' });
+    expect(scan).toHaveBeenCalledOnce();
+    expect(registry.getLive('a')?.path).toBe('/b');
   });
 
   it('claims a Host record and explicitly retracks the same canonical id', () => {
