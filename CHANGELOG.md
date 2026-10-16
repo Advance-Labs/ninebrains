@@ -6,6 +6,32 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-16
+
+Typing and scrolling in agent terminals no longer stutter. With many workspaces open, the app
+spent about one second in every two re-checking every workspace against every other one, on the
+same thread that carries your keystrokes and scroll events. That work is gone, and so are the
+rewrites it triggered: a rescan that finds nothing new now writes nothing and sends nothing.
+
+Archived tasks now clean up after themselves. A task archived longer than the retention you pick in
+Settings (default 7 days) is deleted with its worktree and branch, including commits that were
+never pushed. Worktrees with uncommitted changes are always skipped, and worktrees Ninebrains did not
+create are never touched. **Clean up archived tasks now** in Settings shows how many would go
+before deleting anything.
+
+### Features
+
+- **tasks:** delete archived tasks with their worktree after a retention window (#142) (4cf146c)
+
+### Fixes
+
+- **workspaces:** skip path-owner scan when a refresh keeps the same path (#136) (3b8f8a2)
+
+### Performance
+
+- **workspace-registry:** don't republish a record when a rescan finds nothing new (#139) (a71fbbd)
+- **workspaces:** skip no-op row rewrites and pokes in snapshot sync (#143) (8bb663d)
+
 ## [0.2.4] - 2026-10-15
 
 The working spinner and the status dot now follow the conversation they belong to. tmux does not
