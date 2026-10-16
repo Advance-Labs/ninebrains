@@ -1,5 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { WorkspaceRecords } from '@emdash/core/runtimes/workspace-registry/api';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import {
   createWorkspaceRegistry,
   isAnnotatedWorkspace,
@@ -7,9 +8,13 @@ import {
   workspaceObservationFromRecord,
   workspaceRegistryTable as workspaces,
   type WorkspaceHostIdentity,
+  type WorkspaceObservation,
   type WorkspaceRegistry,
 } from '@core/features/workspaces/api/node/registry';
-import { workspacePathIdentityKey } from '@core/features/workspaces/api/workspace-path-identity';
+import {
+  stableWorkspacePathDisplay,
+  workspacePathIdentityKey,
+} from '@core/features/workspaces/api/workspace-path-identity';
 import type { AppDb, DrizzleTx } from '@core/services/app-db/node/db';
 import { appDbPokes } from '@core/services/app-db/node/pokes';
 import { type WorkspaceRow } from '@core/services/app-db/node/schema';
@@ -70,19 +75,27 @@ export async function applyWorkspaceRegistrySnapshot(
 ): Promise<ApplyWorkspaceRegistrySnapshotResult> {
   const now = new Date().toISOString();
   const registry = createWorkspaceRegistry(input.db, { now: () => now });
-  const result = input.db.transaction((tx) =>
+  const { counts, wrote } = input.db.transaction((tx) =>
     applyWorkspaceRegistrySnapshotTx(tx, input, registry, now)
   );
-  appDbPokes.workspaces.poke({});
-  return result;
+  // The host re-delivers an identical snapshot every scan tick; poking on a no-op delivery
+  // made every renderer workspace query re-run every ~2s for nothing.
+  if (wrote) appDbPokes.workspaces.poke({});
+  return counts;
 }
+
+/**
+ * An unchanged row's observation stamp is bumped at most this often. The only reader of a
+ * row's stamp as wall time is the minute-granular "Synced … ago" label.
+ */
+const OBSERVED_AT_TOUCH_INTERVAL_MS = 30_000;
 
 function applyWorkspaceRegistrySnapshotTx(
   tx: DrizzleTx,
   input: ApplyWorkspaceRegistrySnapshotInput,
   registry: WorkspaceRegistry,
   now: string
-): ApplyWorkspaceRegistrySnapshotResult {
+): { counts: ApplyWorkspaceRegistrySnapshotResult; wrote: boolean } {
   const observedAt = input.observedAt ?? Date.now();
   const hostRows = loadLiveHostRows(tx, input.host);
   const annotations = loadWorkspaceAnnotations(
@@ -103,6 +116,9 @@ function applyWorkspaceRegistrySnapshotTx(
     tx,
     Object.values(input.records).map((record) => record.id)
   );
+  const rowById = new Map(hostRows.map((row) => [row.id, row]));
+  const unchangedIds: string[] = [];
+  let wrote = false;
   const seen = new Set<string>();
   for (const record of Object.values(input.records)) {
     seen.add(record.id);
@@ -110,7 +126,7 @@ function applyWorkspaceRegistrySnapshotTx(
     if (tombstoned.has(record.id)) continue;
     // Matching is a primary-key lookup on the preserved workspace UUID — the host
     // already resolved moves and adoptions; no path or admin-name matching here.
-    const existing = registry.getLive(record.id, tx);
+    const existing = rowById.get(record.id) ?? registry.getLive(record.id, tx);
     if (existing === undefined) {
       registry.adopt(
         {
@@ -122,9 +138,16 @@ function applyWorkspaceRegistrySnapshotTx(
         tx
       );
       counts.adopted += 1;
+      wrote = true;
       continue;
     }
-    registry.refresh(record.id, workspaceObservationFromRecord(record, input.host, observedAt), tx);
+    const observation = workspaceObservationFromRecord(record, input.host, observedAt);
+    if (observationUnchanged(existing, observation)) {
+      unchangedIds.push(record.id);
+    } else {
+      registry.refresh(record.id, observation, tx);
+      wrote = true;
+    }
     counts.refreshed += 1;
   }
 
@@ -137,6 +160,7 @@ function applyWorkspaceRegistrySnapshotTx(
     if (row.deletionTombstone !== null) {
       registry.untrack([row.id], now, undefined, tx);
       counts.purgedTombstones += 1;
+      wrote = true;
       continue;
     }
     const annotated = isAnnotatedWorkspace({
@@ -146,16 +170,61 @@ function applyWorkspaceRegistrySnapshotTx(
     });
     if (annotated) {
       // Annotated rows stay visible as missing until the user acts.
-      registry.refresh(row.id, { observedStatus: 'missing', observedAt }, tx);
+      if (row.observedStatus === 'missing') {
+        unchangedIds.push(row.id);
+      } else {
+        registry.refresh(row.id, { observedStatus: 'missing', observedAt }, tx);
+        wrote = true;
+      }
       counts.markedMissing += 1;
     } else {
       // Pure mirror entries follow the mirror.
       registry.untrack([row.id], now, undefined, tx);
       counts.untracked += 1;
+      wrote = true;
     }
   }
 
-  return counts;
+  if (touchObservedAt(tx, unchangedIds, observedAt) > 0) wrote = true;
+  return { counts, wrote };
+}
+
+/** True when refreshing `row` with `observation` would change nothing but the stamp. */
+function observationUnchanged(row: WorkspaceRow, observation: WorkspaceObservation): boolean {
+  return Object.entries(observation).every(([key, value]) => {
+    if (key === 'observedAt') return true;
+    if (key === 'path') {
+      // Mirrors refresh: a same-identity spelling change keeps the stored display path.
+      return (
+        typeof value === 'string' &&
+        row.path !== null &&
+        stableWorkspacePathDisplay(row.path, value) === row.path
+      );
+    }
+    return isDeepStrictEqual(asStored(row[key as keyof WorkspaceRow]), asStored(value));
+  });
+}
+
+/** JSON columns drop undefined keys on write, so compare values the way they persist. */
+function asStored(value: unknown): unknown {
+  return value === undefined || value === null ? null : JSON.parse(JSON.stringify(value));
+}
+
+function touchObservedAt(tx: DrizzleTx, ids: string[], observedAt: number): number {
+  if (ids.length === 0) return 0;
+  return tx
+    .update(workspaces)
+    .set({ observedAt })
+    .where(
+      and(
+        inArray(workspaces.id, ids),
+        or(
+          isNull(workspaces.observedAt),
+          lt(workspaces.observedAt, observedAt - OBSERVED_AT_TOUCH_INTERVAL_MS)
+        )
+      )
+    )
+    .run().changes;
 }
 
 /**

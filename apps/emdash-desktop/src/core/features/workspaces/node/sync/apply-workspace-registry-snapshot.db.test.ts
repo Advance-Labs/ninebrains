@@ -1,7 +1,8 @@
 import type { WorkspaceRecord } from '@emdash/core/runtimes/workspace-registry/api';
 import { openFixture } from '@tooling/utils/db';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createWorkspaceRegistry } from '@core/features/workspaces/api/node/registry';
+import { appDbPokes } from '@core/services/app-db/node/pokes';
 import {
   applyWorkspaceRegistrySnapshot,
   WorkspaceIdentityConflictError,
@@ -75,6 +76,59 @@ describe('applyWorkspaceRegistrySnapshot', () => {
       )
       .run(taskId, projectId, `task-${taskId}`, workspaceId);
   }
+
+  it('writes nothing and pokes nothing for a replayed identical snapshot', async () => {
+    const records = {
+      'wt-1': hostRecord({
+        id: 'wt-1',
+        lastCreateOutcome: { status: 'succeeded', at: Date.parse('2026-01-01T12:00:00.000Z') },
+        runtime: { creation: null, notices: [], lifecycle: undefined, activation: null },
+      }),
+    };
+    const t0 = Date.parse('2026-01-03T00:00:00.000Z');
+    await applyWorkspaceRegistrySnapshot({
+      db: fixture.db,
+      host: LOCAL_HOST,
+      records,
+      observedAt: t0,
+    });
+    const row = () =>
+      fixture.sqlite
+        .prepare(`SELECT updated_at AS updatedAt, observed_at AS observedAt FROM workspaces`)
+        .get() as { updatedAt: string; observedAt: number };
+    const before = row();
+    const poke = vi.spyOn(appDbPokes.workspaces, 'poke');
+
+    const replay = await applyWorkspaceRegistrySnapshot({
+      db: fixture.db,
+      host: LOCAL_HOST,
+      records,
+      observedAt: t0 + 2_000,
+    });
+    expect(replay.refreshed).toBe(1);
+    expect(row()).toEqual(before);
+    expect(poke).not.toHaveBeenCalled();
+
+    // A stale stamp is still touched so "Synced … ago" stays honest, without a full rewrite.
+    await applyWorkspaceRegistrySnapshot({
+      db: fixture.db,
+      host: LOCAL_HOST,
+      records,
+      observedAt: t0 + 60_000,
+    });
+    expect(row()).toEqual({ updatedAt: before.updatedAt, observedAt: t0 + 60_000 });
+    expect(poke).toHaveBeenCalledOnce();
+
+    // A real change still refreshes the row.
+    await applyWorkspaceRegistrySnapshot({
+      db: fixture.db,
+      host: LOCAL_HOST,
+      records: { 'wt-1': hostRecord({ id: 'wt-1', observedStatus: 'missing' }) },
+      observedAt: t0 + 62_000,
+    });
+    expect(createWorkspaceRegistry(fixture.db).getLive('wt-1')?.observedStatus).toBe('missing');
+    poke.mockRestore();
+  });
 
   it('adopts unknown host records with observations populated (wiped-client reconvergence)', async () => {
     const result = await applyWorkspaceRegistrySnapshot({
