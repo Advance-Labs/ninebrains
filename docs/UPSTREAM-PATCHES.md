@@ -1184,3 +1184,9 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | `src/main/bootstrap/boot/phases/services.ts` | The hourly sweep reads the setting and calls `taskService.cleanUpArchivedTasks` | |
 | `src/core/features/settings/browser/components/TaskSettingsRows.tsx`, `src/core/features/settings/browser/pages/general-settings-page.tsx` | The row becomes "Delete archived tasks" (switch + retention select, and its description says unpushed commits go with the branch); new "Clean up archived tasks now" row with a dry-run count and a second click to confirm | |
 | `src/core/features/tasks/node/archived-worktree-cleanup.db.test.ts` | Sweep cases rewritten for the new action: every task on a worktree deleted in order, a dry run deletes nothing, the five skip guards, and unattached Projects and delete failures counted | |
+
+## 72. Release 0.2.5 (`chore/release-0.2.5`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.4 → 0.2.5 | Written by `pnpm run release:prepare 0.2.5 --from fa57a1feb`; `release.yml` refuses a version that does not match. `--from` because the `v0.2.4` tag is not on main's first-parent history (#129). The site-only #135 was dropped from the generated section |
