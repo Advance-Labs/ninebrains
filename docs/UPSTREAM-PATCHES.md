@@ -1284,6 +1284,33 @@ or error:
 | `packages/core/src/services/fs-watch/impl/native-watch.ts` | A dropped-events error is reported only when it schedules a re-scan, not again while one is queued | Under heavy churn FSEvents reports drops in bursts; the hang's log had 128 identical warnings a minute. One per re-scan says the same thing |
 | `packages/core/src/services/fs-watch/impl/native-watch.test.ts` | The coalescing test expects one warning, not two | Same |
 
+## 80. A task opens the Brain TUI as a tab beside its conversations (`ninebrains/brain-pmxth`)
+
+The `brain` TUI (section 58) had no in-app entry point that actually ran it: section 60's
+"Open Brain CLI" opens an OS terminal at the workspace root and leaves the user to find the
+bundled binary. A task can now open a terminal named "Brain", shown as a main-pane tab next to
+the conversations (or in the drawer, from the drawer's menu), that types a line running the
+bundled `brain-cli/bin.mjs` under the app's own Electron (`ELECTRON_RUN_AS_NODE=1`), with
+`NINEBRAINS_PROJECT` set to the task's project and `NINEBRAINS_BRAIN_HANDSHAKE` set to this
+app's handshake file, so a dev run never attaches to a running release Brain. The line is built
+in main (`brain.cliCommand`, `brainCliCommandLine`) and POSIX-quoted with `formatCommandLine`.
+Local tasks only: the CLI reaches the Brain over 127.0.0.1. Not on Windows yet.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/terminals/browser/task-terminal/terminal-drawer-tab-bar.tsx` | The new-terminal shell dropdown gains a "Brain TUI" item below a separator; `NewTerminalButton` and the tab bar take `onOpenBrain` | The entry point, next to the shells it sits among |
+| `src/core/features/tasks/browser/new-conversation-tab-button.tsx` | The tab strip's "+" gains a chevron dropdown: "New conversation" (same as the click) and "Brain TUI", which opens the Brain as a terminal tab in that pane; disabled in SSH tasks | The Brain lives where the conversations do, so it is entered from there |
+| `src/core/features/terminals/contributions/browser/task-terminal/terminal-panel.tsx` | `handleOpenBrain` calls `taskView.openBrainTerminal(showTerminalInDrawer)` and toasts on failure | Wires the drawer's dropdown item; that one keeps the Brain in the drawer |
+| `src/core/features/workbench/api/browser/task-composition.ts` | `isLocalWorkspace`, `openBrainTerminal(show?)` (default: a main-pane tab), `showTerminalInDrawer`; `createDefaultTerminal` takes an optional terminal name | Opens the named terminal, places it, and types the line from `brain.cliCommand` |
+| `src/core/features/terminals/api/browser/task-terminal/terminal-manager.ts` | `createDefaultTerminal` takes an optional name; new `sendInput(terminalId, data)` | Types into a terminal from outside xterm; the PTY buffers input sent before the prompt is up |
+| `src/core/features/tasks/contributions/commands.ts`, `src/core/features/tasks/browser/task-scope.tsx` | `task.openBrain` ("Open Brain TUI"), opening a main-pane tab; disabled in SSH tasks | Command-palette entry point |
+| `src/renderer/tests/browser/terminal-shell-menu.test.tsx` | Passes `onOpenBrain`; asserts the item calls it | Covers the new item |
+
+Ninebrains-only: `brain/api/contract.ts` (`cliCommand`), `brain/api/browser/client.ts` (new),
+`brain/node/{brain-service,launch-config,wire-controller}.ts` and the `launch-config.test.ts`
+case that runs the line through `/bin/sh`, `main/bootstrap/boot/ninebrains/brain-mcp-bin.ts`
+(resolves either bundled bin) and `create-ninebrains-services.ts` (passes `brainCliBin`).
+
 ## 81. CI runners pinned to ubuntu-24.04 (`ci/pin-ubuntu-24.04`)
 
 On 2026-10-19 `ubuntu-latest` began resolving to `ubuntu-26.04`, where Playwright refuses to

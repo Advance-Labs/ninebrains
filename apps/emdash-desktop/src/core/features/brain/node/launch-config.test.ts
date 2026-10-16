@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,7 +7,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { UnsafeArgvError } from '@core/features/exec-runs/api/node/argv-guard';
 import type { PackLaunch } from '@core/features/packs/api/launch';
 import { launchDir } from './lane-files';
-import { buildLaneLaunch, type LaunchConfigDeps, type LaunchTarget } from './launch-config';
+import {
+  brainCliCommandLine,
+  buildLaneLaunch,
+  type LaunchConfigDeps,
+  type LaunchTarget,
+} from './launch-config';
 
 const TOKEN = 't'.repeat(43);
 const posix = process.platform !== 'win32';
@@ -202,5 +208,23 @@ describe('SEC-14 ids cannot traverse', () => {
     for (const bad of ['..', '.', 'a:b', 'a/b', 'x'.repeat(65), '']) {
       expect(() => launchDir(userDataDir, bad)).toThrow();
     }
+  });
+});
+
+describe('brain TUI command line', () => {
+  it.skipIf(process.platform === 'win32')('survives a POSIX shell word-for-word', () => {
+    const runtime = { execPath: "/Apps/My App's/Electron", binPath: '/x/$HOME/`id`/bin.mjs' };
+    const line = brainCliCommandLine(runtime, '/data dir', 'proj;rm -rf ~');
+    const words = execFileSync('/bin/sh', ['-c', `set -- ${line}; printf '%s\\n' "$@"`], {
+      encoding: 'utf8',
+    });
+    expect(words.trimEnd().split('\n')).toEqual([
+      'env',
+      'ELECTRON_RUN_AS_NODE=1',
+      `NINEBRAINS_BRAIN_HANDSHAKE=${join('/data dir', 'ninebrains', 'brain-cli.json')}`,
+      'NINEBRAINS_PROJECT=proj;rm -rf ~',
+      runtime.execPath,
+      runtime.binPath,
+    ]);
   });
 });

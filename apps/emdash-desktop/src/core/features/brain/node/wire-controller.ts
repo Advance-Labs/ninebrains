@@ -44,6 +44,7 @@ export function createBrainWireController(service: BrainService): {
       stopBrain: ({ brainId }) => service.stopBrain(brainId),
       setDispatcherPaused: ({ paused }) => service.setDispatcherPaused(paused),
       setLaneMode: ({ laneId, mode }) => service.setLaneMode(laneId, mode),
+      cliCommand: ({ projectId }) => service.cliCommand(projectId),
       stopAll: () => service.stopAll(),
       clearStop: () => service.clearStop(),
     },

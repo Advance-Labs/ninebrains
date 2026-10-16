@@ -109,6 +109,15 @@ export const openPulseCommand = defineCommand({
   icon: 'activity',
 });
 
+// Ninebrains: opens the Brain TUI in a task terminal (UPSTREAM-PATCHES 68).
+export const openBrainCommand = defineCommand({
+  id: 'task.openBrain',
+  title: 'Open Brain TUI',
+  description: "Open the Brain operator TUI for this task's project in a terminal",
+  category: 'Terminals',
+  icon: 'brain',
+});
+
 export const browserGoBackCommand = defineCommand({
   id: 'task.browserGoBack',
   title: 'Browser Back',
@@ -286,6 +295,7 @@ export const TASK_COMMAND_DEFS = [
   newTerminalCommand,
   openBrowserCommand,
   openPulseCommand,
+  openBrainCommand,
   browserGoBackCommand,
   browserGoForwardCommand,
   browserReloadCommand,

@@ -284,6 +284,7 @@ export async function createNinebrainsServices(
     endpoint,
     userDataDir,
     brainMcp: { execPath: process.execPath, binPath: resolveBrainMcpBin(app.getAppPath()) },
+    brainCliBin: resolveBrainMcpBin(app.getAppPath(), 'brain-cli'),
     lanes: brainLanes,
     sessions: {
       projects: createProjectsPort(deps),

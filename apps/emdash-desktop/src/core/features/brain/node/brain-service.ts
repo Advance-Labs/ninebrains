@@ -25,7 +25,12 @@ import { APP_IDENTITY, Dispatcher, type DispatchLane } from './dispatcher';
 import { brainLaunchKey, laneLaunchKey, type BrainEndpoint } from './endpoint';
 import { brainEvents } from './event-host';
 import { removeLaunchDir, sweepLaunchDirs } from './lane-files';
-import { buildLaneLaunch, type BrainMcpRuntime, type UpstreamLaunchArgs } from './launch-config';
+import {
+  brainCliCommandLine,
+  buildLaneLaunch,
+  type BrainMcpRuntime,
+  type UpstreamLaunchArgs,
+} from './launch-config';
 import { stopEverything } from './stop';
 import { DEFAULT_UNATTENDED_BUDGETS, runJobUnattended } from './unattended';
 import { startVerification, type GateRunnerPort, type VerificationHandler } from './verification';
@@ -79,6 +84,8 @@ export interface BrainServiceDeps {
   endpoint: BrainEndpoint;
   userDataDir: string;
   brainMcp: BrainMcpRuntime;
+  /** The bundled `brain-cli/bin.mjs`; without it there is no TUI to open from a task. */
+  brainCliBin?: string;
   lanes: BrainLanesPort;
   sessions: BrainSessionPorts;
   supervisor: BrainSupervisorPort;
@@ -441,6 +448,21 @@ export class BrainService {
   }
 
   /** Global STOP (SEC-30). Latches until `clearStop`. */
+  /** The shell line a task terminal types to open the operator TUI for `projectId`. */
+  cliCommand(projectId: string): Result<{ commandLine: string }, BrainError> {
+    const { brainCliBin, brainMcp, userDataDir } = this.deps;
+    if (!brainCliBin) return err({ type: 'unavailable', message: 'The brain CLI is not bundled.' });
+    // ponytail: POSIX shells only. A Windows task terminal needs a PowerShell/cmd form.
+    if (process.platform === 'win32') {
+      return err({
+        type: 'unavailable',
+        message: 'The Brain TUI is not available on Windows yet.',
+      });
+    }
+    const runtime = { execPath: brainMcp.execPath, binPath: brainCliBin };
+    return ok({ commandLine: brainCliCommandLine(runtime, userDataDir, projectId) });
+  }
+
   async stopAll(): Promise<Result<{ killedRuns: number; stoppedLanes: number }, BrainError>> {
     const { supervisor, lanes, onError } = this.deps;
     const result = await stopEverything({
