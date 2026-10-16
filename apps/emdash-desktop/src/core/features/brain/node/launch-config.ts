@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import type { BrainGrant } from '@ninebrains/brain-core';
+import { formatCommandLine } from '@emdash/core/primitives/exec/api';
+import { brainHandshakePath, type BrainGrant } from '@ninebrains/brain-core';
 import { assertSafeArgv } from '@core/features/exec-runs/api/node/argv-guard';
 import { resolveLaneGitPaths } from '@core/features/exec-runs/api/node/lane-git-paths';
 import {
@@ -57,6 +58,32 @@ export function brainServerEntry(
   };
   if (laneHint) env[BRAIN_MCP_ENV.laneHint] = laneHint;
   return { type: 'stdio', command: runtime.execPath, args: [runtime.binPath], env };
+}
+
+/**
+ * The shell line that opens the operator TUI (`brain` with no command) for one
+ * project, typed into a task terminal. `env` keeps it working in bash, zsh, fish
+ * and csh alike. It names this app's own handshake file, so a dev run never
+ * attaches to a release Brain that happens to be running too.
+ */
+export function brainCliCommandLine(
+  runtime: BrainMcpRuntime,
+  userDataDir: string,
+  projectId: string
+): string {
+  return formatCommandLine(
+    {
+      command: 'env',
+      args: [
+        'ELECTRON_RUN_AS_NODE=1',
+        `NINEBRAINS_BRAIN_HANDSHAKE=${brainHandshakePath(userDataDir)}`,
+        `NINEBRAINS_PROJECT=${projectId}`,
+        runtime.execPath,
+        runtime.binPath,
+      ],
+    },
+    'posix'
+  );
 }
 
 /** Pack servers with safe, non-reserved names; the rest are dropped. */

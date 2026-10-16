@@ -34,6 +34,7 @@ describe('terminal shell menu', () => {
             onShellMenuOpen={() => {}}
             onRetryShellAvailability={() => {}}
             onAddTerminal={() => {}}
+            onOpenBrain={() => {}}
           />
         </Tooltip.Provider>
       );
@@ -56,6 +57,7 @@ describe('terminal shell menu', () => {
             onShellMenuOpen={() => {}}
             onRetryShellAvailability={onRetry}
             onAddTerminal={() => {}}
+            onOpenBrain={() => {}}
           />
         </Tooltip.Provider>
       );
@@ -93,6 +95,7 @@ describe('terminal shell menu', () => {
             onShellMenuOpen={onOpen}
             onRetryShellAvailability={() => {}}
             onAddTerminal={() => {}}
+            onOpenBrain={() => {}}
           />
         </Tooltip.Provider>
       );
@@ -107,5 +110,30 @@ describe('terminal shell menu', () => {
     await act(async () => trigger.click());
 
     expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers the Brain TUI below the shells', async () => {
+    const onOpenBrain = vi.fn();
+    await act(async () => {
+      root.render(
+        <Tooltip.Provider>
+          <NewTerminalButton
+            shellMenuState={{ kind: 'ready', availability: [] }}
+            onShellMenuOpen={() => {}}
+            onRetryShellAvailability={() => {}}
+            onAddTerminal={() => {}}
+            onOpenBrain={onOpenBrain}
+          />
+        </Tooltip.Provider>
+      );
+    });
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[aria-label="New terminal with shell"]')!.click()
+    );
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) =>
+      el.textContent?.includes('Brain TUI')
+    );
+    await act(async () => item!.click());
+    expect(onOpenBrain).toHaveBeenCalledOnce();
   });
 });

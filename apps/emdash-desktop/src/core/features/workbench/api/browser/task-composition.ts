@@ -1,6 +1,7 @@
 import { nativePathIdentityKey } from '@emdash/core/primitives/path/api';
 import type { TerminalShellId } from '@emdash/core/primitives/terminal-shell/api';
 import { computed, makeAutoObservable, observable, reaction, runInAction, when } from 'mobx';
+import { getBrainClient } from '@core/features/brain/api/browser/client';
 import type { ConversationManagerStore } from '@core/features/conversations/api/browser/conversation-manager';
 import { EditorViewStore } from '@core/features/editor/api/browser/task-editor/stores/editor-view-store';
 import type { FileTabResource } from '@core/features/editor/api/browser/task-editor/stores/file-tab-resource';
@@ -487,6 +488,39 @@ export class TaskComposition {
     this._terminalSelectionHandle.update((current) => ({ ...current, activeItem: item }));
   }
 
+  // Ninebrains: the Brain TUI opens as a task terminal (UPSTREAM-PATCHES 68).
+  /** True when this task's terminals run on this machine, where the Brain endpoint lives. */
+  get isLocalWorkspace(): boolean {
+    return !this._workspace?.sshConnectionId;
+  }
+
+  /**
+   * Opens a "Brain" terminal running the operator TUI for this project, as a tab in the main pane
+   * next to the conversations unless `show` places it elsewhere. Throws a user-facing error.
+   */
+  async openBrainTerminal(
+    show: (terminalId: string) => void = (terminalId) => {
+      this.paneLayout.open('terminal', { terminalId });
+      this.setFocusedRegion('main');
+    }
+  ): Promise<void> {
+    // The CLI reaches the Brain over 127.0.0.1, so it cannot run on an SSH host.
+    if (!this.isLocalWorkspace) throw new Error('The Brain TUI only runs in local tasks.');
+    const result = await (await getBrainClient()).cliCommand({ projectId: this.projectId });
+    if (!result.success) throw new Error(result.error.message);
+    const terminalId = await this.createDefaultTerminal(undefined, 'Brain');
+    if (!terminalId) throw new Error('Could not open a terminal.');
+    show(terminalId);
+    await this._terminals.sendInput(terminalId, `${result.data.commandLine}\r`);
+  }
+
+  /** Shows an existing terminal as the drawer's active tab. */
+  showTerminalInDrawer(terminalId: string): void {
+    this.chrome.commands.openTerminalDrawer();
+    this.terminalTabs.setActiveTab(terminalId);
+    this.setTerminalDrawerActiveItem({ kind: 'terminal', id: terminalId });
+  }
+
   async openNewTerminal(shell?: TerminalShellId): Promise<string | undefined> {
     this.chrome.commands.openTerminalDrawer();
     const terminalId = await this.createDefaultTerminal(shell);
@@ -498,11 +532,14 @@ export class TaskComposition {
     return terminalId;
   }
 
-  private async createDefaultTerminal(shell?: TerminalShellId): Promise<string | undefined> {
+  private async createDefaultTerminal(
+    shell?: TerminalShellId,
+    name?: string
+  ): Promise<string | undefined> {
     if (this._isCreatingTerminal) return undefined;
     this._isCreatingTerminal = true;
     try {
-      return (await this._terminals.createDefaultTerminal(shell))?.id;
+      return (await this._terminals.createDefaultTerminal(shell, name))?.id;
     } catch (error) {
       log.error('Failed to create terminal:', error);
       return undefined;
