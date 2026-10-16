@@ -180,6 +180,33 @@ describe('workspace registry contract', () => {
     }
   });
 
+  it('a rescan that finds nothing new republishes only once the stamp is stale', async () => {
+    const repoPath = await makeRepo(root, 'quiet-repo');
+    await wire.client.createWorkspace({ workspaceId: 'ws-quiet', path: repoPath });
+    await wire.client.refresh({ workspaceId: 'ws-quiet' });
+    const lease = runtime.recordsHost.acquireState(undefined, 'list');
+    const source = await lease.ready();
+    const updates: LiveUpdate[] = [];
+    const unsubscribe = await source.subscribe((update) => updates.push(update));
+
+    try {
+      await clock.advanceBy(5_000);
+      await wire.client.refresh({ workspaceId: 'ws-quiet' });
+      expect(updates).toHaveLength(0);
+
+      await clock.advanceBy(60_000);
+      await wire.client.refresh({ workspaceId: 'ws-quiet' });
+      expect(updates).toHaveLength(1);
+
+      await fs.writeFile(path.join(repoPath, 'change.txt'), 'x\n');
+      await wire.client.refresh({ workspaceId: 'ws-quiet' });
+      expect(updates).toHaveLength(2);
+    } finally {
+      unsubscribe();
+      await lease.release();
+    }
+  });
+
   it('createWorkspace detects a plain directory (including subdirectories of a repo)', async () => {
     const plain = path.join(root, 'plain');
     await fs.mkdir(plain);

@@ -11,6 +11,7 @@ import {
   cell,
   expose,
   family,
+  peek,
   pokeChannel,
   query,
   type Cell,
@@ -1790,7 +1791,19 @@ export class WorkspaceRegistryRuntime {
       lastObservedAt: now,
     };
     this.store.update(record);
-    this.publish(record);
+    // Ninebrains: file-watch events rescan active worktrees every few seconds and nearly
+    // every rescan finds nothing new. Republishing the bare stamp made every client apply
+    // the full records snapshot each time; an unchanged record now republishes only once
+    // its published stamp is stale. The store still takes the stamp: the scheduler's
+    // polling floor reads it.
+    const published = peek(this.recordsCell)[record.id];
+    if (
+      changed ||
+      published === undefined ||
+      now - published.lastObservedAt >= UNCHANGED_REPUBLISH_INTERVAL_MS
+    ) {
+      this.publish(record);
+    }
   }
 
   /**
@@ -1936,6 +1949,9 @@ function sameGitSetup(a?: WorkspaceGitSetup, b?: WorkspaceGitSetup): boolean {
         };
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
+
+/** Clients render observation time at minute granularity ("Synced 2m ago"). */
+const UNCHANGED_REPUBLISH_INTERVAL_MS = 60_000;
 
 /** The change-detection view of a record: everything except the bookkeeping stamps. */
 function recordEssence(

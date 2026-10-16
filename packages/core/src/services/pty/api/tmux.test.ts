@@ -406,7 +406,10 @@ function stubExecContext(exec: IExecutionContext['exec']): IExecutionContext {
 describe('end-to-end against a real tmux server', () => {
   it.skipIf(!TMUX_AVAILABLE)('applies the history limit on the app socket', async () => {
     const cwd = await mkdtemp('/tmp/nb-e2e-');
-    const env = { ...process.env, TMUX_TMPDIR: cwd };
+    // Inside a tmux pane (every Ninebrains agent session), $TMUX points a bare
+    // `tmux list-sessions` at that live server and the "default socket is empty" check fails.
+    const { TMUX: _tmux, TMUX_PANE: _tmuxPane, ...inherited } = process.env;
+    const env = { ...inherited, TMUX_TMPDIR: cwd };
     const shell = createBoundExec({ file: '/bin/sh', cwd, env });
     const tmux = createBoundExec({ file: 'tmux', cwd, env });
     try {
