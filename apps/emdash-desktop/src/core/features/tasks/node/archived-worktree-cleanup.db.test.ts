@@ -7,14 +7,11 @@ import {
 } from '@core/features/workspaces/api/node/registry';
 import type { WorkspaceObservedGit } from '@core/primitives/workspaces/api/workspace-registry-observations';
 import { tasks } from '@core/services/app-db/node/schema';
-import {
-  ARCHIVED_WORKTREE_RETENTION_DAYS,
-  selectArchivedWorktreeCandidates,
-  sweepArchivedWorktrees,
-} from './archived-worktree-cleanup';
+import { selectArchivedWorktreeCandidates, sweepArchivedTasks } from './archived-worktree-cleanup';
 
 const NOW = Date.parse('2026-09-23T12:00:00Z');
-const CUTOFF = NOW - ARCHIVED_WORKTREE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const RETENTION_DAYS = 30;
+const CUTOFF = NOW - RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const LONG_AGO = '2026-07-01 09:00:00';
 const RECENTLY = '2026-09-20 09:00:00';
 
@@ -134,40 +131,41 @@ describe('archived worktree cleanup', () => {
     expect(selectedIds()).toEqual([]);
   });
 
-  function attachedProjects() {
-    const deleteWorktree = vi.fn(
-      async (_input: { workspaceId: string; deleteBranch: boolean }) => ({
-        success: true as const,
-        data: undefined,
-      })
+  const attached = {
+    requireAttached: () => ({ success: true as const, data: {} as never }),
+  };
+
+  function sweep(options: { dryRun?: boolean; projects?: typeof attached } = {}) {
+    const deleteTask = vi.fn(async (_projectId: string, _taskId: string) => {});
+    const run = sweepArchivedTasks(
+      { db: fixture.db, projects: options.projects ?? attached, deleteTask, now: () => NOW },
+      { retentionDays: RETENTION_DAYS, dryRun: options.dryRun }
     );
-    return {
-      deleteWorktree,
-      projects: {
-        requireAttached: () => ({
-          success: true as const,
-          data: { workspaceRegistry: { deleteWorktree } } as never,
-        }),
-      },
-    };
+    return { run, deleteTask };
   }
 
-  it('removes clean expired worktrees, keeping the branch and the mirror row', async () => {
+  it('deletes every task on a clean expired worktree', async () => {
     seedWorktree('ws-old');
+    await seedTask('task-a', 'ws-old', LONG_AGO);
+    await seedTask('task-b', 'ws-old', LONG_AGO);
+    const { run, deleteTask } = sweep();
+
+    expect(await run).toEqual({ removed: 1, skipped: 0, failed: 0 });
+    expect(deleteTask.mock.calls).toEqual([
+      ['project-1', 'task-a'],
+      ['project-1', 'task-b'],
+    ]);
+  });
+
+  it('counts without deleting on a dry run', async () => {
+    seedWorktree('ws-old');
+    seedWorktree('ws-dirty', { observedGit: { ...CLEAN_GIT, dirty: true } });
     await seedTask('task-old', 'ws-old', LONG_AGO);
-    const { deleteWorktree, projects } = attachedProjects();
+    await seedTask('task-dirty', 'ws-dirty', LONG_AGO);
+    const { run, deleteTask } = sweep({ dryRun: true });
 
-    const result = await sweepArchivedWorktrees({
-      db: fixture.db,
-      projects,
-      isEnabled: async () => true,
-      now: () => NOW,
-    });
-
-    expect(result).toEqual({ removed: 1, skipped: 0, failed: 0 });
-    expect(deleteWorktree).toHaveBeenCalledWith({ workspaceId: 'ws-old', deleteBranch: false });
-    // Restore replays the creation from this row, so the sweep must not untrack it.
-    expect(createWorkspaceRegistry(fixture.db).getLive('ws-old')).toBeDefined();
+    expect(await run).toEqual({ removed: 1, skipped: 1, failed: 0 });
+    expect(deleteTask).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -179,64 +177,32 @@ describe('archived worktree cleanup', () => {
   ])('skips a worktree that is %s', async (_label, observedGit) => {
     seedWorktree('ws-old', { observedGit });
     await seedTask('task-old', 'ws-old', LONG_AGO);
-    const { deleteWorktree, projects } = attachedProjects();
+    const { run, deleteTask } = sweep();
 
-    const result = await sweepArchivedWorktrees({
-      db: fixture.db,
-      projects,
-      isEnabled: async () => true,
-      now: () => NOW,
-    });
-
-    expect(result).toEqual({ removed: 0, skipped: 1, failed: 0 });
-    expect(deleteWorktree).not.toHaveBeenCalled();
+    expect(await run).toEqual({ removed: 0, skipped: 1, failed: 0 });
+    expect(deleteTask).not.toHaveBeenCalled();
   });
 
-  it('does nothing when the setting is off', async () => {
-    seedWorktree('ws-old');
-    await seedTask('task-old', 'ws-old', LONG_AGO);
-    const { deleteWorktree, projects } = attachedProjects();
-
-    const result = await sweepArchivedWorktrees({
-      db: fixture.db,
-      projects,
-      isEnabled: async () => false,
-      now: () => NOW,
-    });
-
-    expect(result).toEqual({ removed: 0, skipped: 0, failed: 0 });
-    expect(deleteWorktree).not.toHaveBeenCalled();
-  });
-
-  it('skips detached Projects and counts host failures without throwing', async () => {
+  it('skips detached Projects and counts delete failures without throwing', async () => {
     seedWorktree('ws-a');
     seedWorktree('ws-b');
     await seedTask('task-a', 'ws-a', LONG_AGO);
     await seedTask('task-b', 'ws-b', LONG_AGO);
-    const deleteWorktree = vi.fn(async () => {
-      throw new Error('host went away');
-    });
     let calls = 0;
     const projects = {
       requireAttached: () =>
-        calls++ === 0
-          ? ({
-              success: false as const,
-              error: {
-                type: 'attachment-unavailable' as const,
-                host: {} as never,
-                phase: 'waiting' as const,
-              },
-            } as never)
-          : ({ success: true as const, data: { workspaceRegistry: { deleteWorktree } } } as never),
+        (calls++ === 0
+          ? { success: false, error: { type: 'attachment-unavailable' } }
+          : { success: true, data: {} }) as never,
     };
-
-    const result = await sweepArchivedWorktrees({
-      db: fixture.db,
-      projects,
-      isEnabled: async () => true,
-      now: () => NOW,
+    const deleteTask = vi.fn(async () => {
+      throw new Error('host went away');
     });
+
+    const result = await sweepArchivedTasks(
+      { db: fixture.db, projects, deleteTask, now: () => NOW },
+      { retentionDays: RETENTION_DAYS }
+    );
 
     expect(result).toEqual({ removed: 0, skipped: 1, failed: 1 });
   });

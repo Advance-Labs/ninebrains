@@ -2,89 +2,83 @@ import type { Logger } from '@emdash/shared/logger';
 import { and, isNotNull, isNull } from 'drizzle-orm';
 import type { ProjectAttachmentManager } from '@core/features/projects/api/node/project-attachment-manager';
 import { createWorkspaceRegistry } from '@core/features/workspaces/api/node/registry';
+import type { ArchivedTaskCleanupResult } from '@core/primitives/tasks/api';
 import type { AppDb } from '@core/services/app-db/node/db';
-import { appDbPokes } from '@core/services/app-db/node/pokes';
 import { tasks, type WorkspaceRow } from '@core/services/app-db/node/schema';
-
-/** A task archived longer than this gives up its worktree; the branch stays. */
-export const ARCHIVED_WORKTREE_RETENTION_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ArchivedWorktreeCandidate = {
   projectId: string;
+  /** Every live task on the worktree; all of them are past the retention window. */
+  taskIds: string[];
   workspace: WorkspaceRow;
 };
 
-export type ArchivedWorktreeSweepDependencies = {
+export type ArchivedTaskSweepDependencies = {
   db: AppDb;
   projects: Pick<ProjectAttachmentManager, 'requireAttached'>;
-  /** Read per run so toggling the setting takes effect without a restart. */
-  isEnabled: () => Promise<boolean>;
+  /** Deletes the task with its worktree, branch and conversations. */
+  deleteTask: (projectId: string, taskId: string) => Promise<void>;
   now?: () => number;
   logger?: Pick<Logger, 'info' | 'warn'>;
 };
 
-export type ArchivedWorktreeSweepResult = {
-  removed: number;
-  skipped: number;
-  failed: number;
+export type ArchivedTaskSweepOptions = {
+  retentionDays: number;
+  /** Count what would be removed without deleting anything. */
+  dryRun?: boolean;
 };
 
 /**
- * Removes the worktrees of tasks archived over the retention window, through the host
- * `deleteWorktree` verb with `deleteBranch: false`. The desktop mirror row is left in
- * place on purpose: it carries the creation spec, so the next registry delivery marks
- * it missing and Restore replays the creation onto the kept branch (the same path
- * `reprovisionWorkspace` uses). Projects that are not attached are skipped until a
- * later run; nothing is queued for an unreachable host.
+ * Ninebrains: deletes tasks archived longer than the retention window, together with
+ * their worktree and branch, through the ordinary Delete Task path. Archived worktrees
+ * otherwise accumulate as live workspace rows that every registry delivery re-applies.
+ * A worktree that is not provably clean is skipped (see isArchivedWorktreeSafeToRemove),
+ * and Projects that are not attached are skipped until a later run, so a task is never
+ * deleted while its worktree removal cannot reach the host.
  */
-export async function sweepArchivedWorktrees(
-  deps: ArchivedWorktreeSweepDependencies
-): Promise<ArchivedWorktreeSweepResult> {
-  const result: ArchivedWorktreeSweepResult = { removed: 0, skipped: 0, failed: 0 };
-  if (!(await deps.isEnabled())) return result;
-
-  const cutoffMs = (deps.now ?? Date.now)() - ARCHIVED_WORKTREE_RETENTION_DAYS * DAY_MS;
+export async function sweepArchivedTasks(
+  deps: ArchivedTaskSweepDependencies,
+  options: ArchivedTaskSweepOptions
+): Promise<ArchivedTaskCleanupResult> {
+  const result: ArchivedTaskCleanupResult = { removed: 0, skipped: 0, failed: 0 };
+  const cutoffMs = (deps.now ?? Date.now)() - options.retentionDays * DAY_MS;
   for (const candidate of selectArchivedWorktreeCandidates(deps.db, cutoffMs)) {
-    if (!isArchivedWorktreeSafeToRemove(candidate.workspace)) {
+    if (
+      !isArchivedWorktreeSafeToRemove(candidate.workspace) ||
+      !deps.projects.requireAttached(candidate.projectId).success
+    ) {
       result.skipped += 1;
       continue;
     }
-    const attached = deps.projects.requireAttached(candidate.projectId);
-    if (!attached.success) {
-      result.skipped += 1;
+    if (options.dryRun) {
+      result.removed += 1;
       continue;
     }
-    const removed = await attached.data.workspaceRegistry
-      .deleteWorktree({ workspaceId: candidate.workspace.id, deleteBranch: false })
-      .catch((error: unknown) => ({
-        success: false as const,
-        error: { type: 'remove-failed', message: String(error) },
-      }));
-    if (!removed.success) {
-      result.failed += 1;
-      deps.logger?.warn('archived worktree cleanup: removal failed', {
+    try {
+      // Sequential: deleteTask only removes the worktree once no other live task holds it.
+      for (const taskId of candidate.taskIds) await deps.deleteTask(candidate.projectId, taskId);
+      result.removed += 1;
+      deps.logger?.info('archived task cleanup: removed task and worktree', {
         workspaceId: candidate.workspace.id,
-        error: removed.error.type,
+        path: candidate.workspace.path,
       });
-      continue;
+    } catch (error) {
+      result.failed += 1;
+      deps.logger?.warn('archived task cleanup: removal failed', {
+        workspaceId: candidate.workspace.id,
+        error: String(error),
+      });
     }
-    result.removed += 1;
-    deps.logger?.info('archived worktree cleanup: removed worktree', {
-      workspaceId: candidate.workspace.id,
-      path: candidate.workspace.path,
-    });
   }
-  if (result.removed > 0) appDbPokes.workspaces.poke({});
   return result;
 }
 
 /**
- * Worktrees whose every live task has been archived since before `cutoffMs`, and
- * that Restore can recreate: provenance `new-worktree` rows (Emdash created them and
- * holds the creation spec) that are present, registered, and not already queued for
- * deletion. Adopted worktrees are never touched; Emdash did not create them.
+ * Worktrees whose every live task has been archived since before `cutoffMs`: provenance
+ * `new-worktree` rows (Emdash created them) that are present, registered, and not already
+ * queued for deletion. Adopted worktrees are never touched; Emdash did not create them.
  */
 export function selectArchivedWorktreeCandidates(
   db: AppDb,
@@ -92,6 +86,7 @@ export function selectArchivedWorktreeCandidates(
 ): ArchivedWorktreeCandidate[] {
   const liveTasks = db
     .select({
+      id: tasks.id,
       projectId: tasks.projectId,
       workspaceId: tasks.workspaceId,
       archivedAt: tasks.archivedAt,
@@ -101,7 +96,7 @@ export function selectArchivedWorktreeCandidates(
     .all();
 
   // A workspace shared with any unarchived (or recently archived) task stays.
-  const byWorkspace = new Map<string, { projectId: string; expired: boolean }>();
+  const byWorkspace = new Map<string, { projectId: string; taskIds: string[]; expired: boolean }>();
   for (const task of liveTasks) {
     if (!task.workspaceId) continue;
     const archivedMs = parseSqliteTimestamp(task.archivedAt);
@@ -109,6 +104,7 @@ export function selectArchivedWorktreeCandidates(
     const current = byWorkspace.get(task.workspaceId);
     byWorkspace.set(task.workspaceId, {
       projectId: current?.projectId ?? task.projectId,
+      taskIds: [...(current?.taskIds ?? []), task.id],
       expired: (current?.expired ?? true) && expired,
     });
   }
@@ -127,25 +123,24 @@ export function selectArchivedWorktreeCandidates(
     ) {
       continue;
     }
-    candidates.push({ projectId: entry.projectId, workspace });
+    candidates.push({ projectId: entry.projectId, taskIds: entry.taskIds, workspace });
   }
   return candidates;
 }
 
 /**
- * The last guard before a force-remove: the host `deleteWorktree` verb refuses nothing
- * by design (informed confirmation is the client's job), and here no user is asked.
- * Decides from the host's latest git observation on the mirror row.
+ * The last guard before an unattended delete: no user is asked, so decide from the host's
+ * latest git observation on the mirror row.
  */
 export function isArchivedWorktreeSafeToRemove(workspace: WorkspaceRow): boolean {
   const git = workspace.observedGit;
   // Never observed: nothing proves the tree clean, so a later run decides.
   if (!git) return false;
-  // Uncommitted or untracked work is the one thing the kept branch cannot bring back.
+  // Uncommitted or untracked work is never removed automatically.
   if (git.dirty || (git.diffStats !== null && git.diffStats.added + git.diffStats.deleted > 0)) {
     return false;
   }
-  // Detached HEAD: its commits are on no branch, so Restore could not recover them.
+  // Detached HEAD: its commits are on no branch at all.
   if (git.branch === null) return false;
   // `git worktree lock` is an explicit request to keep the worktree.
   return !git.locked;

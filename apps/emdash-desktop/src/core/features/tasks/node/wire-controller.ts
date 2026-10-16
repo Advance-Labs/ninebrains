@@ -156,6 +156,7 @@ export function createTasksWireController(options: {
       deleteTasks: ({ projectId, taskIds, options }) =>
         taskOperations.deleteTasks(projectId, taskIds, options),
       teardownTask: ({ projectId, taskId }) => taskOperations.teardownTask(projectId, taskId),
+      cleanUpArchivedTasks: (input) => options.service.cleanUpArchivedTasks(input),
       generateTaskName: (input) => taskOperations.generateTaskName(input),
       taskList: taskListProvider,
       taskStats: taskStatsProvider,

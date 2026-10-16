@@ -56,6 +56,10 @@ import { compileWorktreeGitPlan } from '@core/primitives/workspaces/api';
 import type { AppDb } from '@core/services/app-db/node/db';
 import { appDbPokes } from '@core/services/app-db/node/pokes';
 import { tasks, type WorkspaceRow } from '@core/services/app-db/node/schema';
+import {
+  sweepArchivedTasks,
+  type ArchivedTaskSweepOptions,
+} from '../../node/archived-worktree-cleanup';
 import { archiveTask } from '../../node/operations/archiveTask';
 import { createTask, resolveProjectPreservePatterns } from '../../node/operations/createTask';
 import {
@@ -526,6 +530,24 @@ export class TaskService implements Hookable<TaskLifecycleHooks> {
       throw new Error(result.error.message);
     }
     this.notifyTaskDeleted(taskId, projectId);
+  }
+
+  /** Ninebrains: deletes long-archived tasks with their worktree and branch. */
+  cleanUpArchivedTasks(options: ArchivedTaskSweepOptions) {
+    return sweepArchivedTasks(
+      {
+        db: this.dependencies.db,
+        projects: this.dependencies.projects,
+        deleteTask: (projectId, taskId) =>
+          this.deleteTask(projectId, taskId, {
+            deleteWorktree: true,
+            deleteBranch: true,
+            deleteConversations: true,
+          }),
+        logger: log,
+      },
+      options
+    );
   }
 
   notifyTaskDeleted(taskId: string, projectId: string): void {

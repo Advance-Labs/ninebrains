@@ -254,3 +254,15 @@ export type TaskDeletePreflightItem = {
 export type DeletePreflightResult = {
   tasks: TaskDeletePreflightItem[];
 };
+
+/** Ninebrains: archived-task retention presets offered in settings, in days. */
+export const ARCHIVED_TASK_RETENTION_PRESETS = [1, 7, 14, 30] as const;
+export const DEFAULT_ARCHIVED_TASK_RETENTION_DAYS = 7;
+
+/** Per-worktree counts from one archived-task cleanup run (or its dry run). */
+export type ArchivedTaskCleanupResult = {
+  removed: number;
+  /** Not provably clean, or its Project is not attached right now. */
+  skipped: number;
+  failed: number;
+};

@@ -76,7 +76,6 @@ import { TaskService } from '@core/features/tasks/api/node/task-service';
 import type { TaskSessionCleanup } from '@core/features/tasks/api/node/task-session-cleanup';
 import { TaskSessionLaunchContextResolver } from '@core/features/tasks/api/node/task-session-launch-context';
 import { TaskSessionManager } from '@core/features/tasks/api/node/task-session-manager';
-import { sweepArchivedWorktrees } from '@core/features/tasks/node/archived-worktree-cleanup';
 import { installAutomationTelemetry } from '@core/features/telemetry/node/automation-telemetry';
 import { installTaskTelemetry } from '@core/features/telemetry/node/task-telemetry';
 import { desktopHostEvents } from '@core/features/workbench/node/event-host';
@@ -853,22 +852,21 @@ export async function bootServices(
   void sessionHygieneSweep.runNow().catch((error) => {
     log.warn('session hygiene sweep failed', { error: String(error) });
   });
-  // Ninebrains: archived tasks give up their worktree after the retention window; the branch and the
-  // mirror row stay, so Restore recreates the worktree. Hourly: the query is cheap, and
-  // Projects attach after boot, so an immediate run would mostly skip.
+  // Ninebrains: tasks archived past the retention window are deleted with their worktree
+  // and branch. Hourly: the query is cheap, and Projects attach after boot, so an
+  // immediate run would mostly skip. Settings → Tasks has a "Clean up now" for impatience.
   startPeriodicSweep({
     scope: appScope,
     intervalMs: 60 * 60 * 1000,
     run: async () => {
-      await sweepArchivedWorktrees({
-        db,
-        projects: projectManager,
-        isEnabled: async () => (await appSettingsService.get('tasks')).cleanUpArchivedWorktrees,
-        logger: log,
+      const settings = await appSettingsService.get('tasks');
+      if (!settings.cleanUpArchivedWorktrees) return;
+      await taskService.cleanUpArchivedTasks({
+        retentionDays: settings.archivedTaskRetentionDays,
       });
     },
     onError: (error) => {
-      log.warn('archived worktree cleanup failed', { error: String(error) });
+      log.warn('archived task cleanup failed', { error: String(error) });
     },
   });
   registerProviderTokenHandlers();

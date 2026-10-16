@@ -11,6 +11,7 @@ import z from 'zod';
 import type { LinkedIssue } from '@core/primitives/linked-issues/api';
 import {
   taskLifecycleStatuses,
+  type ArchivedTaskCleanupResult,
   type CreateTaskError,
   type CreateTaskParams,
   type CreateTaskSuccess,
@@ -65,6 +66,10 @@ export const tasksWireContract = defineContract({
   teardownTask: procedure({
     input: z.object({ projectId: z.string(), taskId: z.string() }),
     output: z.custom<Result<void, { type: string; message: string; timeout?: number }>>(),
+  }),
+  cleanUpArchivedTasks: procedure({
+    input: z.object({ retentionDays: z.number().int().positive(), dryRun: z.boolean() }),
+    output: z.custom<ArchivedTaskCleanupResult>(),
   }),
   generateTaskName: procedure({
     input: z.object({ title: z.string().optional(), description: z.string().optional() }),

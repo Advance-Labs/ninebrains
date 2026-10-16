@@ -10,6 +10,7 @@ import {
   AutoApproveByDefaultRow,
   AutoGenerateTaskNamesRow,
   AutoTrustWorktreesRow,
+  CleanUpArchivedTasksNowRow,
   CleanUpArchivedWorktreesRow,
   CreateBranchAndWorktreeRow,
   DeleteBranchByDefaultRow,
@@ -49,6 +50,7 @@ export function GeneralSettingsPage() {
         <CreateBranchAndWorktreeRow />
         <DeleteBranchByDefaultRow />
         <CleanUpArchivedWorktreesRow />
+        <CleanUpArchivedTasksNowRow />
         <PreserveTaskNameCapitalizationRow />
         <IncludeIssueContextByDefaultRow />
         <EnableTmuxRow />
