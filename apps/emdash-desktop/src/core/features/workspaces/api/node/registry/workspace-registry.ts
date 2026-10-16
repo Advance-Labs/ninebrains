@@ -265,9 +265,17 @@ export class WorkspaceRegistry {
     let persistedPath = path;
     if (path !== undefined && path !== null) {
       const current = this.getLive(id, tx);
-      if (current?.location) {
+      // An unchanged path identity cannot introduce a collision, and findLiveByPath scans and
+      // parses every live row: snapshot sync refreshes every row every ~2s, so checking
+      // unconditionally made each delivery O(n²) on the main thread.
+      const pathChanged =
+        current?.path == null ||
+        workspacePathIdentityKey(current.path) !== workspacePathIdentityKey(path);
+      if (current?.location && pathChanged) {
         const owner = this.findLiveByPath(current.location, current.sshConnectionId, path, tx);
         if (owner && owner.id !== id) throw workspacePathCollision(path, id, owner.id);
+      }
+      if (current?.location) {
         if (current.path !== null) persistedPath = stableWorkspacePathDisplay(current.path, path);
       }
     }

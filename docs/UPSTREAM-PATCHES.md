@@ -1147,3 +1147,10 @@ so upstream's README URL is the only inherited surface that had to change.
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.3 → 0.2.4 | Written by `pnpm run release:prepare 0.2.4`; `release.yml` refuses a version that does not match. 0.2.3 was built to a draft but never published, so 0.2.4 is the first release to reach users since 0.2.2 and its changelog section carries 0.2.3's entries as well. The generated section also re-listed every commit back to `v0.2.2-canary.9` (#129) and was trimmed to the work that has not shipped |
+
+## 68. Snapshot sync skips the path-owner scan for unchanged paths (`ninebrains/speed-euf5o`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/workspaces/api/node/registry/workspace-registry.ts` | `refresh` calls `findLiveByPath` only when the incoming path's identity key differs from the row's current path (or the row has none) | The host delivers its full registry snapshot every ~2 s, and `applyWorkspaceRegistrySnapshot` refreshes every live row in one synchronous transaction. `findLiveByPath` selects and parses every live row for the host, so each delivery was O(n²): with 159 live workspaces a profile of the main process put ~3 s of every 5 s in this chain, and keystrokes and scroll events queued behind it (choppy typing, laggy terminal scroll). An unchanged identity cannot create a collision, and the snapshot path already rejects identity conflicts up front in `assertNoIdentityConflicts`; moved paths are nulled first by `releaseMovedPaths`, so they still take the check |
+| `src/core/features/workspaces/api/node/registry/workspace-registry.db.test.ts` | New case: an unchanged-path refresh never calls `findLiveByPath`, a changed one calls it once | Regression guard on the hot path |
