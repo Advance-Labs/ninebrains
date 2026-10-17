@@ -173,6 +173,50 @@ describe('Dispatcher', () => {
       expect(brain.getJob(APP_IDENTITY, ready.id).state).toBe('running');
     });
 
+    it('keeps a held job held, with its lane and active job, when that lane is parked', async () => {
+      const { brain, dispatcher, job } = setup([]);
+      stale(brain, 'G');
+      const held = job('in-flight');
+      brain.assignJob(APP_IDENTITY, held.id, 'G');
+      const activeBefore = brain.store.getLane('G')?.activeJobId;
+
+      await dispatcher.tick();
+      expect(brain.store.getLane('G')?.status).toBe('asleep');
+      expect(brain.store.getLane('G')?.activeJobId).toBe(activeBefore);
+      const after = brain.getJob(APP_IDENTITY, held.id);
+      expect(after.state).toBe('claimed');
+      expect(after.laneId).toBe('G');
+    });
+
+    it('waits out a grace period after start, while the live lane list is still loading', async () => {
+      let clock = 0;
+      const lanes: DispatchLane[] = [];
+      const brain = new Brain({ store: new InMemoryBrainStore(), now: () => clock });
+      const dispatcher = new Dispatcher(
+        {
+          brain,
+          lanes: () => lanes,
+          paste: async () => 'pasted',
+          runUnattended: async () => {},
+          onError: (context, error) => {
+            throw new Error(`${context}: ${String(error)}`);
+          },
+        },
+        { now: () => clock, staleGraceMs: 15_000 }
+      );
+      stale(brain, 'A');
+      dispatcher.start();
+      dispatcher.dispose();
+
+      clock = 1_000; // the lane service has not loaded yet: no live lanes
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('idle');
+
+      clock = 16_000; // still no live lane after the grace period: it really is stale
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('asleep');
+    });
+
     it('makes a parked lane plannable again once it is live', async () => {
       const lanes: DispatchLane[] = [];
       const { brain, dispatcher, job } = setup(lanes);

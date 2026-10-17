@@ -69,12 +69,25 @@ export class Dispatcher {
   private interval: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
 
+  private startedAt: number | undefined;
+
   constructor(
     private readonly ports: DispatcherPorts,
-    private readonly options: { intervalMs?: number; debounceMs?: number } = {}
+    private readonly options: {
+      intervalMs?: number;
+      debounceMs?: number;
+      /**
+       * How long after start() before stale lanes are parked. The live lane list is briefly
+       * empty while the lane service loads; parking then would flip every lane to asleep and back
+       * on each launch. Default 15 s.
+       */
+      staleGraceMs?: number;
+      now?: () => number;
+    } = {}
   ) {}
 
   start(): void {
+    this.startedAt = (this.options.now ?? Date.now)();
     const events = this.ports.brain.events;
     const offs = [
       events.on('jobChanged', () => this.schedule()),
@@ -235,6 +248,12 @@ export class Dispatcher {
    * status back as soon as the lane is live again.
    */
   private parkStaleLanes(live: ReadonlyMap<string, DispatchLane>): void {
+    if (
+      this.startedAt !== undefined &&
+      (this.options.now ?? Date.now)() - this.startedAt < (this.options.staleGraceMs ?? 15_000)
+    ) {
+      return;
+    }
     const { brain } = this.ports;
     for (const stored of brain.store.listLanes()) {
       if (stored.status === 'asleep' || live.has(stored.id) || this.inFlight.has(stored.id)) {
