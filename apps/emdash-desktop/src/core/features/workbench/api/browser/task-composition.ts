@@ -491,7 +491,8 @@ export class TaskComposition {
   // Ninebrains: the Brain TUI opens as a task terminal (UPSTREAM-PATCHES 68).
   /** True when this task's terminals run on this machine, where the Brain endpoint lives. */
   get isLocalWorkspace(): boolean {
-    return !this._workspace?.sshConnectionId;
+    // Unknown until the workspace loads; an SSH task must not pass as local in that window.
+    return this._workspace !== null && !this._workspace.sshConnectionId;
   }
 
   /**
