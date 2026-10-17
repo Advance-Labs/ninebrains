@@ -46,6 +46,16 @@ const JOB_TONE: Record<string, FeedTone> = {
   failed: 'fail',
 };
 
+/**
+ * SEC-09 at the terminal: lane-written text (job titles, bodies and block reasons, notes, inbox
+ * messages) is data. Ink does not filter escape sequences, so a raw ESC or OSC could rewrite the
+ * screen, retitle the window, fake a feed line or set the clipboard. C0/C1 controls and bidi
+ * overrides become spaces before anything reaches the render path.
+ */
+export function clean(text: string): string {
+  return text.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ');
+}
+
 /** Held by a lane: claimed, running, or waiting on its gates. */
 export function isActive(job: Pick<JobSummary, 'state'>): boolean {
   return job.state === 'claimed' || job.state === 'running' || job.state === 'verifying';

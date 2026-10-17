@@ -1,7 +1,7 @@
 import type { JobSummary, Lane } from '@ninebrains/brain-core';
 import { describe, expect, it } from 'vitest';
 import { completions, parseCommand } from '../src/tui/commands';
-import { diffSnapshots, dispatchHint, laneLabel, type Snapshot } from '../src/tui/feed';
+import { clean, diffSnapshots, dispatchHint, laneLabel, type Snapshot } from '../src/tui/feed';
 
 const job = (
   id: string,
@@ -135,5 +135,22 @@ describe('commands', () => {
     expect(completions('/re').map((c) => c.name)).toEqual(['requeue', 'resume']);
     expect(completions('/requeue ')).toEqual([]);
     expect(completions('re')).toEqual([]);
+  });
+});
+
+describe('clean (SEC-09 at the terminal)', () => {
+  it('turns escape sequences, C1 controls and bidi overrides into spaces', () => {
+    expect(clean('ok\u001b]52;c;cHduZWQ=\u0007 done')).toBe('ok ]52;c;cHduZWQ=  done');
+    expect(clean('a\u009bb\u202ec\u2066d')).toBe('a b c d');
+    expect(clean('plain title — fine')).toBe('plain title — fine');
+  });
+});
+
+describe('/new body with more separators', () => {
+  it('keeps everything after the first -- in the body', () => {
+    expect(parseCommand('/new fix it -- first -- second', { jobs: [], lanes: [] })).toEqual({
+      ok: true,
+      action: { type: 'new', title: 'fix it', body: 'first -- second' },
+    });
   });
 });
