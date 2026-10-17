@@ -39,7 +39,9 @@ export function registerCrashDiagnostics(log: Logger, logPath: string | undefine
 
   app.on('render-process-gone', (_event, webContents, details) => {
     if (details.reason === 'clean-exit') return;
-    log.error('renderer process gone', { ...details, url: webContents.getURL() });
+    // Origin and path only: a preview or OAuth page's query string can carry codes and tokens the
+    // redactor does not recognise.
+    log.error('renderer process gone', { ...details, url: safeUrl(webContents.getURL()) });
   });
 
   // `unresponsive` fires when a renderer stops answering. A blocked main thread cannot log at all;
@@ -64,6 +66,16 @@ export function registerCrashDiagnostics(log: Logger, logPath: string | undefine
 
   void app.whenReady().then(() => startMemorySampler(log));
   if (logPath) startMainThreadWatchdog(logPath, log);
+}
+
+/** `origin + pathname`, or the scheme alone for anything that does not parse as a URL. */
+export function safeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === 'null' ? `${parsed.protocol}…` : `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return '';
+  }
 }
 
 const SAMPLE_MS = 60_000;
@@ -143,9 +155,15 @@ const write = (fields) => {
 };
 let stalledAt = null;
 let reportedAt = 0;
+let polledAt = Date.now();
 for (;;) {
   Atomics.wait(nap, 0, 0, pollMs);
   const now = Date.now();
+  // The machine slept (or the clock jumped): this thread did not run either, so the silence is
+  // not a hang. Skip one reading; the main thread beats again within half a second of waking.
+  const asleep = now - polledAt > pollMs * 10;
+  polledAt = now;
+  if (asleep) continue;
   const last = Number(Atomics.load(heartbeat, 0));
   const silentMs = now - last;
   if (silentMs >= stallMs) {
@@ -205,6 +223,9 @@ export function startMainThreadWatchdog(
   }
   worker.unref();
   worker.on('error', (error) => log.warn('main-thread watchdog stopped', error));
+  worker.on('exit', (code) => {
+    if (code !== 0 && code !== 1) log.warn('main-thread watchdog exited', { code });
+  });
   return async () => {
     clearInterval(timer);
     await worker.terminate();

@@ -7,8 +7,13 @@ vi.mock('electron', () => ({
   app: { on: vi.fn(), whenReady: () => new Promise(() => {}) },
 }));
 
-const { memoryReport, recordCleanExit, registerCrashDiagnostics, startMainThreadWatchdog } =
-  await import('./crash-diagnostics');
+const {
+  memoryReport,
+  recordCleanExit,
+  registerCrashDiagnostics,
+  safeUrl,
+  startMainThreadWatchdog,
+} = await import('./crash-diagnostics');
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -117,5 +122,16 @@ describe('recordCleanExit', () => {
       code: 0,
       pid: process.pid,
     });
+  });
+});
+
+describe('safeUrl', () => {
+  it('keeps origin and path, and drops query strings and fragments that can carry codes', () => {
+    expect(safeUrl('https://auth.example.com/callback?code=abc&state=xyz#t=1')).toBe(
+      'https://auth.example.com/callback'
+    );
+    expect(safeUrl('app://index.html/')).toBe('app:…');
+    expect(safeUrl('file:///Users/me/a.html?x=1')).toBe('file:…');
+    expect(safeUrl('not a url')).toBe('');
   });
 });
