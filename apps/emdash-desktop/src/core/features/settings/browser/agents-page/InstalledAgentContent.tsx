@@ -194,7 +194,7 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
                 <Field.Root>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="sheet-skipPlugins">Plugins to skip in task sessions</Label>
-                    <FieldTooltip content="Claude Code plugins left off when Ninebrains starts a task session, so their MCP and language servers don't run once per agent. Your own terminal sessions keep them. One id per line, as `claude plugin list` prints it." />
+                    <FieldTooltip content="Claude Code plugins left off when Ninebrains starts a task session, so their MCP and language servers don't run once per agent. Your own terminal sessions keep them. One id per line, as `claude plugin list` prints it. Not applied if Additional parameters already pass --settings." />
                   </div>
                   <Textarea
                     id="sheet-skipPlugins"

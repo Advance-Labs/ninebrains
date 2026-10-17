@@ -6,20 +6,28 @@
  * plugins, but a per-launch `--settings` outranks user, project and local settings, and a plugin
  * set to false there starts none of its servers. This builds that one argument.
  */
-
-/** `name@marketplace`, as `claude plugin list` prints it. Anything else is dropped. */
-const PLUGIN_ID = /^[A-Za-z0-9][\w.-]*@[A-Za-z0-9][\w.-]*$/;
+import { MAX_SKIP_PLUGINS, PLUGIN_ID } from '@core/primitives/app-settings/api/plugin-id';
 
 export function parseSkipPlugins(text: string): string[] {
   return [...new Set(text.split(/[\s,]+/).filter((id) => PLUGIN_ID.test(id)))];
 }
 
+/** True when the user's own arguments already pass `--settings`, which ours would silently override. */
+export function hasOwnSettingsArg(args: readonly string[]): boolean {
+  return args.some((arg) => arg === '--settings' || arg.startsWith('--settings='));
+}
+
+/**
+ * ponytail: on Windows, cmd and PowerShell quoting may mangle the JSON, so the skip list may not
+ * apply there (Brain lanes' --settings shares this). A settings file path would avoid it.
+ */
 export function pluginSkipArgs(
   providerId: string,
-  skipPlugins: readonly string[] | undefined
+  skipPlugins: readonly string[] | undefined,
+  userArgs: readonly string[] = []
 ): string[] {
-  if (providerId !== 'claude') return [];
-  const ids = (skipPlugins ?? []).filter((id) => PLUGIN_ID.test(id));
+  if (providerId !== 'claude' || hasOwnSettingsArg(userArgs)) return [];
+  const ids = (skipPlugins ?? []).filter((id) => PLUGIN_ID.test(id)).slice(0, MAX_SKIP_PLUGINS);
   if (ids.length === 0) return [];
   return [
     '--settings',

@@ -22,4 +22,10 @@ describe('plugin skip list', () => {
     expect(pluginSkipArgs('codex', ['a@m'])).toEqual([]);
     expect(pluginSkipArgs('claude', ['--dangerously-skip-permissions', 'x"}@y'])).toEqual([]);
   });
+
+  it("steps aside when the user's own arguments already pass --settings", () => {
+    expect(pluginSkipArgs('claude', ['a@m'], ['--settings', '{}'])).toEqual([]);
+    expect(pluginSkipArgs('claude', ['a@m'], ['--settings={}'])).toEqual([]);
+    expect(pluginSkipArgs('claude', ['a@m'], ['--model', 'x'])).toHaveLength(2);
+  });
 });

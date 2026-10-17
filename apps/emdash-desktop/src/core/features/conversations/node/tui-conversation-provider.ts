@@ -186,7 +186,9 @@ export class TuiConversationProvider implements ConversationProvider {
       extraArgs: [
         ...userExtraArgs,
         ...(laneLaunch?.extraArgs ?? []),
-        ...(laneLaunch ? [] : pluginSkipArgs(conversation.providerId, providerConfig?.skipPlugins)),
+        ...(laneLaunch
+          ? []
+          : pluginSkipArgs(conversation.providerId, providerConfig?.skipPlugins, userExtraArgs)),
       ],
       providerVars,
       gitCredentials,
