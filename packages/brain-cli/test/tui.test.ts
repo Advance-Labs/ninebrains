@@ -94,7 +94,13 @@ if (!globalThis.console.Console) {
   (globalThis.console as unknown as { Console: typeof Console }).Console = Console;
 }
 
-async function renderTui(project: string, columns: number, animations = false): Promise<string[]> {
+async function renderTui(
+  project: string,
+  columns: number,
+  animations = false,
+  /** Resize the terminal to this many columns after the first poll; only later frames return. */
+  resizeTo?: number
+): Promise<string[]> {
   const connection = connect({ ...env, NINEBRAINS_PROJECT: project });
   if (!connection.ok) throw new Error(connection.message);
 
@@ -138,9 +144,16 @@ async function renderTui(project: string, columns: number, animations = false): 
   );
   // The first poll lands, then the next frame renders it.
   await new Promise((r) => setTimeout(r, 1000));
+  let from = 0;
+  if (resizeTo !== undefined) {
+    from = chunks.length;
+    mockStdout.columns = resizeTo;
+    mockStdout.emit('resize');
+    await new Promise((r) => setTimeout(r, 300));
+  }
   instance.unmount();
   // Each debug write is one whole frame with no trailing newline, so split frames apart first.
-  return chunks.flatMap((chunk) => stripVTControlCharacters(chunk).split('\n'));
+  return chunks.slice(from).flatMap((chunk) => stripVTControlCharacters(chunk).split('\n'));
 }
 
 describe('brain TUI', () => {
@@ -179,5 +192,12 @@ describe('brain TUI', () => {
     expect(glyphs.size).toBeGreaterThan(3);
     expect(lines.join('\n')).toContain('Busy job');
     expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(120);
+  });
+
+  it('redraws at the new width when the terminal is resized', async () => {
+    // A task terminal spawns small and grows to the pane; the TUI must follow it.
+    const lines = await renderTui('alpha', 80, false, 140);
+    expect(lines.some((line) => line === '─'.repeat(140))).toBe(true);
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(140);
   });
 });

@@ -8,6 +8,9 @@ export function runTui(connection: Connection, projectId: string | undefined): v
   render(
     <BrainStoreProvider client={connection.client} projectId={projectId}>
       <App />
-    </BrainStoreProvider>
+    </BrainStoreProvider>,
+    // Full screen, like Claude Code and Codex: the shell line that launched it is hidden while the
+    // TUI runs, and the shell comes back untouched on /quit. Ink ignores this when not interactive.
+    { alternateScreen: true }
   );
 }
