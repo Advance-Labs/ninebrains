@@ -145,4 +145,89 @@ describe('Dispatcher', () => {
     expect(unattended).toEqual([]);
     dispatcher.dispose();
   });
+
+  describe('#140 stale Brain lanes', () => {
+    // A lane row the app no longer runs: removed while the app was down, or from an older profile.
+    const stale = (brain: Brain, id: string) =>
+      brain.upsertLane(APP_IDENTITY, { id, projectId: 'p1', provider: 'claude', status: 'idle' });
+
+    it('parks a lane with no live lane behind it, so a ready job is never planned onto it', async () => {
+      const { brain, dispatcher, pasted, job } = setup([]);
+      stale(brain, 'ghost');
+      const ready = job('check-running');
+
+      expect(await dispatcher.tick()).toEqual([]);
+      expect(brain.store.getLane('ghost')?.status).toBe('asleep');
+      expect(brain.getJob(APP_IDENTITY, ready.id).state).toBe('ready');
+      expect(pasted).toEqual([]);
+    });
+
+    it('gives the job to the live lane when a stale one is also idle', async () => {
+      const { brain, dispatcher, job } = setup([lane('A')]);
+      // Ordered so the stale lane would be the first candidate.
+      stale(brain, '0-ghost');
+      const ready = job('check-running');
+
+      const records = await dispatcher.tick();
+      expect(records.map((r) => [r.jobId, r.laneId])).toEqual([[ready.id, 'A']]);
+      expect(brain.getJob(APP_IDENTITY, ready.id).state).toBe('running');
+    });
+
+    it('keeps a held job held, with its lane and active job, when that lane is parked', async () => {
+      const { brain, dispatcher, job } = setup([]);
+      stale(brain, 'G');
+      const held = job('in-flight');
+      brain.assignJob(APP_IDENTITY, held.id, 'G');
+      const activeBefore = brain.store.getLane('G')?.activeJobId;
+
+      await dispatcher.tick();
+      expect(brain.store.getLane('G')?.status).toBe('asleep');
+      expect(brain.store.getLane('G')?.activeJobId).toBe(activeBefore);
+      const after = brain.getJob(APP_IDENTITY, held.id);
+      expect(after.state).toBe('claimed');
+      expect(after.laneId).toBe('G');
+    });
+
+    it('waits out a grace period after start, while the live lane list is still loading', async () => {
+      let clock = 0;
+      const lanes: DispatchLane[] = [];
+      const brain = new Brain({ store: new InMemoryBrainStore(), now: () => clock });
+      const dispatcher = new Dispatcher(
+        {
+          brain,
+          lanes: () => lanes,
+          paste: async () => 'pasted',
+          runUnattended: async () => {},
+          onError: (context, error) => {
+            throw new Error(`${context}: ${String(error)}`);
+          },
+        },
+        { now: () => clock, staleGraceMs: 15_000 }
+      );
+      stale(brain, 'A');
+      dispatcher.start();
+      dispatcher.dispose();
+
+      clock = 1_000; // the lane service has not loaded yet: no live lanes
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('idle');
+
+      clock = 16_000; // still no live lane after the grace period: it really is stale
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('asleep');
+    });
+
+    it('makes a parked lane plannable again once it is live', async () => {
+      const lanes: DispatchLane[] = [];
+      const { brain, dispatcher, job } = setup(lanes);
+      stale(brain, 'A');
+      await dispatcher.tick();
+      expect(brain.store.getLane('A')?.status).toBe('asleep');
+
+      lanes.push(lane('A'));
+      const ready = job('after-wake');
+      const records = await dispatcher.tick();
+      expect(records.map((r) => [r.jobId, r.laneId])).toEqual([[ready.id, 'A']]);
+    });
+  });
 });
