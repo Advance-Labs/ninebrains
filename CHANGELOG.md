@@ -6,6 +6,21 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-17
+
+Terminals on screen now draw with the GPU (WebGL) instead of building a DOM row for every line,
+which is the work that remained when agents stream output or you scroll. Only visible terminals use
+WebGL, since browsers limit how many WebGL contexts a page may hold. Terminals in background tabs
+switch back to the regular renderer, which already pauses off-screen. If WebGL is unavailable or the
+GPU resets, terminals fall back to the regular renderer on their own.
+
+Redrawing in the same step as a resize avoids the one blank frame that made GPU-drawn terminals
+flicker when panels open and close. If you still see a flicker or garbled text, please open an issue.
+
+### Performance
+
+- **terminals:** render on-screen terminals with WebGL (#155) (14f40b1)
+
 ## [0.2.6] - 2026-10-17
 
 Agents keep their git access when Ninebrains restarts. Agent sessions live in tmux and survive a

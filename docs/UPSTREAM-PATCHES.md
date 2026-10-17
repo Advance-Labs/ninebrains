@@ -1214,3 +1214,9 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | `src/core/features/terminals/api/browser/pty/pty.ts` | `mount()` attaches a `WebglAddon`, `unmount()` and `dispose()` release it, and context loss falls back to the DOM renderer. A first failure turns WebGL off for the session. A `terminal.onResize` listener, registered after `open()`, and the attach path both call `renderPendingRowsNow()`, which flushes xterm's render debouncer synchronously through private fields and is a guarded no-op if they are renamed | Chromium caps live WebGL contexts per page (~16) and `FrontendPty` keeps every terminal alive, so only mounted terminals may hold one. Upstream stayed on the DOM renderer because a canvas renderer flickers on resize: setting `canvas.width` clears it synchronously, while xterm redraws on the next animation frame, so a ResizeObserver-driven resize paints one blank frame. Rendering in the same task closes that frame |
 | `src/core/features/workbench/node/layout-contract.test.ts` | `pty.ts` allowlisted under "no onResize handlers", with its reason | The rule bans layout `onResize` callbacks that write to stores. This is xterm's terminal event, used only to repaint, which is the measurement-only case the rule says to allowlist after review |
 | `src/renderer/tests/browser/terminal-webgl.test.ts` (new) | Canvas held only while mounted; 20 terminals cycled never leave a context behind; a resize draws in the same task (verified to fail with the synchronous render disabled) | Regression guards for the context budget and the flicker |
+
+## 76. Release 0.2.7 (`chore/release-0.2.7`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.6 → 0.2.7 | Written by `pnpm run release:prepare 0.2.7 --from aefe9d812` (the 0.2.6 release commit); `release.yml` refuses a version that does not match |
