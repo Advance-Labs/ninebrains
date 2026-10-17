@@ -2,6 +2,7 @@ import { Console } from 'node:console';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import {
   Brain,
   brainHandshakePath,
@@ -58,6 +59,8 @@ beforeEach(async () => {
     status: 'idle',
   });
   brain.createJob(BRAIN_IDENTITY, { projectId: 'alpha', title: 'Test job' });
+  // beta has a ready job and no lane at all: the TUI must say why it is not moving.
+  brain.createJob(BRAIN_IDENTITY, { projectId: 'beta', title: 'Stuck job' });
   server = await startBrainHttpServer({ brain, host: fakeHost() });
   const token = server.issueToken({
     identity: { role: 'brain', brainId: USER_BRAIN_ID },
@@ -81,58 +84,71 @@ if (!globalThis.console.Console) {
   (globalThis.console as unknown as { Console: typeof Console }).Console = Console;
 }
 
+async function renderTui(project: string, columns: number): Promise<string[]> {
+  const connection = connect({ ...env, NINEBRAINS_PROJECT: project });
+  if (!connection.ok) throw new Error(connection.message);
+
+  const chunks: string[] = [];
+  const mockStdout = Object.create(process.stdout);
+  mockStdout.write = (chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
+    return true;
+  };
+  mockStdout.columns = columns;
+  mockStdout.rows = 30;
+  mockStdout.isTTY = true;
+
+  const mockStdin = Object.create(process.stdin);
+  mockStdin.isTTY = true;
+  mockStdin.setRawMode = () => mockStdin;
+  mockStdin.on = () => mockStdin;
+  mockStdin.off = () => mockStdin;
+  mockStdin.pause = () => mockStdin;
+  mockStdin.resume = () => mockStdin;
+
+  const instance = render(
+    React.createElement(
+      BrainStoreProvider,
+      { client: connection.connection.client, projectId: project },
+      React.createElement(App)
+    ),
+    {
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+      stdin: mockStdin as unknown as NodeJS.ReadStream,
+      // Ink only writes dynamic frames to stdout while interactive, and it treats a CI
+      // environment as non-interactive (isInCi in ink/build/ink.js) regardless of isTTY,
+      // buffering the frame until unmount. debug mode writes every frame synchronously, so the
+      // assertions below see the rendered output in both environments.
+      debug: true,
+    }
+  );
+  // The first poll lands, then the next frame renders it.
+  await new Promise((r) => setTimeout(r, 1000));
+  instance.unmount();
+  // Each debug write is one whole frame with no trailing newline, so split frames apart first.
+  return chunks.flatMap((chunk) => stripVTControlCharacters(chunk).split('\n'));
+}
+
 describe('brain TUI', () => {
-  it('renders the dashboard and loads data from the endpoint', async () => {
-    const connection = connect(env);
-    if (!connection.ok) throw new Error(connection.message);
+  it.each([80, 160])(
+    'renders header, feed, prompt and status line within %i columns',
+    async (columns) => {
+      const lines = await renderTui('alpha', columns);
+      const output = lines.join('\n');
 
-    const lines: string[] = [];
-    const mockStdout = Object.create(process.stdout);
-    const originalWrite = process.stdout.write.bind(process.stdout);
-    mockStdout.write = (chunk: string | Uint8Array, _encoding?: string, _cb?: () => void) => {
-      lines.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
-      return originalWrite(chunk);
-    };
-    mockStdout.columns = 120;
-    mockStdout.rows = 40;
-    mockStdout.isTTY = true;
+      expect(output).toContain('Ninebrains Brain · alpha');
+      expect(output).toContain('● dispatching');
+      expect(output).toContain('connected · 1 jobs · claude-A');
+      expect(output).toContain('/new, /send, /jobs');
+      expect(output).toContain('1 ready · 0 active · 0 blocked');
+      expect(output).toContain('lanes 1 live · 1 idle');
+      // No boxed panels and no wrapping: every line fits the terminal.
+      expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(columns);
+    }
+  );
 
-    const mockStdin = Object.create(process.stdin);
-    mockStdin.isTTY = true;
-    mockStdin.setRawMode = () => mockStdin;
-    mockStdin.on = () => mockStdin;
-    mockStdin.off = () => mockStdin;
-    mockStdin.pause = () => mockStdin;
-    mockStdin.resume = () => mockStdin;
-
-    const instance = render(
-      React.createElement(
-        BrainStoreProvider,
-        { client: connection.connection.client, projectId: env.NINEBRAINS_PROJECT },
-        React.createElement(App)
-      ),
-      {
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stdin: mockStdin as unknown as NodeJS.ReadStream,
-        // Ink only writes dynamic frames to stdout while interactive, and it treats a CI
-        // environment as non-interactive (isInCi in ink/build/ink.js) regardless of isTTY,
-        // buffering the frame until unmount. That left this capture empty under CI while it
-        // passed locally. debug mode writes every frame synchronously, so the assertions below
-        // see the rendered output in both environments.
-        debug: true,
-      }
-    );
-
-    // Wait for initial data load
-    await new Promise((r) => setTimeout(r, 1500));
-
-    const output = lines.join('');
-    expect(output).toContain('Ninebrains Brain');
-    expect(output).toContain('Dashboard');
-    expect(output).toContain('Test job');
-    expect(output).toContain('claude');
-    expect(output).toContain('Dispatching');
-
-    instance.unmount();
+  it('says why a ready job is not moving', async () => {
+    const output = (await renderTui('beta', 120)).join('\n');
+    expect(output).toContain('no lanes: add one in the Lanes grid');
   });
 });
