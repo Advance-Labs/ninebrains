@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { err, ok, type Result } from '@emdash/shared';
 import {
   CycleError,
@@ -447,11 +448,16 @@ export class BrainService {
     }
   }
 
-  /** Global STOP (SEC-30). Latches until `clearStop`. */
   /** The shell line a task terminal types to open the operator TUI for `projectId`. */
   cliCommand(projectId: string): Result<{ commandLine: string }, BrainError> {
     const { brainCliBin, brainMcp, userDataDir } = this.deps;
-    if (!brainCliBin) return err({ type: 'unavailable', message: 'The brain CLI is not bundled.' });
+    if (!brainCliBin || !existsSync(brainCliBin)) {
+      return err({ type: 'unavailable', message: 'The brain CLI is not built or bundled.' });
+    }
+    // The id is typed into a terminal: a control byte would act outside the quoting.
+    if (/[\u0000-\u001f\u007f]/.test(projectId)) {
+      return err({ type: 'invalid', message: 'Project id contains control characters.' });
+    }
     // ponytail: POSIX shells only. A Windows task terminal needs a PowerShell/cmd form.
     if (process.platform === 'win32') {
       return err({
@@ -463,6 +469,7 @@ export class BrainService {
     return ok({ commandLine: brainCliCommandLine(runtime, userDataDir, projectId) });
   }
 
+  /** Global STOP (SEC-30). Latches until `clearStop`. */
   async stopAll(): Promise<Result<{ killedRuns: number; stoppedLanes: number }, BrainError>> {
     const { supervisor, lanes, onError } = this.deps;
     const result = await stopEverything({
