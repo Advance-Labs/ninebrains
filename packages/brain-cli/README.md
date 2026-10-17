@@ -57,6 +57,28 @@ built-ins external). Link it or alias it:
 alias brain='node /path/to/packages/brain-cli/dist/bin.mjs'
 ```
 
+## The TUI
+
+`brain` with no command opens a full-screen view of the Brain for `NINEBRAINS_PROJECT`, laid out
+like Claude Code:
+
+- one header line with the project and the dispatcher's state (dispatching, paused, STOP latched);
+- an activity feed, newest at the bottom: jobs created, claimed, blocked or done, lane status
+  changes, pause and STOP, and the result of everything you type;
+- a prompt box. Every action is a slash command, so stray typing does nothing: `/new <title>
+  [-- <body>]`, `/send <lane|brain:id> <message>`, `/assign <job> <lane>`, `/requeue`, `/block`,
+  `/complete`, `/note`, `/mode`, `/pause`, `/resume`, `/stop`, `/clear-stop`. `/jobs`, `/lanes`,
+  `/notes` and `/inbox` open a read-only list over the feed (↑/↓ scroll, Esc closes); `/help`
+  lists everything and `/quit` leaves;
+- one status line: jobs by state, live and asleep lanes, and, in yellow, why ready jobs are not
+  moving (no lane, every lane asleep, paused, STOP).
+
+Jobs and lanes can be named by job title, by lane label (`claude-bdc0`) or by an id prefix of four
+or more characters. Tab completes a command name and ↑/↓ walk your history.
+
+The feed is built by comparing polls every two seconds, so a change that starts and ends between
+two polls does not appear in it.
+
 ## Commands
 
 Every command sends exactly one request, so nothing here can half-apply.

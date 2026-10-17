@@ -1,105 +1,48 @@
-import { Box, useApp, useInput } from 'ink';
-import React from 'react';
-import { CreateJobForm } from './components/create-job-form';
-import { Dashboard } from './components/dashboard';
+import { Box, useStdout } from 'ink';
+import React, { useEffect, useState } from 'react';
+import { Feed } from './components/feed';
 import { Header } from './components/header';
-import { HelpOverlay } from './components/help-overlay';
-import { JobsView } from './components/jobs-view';
-import { LanesView } from './components/lanes-view';
-import { MessagesView } from './components/messages-view';
-import { NotesView } from './components/notes-view';
-import { SendMessageForm } from './components/send-message-form';
-import { StatusBar } from './components/status-bar';
+import { OverlayView, overlayLength } from './components/overlay';
+import { Prompt } from './components/prompt';
+import { StatusLine } from './components/status-line';
 import { useBrainStore } from './store';
 
+/** Header, prompt box (3 rows), status line and the header's rule. */
+const CHROME_ROWS = 7;
+
+/**
+ * Header, then the feed (or an overlay list over it), then the prompt and one status line.
+ * No key does anything on its own: actions are slash commands typed into the prompt.
+ */
 export function App() {
   const store = useBrainStore();
-  const { exit } = useApp();
+  const { stdout } = useStdout();
+  const width = stdout.columns ?? 80;
+  const bodyRows = Math.max((stdout.rows ?? 24) - CHROME_ROWS, 3);
+  const [offset, setOffset] = useState(0);
 
-  useInput((input, key) => {
-    if (store.showHelp) {
-      if (input === '?' || key.escape) {
-        store.toggleHelp();
-      }
-      return;
-    }
+  useEffect(() => setOffset(0), [store.overlay]);
 
-    // Global navigation
-    if (input === 'q' && !key.meta) {
-      exit();
-      return;
-    }
-    if (input === '?') {
-      store.toggleHelp();
-      return;
-    }
-    if (key.escape) {
-      if (store.view === 'create-job' || store.view === 'send-message') {
-        store.goBack();
-      }
-      return;
-    }
-
-    // View switching (only when not in a form)
-    if (store.view !== 'create-job' && store.view !== 'send-message') {
-      switch (input) {
-        case '1':
-          store.setView('dashboard');
-          return;
-        case '2':
-          store.setView('jobs');
-          return;
-        case '3':
-          store.setView('lanes');
-          return;
-        case '4':
-          store.setView('notes');
-          return;
-        case '5':
-          store.setView('messages');
-          return;
-        case 'n':
-          store.setView('create-job');
-          return;
-        case 's':
-          store.setView('send-message');
-          return;
-        case 'r':
-          void store.refresh();
-          return;
-      }
-    }
-  });
-
-  const renderView = () => {
-    switch (store.view) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'jobs':
-        return <JobsView />;
-      case 'lanes':
-        return <LanesView />;
-      case 'notes':
-        return <NotesView />;
-      case 'messages':
-        return <MessagesView />;
-      case 'create-job':
-        return <CreateJobForm />;
-      case 'send-message':
-        return <SendMessageForm />;
-      default:
-        return <Dashboard />;
-    }
+  const scroll = (direction: -1 | 1) => {
+    if (!store.overlay) return;
+    const max = Math.max(overlayLength(store.overlay, store) - 1, 0);
+    setOffset((o) => Math.min(Math.max(o + direction, 0), max));
   };
 
   return (
-    <Box flexDirection="column" height="100%">
-      <Header />
-      <Box flexDirection="column" flexGrow={1}>
-        {renderView()}
-      </Box>
-      <StatusBar />
-      {store.showHelp && <HelpOverlay />}
+    <Box flexDirection="column" height={stdout.rows ?? 24} width={width}>
+      <Header width={width} />
+      {store.overlay ? (
+        <OverlayView overlay={store.overlay} rows={bodyRows} offset={offset} />
+      ) : (
+        <Feed rows={bodyRows} />
+      )}
+      <Prompt
+        onSubmit={(line) => void store.submit(line)}
+        onEscape={store.closeOverlay}
+        {...(store.overlay ? { onArrow: scroll } : {})}
+      />
+      <StatusLine />
     </Box>
   );
 }
