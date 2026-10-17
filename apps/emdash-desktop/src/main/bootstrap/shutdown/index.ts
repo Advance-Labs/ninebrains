@@ -2,6 +2,7 @@ import type { HostRef } from '@emdash/core/primitives/host/api';
 import type { RuntimeBroker } from '@emdash/core/services/runtime-broker/api';
 import { app, type BrowserWindow } from 'electron';
 import { desktopHostEvents } from '@core/features/workbench/node';
+import { recordCleanExit } from '@main/host/crash-diagnostics';
 import { getActiveSessionSummary } from '@main/host/sessions/active-session-summary';
 import { updateService } from '@main/host/updates/update-service';
 import { createShutdownCoordinator } from './coordinator';
@@ -24,7 +25,11 @@ const shutdownCoordinator = createShutdownCoordinator({
   },
   isInstallRequested: () => updateService.isInstallRequested,
   runCleanup: runQuitCleanup,
-  exit: (code) => app.exit(code),
+  // Ninebrains: mark the clean exit in the log before app.exit skips will-quit (UPSTREAM-PATCHES 75).
+  exit: (code) => {
+    recordCleanExit(code);
+    app.exit(code);
+  },
 });
 
 let registered = false;
