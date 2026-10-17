@@ -454,9 +454,10 @@ export class BrainService {
     if (!brainCliBin || !existsSync(brainCliBin)) {
       return err({ type: 'unavailable', message: 'The brain CLI is not built or bundled.' });
     }
-    // The id is typed into a terminal: a control byte would act outside the quoting.
-    if (/[\u0000-\u001f\u007f]/.test(projectId)) {
-      return err({ type: 'invalid', message: 'Project id contains control characters.' });
+    // The id is typed into an interactive shell, so it is allow-listed rather than deny-listed:
+    // no control byte, no `!` (csh history expands it even inside single quotes), no quoting games.
+    if (!/^[A-Za-z0-9._-]{1,128}$/.test(projectId)) {
+      return err({ type: 'invalid', message: 'Not a valid project id.' });
     }
     // ponytail: POSIX shells only. A Windows task terminal needs a PowerShell/cmd form.
     if (process.platform === 'win32') {

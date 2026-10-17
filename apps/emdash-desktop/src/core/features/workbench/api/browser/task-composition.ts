@@ -507,11 +507,17 @@ export class TaskComposition {
   ): Promise<void> {
     // The CLI reaches the Brain over 127.0.0.1, so it cannot run on an SSH host.
     if (!this.isLocalWorkspace) throw new Error('The Brain TUI only runs in local tasks.');
+    const workspace = this._workspace;
     const result = await (await getBrainClient()).cliCommand({ projectId: this.projectId });
     if (!result.success) throw new Error(result.error.message);
     const terminalId = await this.createDefaultTerminal(undefined, 'Brain');
     if (!terminalId) throw new Error('Could not open a terminal.');
     show(terminalId);
+    // Re-checked after the awaits: the line embeds local paths, so the task must still be the
+    // same local workspace when it is typed.
+    if (this._workspace !== workspace || !this.isLocalWorkspace) {
+      throw new Error('The task changed while the Brain TUI was opening.');
+    }
     await this._terminals.sendInput(terminalId, `${result.data.commandLine}\r`);
   }
 
