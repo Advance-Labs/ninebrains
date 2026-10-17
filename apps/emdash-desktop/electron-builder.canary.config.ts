@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import type { Configuration } from 'electron-builder';
 import { resolveMacSigning, resolveWinSigning } from './scripts/release/lib/signing.ts';
 import {
@@ -80,6 +81,9 @@ const config: Configuration = {
     runAfterFinish: true,
   },
   npmRebuild: false,
+  // Ninebrains: ship ripgrep for repo search. Absolute path: build.ts packages from a temp deploy
+  // dir and structuredClones this config, so neither a relative path nor a function survives.
+  afterPack: fileURLToPath(new URL('./scripts/release/bundle-ripgrep.mjs', import.meta.url)),
   // Encrypt Chromium's on-disk cookie store (in-app browser logins) with OS-level
   // keys, like Chrome does. One-way: never disable once shipped or existing
   // cookie stores become unreadable.
