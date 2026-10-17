@@ -6,6 +6,25 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-17
+
+Agents keep their git access when Ninebrains restarts. Agent sessions live in tmux and survive a
+restart or an update, but the channel they use to get git credentials did not, so every surviving
+agent's `git push` failed with "could not read Username". The channels now persist (encrypted, in
+the app's secret storage) and the credential server reopens on the same port.
+
+Sessions started before 0.2.6 never had their channel saved, so restart each running agent session
+once after updating. Until then, `git -c credential.helper= -c 'credential.helper=!gh auth
+git-credential' push` works around it.
+
+### Fixes
+
+- **github:** keep agent git credential channels across an app restart (#151) (3a86625)
+
+### Documentation
+
+- **engineering:** write up the 0.2.4 terminal input lag and its fixes (#149) (97e0e83)
+
 ## [0.2.5] - 2026-10-16
 
 Typing and scrolling in agent terminals no longer stutter. With many workspaces open, the app

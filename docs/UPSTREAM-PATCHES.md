@@ -1199,3 +1199,9 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | `src/core/features/github/api/node/services/git-credentials-service.ts` | `GitCredentialChannelServer.mintSession` takes `{ durable }`; `resolveSessionSpec` (PTY sessions) mints durable. Operation leases stay in memory | Leases are released in-process and must not outlive it |
 | `src/main/bootstrap/boot/phases/services.ts` | Persistence is `encryptedAppSecretsStore` under `git-credential-channels` (safeStorage-encrypted); the server starts at boot | Saved nonces are credential-channel secrets, so they get the same storage as other app secrets |
 | `src/core/features/github/node/services/git-credential-server.test.ts`, `src/core/features/github/api/node/services/git-credentials-service.test.ts` | New restart case: a durable channel answers on the same port from a second server sharing the persistence; operation and revoked channels get 403. The session-spec test now expects `{ durable: true }` | Regression guard for #150 |
+
+## 74. Release 0.2.6 (`chore/release-0.2.6`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.5 → 0.2.6 | Written by `pnpm run release:prepare 0.2.6 --from 81c00ad5d` (the 0.2.5 release commit); `release.yml` refuses a version that does not match |
