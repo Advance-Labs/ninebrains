@@ -73,6 +73,8 @@ export type InterfaceSettings = {
 export type ProviderCustomConfig = {
   extraArgs?: string;
   env?: Record<string, string>;
+  /** Ninebrains: Claude Code plugin ids (`name@marketplace`) left off in task sessions. */
+  skipPlugins?: string[];
 };
 export type ProviderCustomConfigs = Record<string, ProviderCustomConfig>;
 

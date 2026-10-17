@@ -1,8 +1,17 @@
-import { Button, Collapsible, Field, Input, Label, Tooltip } from '@emdash/ui/react/primitives';
+import {
+  Button,
+  Collapsible,
+  Field,
+  Input,
+  Label,
+  Textarea,
+  Tooltip,
+} from '@emdash/ui/react/primitives';
 import { useForm } from '@tanstack/react-form';
 import { ChevronRight, Info, RotateCcw } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React, { useCallback, useEffect, useState } from 'react';
+import { parseSkipPlugins } from '@core/features/conversations/api/plugin-skip';
 import type { ProviderCustomConfig } from '@core/primitives/app-settings/api';
 import {
   EnvironmentVariableInputs,
@@ -31,6 +40,8 @@ const FieldTooltip: React.FC<{ content: string }> = ({ content }) => (
 );
 
 export interface InstalledAgentContentProps {
+  /** Which agent this form edits; some fields are Claude-only. */
+  agentId: string;
   storedConfig: ProviderCustomConfig | undefined;
   isOverridden: boolean;
   isLoading: boolean;
@@ -47,6 +58,7 @@ export interface InstalledAgentContentProps {
 function makeDefaultValues(cfg: ProviderCustomConfig | undefined) {
   return {
     extraArgs: cfg?.extraArgs ?? '',
+    skipPlugins: (cfg?.skipPlugins ?? []).join('\n'),
     envEntries: cfg?.env
       ? (Object.entries(cfg.env).map(([key, value]) => ({
           key,
@@ -57,6 +69,7 @@ function makeDefaultValues(cfg: ProviderCustomConfig | undefined) {
 }
 
 export const InstalledAgentContent = observer(function InstalledAgentContent({
+  agentId,
   storedConfig,
   isOverridden,
   isLoading,
@@ -72,12 +85,14 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
     if (isLoading) return;
     const next = makeDefaultValues(storedConfig);
     form.setFieldValue('extraArgs', next.extraArgs);
+    form.setFieldValue('skipPlugins', next.skipPlugins);
     form.setFieldValue('envEntries', next.envEntries);
   }, [isLoading, storedConfig, isOverridden, form]);
 
   const commit = useCallback(
     (entries?: EnvironmentVariableEntry[]) => {
       const { extraArgs, envEntries: currentEntries } = form.state.values;
+      const skipPlugins = parseSkipPlugins(form.state.values.skipPlugins);
       const envEntries = entries ?? currentEntries;
       const envRecord: Record<string, string> = {};
       for (const { key, value } of envEntries) {
@@ -87,7 +102,10 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
         }
       }
 
-      const isAtDefaults = extraArgs.trim() === '' && envEntries.every((e) => !e.key.trim());
+      const isAtDefaults =
+        extraArgs.trim() === '' &&
+        skipPlugins.length === 0 &&
+        envEntries.every((e) => !e.key.trim());
 
       if (isAtDefaults) {
         reset(undefined, {
@@ -97,6 +115,7 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
         const config: ProviderCustomConfig = {
           ...(storedConfig ?? {}),
           extraArgs: extraArgs.trim() || undefined,
+          skipPlugins: skipPlugins.length > 0 ? skipPlugins : undefined,
           env: Object.keys(envRecord).length > 0 ? envRecord : undefined,
         };
         update(config, {
@@ -109,6 +128,7 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
 
   const handleResetToDefaults = useCallback(() => {
     form.setFieldValue('extraArgs', '');
+    form.setFieldValue('skipPlugins', '');
     form.setFieldValue('envEntries', []);
     reset(undefined, {
       onError: (err) => log.error('Failed to reset agent config:', err),
@@ -166,6 +186,31 @@ export const InstalledAgentContent = observer(function InstalledAgentContent({
               </Field.Root>
             )}
           </form.Field>
+
+          {/* Ninebrains: plugins left off in task sessions (#158). */}
+          {agentId === 'claude' && (
+            <form.Field name="skipPlugins">
+              {(field) => (
+                <Field.Root>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="sheet-skipPlugins">Plugins to skip in task sessions</Label>
+                    <FieldTooltip content="Claude Code plugins left off when Ninebrains starts a task session, so their MCP and language servers don't run once per agent. Your own terminal sessions keep them. One id per line, as `claude plugin list` prints it." />
+                  </div>
+                  <Textarea
+                    id="sheet-skipPlugins"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={() => commit()}
+                    placeholder={
+                      'typescript-lsp@claude-plugins-official\nswift-lsp@claude-plugins-official'
+                    }
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                </Field.Root>
+              )}
+            </form.Field>
+          )}
 
           {/* Environment variables */}
           <form.Field name="envEntries">

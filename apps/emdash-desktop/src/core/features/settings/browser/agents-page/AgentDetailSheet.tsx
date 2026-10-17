@@ -85,6 +85,7 @@ const AgentDetailSheetContent = observer(function AgentDetailSheetContent({
       </div>
       {agentPayload && isInstalled && (
         <InstalledAgentContent
+          agentId={agentId}
           storedConfig={storedConfig}
           isOverridden={isOverridden}
           isLoading={isLoading}

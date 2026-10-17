@@ -1221,6 +1221,7 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.6 → 0.2.7 | Written by `pnpm run release:prepare 0.2.7 --from aefe9d812` (the 0.2.6 release commit); `release.yml` refuses a version that does not match |
 
+<<<<<<< HEAD
 ## 78. Heavy check runs take turns (`perf/gate-slots`)
 
 Part of #158. Each typecheck-and-test run costs about 1 GB of swap on a 16 GB Mac, and with many
@@ -1234,3 +1235,23 @@ Ninebrains-only.
 | File | Change | Why |
 |---|---|---|
 | `CONTRIBUTING.md` | The pre-push section explains the gate slot, the wait message, reclaiming a dead owner's slot, the 30-minute cap and `NINEBRAINS_GATE_SLOTS` | So a contributor whose push pauses knows why and how to change the limit |
+=======
+## 77. Claude task sessions can skip plugins (`feat/agent-plugin-skip`)
+
+Every agent session starts every enabled Claude Code plugin's MCP and language servers, so with
+many agents per-session costs multiply (#158). Claude Code has no per-directory switch for user
+plugins, but a per-launch `--settings` outranks user, project and local settings, and a plugin set
+to `false` there starts none of its servers. Settings → Agents → Claude → Advanced settings gains
+"Plugins to skip in task sessions" (one `name@marketplace` id per line). Task conversations launch
+with `--settings '{"enabledPlugins":{<id>:false,…}}'`; the user's own terminal sessions keep every
+plugin. Ninebrains-only: `src/core/features/conversations/api/plugin-skip.ts` (parse, and the
+argument builder, which drops anything that is not a plugin id) and its test.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/primitives/app-settings/api/app-settings.ts` | `ProviderCustomConfig.skipPlugins?: string[]` | Where the list is stored, beside `extraArgs` and `env` |
+| `src/core/services/settings/node/provider-config-schema.ts` | `skipPlugins` in the entry schema | Persisted and validated with the rest of the provider config |
+| `src/core/features/conversations/node/tui-conversation-provider.ts` | Appends `pluginSkipArgs(providerId, skipPlugins)` to `extraArgs`, except for Brain lanes | Lanes already launch with their own guarded `--settings` (SEC-41), so they are left alone |
+| `src/core/features/conversations/node/tui-conversation-provider.test.ts` | Claude gets the argument; lanes and other agents do not | Covers the launch path |
+| `src/core/features/settings/browser/agents-page/InstalledAgentContent.tsx`, `AgentDetailSheet.tsx` | The Claude-only "Plugins to skip in task sessions" field; the sheet passes `agentId` | The user-facing setting |
+>>>>>>> a6e54d7f4 (feat(agents): let Claude task sessions skip plugins)
