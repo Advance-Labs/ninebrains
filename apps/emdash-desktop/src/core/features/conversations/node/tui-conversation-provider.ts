@@ -8,6 +8,7 @@ import type {
   EnsureConversationSessionRequest,
   EnsureConversationSessionResult,
 } from '@core/features/conversations/api/node/types';
+import { pluginSkipArgs } from '@core/features/conversations/api/plugin-skip';
 import type { TaskSessionLaunchContextSource } from '@core/features/tasks/api/node/task-session-launch-context';
 import type { ProviderCustomConfig } from '@core/primitives/app-settings/api';
 import type { Conversation } from '@core/primitives/conversations/api';
@@ -181,7 +182,14 @@ export class TuiConversationProvider implements ConversationProvider {
       initialPrompt: effectiveInitialPrompt,
       autoApprove: conversation.autoApprove ?? false,
       trustWorkspace,
-      extraArgs: [...userExtraArgs, ...(laneLaunch?.extraArgs ?? [])],
+      // Ninebrains: lanes bring their own guarded --settings; plain task sessions get the skip list.
+      extraArgs: [
+        ...userExtraArgs,
+        ...(laneLaunch?.extraArgs ?? []),
+        ...(laneLaunch
+          ? []
+          : pluginSkipArgs(conversation.providerId, providerConfig?.skipPlugins, userExtraArgs)),
+      ],
       providerVars,
       gitCredentials,
       cols: initialSize.cols,

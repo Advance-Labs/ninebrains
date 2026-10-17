@@ -1,5 +1,6 @@
 import { ok } from '@emdash/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProviderCustomConfig } from '@core/primitives/app-settings/api';
 import type { Conversation } from '@core/primitives/conversations/api';
 import {
   TuiConversationProvider,
@@ -200,6 +201,40 @@ describe('TuiConversationProvider', () => {
       })
     );
   });
+  describe('#158 plugins skipped in task sessions', () => {
+    const skip = { skipPlugins: ['typescript-lsp@claude-plugins-official'] };
+
+    it('passes the skip list to Claude as one --settings argument', async () => {
+      await createProvider({ providerConfig: skip }).ensureSession({
+        conversation: conversation({ providerId: 'claude' }),
+        mode: 'start',
+      });
+      expect(start).toHaveBeenCalledWith(
+        expect.objectContaining({
+          extraArgs: [
+            '--settings',
+            '{"enabledPlugins":{"typescript-lsp@claude-plugins-official":false}}',
+          ],
+        })
+      );
+    });
+
+    it('leaves Brain lanes alone: they bring their own guarded --settings', async () => {
+      await createProvider({ providerConfig: skip, laneExtraArgs: ['--lane-flag'] }).ensureSession({
+        conversation: conversation({ providerId: 'claude' }),
+        mode: 'start',
+      });
+      expect(start).toHaveBeenCalledWith(expect.objectContaining({ extraArgs: ['--lane-flag'] }));
+    });
+
+    it('ignores the list for agents other than Claude', async () => {
+      await createProvider({ providerConfig: skip }).ensureSession({
+        conversation: conversation({ providerId: 'codex' }),
+        mode: 'start',
+      });
+      expect(start).toHaveBeenCalledWith(expect.objectContaining({ extraArgs: [] }));
+    });
+  });
 });
 
 function createProvider(
@@ -208,6 +243,8 @@ function createProvider(
     autoTrustWorktrees?: boolean;
     getTaskSettings?: () => Promise<{ autoTrustWorktrees: boolean }>;
     launchContextSource?: TuiConversationProviderOptions['launchContextSource'];
+    providerConfig?: ProviderCustomConfig;
+    laneExtraArgs?: string[];
   } = {}
 ): TuiConversationProvider {
   return new TuiConversationProvider(
@@ -233,7 +270,15 @@ function createProvider(
     },
     {
       db: { select: vi.fn() } as never,
-      getProviderConfig: () => Promise.resolve(undefined),
+      getProviderConfig: () => Promise.resolve(overrides.providerConfig),
+      ...(overrides.laneExtraArgs
+        ? {
+            resolveLaneLaunch: () => ({
+              extraArgs: overrides.laneExtraArgs!,
+              providerVars: {},
+            }),
+          }
+        : {}),
       getTaskSettings:
         overrides.getTaskSettings ??
         (() => Promise.resolve({ autoTrustWorktrees: overrides.autoTrustWorktrees ?? false })),
