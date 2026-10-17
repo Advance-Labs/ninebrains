@@ -1,4 +1,4 @@
-import { Box, useStdout } from 'ink';
+import { Box, useWindowSize } from 'ink';
 import React, { useEffect, useState } from 'react';
 import { Feed } from './components/feed';
 import { Header } from './components/header';
@@ -17,10 +17,11 @@ const CHROME_ROWS = 7;
  */
 export function App() {
   const store = useBrainStore();
-  const { stdout } = useStdout();
-  const width = stdout.columns ?? 80;
+  // Re-renders on every resize: a task terminal spawns small and grows to the pane, and reading
+  // stdout.columns once left the TUI drawn at its spawn width.
+  const { columns: width, rows } = useWindowSize();
   const working = store.busySince !== null ? 1 : 0;
-  const bodyRows = Math.max((stdout.rows ?? 24) - CHROME_ROWS - working, 3);
+  const bodyRows = Math.max(rows - CHROME_ROWS - working, 3);
   const [offset, setOffset] = useState(0);
 
   useEffect(() => setOffset(0), [store.overlay]);
@@ -32,7 +33,7 @@ export function App() {
   };
 
   return (
-    <Box flexDirection="column" height={stdout.rows ?? 24} width={width}>
+    <Box flexDirection="column" height={rows} width={width}>
       <Header width={width} />
       {store.overlay ? (
         <OverlayView overlay={store.overlay} rows={bodyRows} offset={offset} />
