@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink';
 import React from 'react';
+import { isActive } from '../feed';
 import { useBrainStore } from '../store';
 
 const count = (
@@ -8,13 +9,10 @@ const count = (
   value: string
 ) => items.filter((item) => item[key] === value).length;
 
-/** Held by a lane: claimed, running, or waiting on its gates. */
-const ACTIVE = new Set(['claimed', 'running', 'verifying']);
-
 /** One dim line under the prompt. Truncated, never wrapped. A hold-up reason wins the right side. */
 export function StatusLine() {
   const { jobs, lanes, hint } = useBrainStore();
-  const active = jobs.filter((job) => ACTIVE.has(job.state)).length;
+  const active = jobs.filter(isActive).length;
   const jobPart = `${count(jobs, 'state', 'ready')} ready · ${active} active · ${count(jobs, 'state', 'blocked')} blocked`;
   const idle = count(lanes, 'status', 'idle');
   const asleep = count(lanes, 'status', 'asleep');

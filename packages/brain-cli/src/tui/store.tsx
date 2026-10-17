@@ -21,6 +21,7 @@ import { parseCommand, type Action, type Overlay } from './commands';
 import {
   diffSnapshots,
   dispatchHint,
+  isActive,
   laneLabel,
   type FeedEntry,
   type FeedEvent,
@@ -45,6 +46,8 @@ interface TuiState {
   connected: boolean;
   feed: FeedEvent[];
   hint: string | null;
+  /** When jobs started being held by lanes, for the working row's clock. Null when none are. */
+  busySince: number | null;
   overlay: Overlay | null;
   projectId: string | null;
 }
@@ -91,6 +94,7 @@ export function BrainStoreProvider({
     connected: false,
     feed: [],
     hint: null,
+    busySince: null,
     overlay: null,
     projectId: projectId ?? null,
   });
@@ -168,6 +172,7 @@ export function BrainStoreProvider({
       dispatcherStatus: status,
       connected: true,
       hint,
+      busySince: jobs.some(isActive) ? (s.busySince ?? Date.now()) : null,
     }));
   }, [call, append, projectArgs]);
 

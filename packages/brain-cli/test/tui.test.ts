@@ -18,6 +18,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { connect } from '../src/connect';
 import { App } from '../src/tui/app';
+import { MotionContext } from '../src/tui/motion';
 import { BrainStoreProvider } from '../src/tui/store';
 
 const BRAIN_IDENTITY = { role: 'brain', brainId: 'main' } as const;
@@ -61,6 +62,15 @@ beforeEach(async () => {
   brain.createJob(BRAIN_IDENTITY, { projectId: 'alpha', title: 'Test job' });
   // beta has a ready job and no lane at all: the TUI must say why it is not moving.
   brain.createJob(BRAIN_IDENTITY, { projectId: 'beta', title: 'Stuck job' });
+  // gamma has a lane holding a job: the working row shows.
+  brain.upsertLane(BRAIN_IDENTITY, {
+    id: 'G',
+    projectId: 'gamma',
+    provider: 'codex',
+    status: 'idle',
+  });
+  const held = brain.createJob(BRAIN_IDENTITY, { projectId: 'gamma', title: 'Busy job' });
+  brain.assignJob(BRAIN_IDENTITY, held.id, 'G');
   server = await startBrainHttpServer({ brain, host: fakeHost() });
   const token = server.issueToken({
     identity: { role: 'brain', brainId: USER_BRAIN_ID },
@@ -84,7 +94,7 @@ if (!globalThis.console.Console) {
   (globalThis.console as unknown as { Console: typeof Console }).Console = Console;
 }
 
-async function renderTui(project: string, columns: number): Promise<string[]> {
+async function renderTui(project: string, columns: number, animations = false): Promise<string[]> {
   const connection = connect({ ...env, NINEBRAINS_PROJECT: project });
   if (!connection.ok) throw new Error(connection.message);
 
@@ -108,9 +118,13 @@ async function renderTui(project: string, columns: number): Promise<string[]> {
 
   const instance = render(
     React.createElement(
-      BrainStoreProvider,
-      { client: connection.connection.client, projectId: project },
-      React.createElement(App)
+      MotionContext.Provider,
+      { value: animations },
+      React.createElement(
+        BrainStoreProvider,
+        { client: connection.connection.client, projectId: project },
+        React.createElement(App)
+      )
     ),
     {
       stdout: mockStdout as unknown as NodeJS.WriteStream,
@@ -150,5 +164,20 @@ describe('brain TUI', () => {
   it('says why a ready job is not moving', async () => {
     const output = (await renderTui('beta', 120)).join('\n');
     expect(output).toContain('no lanes: add one in the Lanes grid');
+  });
+
+  it('shows a static working row with reduced motion', async () => {
+    const output = (await renderTui('gamma', 120)).join('\n');
+    expect(output).toMatch(/◌ Working · Busy job · \d+s/);
+    expect(output).not.toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+  });
+
+  it('animates the working row: the spinner turns while a lane holds a job', async () => {
+    const lines = await renderTui('gamma', 120, true);
+    const glyphs = new Set(lines.join('').match(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g));
+    // About a second of frames at 100 ms each: the spinner has moved through several glyphs.
+    expect(glyphs.size).toBeGreaterThan(3);
+    expect(lines.join('\n')).toContain('Busy job');
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(120);
   });
 });

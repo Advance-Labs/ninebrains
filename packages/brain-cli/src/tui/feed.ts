@@ -46,6 +46,11 @@ const JOB_TONE: Record<string, FeedTone> = {
   failed: 'fail',
 };
 
+/** Held by a lane: claimed, running, or waiting on its gates. */
+export function isActive(job: Pick<JobSummary, 'state'>): boolean {
+  return job.state === 'claimed' || job.state === 'running' || job.state === 'verifying';
+}
+
 /** A lane's display name. Lanes have no names in the Brain, so provider plus a short id. */
 export function laneLabel(lane: Pick<Lane, 'id' | 'provider'>): string {
   return `${lane.provider}-${lane.id.slice(0, 4)}`;
