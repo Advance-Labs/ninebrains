@@ -1,31 +1,41 @@
 import { Box, Text } from 'ink';
 import React from 'react';
+import { pulseOn, useAnimations, useNow } from '../motion';
 import { useBrainStore } from '../store';
-import { COLORS } from '../theme';
 
-export function Header() {
-  const { view, loading, projectId } = useBrainStore();
+/** A readable id as is; a UUID cut to its first block, since the Brain has no project names. */
+const projectLabel = (id: string) =>
+  /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id) ? `project ${id.slice(0, 8)}` : id;
 
-  const viewLabel: Record<string, string> = {
-    dashboard: 'Dashboard',
-    jobs: 'Jobs',
-    lanes: 'Lanes',
-    notes: 'Notes',
-    messages: 'Messages',
-    'create-job': 'New Job',
-    'send-message': 'Send Message',
-  };
+/** One line, no border: the project, then the dispatcher's state as a coloured dot. */
+export function Header({ width }: { width: number }) {
+  const { projectId, dispatcherStatus, connected, busySince } = useBrainStore();
+  const animate = useAnimations();
+  const now = useNow(busySince !== null);
+  const [label, color] = !connected
+    ? ['connecting', 'gray']
+    : dispatcherStatus?.stopLatched
+      ? ['STOP latched', 'red']
+      : dispatcherStatus?.paused
+        ? ['paused', 'yellow']
+        : ['dispatching', 'green'];
 
   return (
-    <Box paddingX={1} paddingY={0} borderStyle="single" borderBottom>
-      <Box flexGrow={1}>
-        <Text bold color={COLORS.primary}>
-          Ninebrains Brain
+    <Box flexDirection="column">
+      <Box justifyContent="space-between" paddingX={1}>
+        <Text wrap="truncate-end">
+          <Text bold color="cyan">
+            Ninebrains Brain
+          </Text>
+          <Text dimColor> · {projectId ? projectLabel(projectId) : 'all projects'}</Text>
         </Text>
-        <Text color={COLORS.secondary}> — {viewLabel[view] ?? view}</Text>
-        {projectId && <Text color={COLORS.secondary}> | project: {projectId}</Text>}
+        <Text color={color}>
+          {/* Breathes while lanes hold jobs; steady when idle, paused or latched. */}
+          <Text dimColor={animate && busySince !== null && !pulseOn(now - busySince)}>●</Text>{' '}
+          {label}
+        </Text>
       </Box>
-      <Box>{loading && <Text color={COLORS.warning}> refreshing...</Text>}</Box>
+      <Text dimColor>{'─'.repeat(width)}</Text>
     </Box>
   );
 }

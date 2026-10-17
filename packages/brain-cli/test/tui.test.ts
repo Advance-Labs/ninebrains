@@ -2,6 +2,7 @@ import { Console } from 'node:console';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import {
   Brain,
   brainHandshakePath,
@@ -17,6 +18,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { connect } from '../src/connect';
 import { App } from '../src/tui/app';
+import { MotionContext } from '../src/tui/motion';
 import { BrainStoreProvider } from '../src/tui/store';
 
 const BRAIN_IDENTITY = { role: 'brain', brainId: 'main' } as const;
@@ -58,6 +60,30 @@ beforeEach(async () => {
     status: 'idle',
   });
   brain.createJob(BRAIN_IDENTITY, { projectId: 'alpha', title: 'Test job' });
+  // beta has a ready job and no lane at all: the TUI must say why it is not moving.
+  brain.createJob(BRAIN_IDENTITY, { projectId: 'beta', title: 'Stuck job' });
+  // gamma has a lane holding a job: the working row shows.
+  brain.upsertLane(BRAIN_IDENTITY, {
+    id: 'G',
+    projectId: 'gamma',
+    provider: 'codex',
+    status: 'idle',
+  });
+  const held = brain.createJob(BRAIN_IDENTITY, { projectId: 'gamma', title: 'Busy job' });
+  brain.assignJob(BRAIN_IDENTITY, held.id, 'G');
+  // delta: a lane-written title that tries an OSC 52 clipboard write. Claimed, so the working
+  // row puts it on screen.
+  brain.upsertLane(BRAIN_IDENTITY, {
+    id: 'D',
+    projectId: 'delta',
+    provider: 'claude',
+    status: 'idle',
+  });
+  const evil = brain.createJob(BRAIN_IDENTITY, {
+    projectId: 'delta',
+    title: 'evil\u001b]52;c;cHduZWQ=\u0007 title',
+  });
+  brain.assignJob(BRAIN_IDENTITY, evil.id, 'D');
   server = await startBrainHttpServer({ brain, host: fakeHost() });
   const token = server.issueToken({
     identity: { role: 'brain', brainId: USER_BRAIN_ID },
@@ -81,58 +107,119 @@ if (!globalThis.console.Console) {
   (globalThis.console as unknown as { Console: typeof Console }).Console = Console;
 }
 
-describe('brain TUI', () => {
-  it('renders the dashboard and loads data from the endpoint', async () => {
-    const connection = connect(env);
-    if (!connection.ok) throw new Error(connection.message);
+async function renderTui(
+  project: string,
+  columns: number,
+  animations = false,
+  /** Resize the terminal to this many columns after the first poll; only later frames return. */
+  resizeTo?: number,
+  raw = false
+): Promise<string[]> {
+  const connection = connect({ ...env, NINEBRAINS_PROJECT: project });
+  if (!connection.ok) throw new Error(connection.message);
 
-    const lines: string[] = [];
-    const mockStdout = Object.create(process.stdout);
-    const originalWrite = process.stdout.write.bind(process.stdout);
-    mockStdout.write = (chunk: string | Uint8Array, _encoding?: string, _cb?: () => void) => {
-      lines.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
-      return originalWrite(chunk);
-    };
-    mockStdout.columns = 120;
-    mockStdout.rows = 40;
-    mockStdout.isTTY = true;
+  const chunks: string[] = [];
+  const mockStdout = Object.create(process.stdout);
+  mockStdout.write = (chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
+    return true;
+  };
+  mockStdout.columns = columns;
+  mockStdout.rows = 30;
+  mockStdout.isTTY = true;
 
-    const mockStdin = Object.create(process.stdin);
-    mockStdin.isTTY = true;
-    mockStdin.setRawMode = () => mockStdin;
-    mockStdin.on = () => mockStdin;
-    mockStdin.off = () => mockStdin;
-    mockStdin.pause = () => mockStdin;
-    mockStdin.resume = () => mockStdin;
+  const mockStdin = Object.create(process.stdin);
+  mockStdin.isTTY = true;
+  mockStdin.setRawMode = () => mockStdin;
+  mockStdin.on = () => mockStdin;
+  mockStdin.off = () => mockStdin;
+  mockStdin.pause = () => mockStdin;
+  mockStdin.resume = () => mockStdin;
 
-    const instance = render(
+  const instance = render(
+    React.createElement(
+      MotionContext.Provider,
+      { value: animations },
       React.createElement(
         BrainStoreProvider,
-        { client: connection.connection.client, projectId: env.NINEBRAINS_PROJECT },
+        { client: connection.connection.client, projectId: project },
         React.createElement(App)
-      ),
-      {
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stdin: mockStdin as unknown as NodeJS.ReadStream,
-        // Ink only writes dynamic frames to stdout while interactive, and it treats a CI
-        // environment as non-interactive (isInCi in ink/build/ink.js) regardless of isTTY,
-        // buffering the frame until unmount. That left this capture empty under CI while it
-        // passed locally. debug mode writes every frame synchronously, so the assertions below
-        // see the rendered output in both environments.
-        debug: true,
-      }
-    );
+      )
+    ),
+    {
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+      stdin: mockStdin as unknown as NodeJS.ReadStream,
+      // Ink only writes dynamic frames to stdout while interactive, and it treats a CI
+      // environment as non-interactive (isInCi in ink/build/ink.js) regardless of isTTY,
+      // buffering the frame until unmount. debug mode writes every frame synchronously, so the
+      // assertions below see the rendered output in both environments.
+      debug: true,
+    }
+  );
+  // The first poll lands, then the next frame renders it.
+  await new Promise((r) => setTimeout(r, 1000));
+  let from = 0;
+  if (resizeTo !== undefined) {
+    from = chunks.length;
+    mockStdout.columns = resizeTo;
+    mockStdout.emit('resize');
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  instance.unmount();
+  // Each debug write is one whole frame with no trailing newline, so split frames apart first.
+  if (raw) return chunks.slice(from);
+  return chunks.slice(from).flatMap((chunk) => stripVTControlCharacters(chunk).split('\n'));
+}
 
-    // Wait for initial data load
-    await new Promise((r) => setTimeout(r, 1500));
+describe('brain TUI', () => {
+  it.each([80, 160])(
+    'renders header, feed, prompt and status line within %i columns',
+    async (columns) => {
+      const lines = await renderTui('alpha', columns);
+      const output = lines.join('\n');
 
-    const output = lines.join('');
-    expect(output).toContain('Ninebrains Brain');
-    expect(output).toContain('Dashboard');
-    expect(output).toContain('Test job');
-    expect(output).toContain('claude');
-    expect(output).toContain('Dispatching');
+      expect(output).toContain('Ninebrains Brain · alpha');
+      expect(output).toContain('● dispatching');
+      expect(output).toContain('connected · 1 jobs · claude-A');
+      expect(output).toContain('/new, /send, /jobs');
+      expect(output).toContain('1 ready · 0 active · 0 blocked');
+      expect(output).toContain('lanes 1 live · 1 idle');
+      // No boxed panels and no wrapping: every line fits the terminal.
+      expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(columns);
+    }
+  );
 
-    instance.unmount();
+  it('says why a ready job is not moving', async () => {
+    const output = (await renderTui('beta', 120)).join('\n');
+    expect(output).toContain('no lanes: add one in the Lanes grid');
+  });
+
+  it('shows a static working row with reduced motion', async () => {
+    const output = (await renderTui('gamma', 120)).join('\n');
+    expect(output).toMatch(/◌ Working · Busy job · \d+s/);
+    expect(output).not.toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+  });
+
+  it('animates the working row: the spinner turns while a lane holds a job', async () => {
+    const lines = await renderTui('gamma', 120, true);
+    const glyphs = new Set(lines.join('').match(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g));
+    // About a second of frames at 100 ms each: the spinner has moved through several glyphs.
+    expect(glyphs.size).toBeGreaterThan(3);
+    expect(lines.join('\n')).toContain('Busy job');
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(120);
+  });
+
+  it('redraws at the new width when the terminal is resized', async () => {
+    // A task terminal spawns small and grows to the pane; the TUI must follow it.
+    const lines = await renderTui('alpha', 80, false, 140);
+    expect(lines.some((line) => line === '─'.repeat(140))).toBe(true);
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(140);
+  });
+
+  it('never writes a lane-written escape sequence to the terminal (SEC-09)', async () => {
+    const raw = (await renderTui('delta', 120, false, undefined, true)).join('');
+    expect(raw).toContain('evil ]52;c;cHduZWQ=  title');
+    expect(raw).not.toContain('\u001b]52');
+    expect(raw).not.toContain('\u0007');
   });
 });

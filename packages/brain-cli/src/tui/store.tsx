@@ -7,9 +7,29 @@ import type {
   MessageView,
   Note,
 } from '@ninebrains/brain-core';
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useApp } from 'ink';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { parseCommand, type Action, type Overlay } from './commands';
+import {
+  clean,
+  diffSnapshots,
+  dispatchHint,
+  isActive,
+  laneLabel,
+  type FeedEntry,
+  type FeedEvent,
+  type Snapshot,
+} from './feed';
 
-interface BrainDispatcherView {
+export interface BrainDispatcherView {
   paused: boolean;
   stopLatched: boolean;
   laneModes: Record<string, 'attended' | 'unattended'>;
@@ -18,62 +38,32 @@ interface BrainDispatcherView {
   unattendedBudgets: unknown;
 }
 
-export type TuiView =
-  | 'dashboard'
-  | 'jobs'
-  | 'lanes'
-  | 'notes'
-  | 'messages'
-  | 'create-job'
-  | 'send-message';
-
 interface TuiState {
-  view: TuiView;
-  previousView: TuiView | null;
   jobs: JobSummary[];
   lanes: Lane[];
   notes: Note[];
   messages: MessageView[];
   dispatcherStatus: BrainDispatcherView | null;
-  selectedJobId: string | null;
-  selectedLaneId: string | null;
-  loading: boolean;
-  error: string | null;
-  lastRefresh: number;
-  showHelp: boolean;
+  connected: boolean;
+  feed: FeedEvent[];
+  hint: string | null;
+  /** When jobs started being held by lanes, for the working row's clock. Null when none are. */
+  busySince: number | null;
+  overlay: Overlay | null;
   projectId: string | null;
 }
 
 interface TuiActions {
-  setView(view: TuiView): void;
-  goBack(): void;
-  refresh(): Promise<void>;
-  createJob(params: {
-    title: string;
-    body?: string;
-    dependsOn?: string[];
-    gates?: string[];
-  }): Promise<BrainResponse>;
-  sendMessage(to: { kind: 'lane' | 'brain'; id: string }, body: string): Promise<BrainResponse>;
-  readInbox(limit?: number): Promise<void>;
-  setSelectedJobId(id: string | null): void;
-  setSelectedLaneId(id: string | null): void;
-  toggleHelp(): void;
-  blockJob(jobId: string, reason: string): Promise<BrainResponse>;
-  completeJob(jobId: string, summary: string): Promise<BrainResponse>;
-  requeueJob(jobId: string): Promise<BrainResponse>;
-  assignJob(jobId: string, laneId: string): Promise<BrainResponse>;
-  setLaneMode(laneId: string, mode: 'attended' | 'unattended'): Promise<BrainResponse>;
-  addNote(body: string, jobId?: string): Promise<BrainResponse>;
-  pauseDispatcher(): Promise<BrainResponse>;
-  resumeDispatcher(): Promise<BrainResponse>;
-  stopAll(): Promise<BrainResponse>;
-  clearStop(): Promise<BrainResponse>;
+  /** Runs one prompt line. Every outcome, good or bad, lands in the feed. */
+  submit(line: string): Promise<void>;
+  closeOverlay(): void;
 }
 
-const BrainStoreContext = createContext<(TuiState & TuiActions) | null>(null);
+export type BrainStore = TuiState & TuiActions;
 
-export function useBrainStore() {
+const BrainStoreContext = createContext<BrainStore | null>(null);
+
+export function useBrainStore(): BrainStore {
   const ctx = useContext(BrainStoreContext);
   if (!ctx) throw new Error('useBrainStore must be used within BrainStoreProvider');
   return ctx;
@@ -83,6 +73,9 @@ interface BrainStoreProviderProps {
   client: HttpBrainClient;
   projectId: string | undefined;
 }
+
+const FEED_LIMIT = 500;
+const POLL_MS = 2_000;
 
 function makeRequest(op: BrainRequest['op'], args: unknown): BrainRequest {
   return { v: 1, op, args } as BrainRequest;
@@ -94,257 +87,195 @@ export function BrainStoreProvider({
   children,
 }: React.PropsWithChildren<BrainStoreProviderProps>) {
   const [state, setState] = useState<TuiState>({
-    view: 'dashboard',
-    previousView: null,
     jobs: [],
     lanes: [],
     notes: [],
     messages: [],
     dispatcherStatus: null,
-    selectedJobId: null,
-    selectedLaneId: null,
-    loading: false,
-    error: null,
-    lastRefresh: 0,
-    showHelp: false,
+    connected: false,
+    feed: [],
+    hint: null,
+    busySince: null,
+    overlay: null,
     projectId: projectId ?? null,
   });
+  const { exit } = useApp();
+  const previous = useRef<Snapshot | null>(null);
+  const lastHint = useRef<string | null>(null);
+  const nextId = useRef(0);
+  const projectArgs = useMemo(() => (projectId ? { projectId } : {}), [projectId]);
+
+  const append = useCallback((entries: FeedEntry[]) => {
+    if (entries.length === 0) return;
+    const at = Date.now();
+    const events = entries.map((entry) => ({
+      ...entry,
+      text: clean(entry.text),
+      id: nextId.current++,
+      at,
+    }));
+    setState((s) => ({ ...s, feed: [...s.feed, ...events].slice(-FEED_LIMIT) }));
+  }, []);
 
   const call = useCallback(
     async (request: BrainRequest): Promise<BrainResponse> => {
       try {
         return await client.call(request);
       } catch (err) {
-        return {
-          ok: false,
-          error: {
-            code: 'UNAVAILABLE',
-            message: err instanceof Error ? err.message : String(err),
-          },
-        };
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: { code: 'UNAVAILABLE', message } };
       }
     },
     [client]
   );
 
   const refresh = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
-
-    const projectArgs = state.projectId ? { projectId: state.projectId } : {};
-
     const [jobsRes, lanesRes, notesRes, statusRes] = await Promise.all([
       call(makeRequest('list_jobs', { ...projectArgs, limit: 100 })),
       call(makeRequest('list_lanes', projectArgs)),
       call(makeRequest('list_notes', { ...projectArgs, limit: 50 })),
       call(makeRequest('dispatcher_status', {})),
     ]);
+    if (!jobsRes.ok || !lanesRes.ok) {
+      const error = !jobsRes.ok ? jobsRes.error : !lanesRes.ok ? lanesRes.error : null;
+      if (previous.current) {
+        append([{ tone: 'fail', kind: 'brain', text: `lost the Brain: ${error?.message ?? ''}` }]);
+      }
+      previous.current = null;
+      setState((s) => ({ ...s, connected: false }));
+      return;
+    }
 
-    const jobs = jobsRes.ok ? (jobsRes.result as JobSummary[]) : [];
-    const lanes = lanesRes.ok ? (lanesRes.result as Lane[]) : [];
-    const notes = notesRes.ok ? (notesRes.result as Note[]) : [];
-    const dispatcherStatus = statusRes.ok ? (statusRes.result as BrainDispatcherView) : null;
-
-    const error =
-      !jobsRes.ok && jobsRes.error.code !== 'UNAVAILABLE'
-        ? `Jobs: ${jobsRes.error.message}`
-        : !lanesRes.ok && lanesRes.error.code !== 'UNAVAILABLE'
-          ? `Lanes: ${lanesRes.error.message}`
-          : !statusRes.ok && statusRes.error.code !== 'UNAVAILABLE'
-            ? `Status: ${statusRes.error.message}`
-            : null;
-
+    // Sanitized once here, so the feed, overlays and working row never see a raw control byte.
+    const jobs = (jobsRes.result as JobSummary[]).map((job) => ({
+      ...job,
+      title: clean(job.title),
+      body: clean(job.body),
+      ...(job.reason ? { reason: clean(job.reason) } : {}),
+    }));
+    const lanes = lanesRes.result as Lane[];
+    const status = statusRes.ok ? (statusRes.result as BrainDispatcherView) : null;
+    const snapshot: Snapshot = {
+      jobs,
+      lanes,
+      paused: status?.paused ?? false,
+      stopLatched: status?.stopLatched ?? false,
+    };
+    const hint = dispatchHint(snapshot);
+    const entries: FeedEntry[] = previous.current
+      ? diffSnapshots(previous.current, snapshot)
+      : [
+          {
+            tone: 'ok',
+            kind: 'brain',
+            text: `connected · ${jobs.length} jobs · ${lanes.map(laneLabel).join(', ') || 'no lanes'}`,
+          },
+        ];
+    if (hint && hint !== lastHint.current)
+      entries.push({ tone: 'warn', kind: 'brain', text: hint });
+    previous.current = snapshot;
+    lastHint.current = hint;
+    append(entries);
     setState((s) => ({
       ...s,
       jobs,
       lanes,
-      notes,
-      dispatcherStatus,
-      loading: false,
-      error,
-      lastRefresh: Date.now(),
+      notes: notesRes.ok
+        ? (notesRes.result as Note[]).map((note) => ({ ...note, body: clean(note.body) }))
+        : s.notes,
+      dispatcherStatus: status,
+      connected: true,
+      hint,
+      busySince: jobs.some(isActive) ? (s.busySince ?? Date.now()) : null,
     }));
-  }, [call, state.projectId]);
+  }, [call, append, projectArgs]);
 
-  // Initial load and polling
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
-
   useEffect(() => {
     void refreshRef.current();
-    const interval = setInterval(() => void refreshRef.current(), 5000);
+    const interval = setInterval(() => void refreshRef.current(), POLL_MS);
     return () => clearInterval(interval);
   }, []);
 
-  const setView = useCallback((view: TuiView) => {
-    setState((s) => ({ ...s, previousView: s.view, view, showHelp: false }));
-  }, []);
-
-  const goBack = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      view: s.previousView ?? 'dashboard',
-      previousView: null,
-      showHelp: false,
-    }));
-  }, []);
-
-  const setSelectedJobId = useCallback((id: string | null) => {
-    setState((s) => ({ ...s, selectedJobId: id }));
-  }, []);
-
-  const setSelectedLaneId = useCallback((id: string | null) => {
-    setState((s) => ({ ...s, selectedLaneId: id }));
-  }, []);
-
-  const toggleHelp = useCallback(() => {
-    setState((s) => ({ ...s, showHelp: !s.showHelp }));
-  }, []);
-
-  const createJob = useCallback(
-    async (params: { title: string; body?: string; dependsOn?: string[]; gates?: string[] }) => {
-      const args: Record<string, unknown> = {
-        title: params.title,
-        ...(params.body ? { body: params.body } : {}),
-        ...(params.dependsOn?.length ? { dependsOn: params.dependsOn } : {}),
-        ...(params.gates?.length ? { gates: params.gates } : {}),
-        ...(state.projectId ? { projectId: state.projectId } : {}),
-      };
-      const res = await call(makeRequest('create_job', args));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call, state.projectId]
-  );
-
-  const sendMessage = useCallback(
-    async (to: { kind: 'lane' | 'brain'; id: string }, body: string) => {
-      const res = await call(
-        makeRequest('send_message', {
-          to: { kind: to.kind, id: to.id },
-          body,
-        })
-      );
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call]
-  );
-
-  const readInbox = useCallback(
-    async (limit = 50) => {
-      const res = await call(makeRequest('read_inbox', { limit }));
-      if (res.ok) {
-        setState((s) => ({ ...s, messages: res.result as MessageView[] }));
+  const request = useCallback(
+    (action: Exclude<Action, { type: 'overlay' } | { type: 'quit' }>): BrainRequest => {
+      switch (action.type) {
+        case 'new':
+          return makeRequest('create_job', {
+            ...projectArgs,
+            title: action.title,
+            ...(action.body ? { body: action.body } : {}),
+          });
+        case 'send':
+          return makeRequest('send_message', { to: action.to, body: action.body });
+        case 'assign':
+          return makeRequest('assign_job', { jobId: action.jobId, laneId: action.laneId });
+        case 'requeue':
+          return makeRequest('requeue_job', { jobId: action.jobId });
+        case 'block':
+          return makeRequest('block_job', { jobId: action.jobId, reason: action.reason });
+        case 'complete':
+          return makeRequest('complete_job', { jobId: action.jobId, summary: action.summary });
+        case 'note':
+          return makeRequest('add_note', { ...projectArgs, body: action.body });
+        case 'mode':
+          return makeRequest('set_lane_mode', { laneId: action.laneId, mode: action.mode });
+        case 'pause':
+        case 'resume':
+          return makeRequest('set_dispatcher_paused', { paused: action.type === 'pause' });
+        case 'stop':
+          return makeRequest('stop_all', {});
+        case 'clear-stop':
+          return makeRequest('clear_stop', {});
       }
     },
-    [call]
+    [projectArgs]
   );
 
-  const blockJob = useCallback(
-    async (jobId: string, reason: string) => {
-      const res = await call(makeRequest('block_job', { jobId, reason }));
+  const submit = useCallback(
+    async (line: string) => {
+      const parsed = parseCommand(line, { jobs: state.jobs, lanes: state.lanes });
+      if (!parsed.ok) {
+        append([{ tone: 'warn', kind: 'you', text: parsed.error }]);
+        return;
+      }
+      const { action } = parsed;
+      if (action.type === 'quit') {
+        exit();
+        return;
+      }
+      if (action.type === 'overlay') {
+        if (action.overlay === 'inbox') {
+          // Reading marks the messages read, so the inbox loads only when asked for.
+          const res = await call(makeRequest('read_inbox', { limit: 50 }));
+          if (res.ok) {
+            const messages = (res.result as MessageView[]).map((m) => ({
+              ...m,
+              body: clean(m.body),
+            }));
+            setState((s) => ({ ...s, messages }));
+          }
+        }
+        setState((s) => ({ ...s, overlay: action.overlay }));
+        return;
+      }
+      const res = await call(request(action));
+      append([
+        res.ok
+          ? { tone: 'ok', kind: 'you', text: line.trim() }
+          : { tone: 'fail', kind: 'you', text: `${line.trim()}: ${res.error.message}` },
+      ]);
       if (res.ok) void refreshRef.current();
-      return res;
     },
-    [call]
+    [state.jobs, state.lanes, append, call, request, exit]
   );
 
-  const completeJob = useCallback(
-    async (jobId: string, summary: string) => {
-      const res = await call(makeRequest('complete_job', { jobId, summary }));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call]
+  const closeOverlay = useCallback(() => setState((s) => ({ ...s, overlay: null })), []);
+
+  return (
+    <BrainStoreContext.Provider value={{ ...state, submit, closeOverlay }}>
+      {children}
+    </BrainStoreContext.Provider>
   );
-
-  const requeueJob = useCallback(
-    async (jobId: string) => {
-      const res = await call(makeRequest('requeue_job', { jobId }));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call]
-  );
-
-  const assignJob = useCallback(
-    async (jobId: string, laneId: string) => {
-      const res = await call(makeRequest('assign_job', { jobId, laneId }));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call]
-  );
-
-  const setLaneMode = useCallback(
-    async (laneId: string, mode: 'attended' | 'unattended') => {
-      const res = await call(makeRequest('set_lane_mode', { laneId, mode }));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call]
-  );
-
-  const addNote = useCallback(
-    async (body: string, jobId?: string) => {
-      const args: Record<string, unknown> = {
-        body,
-        ...(jobId ? { jobId } : {}),
-        ...(state.projectId ? { projectId: state.projectId } : {}),
-      };
-      const res = await call(makeRequest('add_note', args));
-      if (res.ok) void refreshRef.current();
-      return res;
-    },
-    [call, state.projectId]
-  );
-
-  const pauseDispatcher = useCallback(async () => {
-    const res = await call(makeRequest('set_dispatcher_paused', { paused: true }));
-    if (res.ok) void refreshRef.current();
-    return res;
-  }, [call]);
-
-  const resumeDispatcher = useCallback(async () => {
-    const res = await call(makeRequest('set_dispatcher_paused', { paused: false }));
-    if (res.ok) void refreshRef.current();
-    return res;
-  }, [call]);
-
-  const stopAll = useCallback(async () => {
-    const res = await call(makeRequest('stop_all', {}));
-    if (res.ok) void refreshRef.current();
-    return res;
-  }, [call]);
-
-  const clearStop = useCallback(async () => {
-    const res = await call(makeRequest('clear_stop', {}));
-    if (res.ok) void refreshRef.current();
-    return res;
-  }, [call]);
-
-  const value: TuiState & TuiActions = {
-    ...state,
-    setView,
-    goBack,
-    refresh,
-    createJob,
-    sendMessage,
-    readInbox,
-    setSelectedJobId,
-    setSelectedLaneId,
-    toggleHelp,
-    blockJob,
-    completeJob,
-    requeueJob,
-    assignJob,
-    setLaneMode,
-    addNote,
-    pauseDispatcher,
-    resumeDispatcher,
-    stopAll,
-    clearStop,
-  };
-
-  return <BrainStoreContext.Provider value={value}>{children}</BrainStoreContext.Provider>;
 }
