@@ -74,6 +74,7 @@
     "@parcel/watcher": "^2.5.6",
     "@team-plain/graphql": "^1.0.1",
     "@typescript/native-preview": "7.0.0-dev.20260609.1",
+    "@xterm/addon-webgl": "^0.19.0",
     "@xyflow/react": "^12.11.6",
     "better-sqlite3": "^12.6.0",
     "croner": "^10.0.1",
