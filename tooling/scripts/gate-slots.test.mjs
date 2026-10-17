@@ -1,6 +1,15 @@
 // Run: node --test tooling/scripts/gate-slots.test.mjs
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
@@ -34,7 +43,7 @@ describe('acquireGateSlot', () => {
     const dir = freshDir();
     const a = acquireGateSlot(base(dir, { owner: { pid: 1, cwd: '/w/a' } }));
     const b = acquireGateSlot(base(dir, { owner: { pid: 2, cwd: '/w/b' } }));
-    assert.equal(readdirSync(dir).length, 2);
+    assert.equal(readdirSync(dir).filter((f) => f.startsWith('slot-')).length, 2);
     a();
     assert.equal(readdirSync(dir).length, 1);
     b();
@@ -103,4 +112,87 @@ describe('acquireGateSlot', () => {
     release(); // a no-op: it never held one
     assert.equal(readdirSync(dir).length, 1);
   });
+
+  it('never spins: a slot it cannot reclaim counts as held, and the maximum wait still applies', () => {
+    const dir = freshDir();
+    // A "slot" that reads as garbage, is old, and cannot be unlinked (a non-empty directory).
+    mkdirSync(join(dir, 'slot-0', 'x'), { recursive: true });
+    utimesSync(join(dir, 'slot-0'), new Date(0), new Date(0));
+    let clock = 1_000_000;
+    let naps = 0;
+    const logs = [];
+    acquireGateSlot(
+      base(dir, {
+        slots: 1,
+        owner: { pid: 2, cwd: '/w/b' },
+        now: () => clock,
+        sleep: () => {
+          naps += 1;
+          clock += 60_000;
+        },
+        maxWaitMs: 3 * 60_000,
+        log: (line) => logs.push(line),
+      })
+    );
+    assert.equal(naps, 3);
+    assert.match(logs.at(-1), /running anyway/);
+  });
+
+  it('treats a fresh unreadable slot as someone mid-write, and an old one as dead', () => {
+    const dir = freshDir();
+    writeFileSync(join(dir, 'slot-0'), '');
+    let slept = 0;
+    acquireGateSlot(
+      base(dir, {
+        slots: 1,
+        owner: { pid: 2, cwd: '/w/b' },
+        sleep: () => {
+          slept += 1;
+          utimesSync(join(dir, 'slot-0'), new Date(0), new Date(0)); // ...and then it ages out
+        },
+      })
+    )();
+    assert.equal(slept, 1);
+  });
+
+  it('reclaims a slot held for over two hours, even if its pid looks alive (pid reuse)', () => {
+    const dir = freshDir();
+    const clock = 10 * 60 * 60_000;
+    writeFileSync(join(dir, 'slot-0'), JSON.stringify({ pid: 1, cwd: '/w/old', startedAt: 0 }));
+    let slept = false;
+    acquireGateSlot(
+      base(dir, { slots: 1, owner: { pid: 2, cwd: '/w/b' }, now: () => clock, sleep: () => (slept = true) })
+    )();
+    assert.equal(slept, false);
+  });
+
+  it('prints a planted holder safely and does not crash on odd fields', () => {
+    const dir = freshDir();
+    writeFileSync(join(dir, 'slot-0'), JSON.stringify({ pid: '1\u001b]52;c;x\u0007', cwd: 5, startedAt: Date.now() }));
+    let clock = Date.now();
+    const logs = [];
+    acquireGateSlot(
+      base(dir, {
+        slots: 1,
+        owner: { pid: 2, cwd: '/w/b' },
+        now: () => clock,
+        sleep: () => (clock += 60_000),
+        maxWaitMs: 60_000,
+        log: (line) => logs.push(line),
+      })
+    );
+    assert.match(logs[0], /busy \(pid 152 in 5\)/);
+    assert.ok(!logs.join('').includes('\u001b'));
+  });
+
+  it('refuses a slot directory others can write, and runs the checks without a slot', () => {
+    const dir = freshDir();
+    chmodSync(dir, 0o777);
+    const logs = [];
+    const release = acquireGateSlot(base(dir, { owner: { pid: 1, cwd: '/w/a' }, log: (l) => logs.push(l) }));
+    assert.match(logs[0], /not a private directory/);
+    assert.equal(readdirSync(dir).length, 0);
+    release();
+  });
 });
+
