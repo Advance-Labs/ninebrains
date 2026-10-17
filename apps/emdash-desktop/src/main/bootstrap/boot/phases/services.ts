@@ -5,7 +5,7 @@ import {
   type HostRef,
 } from '@emdash/core/primitives/host/api';
 import { integrationPluginRegistry } from '@emdash/plugins/integrations';
-import { err, ok } from '@emdash/shared';
+import { err, ok, secret } from '@emdash/shared';
 import { runWithTimeout } from '@emdash/shared/scheduling';
 import { peek } from '@emdash/wire/state';
 import { app } from 'electron';
@@ -36,7 +36,10 @@ import { GitHubAccountService } from '@core/features/github/node/accounts/github
 import { GitHubCliAccountImportService } from '@core/features/github/node/accounts/github-cli-account-import';
 import { GitHubLegacyTokenImportStep } from '@core/features/github/node/accounts/github-legacy-token-import-step';
 import { githubEvents } from '@core/features/github/node/event-host';
-import { GitCredentialServer } from '@core/features/github/node/services/git-credential-server';
+import {
+  GIT_CREDENTIAL_CHANNELS_SECRET_KEY,
+  GitCredentialServer,
+} from '@core/features/github/node/services/git-credential-server';
 import {
   defaultGitHubDeviceAuthFactory,
   GitHubDeviceFlowService,
@@ -557,6 +560,20 @@ export async function bootServices(
     listAccounts: () => githubAccountService.listAccounts(),
     getToken: (host, context) => githubApiAuthService.getToken(host, context),
     logger: log,
+    persistence: {
+      load: async () =>
+        (await encryptedAppSecretsStore.getSecret(GIT_CREDENTIAL_CHANNELS_SECRET_KEY))?.expose() ??
+        null,
+      save: (serialized) =>
+        encryptedAppSecretsStore.setSecret(
+          GIT_CREDENTIAL_CHANNELS_SECRET_KEY,
+          secret(serialized, GIT_CREDENTIAL_CHANNELS_SECRET_KEY)
+        ),
+    },
+  });
+  // Ninebrains: listen now, so agent sessions that survived the restart can push (#150).
+  void gitCredentialServer.start().catch((error) => {
+    log.warn('git credential server failed to start', { error: String(error) });
   });
   appScope.add(() => {
     gitCredentialServer.stop();

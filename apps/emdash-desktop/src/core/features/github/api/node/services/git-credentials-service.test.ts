@@ -46,7 +46,11 @@ describe('resolveSessionSpec', () => {
       channel: { port: 45678, nonce: 'nonce-1' },
       hosts: ['github.com'],
     });
-    expect(mintSession).toHaveBeenCalledWith({ kind: 'project', projectId: 'p1' });
+    // Durable: the agent session outlives an app restart inside tmux (#150).
+    expect(mintSession).toHaveBeenCalledWith(
+      { kind: 'project', projectId: 'p1' },
+      { durable: true }
+    );
   });
 
   it('maps system and none settings without minting a channel', async () => {

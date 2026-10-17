@@ -1190,3 +1190,12 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.4 → 0.2.5 | Written by `pnpm run release:prepare 0.2.5 --from fa57a1feb`; `release.yml` refuses a version that does not match. `--from` because the `v0.2.4` tag is not on main's first-parent history (#129). The site-only #135 was dropped from the generated section |
+
+## 73. Agent git credentials survive an app restart (`fix/git-credential-survives-restart`)
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/github/node/services/git-credential-server.ts` | `mintSession(target, { durable })`. Durable channels are saved with the server's port through an injected `persistence` and restored on start. `start()` listens immediately, trying the saved port first and falling back to any port. Revoking or evicting a durable channel re-saves | Agent sessions run in tmux and outlive the app, holding the port and nonce they were spawned with in an environment nothing can update. The server listened on a random port with an in-memory nonce map, so after any restart (an update, say) every surviving agent's `git push` hit a dead port with an unknown nonce and fell through to an interactive prompt (#150) |
+| `src/core/features/github/api/node/services/git-credentials-service.ts` | `GitCredentialChannelServer.mintSession` takes `{ durable }`; `resolveSessionSpec` (PTY sessions) mints durable. Operation leases stay in memory | Leases are released in-process and must not outlive it |
+| `src/main/bootstrap/boot/phases/services.ts` | Persistence is `encryptedAppSecretsStore` under `git-credential-channels` (safeStorage-encrypted); the server starts at boot | Saved nonces are credential-channel secrets, so they get the same storage as other app secrets |
+| `src/core/features/github/node/services/git-credential-server.test.ts`, `src/core/features/github/api/node/services/git-credentials-service.test.ts` | New restart case: a durable channel answers on the same port from a second server sharing the persistence; operation and revoked channels get 403. The session-spec test now expects `{ durable: true }` | Regression guard for #150 |
