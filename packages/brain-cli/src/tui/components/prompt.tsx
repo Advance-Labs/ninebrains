@@ -27,7 +27,10 @@ export function Prompt({
     if (key.return) {
       if (!value.trim()) return;
       onSubmit(value);
-      setHistory((h) => [...h.slice(-49), value]);
+      // The brakes stay out of ↑ history, so a stray ↑ Enter cannot fire them again.
+      if (!/^\/(stop|clear-stop)\s*$/.test(value.trim())) {
+        setHistory((h) => [...h.slice(-49), value]);
+      }
       setBack(0);
       setValue('');
       return;

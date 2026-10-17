@@ -71,6 +71,19 @@ beforeEach(async () => {
   });
   const held = brain.createJob(BRAIN_IDENTITY, { projectId: 'gamma', title: 'Busy job' });
   brain.assignJob(BRAIN_IDENTITY, held.id, 'G');
+  // delta: a lane-written title that tries an OSC 52 clipboard write. Claimed, so the working
+  // row puts it on screen.
+  brain.upsertLane(BRAIN_IDENTITY, {
+    id: 'D',
+    projectId: 'delta',
+    provider: 'claude',
+    status: 'idle',
+  });
+  const evil = brain.createJob(BRAIN_IDENTITY, {
+    projectId: 'delta',
+    title: 'evil\u001b]52;c;cHduZWQ=\u0007 title',
+  });
+  brain.assignJob(BRAIN_IDENTITY, evil.id, 'D');
   server = await startBrainHttpServer({ brain, host: fakeHost() });
   const token = server.issueToken({
     identity: { role: 'brain', brainId: USER_BRAIN_ID },
@@ -99,7 +112,8 @@ async function renderTui(
   columns: number,
   animations = false,
   /** Resize the terminal to this many columns after the first poll; only later frames return. */
-  resizeTo?: number
+  resizeTo?: number,
+  raw = false
 ): Promise<string[]> {
   const connection = connect({ ...env, NINEBRAINS_PROJECT: project });
   if (!connection.ok) throw new Error(connection.message);
@@ -153,6 +167,7 @@ async function renderTui(
   }
   instance.unmount();
   // Each debug write is one whole frame with no trailing newline, so split frames apart first.
+  if (raw) return chunks.slice(from);
   return chunks.slice(from).flatMap((chunk) => stripVTControlCharacters(chunk).split('\n'));
 }
 
@@ -199,5 +214,12 @@ describe('brain TUI', () => {
     const lines = await renderTui('alpha', 80, false, 140);
     expect(lines.some((line) => line === '─'.repeat(140))).toBe(true);
     expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(140);
+  });
+
+  it('never writes a lane-written escape sequence to the terminal (SEC-09)', async () => {
+    const raw = (await renderTui('delta', 120, false, undefined, true)).join('');
+    expect(raw).toContain('evil ]52;c;cHduZWQ=  title');
+    expect(raw).not.toContain('\u001b]52');
+    expect(raw).not.toContain('\u0007');
   });
 });

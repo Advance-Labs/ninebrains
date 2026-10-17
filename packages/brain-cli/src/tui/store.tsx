@@ -19,6 +19,7 @@ import React, {
 } from 'react';
 import { parseCommand, type Action, type Overlay } from './commands';
 import {
+  clean,
   diffSnapshots,
   dispatchHint,
   isActive,
@@ -107,7 +108,12 @@ export function BrainStoreProvider({
   const append = useCallback((entries: FeedEntry[]) => {
     if (entries.length === 0) return;
     const at = Date.now();
-    const events = entries.map((entry) => ({ ...entry, id: nextId.current++, at }));
+    const events = entries.map((entry) => ({
+      ...entry,
+      text: clean(entry.text),
+      id: nextId.current++,
+      at,
+    }));
     setState((s) => ({ ...s, feed: [...s.feed, ...events].slice(-FEED_LIMIT) }));
   }, []);
 
@@ -140,7 +146,13 @@ export function BrainStoreProvider({
       return;
     }
 
-    const jobs = jobsRes.result as JobSummary[];
+    // Sanitized once here, so the feed, overlays and working row never see a raw control byte.
+    const jobs = (jobsRes.result as JobSummary[]).map((job) => ({
+      ...job,
+      title: clean(job.title),
+      body: clean(job.body),
+      ...(job.reason ? { reason: clean(job.reason) } : {}),
+    }));
     const lanes = lanesRes.result as Lane[];
     const status = statusRes.ok ? (statusRes.result as BrainDispatcherView) : null;
     const snapshot: Snapshot = {
@@ -168,7 +180,9 @@ export function BrainStoreProvider({
       ...s,
       jobs,
       lanes,
-      notes: notesRes.ok ? (notesRes.result as Note[]) : s.notes,
+      notes: notesRes.ok
+        ? (notesRes.result as Note[]).map((note) => ({ ...note, body: clean(note.body) }))
+        : s.notes,
       dispatcherStatus: status,
       connected: true,
       hint,
@@ -235,7 +249,13 @@ export function BrainStoreProvider({
         if (action.overlay === 'inbox') {
           // Reading marks the messages read, so the inbox loads only when asked for.
           const res = await call(makeRequest('read_inbox', { limit: 50 }));
-          if (res.ok) setState((s) => ({ ...s, messages: res.result as MessageView[] }));
+          if (res.ok) {
+            const messages = (res.result as MessageView[]).map((m) => ({
+              ...m,
+              body: clean(m.body),
+            }));
+            setState((s) => ({ ...s, messages }));
+          }
         }
         setState((s) => ({ ...s, overlay: action.overlay }));
         return;

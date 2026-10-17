@@ -102,7 +102,10 @@ export function parseCommand(line: string, ctx: CommandContext): ParseResult {
 
   switch (head) {
     case 'new': {
-      const [title = '', body] = rest.split(/\s+--\s+/, 2).map((part) => part.trim());
+      // The first ` -- ` splits title from body; any later ones are part of the body.
+      const split = /\s+--\s+/.exec(rest);
+      const title = (split ? rest.slice(0, split.index) : rest).trim();
+      const body = split ? rest.slice(split.index + split[0].length).trim() : undefined;
       if (!title) return fail('/new needs a title');
       return { ok: true, action: { type: 'new', title, ...(body ? { body } : {}) } };
     }
