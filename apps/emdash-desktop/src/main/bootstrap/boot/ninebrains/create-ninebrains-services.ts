@@ -16,6 +16,10 @@ import { startBrainEndpoint } from '@core/features/brain/node/endpoint';
 import { createMementoBrainSessionsPersistence } from '@core/features/brain/node/sessions-persistence';
 import { ExecRunSupervisor } from '@core/features/exec-runs/api/node/run-supervisor';
 import type { ExecProvider } from '@core/features/exec-runs/api/node/types';
+import {
+  gateCommandSlots,
+  limitShellCommands,
+} from '@core/features/gates/node/capabilities/command-slots';
 import { createFetchText } from '@core/features/gates/node/capabilities/fetch-text';
 import { isBlockedAddress } from '@core/features/gates/node/capabilities/ip-policy';
 import { createPrepareReviewCheckout } from '@core/features/gates/node/capabilities/review-checkout';
@@ -376,22 +380,27 @@ export async function createNinebrainsServices(
       },
     },
     capabilities: {
-      runCommand: createRunCommand({
-        allowedRoots: () => [...laneWorktrees(), checkoutRoot],
-        ninebrainsDataDir: join(userDataDir, 'ninebrains'),
-        userDataDir,
-        siblingWorktrees: (cwd) => laneWorktrees().filter((root) => !isInside(cwd, root)),
-        deniedPaths: () => [checkoutRoot],
-        // SEC-08: allowNetwork/allowUnsandboxed come only from Settings → Gates (project prefs),
-        // never from a job or worktree file. A cwd outside every lane worktree (e.g. a review
-        // checkout) gets neither.
-        projectSettings: (cwd) => {
-          const lane = laneInfos().find(
-            (info) => info.worktreePath && isInside(cwd, info.worktreePath)
-          );
-          return lane ? rigor.testsGateSettingsFor(lane.projectId) : {};
-        },
-      }),
+      // #158: tests-gate commands across all jobs share a limit, so verifying lanes don't all run
+      // the test suite side by side.
+      runCommand: limitShellCommands(
+        createRunCommand({
+          allowedRoots: () => [...laneWorktrees(), checkoutRoot],
+          ninebrainsDataDir: join(userDataDir, 'ninebrains'),
+          userDataDir,
+          siblingWorktrees: (cwd) => laneWorktrees().filter((root) => !isInside(cwd, root)),
+          deniedPaths: () => [checkoutRoot],
+          // SEC-08: allowNetwork/allowUnsandboxed come only from Settings → Gates (project prefs),
+          // never from a job or worktree file. A cwd outside every lane worktree (e.g. a review
+          // checkout) gets neither.
+          projectSettings: (cwd) => {
+            const lane = laneInfos().find(
+              (info) => info.worktreePath && isInside(cwd, info.worktreePath)
+            );
+            return lane ? rigor.testsGateSettingsFor(lane.projectId) : {};
+          },
+        }),
+        gateCommandSlots()
+      ),
       spawnReviewer: createSpawnReviewer({
         supervisor,
         route: (purpose) =>

@@ -18,6 +18,10 @@ import {
 const SHA = 'b'.repeat(40);
 const line = (remoteRef, localSha = SHA) => `refs/heads/x ${localSha} ${remoteRef} ${'c'.repeat(40)}`;
 
+
+/** Tests never take a real host-wide gate slot. */
+const noSlot = () => () => {};
+
 describe('protectedRefProblems', () => {
   it('refuses a push to main without the guard', () => {
     const problems = protectedRefProblems(parsePushLines(line('refs/heads/main')), {});
@@ -62,7 +66,7 @@ describe('runPrePush', () => {
 
   it('refuses main before running any check', () => {
     const ran = [];
-    const code = runPrePush({ stdin: line('refs/heads/main'), env: {}, run: (c) => ran.push(c), git, log: () => {} });
+    const code = runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/main'), env: {}, run: (c) => ran.push(c), git, log: () => {} });
     assert.equal(code, 1);
     assert.deepEqual(ran, []);
   });
@@ -73,7 +77,7 @@ describe('runPrePush', () => {
       ran.push(args[0]);
       return args[0] === 'exec' ? 3 : 0;
     };
-    const code = runPrePush({ stdin: line('refs/heads/feat/x'), env: {}, run, git, log: () => {} });
+    const code = runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/feat/x'), env: {}, run, git, log: () => {} });
     assert.equal(code, 3);
     assert.deepEqual(ran, ['run', 'exec']);
   });
@@ -84,14 +88,14 @@ describe('runPrePush', () => {
       if (args[0] === 'rev-parse') throw new Error('missing');
       return '';
     };
-    runPrePush({ stdin: line('refs/heads/feat/x'), env: {}, run: (cmd, args) => (ran.push(args.join(' ')), 0), git: gitNoOrigin, log: () => {} });
+    runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/feat/x'), env: {}, run: (cmd, args) => (ran.push(args.join(' ')), 0), git: gitNoOrigin, log: () => {} });
     assert.match(ran[1], /--base=main /);
   });
 
   it('runs every check without the repo-locating variables git gives the hook', () => {
     const envs = [];
     const env = { PATH: '/bin', GIT_DIR: '/repo/.git', GIT_INDEX_FILE: '/repo/.git/index' };
-    runPrePush({ stdin: line('refs/heads/feat/x'), env, run: (cmd, args, childEnv) => (envs.push(childEnv), 0), git, log: () => {} });
+    runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/feat/x'), env, run: (cmd, args, childEnv) => (envs.push(childEnv), 0), git, log: () => {} });
     assert.equal(envs.length, 3);
     for (const childEnv of envs) assert.deepEqual(childEnv, { PATH: '/bin', EMDASH_TEST_SKIP_BROWSER: '1' });
   });
@@ -99,10 +103,10 @@ describe('runPrePush', () => {
   it('skips the browser test projects, unless the pusher forces them on', () => {
     const envs = [];
     const run = (cmd, args, childEnv) => (envs.push(childEnv), 0);
-    runPrePush({ stdin: line('refs/heads/feat/x'), env: {}, run, git, log: () => {} });
+    runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/feat/x'), env: {}, run, git, log: () => {} });
     assert.equal(envs[1].EMDASH_TEST_SKIP_BROWSER, '1');
     envs.length = 0;
-    runPrePush({ stdin: line('refs/heads/feat/x'), env: { EMDASH_TEST_BROWSER: '1' }, run, git, log: () => {} });
+    runPrePush({ acquireSlot: noSlot, stdin: line('refs/heads/feat/x'), env: { EMDASH_TEST_BROWSER: '1' }, run, git, log: () => {} });
     // vitest.config.ts: EMDASH_TEST_BROWSER=1 wins over EMDASH_TEST_SKIP_BROWSER.
     assert.equal(envs[1].EMDASH_TEST_BROWSER, '1');
   });
@@ -138,3 +142,39 @@ describe('checkEnv', () => {
     }
   });
 });
+
+describe('gate slot', () => {
+  const git = (args) => (args[0] === 'status' ? '' : 'a'.repeat(40));
+
+  it('holds a slot for exactly the checks, and frees it even when one fails', () => {
+    const events = [];
+    const acquireSlot = () => {
+      events.push('acquire');
+      return () => events.push('release');
+    };
+    const code = runPrePush({
+      stdin: line('refs/heads/feat/x'),
+      env: {},
+      run: (cmd) => (events.push(cmd), cmd === 'node' ? 0 : 1),
+      git,
+      log: () => {},
+      acquireSlot,
+    });
+    assert.equal(code, 1);
+    assert.deepEqual(events, ['acquire', 'pnpm', 'release']);
+  });
+
+  it('takes no slot when the push only deletes refs', () => {
+    let acquired = false;
+    runPrePush({
+      stdin: `refs/heads/feat/x ${'0'.repeat(40)} refs/heads/feat/x ${'a'.repeat(40)}\n`,
+      env: {},
+      run: () => 0,
+      git,
+      log: () => {},
+      acquireSlot: () => ((acquired = true), () => {}),
+    });
+    assert.equal(acquired, false);
+  });
+});
+

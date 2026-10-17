@@ -1220,3 +1220,17 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.6 → 0.2.7 | Written by `pnpm run release:prepare 0.2.7 --from aefe9d812` (the 0.2.6 release commit); `release.yml` refuses a version that does not match |
+
+## 78. Heavy check runs take turns (`perf/gate-slots`)
+
+Part of #158. Each typecheck-and-test run costs about 1 GB of swap on a 16 GB Mac, and with many
+agents pushing and many lanes verifying at once they ran side by side until the app hung. The
+pre-push hook now takes a host-wide gate slot (`tooling/scripts/gate-slots.mjs`) before its checks,
+and Brain tests-gate commands share a limit across jobs
+(`src/core/features/gates/node/capabilities/command-slots.ts`, wired in
+`create-ninebrains-services.ts`). Both allow one slot per 8 GB of RAM. These files are
+Ninebrains-only.
+
+| File | Change | Why |
+|---|---|---|
+| `CONTRIBUTING.md` | The pre-push section explains the gate slot, the wait message, reclaiming a dead owner's slot, the 30-minute cap and `NINEBRAINS_GATE_SLOTS` | So a contributor whose push pauses knows why and how to change the limit |

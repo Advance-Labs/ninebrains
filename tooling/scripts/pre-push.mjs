@@ -5,7 +5,9 @@
  *    merges on GitHub. The one deliberate override is NINEBRAINS_MERGE_GUARD=<the exact sha being
  *    pushed>, for a documented emergency such as a release rollback (docs/RELEASING.md).
  * 2. Runs what CI's static and test jobs would catch first: format:check, `nx affected` lint,
- *    typecheck and test against origin/main, and the upstream-patch log check.
+ *    typecheck and test against origin/main, and the upstream-patch log check. The checks take a
+ *    host-wide gate slot first (gate-slots.mjs, #158), so pushes from many worktrees at once queue
+ *    instead of running side by side and swapping the machine to a halt.
  *
  * `git push --no-verify` skips all of it. CI still runs everything; this only saves a round trip.
  */
@@ -13,6 +15,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { acquireGateSlot } from './gate-slots.mjs';
 
 export const ZERO_SHA = '0'.repeat(40);
 export const PROTECTED_REFS = ['refs/heads/main'];
@@ -96,6 +99,7 @@ export function runPrePush({
     spawnSync(cmd, args, { stdio: 'inherit', env: childEnv, shell: process.platform === 'win32' }).status,
   git = (args) => execFileSync('git', args, { encoding: 'utf8' }),
   log = console.error,
+  acquireSlot = () => acquireGateSlot({ log }),
 }) {
   const updates = parsePushLines(stdin);
   const problems = protectedRefProblems(updates, env);
@@ -118,15 +122,21 @@ export function runPrePush({
   // bugs, and block the push. CI's test-browser job still runs them on every PR.
   // `EMDASH_TEST_BROWSER=1 git push` forces them back on.
   const childEnv = { ...checkEnv(env), EMDASH_TEST_SKIP_BROWSER: '1' };
-  for (const [cmd, args] of commands) {
-    log(`\npre-push: ${cmd} ${args.join(' ')}`);
-    const status = run(cmd, args, childEnv);
-    if (status !== 0) {
-      log(`\npre-push: failed at "${cmd} ${args.join(' ')}". Fix it, or push with --no-verify (CI will still run it).`);
-      return typeof status === 'number' ? status : 1;
+  if (commands.length === 0) return 0;
+  const release = acquireSlot();
+  try {
+    for (const [cmd, args] of commands) {
+      log(`\npre-push: ${cmd} ${args.join(' ')}`);
+      const status = run(cmd, args, childEnv);
+      if (status !== 0) {
+        log(`\npre-push: failed at "${cmd} ${args.join(' ')}". Fix it, or push with --no-verify (CI will still run it).`);
+        return typeof status === 'number' ? status : 1;
+      }
     }
+    return 0;
+  } finally {
+    release();
   }
-  return 0;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
