@@ -111,7 +111,14 @@ const checks: ContractCheck[] = [
     name: 'no onResize handlers',
     pattern: /\bonResize\b/,
     scope: wholeSrc,
-    allowlist: [],
+    allowlist: [
+      {
+        path: 'core/features/terminals/api/browser/pty/pty.ts',
+        reason:
+          "xterm's Terminal.onResize event, not a layout callback: it repaints the WebGL canvas " +
+          'in the same task as a grid resize (#146) and writes to no store.',
+      },
+    ],
     rationale:
       'onResize is a measurement channel only and must never write to stores. No legitimate ' +
       'use exists in app code today; a genuine measurement-only use may be allowlisted with a ' +

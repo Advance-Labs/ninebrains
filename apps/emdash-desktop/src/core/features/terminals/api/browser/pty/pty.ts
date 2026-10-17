@@ -1,4 +1,5 @@
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal, type ITerminalOptions } from '@xterm/xterm';
 import {
   FileLinkProvider,
@@ -96,6 +97,10 @@ export class FrontendPty {
   readonly ownedContainer: HTMLDivElement;
   private theme?: SessionTheme;
   private offData: (() => void) | null = null;
+  /** Ninebrains: GPU renderer, held only while mounted (see attachWebgl). */
+  private webgl: WebglAddon | null = null;
+  /** Set once WebGL fails to initialise; every terminal stays on the DOM renderer after that. */
+  private static webglUnavailable = false;
 
   constructor(
     readonly sessionId: string,
@@ -138,8 +143,11 @@ export class FrontendPty {
       theme: buildTheme(theme),
     });
 
-    // Keep xterm on its DOM renderer: CanvasAddon repaints the full canvas on resize,
-    // which makes panel/sidebar transitions visibly flicker.
+    // Ninebrains: on-screen terminals render with WebGL (attachWebgl), parked ones fall back
+    // to the DOM renderer, which is paused off-screen anyway. A canvas renderer clears its
+    // canvas synchronously on resize but redraws on the next animation frame, so a resize from
+    // a ResizeObserver painted one blank frame: the panel-transition flicker that kept xterm
+    // on the DOM renderer before. Rendering synchronously after each resize closes that frame.
 
     const webLinksAddon = new WebLinksAddon((event, uri) => {
       if (!isPrimaryMouseButton(event)) return;
@@ -165,6 +173,11 @@ export class FrontendPty {
     });
 
     this.terminal.open(this.ownedContainer);
+    // Registered after open(), so it runs after the renderer's own resize handler has
+    // cleared the canvas.
+    this.terminal.onResize(() => {
+      if (this.webgl) renderPendingRowsNow(this.terminal);
+    });
 
     // xterm v6 insets .xterm-screen by padding on the .xterm element and subtracts
     // padding-left/padding-top in its coordinate math (getCoordsRelativeToElement),
@@ -236,6 +249,7 @@ export class FrontendPty {
       this.terminal.resize(targetDims.cols, targetDims.rows);
     }
     mountTarget.appendChild(this.ownedContainer);
+    this.attachWebgl();
     // Force a repaint after reparenting in the DOM.
     const t = this.terminal;
     requestAnimationFrame(() => {
@@ -257,7 +271,35 @@ export class FrontendPty {
    * buffer stays intact for an instant, pixel-faithful restore.
    */
   unmount(): void {
+    this.detachWebgl();
     ensureXtermHost().appendChild(this.ownedContainer);
+  }
+
+  /**
+   * Chromium caps live WebGL contexts per page (about 16) and drops the oldest past that, so
+   * only mounted terminals hold one; FrontendPty keeps every terminal alive, parked ones too.
+   */
+  private attachWebgl(): void {
+    if (this.webgl || FrontendPty.webglUnavailable) return;
+    try {
+      const addon = new WebglAddon();
+      addon.onContextLoss(() => this.detachWebgl());
+      this.terminal.loadAddon(addon);
+      this.webgl = addon;
+      // Swapping renderers leaves an empty canvas until the next frame; fill it now.
+      renderPendingRowsNow(this.terminal);
+    } catch (error) {
+      FrontendPty.webglUnavailable = true;
+      log.warn('FrontendPty: WebGL unavailable, using the DOM renderer', { error: String(error) });
+    }
+  }
+
+  private detachWebgl(): void {
+    const addon = this.webgl;
+    this.webgl = null;
+    try {
+      addon?.dispose();
+    } catch {}
   }
 
   /**
@@ -270,6 +312,7 @@ export class FrontendPty {
     FrontendPty.bySession.delete(this.sessionId);
     this.offData?.();
     this.offData = null;
+    this.detachWebgl();
     try {
       this.terminal.dispose();
     } catch {}
@@ -312,4 +355,20 @@ export function disposeAllPtys(): void {
   for (const pty of [...FrontendPty.all]) {
     pty.dispose();
   }
+}
+
+/**
+ * Renders xterm's pending rows now instead of on its next animation frame. xterm has no public
+ * API for this, so it reaches the render debouncer through private fields and does nothing if
+ * a future version renames them (the frame is then just drawn one frame later, as before).
+ */
+function renderPendingRowsNow(terminal: Terminal): void {
+  type Internals = {
+    _core?: { _renderService?: { _renderDebouncer?: { _innerRefresh?: () => void } } };
+  };
+  const debouncer = (terminal as unknown as Internals)._core?._renderService?._renderDebouncer;
+  if (typeof debouncer?._innerRefresh !== 'function') return;
+  try {
+    debouncer._innerRefresh();
+  } catch {}
 }
