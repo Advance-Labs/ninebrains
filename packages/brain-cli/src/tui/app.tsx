@@ -5,6 +5,7 @@ import { Header } from './components/header';
 import { OverlayView, overlayLength } from './components/overlay';
 import { Prompt } from './components/prompt';
 import { StatusLine } from './components/status-line';
+import { WorkingRow } from './components/working-row';
 import { useBrainStore } from './store';
 
 /** Header, prompt box (3 rows), status line and the header's rule. */
@@ -18,7 +19,8 @@ export function App() {
   const store = useBrainStore();
   const { stdout } = useStdout();
   const width = stdout.columns ?? 80;
-  const bodyRows = Math.max((stdout.rows ?? 24) - CHROME_ROWS, 3);
+  const working = store.busySince !== null ? 1 : 0;
+  const bodyRows = Math.max((stdout.rows ?? 24) - CHROME_ROWS - working, 3);
   const [offset, setOffset] = useState(0);
 
   useEffect(() => setOffset(0), [store.overlay]);
@@ -37,6 +39,7 @@ export function App() {
       ) : (
         <Feed rows={bodyRows} />
       )}
+      <WorkingRow />
       <Prompt
         onSubmit={(line) => void store.submit(line)}
         onEscape={store.closeOverlay}

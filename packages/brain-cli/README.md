@@ -76,6 +76,12 @@ like Claude Code:
 Jobs and lanes can be named by job title, by lane label (`claude-bdc0`) or by an id prefix of four
 or more characters. Tab completes a command name and ↑/↓ walk your history.
 
+While any lane holds a job, a working row above the prompt shows a spinner, a shimmering
+"Working", what is running and for how long, and the dispatcher dot breathes. New feed lines fade
+in, and a finished job flashes green. Nothing moves while the Brain is idle. Set
+`NINEBRAINS_REDUCED_MOTION=1` to turn every animation off; it is also off when stdout is not a
+terminal.
+
 The feed is built by comparing polls every two seconds, so a change that starts and ends between
 two polls does not appear in it.
 
@@ -154,6 +160,7 @@ the window has hung.
 | `NINEBRAINS_PROJECT` | Default `--project` |
 | `NINEBRAINS_BRAIN_HANDSHAKE` | Use this handshake file, skipping the search |
 | `NINEBRAINS_BRAIN_TIMEOUT_MS` | Request timeout, default 30000 |
+| `NINEBRAINS_REDUCED_MOTION` | `1` turns off the TUI's animations |
 
 ## Exit codes
 
