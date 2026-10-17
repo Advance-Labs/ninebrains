@@ -1205,3 +1205,10 @@ Replaces the behaviour of patch 43's archived-worktree expiry. That expiry remov
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.5 → 0.2.6 | Written by `pnpm run release:prepare 0.2.6 --from 81c00ad5d` (the 0.2.5 release commit); `release.yml` refuses a version that does not match |
+
+## 75. The app ships its own ripgrep, so repo search works without a system `rg` (`ninebrains/search-fix-av6xu`)
+
+| File | Change | Why |
+|---|---|---|
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `afterPack` runs `scripts/release/bundle-ripgrep.mjs` (new), given as an absolute path | Content search spawns `rg` and showed "ripgrep is not installed or could not be found" on any Mac without Homebrew ripgrep. The hook downloads the pinned ripgrep 15.2.0 build for the arch being packaged, checks its SHA-256, and puts `rg` plus its licenses in `Resources/ripgrep/` before signing. No npm dependency and no install script: CI installs with `--ignore-scripts`, and the mac job packages x64 on an arm64 runner, so a postinstall download would ship no binary or the wrong one. The path is absolute because `build.ts` packages from a temp deploy dir and `structuredClone`s the config |
+| `src/main/gateway/desktop-workers.ts` | The file-search worker gets `ripgrepPath: resolveBundledRipgrepPath()` (new, `src/main/core/file-search/ripgrep-path.ts`) | Uses the bundled binary when it exists; in dev it returns undefined and search keeps using `rg` on PATH |
