@@ -34,7 +34,14 @@ export type GitCredentialSessionTarget =
   | { kind: 'host'; host: string };
 
 export type GitCredentialChannelServer = {
-  mintSession(target: GitCredentialSessionTarget): Promise<GitCredentialChannel>;
+  /**
+   * `durable` channels outlive an app restart (agent PTY sessions do, inside tmux);
+   * operation leases are released in-process and never need to.
+   */
+  mintSession(
+    target: GitCredentialSessionTarget,
+    options?: { durable?: boolean }
+  ): Promise<GitCredentialChannel>;
   revokeSession(nonce: string): void;
 };
 
@@ -108,7 +115,10 @@ export function createGitCredentialsService(
 
       const account = await resolveEffectiveAccount(projectId);
       if (!account) return undefined;
-      const channel = await deps.channels.mintSession({ kind: 'project', projectId });
+      const channel = await deps.channels.mintSession(
+        { kind: 'project', projectId },
+        { durable: true }
+      );
       return {
         mode: 'effective-account',
         channel,

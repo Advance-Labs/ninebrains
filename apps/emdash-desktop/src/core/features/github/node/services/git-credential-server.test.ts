@@ -4,7 +4,7 @@ import type { Logger } from '@emdash/shared/logger';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { GitHubAccountSummary } from '@core/primitives/github/api';
 import type { Resolved } from '@core/primitives/project-settings/api';
-import { GitCredentialServer } from './git-credential-server';
+import { GitCredentialServer, type GitCredentialPersistence } from './git-credential-server';
 
 const SECRET_TOKEN = 'ghp_SECRET_TOKEN_MATERIAL_do_not_leak';
 
@@ -22,6 +22,7 @@ function makeHarness(
     resolution?: Resolved<GitHubAccountSummary | null>;
     accounts?: GitHubAccountSummary[];
     tokenResult?: Result<string, unknown>;
+    persistence?: GitCredentialPersistence;
   } = {}
 ) {
   const logLines: string[] = [];
@@ -40,6 +41,7 @@ function makeHarness(
     listAccounts: async () => options.accounts ?? [account],
     getToken: async () => options.tokenResult ?? ok(SECRET_TOKEN),
     logger,
+    persistence: options.persistence,
   });
   return { server, logLines };
 }
@@ -90,6 +92,38 @@ describe('GitCredentialServer', () => {
     server.revokeSession(channel.nonce);
     const revoked = await requestCredential(channel, 'protocol=https\nhost=github.com\n');
     expect(revoked.status).toBe(403);
+  });
+
+  it('keeps durable channels, and their port, across a restart (#150)', async () => {
+    let saved: string | null = null;
+    const persistence: GitCredentialPersistence = {
+      load: async () => saved,
+      save: async (serialized) => {
+        saved = serialized;
+      },
+    };
+    const before = makeHarness({ persistence }).server;
+    const session = await before.mintSession(
+      { kind: 'project', projectId: 'project-1' },
+      { durable: true }
+    );
+    const operation = await before.mintSession({ kind: 'project', projectId: 'project-1' });
+    const revoked = await before.mintSession(
+      { kind: 'project', projectId: 'project-1' },
+      { durable: true }
+    );
+    before.revokeSession(revoked.nonce);
+    before.stop();
+
+    // The app restarts; agent sessions still hold the old port and nonce in their env.
+    const { server: after } = track(makeHarness({ persistence }));
+    await after.start();
+
+    const body = 'protocol=https\nhost=github.com\n';
+    expect((await requestCredential(session, body)).status).toBe(200);
+    // Operation leases and revoked channels do not survive.
+    expect((await requestCredential(operation, body)).status).toBe(403);
+    expect((await requestCredential(revoked, body)).status).toBe(403);
   });
 
   it('denies non-https requests and host mismatches', async () => {
