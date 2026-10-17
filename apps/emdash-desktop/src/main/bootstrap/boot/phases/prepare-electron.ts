@@ -16,7 +16,7 @@ export async function prepareElectron(config: AppConfig, signals: BootSignals): 
   registerAppScheme();
   initializeFileLogger();
   registerProcessErrorLogging(log);
-  // Ninebrains: hang, crash and memory evidence in the release log (UPSTREAM-PATCHES 75).
+  // Ninebrains: hang, crash and memory evidence in the release log (UPSTREAM-PATCHES 79).
   registerCrashDiagnostics(log, getLogFilePath());
 
   app.on('second-instance', () => {

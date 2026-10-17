@@ -25,7 +25,7 @@ const shutdownCoordinator = createShutdownCoordinator({
   },
   isInstallRequested: () => updateService.isInstallRequested,
   runCleanup: runQuitCleanup,
-  // Ninebrains: mark the clean exit in the log before app.exit skips will-quit (UPSTREAM-PATCHES 75).
+  // Ninebrains: mark the clean exit in the log before app.exit skips will-quit (UPSTREAM-PATCHES 79).
   exit: (code) => {
     recordCleanExit(code);
     app.exit(code);
