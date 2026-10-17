@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ok } from '@emdash/shared';
@@ -15,7 +15,7 @@ afterEach(async () => {
   while (services.length > 0) await services.pop()!.dispose();
 });
 
-async function setup(extra: { verification?: 'internal' | 'external' } = {}) {
+async function setup(extra: { verification?: 'internal' | 'external'; brainCliBin?: string } = {}) {
   const userDataDir = realpathSync(mkdtempSync(join(tmpdir(), 'nb-service-')));
   const brain = new Brain({ store: new InMemoryBrainStore() });
   const endpoint = await startBrainEndpoint({ brain, onInternalError: () => {} });
@@ -221,5 +221,31 @@ describe('BrainService', () => {
     expect(service.dispatcher.state).toMatchObject({ paused: true, stopLatched: false });
     brain.createJob(APP_IDENTITY, { projectId: 'p1', title: 'Work' });
     expect(await service.dispatcher.tick()).toEqual([]);
+  });
+});
+
+describe('cliCommand (Brain TUI launch line)', () => {
+  const builtCli = () => {
+    const bin = join(mkdtempSync(join(tmpdir(), 'nb-cli-')), 'bin.mjs');
+    writeFileSync(bin, '');
+    return bin;
+  };
+
+  it('refuses when the CLI is not built, instead of typing a line that fails in the terminal', async () => {
+    const { service } = await setup({ brainCliBin: '/nowhere/brain-cli/bin.mjs' });
+    const result = service.cliCommand('p1');
+    expect(result.success ? 'ok' : result.error.type).toBe('unavailable');
+  });
+
+  it('refuses a project id with control characters, which would act outside the quoting', async () => {
+    const { service } = await setup({ brainCliBin: builtCli() });
+    const result = service.cliCommand('p1\u0003');
+    expect(result.success ? 'ok' : result.error.type).toBe('invalid');
+  });
+
+  it('builds the quoted line for a built CLI and a plain id', async () => {
+    const { service } = await setup({ brainCliBin: builtCli() });
+    const result = service.cliCommand('p1');
+    expect(result.success && result.data.commandLine).toContain('NINEBRAINS_PROJECT=p1');
   });
 });

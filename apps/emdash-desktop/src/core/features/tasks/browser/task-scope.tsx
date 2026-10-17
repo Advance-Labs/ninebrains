@@ -173,6 +173,21 @@ const taskScopeImplementation = {
       taskView?.setFocusedRegion('main');
     },
   }),
+  'task.openBrain': (params) => ({
+    availability: () =>
+      taskAvailability(
+        params,
+        () => getTaskComposition(params.projectId, params.taskId)?.isLocalWorkspace ?? false,
+        'The Brain TUI only runs in local tasks'
+      ),
+    execute: () => {
+      void getTaskComposition(params.projectId, params.taskId)
+        ?.openBrainTerminal()
+        .catch((error: unknown) =>
+          toast.error(error instanceof Error ? error.message : 'Could not open the Brain TUI')
+        );
+    },
+  }),
   'task.browserGoBack': (params) => ({
     availability: () =>
       taskAvailability(

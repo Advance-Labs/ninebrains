@@ -1,6 +1,6 @@
 import type { TerminalShellId } from '@emdash/core/primitives/terminal-shell/api';
 import { EmptyState } from '@emdash/ui/react/components';
-import { Button } from '@emdash/ui/react/primitives';
+import { Button, toast } from '@emdash/ui/react/primitives';
 import { observer } from 'mobx-react-lite';
 import { useEffect, useRef, useState } from 'react';
 import { useIsActiveTask } from '@core/features/tasks/api/browser/hooks/use-is-active-task';
@@ -136,6 +136,16 @@ export const TerminalsPanel = observer(function TerminalsPanel() {
     await taskView.openNewTerminal(shell);
   };
 
+  const handleOpenBrain = async () => {
+    if (liveActionsDisabled) return;
+    setMode('terminals');
+    await taskView
+      .openBrainTerminal((terminalId) => taskView.showTerminalInDrawer(terminalId))
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : 'Could not open the Brain TUI');
+      });
+  };
+
   const handleShellMenuOpen = () => {
     if (liveActionsDisabled) return;
     if (!shouldLoadShellAvailability) {
@@ -244,6 +254,7 @@ export const TerminalsPanel = observer(function TerminalsPanel() {
             taskView.setTerminalDrawerActiveItem({ kind: 'terminal', id });
           }}
           onAddTerminal={(shell) => void handleCreate(shell)}
+          onOpenBrain={() => void handleOpenBrain()}
           onRemoveTerminal={(id) => terminalTabView.removeTab(id)}
           onRenameTerminal={(id, name) => void terminalMgr.renameTerminal(id, name)}
           onHoverTerminal={handleHoverTerminal}

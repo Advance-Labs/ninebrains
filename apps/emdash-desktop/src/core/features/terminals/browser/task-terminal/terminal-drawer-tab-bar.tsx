@@ -5,7 +5,17 @@ import type {
 } from '@emdash/core/primitives/terminal-shell/api';
 import { ScriptStatus, type ScriptStatusKind } from '@emdash/ui/react/components';
 import { Button, DropdownMenu, Tabs, Tooltip } from '@emdash/ui/react/primitives';
-import { ChevronDown, LoaderCircle, Pause, Play, Plus, RefreshCw, Terminal, X } from 'lucide-react';
+import {
+  Brain,
+  ChevronDown,
+  LoaderCircle,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Terminal,
+  X,
+} from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -46,6 +56,7 @@ interface TerminalDrawerTabBarProps {
   onRetryShellAvailability: () => void;
   onSelectTerminal: (id: string) => void;
   onAddTerminal: (shell?: TerminalShellId) => void;
+  onOpenBrain: () => void;
   onRemoveTerminal: (id: string) => void;
   onRenameTerminal: (id: string, name: string) => void;
   onHoverTerminal?: (id: string) => void;
@@ -78,6 +89,7 @@ export const TerminalDrawerTabBar = observer(function TerminalDrawerTabBar({
   onRetryShellAvailability,
   onSelectTerminal,
   onAddTerminal,
+  onOpenBrain,
   onRemoveTerminal,
   onRenameTerminal,
   onHoverTerminal,
@@ -144,6 +156,7 @@ export const TerminalDrawerTabBar = observer(function TerminalDrawerTabBar({
                 onShellMenuOpen={onShellMenuOpen}
                 onRetryShellAvailability={onRetryShellAvailability}
                 onAddTerminal={onAddTerminal}
+                onOpenBrain={onOpenBrain}
               />
             </projectAvailabilityUi.LiveActionGuard>
           </>
@@ -206,12 +219,14 @@ export function NewTerminalButton({
   onShellMenuOpen,
   onRetryShellAvailability,
   onAddTerminal,
+  onOpenBrain,
 }: {
   disabled?: boolean;
   shellMenuState: TerminalShellMenuState;
   onShellMenuOpen: () => void;
   onRetryShellAvailability: () => void;
   onAddTerminal: (shell?: TerminalShellId) => void;
+  onOpenBrain: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-center">
@@ -275,6 +290,12 @@ export function NewTerminalButton({
               </DropdownMenu.Item>
             ))
           )}
+          {/* Ninebrains: the Brain TUI as a terminal kind (UPSTREAM-PATCHES 80). */}
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item onClick={onOpenBrain}>
+            <Brain />
+            Brain TUI
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
     </div>
