@@ -115,6 +115,12 @@ The hook skips the Playwright `browser` test projects: in a full local run they 
 and would block pushes for no real failure. CI's `test-browser` job still runs them on every PR.
 Push with `EMDASH_TEST_BROWSER=1 git push` to include them.
 
+The checks take a gate slot first, shared by every worktree on the machine: one slot per 8 GB of RAM
+(two on a 16 GB Mac). With many agents pushing at once, the extra pushes wait, and say whose checks
+they are waiting on, instead of running side by side. Each run costs about 1 GB of swap, and a dozen
+at once can hang the machine (#158). A slot whose owner died is reclaimed, and nothing waits more
+than 30 minutes. `NINEBRAINS_GATE_SLOTS=<n> git push` sets the limit.
+
 CI runs the Playwright-backed `browser` projects too, but run them locally for UI changes. The first
 run on a machine needs:
 
