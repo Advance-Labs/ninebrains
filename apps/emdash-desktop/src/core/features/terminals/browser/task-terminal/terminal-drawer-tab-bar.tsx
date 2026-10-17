@@ -290,7 +290,7 @@ export function NewTerminalButton({
               </DropdownMenu.Item>
             ))
           )}
-          {/* Ninebrains: the Brain TUI as a terminal kind (UPSTREAM-PATCHES 68). */}
+          {/* Ninebrains: the Brain TUI as a terminal kind (UPSTREAM-PATCHES 80). */}
           <DropdownMenu.Separator />
           <DropdownMenu.Item onClick={onOpenBrain}>
             <Brain />

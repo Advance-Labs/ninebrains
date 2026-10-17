@@ -32,7 +32,7 @@ export const NewConversationTabButton = observer(function NewConversationTabButt
   };
 
   // Ninebrains: the Brain TUI opens as a tab in this pane, beside the conversations
-  // (UPSTREAM-PATCHES 68).
+  // (UPSTREAM-PATCHES 80).
   const handleOpenBrain = () => {
     void taskView
       .openBrainTerminal((terminalId) => pane.open('terminal', { terminalId }))

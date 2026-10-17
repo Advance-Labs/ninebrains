@@ -488,7 +488,7 @@ export class TaskComposition {
     this._terminalSelectionHandle.update((current) => ({ ...current, activeItem: item }));
   }
 
-  // Ninebrains: the Brain TUI opens as a task terminal (UPSTREAM-PATCHES 68).
+  // Ninebrains: the Brain TUI opens as a task terminal (UPSTREAM-PATCHES 80).
   /** True when this task's terminals run on this machine, where the Brain endpoint lives. */
   get isLocalWorkspace(): boolean {
     // Unknown until the workspace loads; an SSH task must not pass as local in that window.
