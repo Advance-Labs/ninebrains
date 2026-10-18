@@ -65,7 +65,8 @@ describe('NativeWatch', () => {
     callbacks[0](dropped, []);
     await vi.advanceTimersByTimeAsync(250);
 
-    expect(onError).toHaveBeenCalledTimes(2);
+    // One warning per re-scan: a burst of drops while one is queued is the same event.
+    expect(onError).toHaveBeenCalledOnce();
     expect(resync).toHaveBeenCalledOnce();
     expect(subscribe).toHaveBeenCalledOnce();
     expect(unsubscribe).not.toHaveBeenCalled();

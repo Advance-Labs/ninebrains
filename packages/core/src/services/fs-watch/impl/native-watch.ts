@@ -83,11 +83,14 @@ export class NativeWatch implements Disposable {
       (err, events) => {
         if (this.disposed || generation !== this.activeGeneration) return;
         if (err) {
-          this.reportError(`watch ${this.root}`, err);
           if (requiresResync(err)) {
+            // Under heavy file churn FSEvents reports drops in bursts (128 warnings a minute in a
+            // log that then went silent on a hang). Warn once per re-scan, not once per drop.
+            if (!this.resyncTimer) this.reportError(`watch ${this.root}`, err);
             this.scheduleResync();
             return;
           }
+          this.reportError(`watch ${this.root}`, err);
           if (this.restartPromise) {
             this.retryRequested = true;
             return;

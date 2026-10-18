@@ -1257,3 +1257,29 @@ Ninebrains-only.
 | File | Change | Why |
 |---|---|---|
 | `CONTRIBUTING.md` | The pre-push section explains the gate slot, the wait message, reclaiming a dead owner's slot, the 30-minute cap and `NINEBRAINS_GATE_SLOTS` | So a contributor whose push pauses knows why and how to change the limit |
+
+## 79. The release log tells a hang, a crash, a kill and a clean quit apart (`fix/main-hang-diagnostics`)
+
+A release instance beachballed and was force-quit. Its log ended in a burst of FSEvents
+"events were dropped" warnings and said nothing else: release builds log warn and above, no line
+recorded that the main thread had stopped, memory is only sampled at debug level, and a clean quit
+looked the same as a kill. `src/main/host/crash-diagnostics.ts` (Ninebrains-only) adds, all at warn
+or error:
+
+- a main-thread watchdog: a worker thread watches a heartbeat the main thread bumps every 500 ms
+  and appends "main thread blocked" (with RSS) straight to the log file when it stops for 5 s,
+  "still blocked" every 30 s, and "recovered" with the blocked duration. It writes from its own
+  thread, so a hang that ends in a force quit leaves its own last line;
+- `child-process-gone` and `render-process-gone` with reason and exit code (not on clean exits);
+- window `unresponsive` and `responsive` with the blocked duration;
+- "app memory high" with the five largest processes when the app's total working set reaches
+  3 GB, at most every 10 minutes;
+- "quit: clean exit", written synchronously on the shutdown coordinator's exit and on `will-quit`, so a
+  log without it ended in a crash, a force quit or a kill.
+
+| File | Change | Why |
+|---|---|---|
+| `src/main/bootstrap/boot/phases/prepare-electron.ts` | Calls `registerCrashDiagnostics(log, getLogFilePath())` after `registerProcessErrorLogging` | Wires the diagnostics in before any window or worker starts |
+| `src/main/bootstrap/shutdown/index.ts` | The coordinator's `exit` writes "quit: clean exit" synchronously before `app.exit` | `app.exit` skips `will-quit` and ends the process before an async log write lands; without this a normal quit and a kill end the log the same way |
+| `packages/core/src/services/fs-watch/impl/native-watch.ts` | A dropped-events error is reported only when it schedules a re-scan, not again while one is queued | Under heavy churn FSEvents reports drops in bursts; the hang's log had 128 identical warnings a minute. One per re-scan says the same thing |
+| `packages/core/src/services/fs-watch/impl/native-watch.test.ts` | The coalescing test expects one warning, not two | Same |

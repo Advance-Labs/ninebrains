@@ -1,6 +1,11 @@
 import { app } from 'electron';
 import devIcon from '@/assets/images/emdash/emdash-dev.png?asset';
-import { initializeFileLogger, registerProcessErrorLogging } from '@main/host/file-logger';
+import { registerCrashDiagnostics } from '@main/host/crash-diagnostics';
+import {
+  getLogFilePath,
+  initializeFileLogger,
+  registerProcessErrorLogging,
+} from '@main/host/file-logger';
 import { registerAppScheme } from '@main/host/protocol';
 import { log } from '@main/lib/logger';
 import type { AppConfig } from '../../core/config';
@@ -11,6 +16,8 @@ export async function prepareElectron(config: AppConfig, signals: BootSignals): 
   registerAppScheme();
   initializeFileLogger();
   registerProcessErrorLogging(log);
+  // Ninebrains: hang, crash and memory evidence in the release log (UPSTREAM-PATCHES 79).
+  registerCrashDiagnostics(log, getLogFilePath());
 
   app.on('second-instance', () => {
     if (signals.windowPhaseReady) void showMainWindow();
