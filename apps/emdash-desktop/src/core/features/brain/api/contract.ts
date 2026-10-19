@@ -121,6 +121,12 @@ export const brainContract = defineContract({
     data: z.void(),
     error: brainErrorSchema,
   }),
+  /** The shell line that opens the `brain` TUI for a project, for a task terminal to type. */
+  cliCommand: fallible({
+    input: projectKey,
+    data: z.object({ commandLine: z.string() }),
+    error: brainErrorSchema,
+  }),
   /** Global STOP (SEC-30): kills runs, pauses dispatch, stops Brain-dispatched lanes. Latches. */
   stopAll: fallible({
     input: z.void(),

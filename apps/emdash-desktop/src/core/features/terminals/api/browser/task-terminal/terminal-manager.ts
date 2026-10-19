@@ -165,9 +165,8 @@ export class TerminalManagerStore implements Disposable {
     }
   }
 
-  async createDefaultTerminal(shell?: TerminalShellId): Promise<Terminal> {
-    const names = Array.from(this.terminals.values()).map((t) => t.data.name);
-    const name = nextTerminalName(names);
+  async createDefaultTerminal(shell?: TerminalShellId, name?: string): Promise<Terminal> {
+    name ??= nextTerminalName(Array.from(this.terminals.values()).map((t) => t.data.name));
     const id = crypto.randomUUID();
     const params: CreateTerminalParams = {
       id,
@@ -177,6 +176,13 @@ export class TerminalManagerStore implements Disposable {
     };
     if (shell !== undefined) params.shell = shell;
     return this.createTerminal(params);
+  }
+
+  /** Types into the terminal's shell. Input sent before the prompt is up is buffered by the PTY. */
+  async sendInput(terminalId: string, data: string): Promise<void> {
+    const key = await this.ensureRuntimeKey(terminalId);
+    const result = await (await getTerminalsClient()).sendInput({ ...key, data });
+    if (!result.success) throw new Error(terminalErrorMessage(result.error));
   }
 
   async deleteTerminal(terminalId: string): Promise<void> {
