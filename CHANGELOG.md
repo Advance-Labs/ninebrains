@@ -6,6 +6,36 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-19
+
+The Brain TUI now opens as a tab beside a task's conversations: use the **+ ▾** menu next to the
+conversation tabs and pick **Brain TUI**. The TUI itself is redesigned as a live feed, a prompt box
+with slash commands and a status line, with light animations (set `NINEBRAINS_REDUCED_MOTION=1` to
+turn them off). Jobs no longer get stuck behind a lane whose session has gone away.
+
+For people running many agents at once: Claude task sessions can skip plugins you don't need there
+(**Settings → Agents → Claude → Plugins to skip in task sessions**), which saves an MCP server or LSP
+per session. Heavy test runs from gate checks now take turns instead of all running together.
+
+When the app hangs, a process dies or memory runs high, the log at
+`~/Library/Application Support/ninebrains/logs/ninebrains.log` now says so, and a clean quit is
+recorded, so a force quit can be told apart from one.
+
+### Features
+
+- **brain:** open the Brain TUI as a tab beside a task's conversations (#141) (28b7d7e)
+- **brain-cli:** redesign the TUI as a feed, a prompt box and a status line (#152) (8a78f00)
+- **agents:** let Claude task sessions skip plugins (#160) (15ef73a)
+
+### Fixes
+
+- **main:** log hangs, process deaths, high memory and clean exits (#159) (5a8473c)
+- **brain:** park stale lanes so the dispatcher stops planning onto them (#144) (249aecd)
+
+### Performance
+
+- let heavy check runs take turns across worktrees and lanes (#161) (0f570f5)
+
 ## [0.2.7] - 2026-10-17
 
 Terminals on screen now draw with the GPU (WebGL) instead of building a DOM row for every line,
