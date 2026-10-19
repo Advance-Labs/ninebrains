@@ -65,9 +65,9 @@ function pillBody(update: UpdateStoreLike): ReactNode | null {
         </>
       );
     case 'available':
+      // Nothing is in flight here — we're waiting on the user — so no loading mark.
       return (
         <>
-          <BrandLoadingMark size={18} />
           <span className="text-foreground">
             <span className="font-medium">v{versionLabel(update)} available</span>
             <span className="block text-[11px] text-foreground-passive">Ninebrains</span>
