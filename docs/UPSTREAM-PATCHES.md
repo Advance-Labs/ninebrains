@@ -1320,3 +1320,9 @@ install `chromium-headless-shell`, so the browser tests and the `ci-ok` gate fai
 | File | Change | Why |
 |---|---|---|
 | `.github/workflows/code-consistency-check.yml` | `runs-on: ubuntu-latest` → `ubuntu-24.04` | Same runner as the rest of CI, so the gate does not depend on GitHub's `-latest` rollout |
+
+## 82. Release 0.2.8 (`chore/release-0.2.8`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.7 → 0.2.8 | Written by `pnpm run release:prepare 0.2.8 --from 7d597140a` (the 0.2.7 release commit); `release.yml` refuses a version that does not match |
