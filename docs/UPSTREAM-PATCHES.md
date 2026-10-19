@@ -1283,3 +1283,13 @@ or error:
 | `src/main/bootstrap/shutdown/index.ts` | The coordinator's `exit` writes "quit: clean exit" synchronously before `app.exit` | `app.exit` skips `will-quit` and ends the process before an async log write lands; without this a normal quit and a kill end the log the same way |
 | `packages/core/src/services/fs-watch/impl/native-watch.ts` | A dropped-events error is reported only when it schedules a re-scan, not again while one is queued | Under heavy churn FSEvents reports drops in bursts; the hang's log had 128 identical warnings a minute. One per re-scan says the same thing |
 | `packages/core/src/services/fs-watch/impl/native-watch.test.ts` | The coalescing test expects one warning, not two | Same |
+
+## 81. CI runners pinned to ubuntu-24.04 (`ci/pin-ubuntu-24.04`)
+
+On 2026-10-19 `ubuntu-latest` began resolving to `ubuntu-26.04`, where Playwright refuses to
+install `chromium-headless-shell`, so the browser tests and the `ci-ok` gate failed on every PR.
+`ci.yml` (Ninebrains-only) pins its six jobs to `ubuntu-24.04`.
+
+| File | Change | Why |
+|---|---|---|
+| `.github/workflows/code-consistency-check.yml` | `runs-on: ubuntu-latest` → `ubuntu-24.04` | Same runner as the rest of CI, so the gate does not depend on GitHub's `-latest` rollout |
