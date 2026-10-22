@@ -6,6 +6,19 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-10-22
+
+In-app updates work on Windows again. Before this release the update downloaded and the pill said
+**Update ready**, but the installer never ran, so each restart came back on the old version and
+downloaded the same update again. **On Windows, install 0.2.9 by hand once** (download the `.exe`
+below and run it): 0.2.8 and older still have the bug and cannot update themselves. From 0.2.9 on,
+**Restart now** installs the update and reopens the app.
+
+### Fixes
+
+- **updates:** install and relaunch Windows updates (#166) (9537971)
+- **updates:** drop the loading mark from the idle update-available pill (#165) (bfe8187)
+
 ## [0.2.8] - 2026-10-19
 
 The Brain TUI now opens as a tab beside a task's conversations: use the **+ ▾** menu next to the
