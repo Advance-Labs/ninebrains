@@ -22,6 +22,8 @@ test('ships every asset the page references', () => {
   for (const match of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) {
     const path = match[1];
     if (path.startsWith('//')) continue;
+    // Vercel infrastructure paths (like Speed Insights) are only available when deployed
+    if (path.startsWith('/_vercel/')) continue;
     assert.doesNotThrow(
       () => readFileSync(join(DIST, path.slice(1))),
       `referenced but not built: ${path}`
