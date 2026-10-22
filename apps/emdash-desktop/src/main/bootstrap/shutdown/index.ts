@@ -28,6 +28,8 @@ const shutdownCoordinator = createShutdownCoordinator({
   // Ninebrains: mark the clean exit in the log before app.exit skips will-quit (UPSTREAM-PATCHES 79).
   exit: (code) => {
     recordCleanExit(code);
+    // app.exit skips will-quit too, so a queued Windows update installer must be launched here.
+    updateService.launchQueuedWindowsInstaller();
     app.exit(code);
   },
 });

@@ -43,8 +43,12 @@ describe('UpdateService', () => {
     service.dispose();
   });
 
-  it('registers the Windows will-quit installer hook at construction', () => {
-    expect(hoisted.app.once).toHaveBeenCalledWith('will-quit', expect.any(Function));
+  it('does not rely on will-quit, which app.exit() never emits', () => {
+    expect(hoisted.app.once).not.toHaveBeenCalledWith('will-quit', expect.any(Function));
+  });
+
+  it('launching the Windows installer with nothing queued is a no-op', () => {
+    expect(() => service.launchQueuedWindowsInstaller()).not.toThrow();
   });
 
   it('initializes but stays inactive in a dev/test build (no polling, no writes)', async () => {

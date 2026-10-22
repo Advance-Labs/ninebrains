@@ -1326,3 +1326,19 @@ install `chromium-headless-shell`, so the browser tests and the `ci-ok` gate fai
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.7 → 0.2.8 | Written by `pnpm run release:prepare 0.2.8 --from 7d597140a` (the 0.2.7 release commit); `release.yml` refuses a version that does not match |
+
+## 83. Windows updates install and relaunch (`fix/windows-update-install`)
+
+On Windows the staged update never installed: every launch cleared the pending marker, quit, and
+came back on the old version, then downloaded the same update again. The installer was spawned from
+`will-quit`, but shutdown always ends in `app.exit()` (patch 79), which never emits `will-quit`.
+Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unless it gets
+`--force-run`, so a working install would not have reopened the app.
+
+| File | Change | Why |
+|---|---|---|
+| `src/main/host/updates/update-service.ts` | `will-quit` hook removed; `launchQueuedWindowsInstaller()` made public | The hook never fired, so the installer never ran |
+| `src/main/bootstrap/shutdown/index.ts` | exit step calls `updateService.launchQueuedWindowsInstaller()` before `app.exit()` | Shutdown's one exit point is where the locked exe is about to be released |
+| `src/main/host/updates/apply/index.ts` | installer args `/S --force-run /D=<dir>` | electron-builder's assisted template only starts the app after a silent install with `--force-run` |
+| `src/main/host/updates/apply/index.test.ts`, `update-service.test.ts` | Tests for the installer args and for not relying on `will-quit` | Guards both regressions |
+| `docs/RELEASING.md`, `agents/risky-areas/updater.md` | Windows apply step described as above | The docs described the broken `will-quit` path |
