@@ -181,13 +181,16 @@ function runningAppImagePath(): string {
 
 /**
  * Launches the staged NSIS installer silently into the current install directory. The caller runs
- * this from `will-quit`, after the running exe is about to release its lock. `installDir` is the
+ * this just before app.exit(), so the running exe is about to release its lock. `installDir` is the
  * final argument by NSIS convention; leaving it pointing at the current install keeps the shell
  * variables (Start Menu, uninstall entries) intact.
+ *
+ * `--force-run` is required for the relaunch: the assisted (oneClick: false) NSIS template ignores
+ * runAfterFinish in silent mode and only starts the app after a `/S` install when it sees that flag.
  */
 export function spawnWindowsInstaller(stagedPath: string): void {
   const installDir = dirname(process.execPath);
-  const installer = spawn(stagedPath, ['/S', `/D=${installDir}`], {
+  const installer = spawn(stagedPath, ['/S', '--force-run', `/D=${installDir}`], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,

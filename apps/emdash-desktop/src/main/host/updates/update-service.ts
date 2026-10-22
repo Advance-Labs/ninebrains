@@ -75,9 +75,6 @@ export class UpdateService implements Disposable {
   constructor(fetchImpl: FeedFetcher = defaultFetcher) {
     this.fetchImpl = fetchImpl;
     this.updateState = { status: 'idle', currentVersion: 'unknown' };
-    // Windows cannot overwrite the running exe, so the staged installer is launched from
-    // `will-quit`, once the process is about to release its files (runAfterFinish relaunches).
-    app.once('will-quit', () => this.runQueuedWindowsInstaller());
   }
 
   async initialize(): Promise<void> {
@@ -175,7 +172,10 @@ export class UpdateService implements Disposable {
       });
   }
 
-  /** Windows: remember the installer, drop the marker, and let `will-quit` launch it. */
+  /**
+   * Windows: remember the installer, drop the marker, and quit. The shutdown coordinator launches
+   * it via launchQueuedWindowsInstaller() right before app.exit().
+   */
   private queueWindowsInstall(pending: PendingUpdate): void {
     this.pending = pending;
     this.pendingWindowsInstaller = pending.stagedPath;
@@ -183,7 +183,12 @@ export class UpdateService implements Disposable {
     app.quit();
   }
 
-  private runQueuedWindowsInstaller(): void {
+  /**
+   * Windows cannot overwrite the running exe, so the staged installer is spawned detached as the
+   * process exits. This must be called explicitly from the exit path: shutdown ends in app.exit(),
+   * which never emits `will-quit`, so a `will-quit` hook silently never ran the installer.
+   */
+  launchQueuedWindowsInstaller(): void {
     const installer = this.pendingWindowsInstaller;
     if (!installer) return;
     this.pendingWindowsInstaller = undefined;

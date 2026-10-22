@@ -1,3 +1,4 @@
+import type * as ChildProcess from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fsp } from 'node:fs';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,12 +10,30 @@ import {
   applyStagedUpdate,
   resolveMacBundlePath,
   sha256FileHex,
+  spawnWindowsInstaller,
   sweepLeftoverUpdateDirs,
 } from './index';
 
+const spawnMock = vi.hoisted(() => vi.fn(() => ({ unref: vi.fn() })));
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof ChildProcess>()),
+  spawn: spawnMock,
+}));
 vi.mock('@main/lib/logger', () => ({
   log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+
+describe('spawnWindowsInstaller', () => {
+  it('runs the NSIS installer silently with --force-run so the app relaunches', () => {
+    spawnWindowsInstaller('C:\\staged\\Ninebrains-0.2.8-win-x64.exe');
+    const [file, args] = spawnMock.mock.calls[0] as unknown as [string, string[]];
+    expect(file).toBe('C:\\staged\\Ninebrains-0.2.8-win-x64.exe');
+    expect(args.slice(0, 2)).toEqual(['/S', '--force-run']);
+    // NSIS requires /D= to be the last argument.
+    expect(args[args.length - 1]).toMatch(/^\/D=/);
+  });
+});
 
 let dir: string;
 beforeEach(() => {

@@ -56,10 +56,13 @@ release-assets,artifacts,…}.ts`. Don't rely on them in a release; say so when 
 4. **Apply on next launch.** After the user picks **Restart now**, the app quits. On the next
    launch `initialize()` (called after the main window is up) checks the staged marker and applies:
    - macOS/Linux: replace the bundle/AppImage/`.deb` in place (`apply/index.ts`) and relaunch.
-   - Windows: the running `.exe` is locked, so `update-service.ts` registers a `will-quit` handler
-     that spawns the staged NSIS installer detached for the current user (`/S /D=<app dir>`), after
-     `clearPendingUpdateSync` clears the marker; electron-builder's `runAfterFinish: true` restarts
-     the app when the install completes.
+   - Windows: the running `.exe` is locked, so `update-service.ts` clears the marker
+     (`clearPendingUpdateSync`), queues the installer and quits. The shutdown coordinator's exit
+     step (`bootstrap/shutdown/index.ts`) calls `launchQueuedWindowsInstaller()` right before
+     `app.exit()`, which spawns the staged NSIS installer detached for the current user
+     (`/S --force-run /D=<app dir>`). Do not move this back to a `will-quit` hook: shutdown always
+     ends in `app.exit()`, which never emits `will-quit`. `--force-run` is what makes a silent
+     assisted (`oneClick: false`) install relaunch the app; `runAfterFinish` alone does not.
 5. **Failure is local.** A failed apply clears the marker and leaves the old version running. No
    update is ever applied automatically at quit.
 

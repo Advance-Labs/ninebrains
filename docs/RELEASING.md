@@ -331,7 +331,8 @@ under `src/main/host/updates/` so the trust check exactly matches what we sign:
   reports an error. The user then picks **Restart now**.
 - **Apply on relaunch.** The app quits; on the next launch it applies the staged update in place and
   relaunches onto it (macOS and Linux). On Windows the running `.exe` cannot be replaced, so the
-  staged NSIS installer is launched from `will-quit` and `runAfterFinish: true` restarts the app.
+  staged NSIS installer is launched by the shutdown path just before `app.exit()` (which never
+  emits `will-quit`), silently with `--force-run` so the installer restarts the app.
 - **Channels and artifacts.** Stable publishes `Ninebrains-<version>-<os>-<arch>.<ext>`; canary
   publishes `Ninebrains-Canary-<version>-<os>-<arch>.<ext>` as a prerelease with its own app
   identity and data directory. There is no separate R2 feed.
