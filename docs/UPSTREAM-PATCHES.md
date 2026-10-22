@@ -1342,3 +1342,9 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | `src/main/host/updates/apply/index.ts` | installer args `/S --force-run /D=<dir>` | electron-builder's assisted template only starts the app after a silent install with `--force-run` |
 | `src/main/host/updates/apply/index.test.ts`, `update-service.test.ts` | Tests for the installer args and for not relying on `will-quit` | Guards both regressions |
 | `docs/RELEASING.md`, `agents/risky-areas/updater.md` | Windows apply step described as above | The docs described the broken `will-quit` path |
+
+## 84. Release 0.2.9 (`chore/release-0.2.9`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
