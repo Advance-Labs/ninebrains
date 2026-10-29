@@ -1348,3 +1348,14 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
+
+## 86. Component workers exit when orphaned (`fix/orphaned-component-workers`)
+
+Workers survived app exit and were reparented to PID 1 (#126). Shutdown waited on `scope.dispose()`
+with no bound, so one hung disposer meant `exit()` never ran, and a missed IPC `disconnect` was the
+only parent-death signal.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/wire/src/worker/run-component-worker.ts` | `shutdown` races dispose against a 3 s timeout before `exit`; new 5 s parent poll (`process.ppid` change, injectable via `isParentAlive`) calls `shutdown` | A hung disposer or missed `disconnect` no longer strands the process; works after a main-process crash or SIGKILL |
+| `packages/wire/src/worker/run-component-worker.test.ts` | New test: worker exits when the parent is reported dead | Guards the watchdog |
