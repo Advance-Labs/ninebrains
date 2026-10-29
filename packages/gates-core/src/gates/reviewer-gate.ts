@@ -34,7 +34,7 @@ export interface ReviewerGateOptions {
   diffArgs?: (job: GateJob, base: string) => string[];
   /** git arguments that list new files, run as argv; null to skip. */
   untrackedArgs?: string[] | null;
-  /** Diff characters included in the prompt. The full diff is stored as evidence. Default 60000. */
+  /** Diff characters included in the prompt. The full diff is stored as evidence. A pass over a longer diff is recorded as a fail. Default 60000. */
   maxDiffChars?: number;
   appliesTo?: (job: GateJob) => boolean;
 }
@@ -198,7 +198,13 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
       return fail(`Reviewer failed to run: ${errorMessage(error)}`, [diffEvidence]);
     }
 
-    const metrics = { diffChars: diff.length };
+    // A verdict on a truncated diff covers part of the change, so it cannot be a pass.
+    const omitted = Math.max(0, diff.length - maxDiffChars);
+    const metrics: Record<string, number> = { diffChars: diff.length };
+    if (omitted > 0) {
+      metrics.diffTruncated = 1;
+      metrics.diffOmittedChars = omitted;
+    }
     const parsed = parseReviewerVerdict(reply);
     if (!parsed.ok) {
       const raw = await ctx.evidence.put({
@@ -225,6 +231,17 @@ export function reviewerGate(options: ReviewerGateOptions = {}): Gate {
     const issues = formatIssues(parsed.verdict.issues);
     const evidence = [diffEvidence, verdict];
     const withIssues = { ...metrics, issues: parsed.verdict.issues.length };
+    if (parsed.verdict.pass && omitted > 0) {
+      return {
+        pass: false,
+        evidence,
+        feedback:
+          `Reviewer approved only the first ${maxDiffChars} of ${diff.length} diff characters; ` +
+          `${omitted} were not reviewed, so the change is unverified. Split it into smaller changes.` +
+          `${issues ? `\nNotes:\n${issues}` : ''}`,
+        metrics: withIssues,
+      };
+    }
     return parsed.verdict.pass
       ? {
           pass: true,
