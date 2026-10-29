@@ -1348,3 +1348,10 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
+
+## 87. tmux server is never born in a task worktree (`fix/tmux-server-cwd`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-commands.ts` | `buildTmuxShellLine` runs `new-session` (both variants) from `cd /` and passes the pane's own directory explicitly with `-c "$OLDPWD"` | The tmux server keeps the cwd of the first client that starts it. Started from a task worktree, deleting that task left the server in a dead directory and every later pane died at startup, surfacing only as `can't find session` (#169) |
+| `packages/core/src/services/pty/api/tmux.test.ts` | New e2e case on an isolated `TMUX_TMPDIR`: spawn from worktree A, delete A, spawn from B; the pane is still created in B | Fails on the old line, passes on the new one |
