@@ -202,6 +202,23 @@ describe('reviewerGate', () => {
     expect(result.evidence.map((e) => e.kind)).toEqual(['diff', 'text']);
   });
 
+  it('does not pass a review that saw only part of the diff', async () => {
+    const diff = `${DIFF}${'+x\n'.repeat(100)}`;
+    const omitted = diff.length - 100;
+    const { ctx } = setup(APPROVE, { diff });
+    const result = await reviewerGate({ maxDiffChars: 100 }).run(ctx);
+    expect(result.pass).toBe(false);
+    expect(result.feedback).toContain(`${omitted} were not reviewed`);
+    expect(result.metrics).toMatchObject({ diffTruncated: 1, diffOmittedChars: omitted });
+    expect(result.evidence.map((e) => e.kind)).toEqual(['diff', 'json']);
+
+    const whole = await reviewerGate({ maxDiffChars: diff.length }).run(
+      setup(APPROVE, { diff }).ctx
+    );
+    expect(whole.pass).toBe(true);
+    expect(whole.metrics?.diffTruncated).toBeUndefined();
+  });
+
   it('fails with the listed issues when the reviewer rejects', async () => {
     const { ctx } = setup(
       '```json\n{"pass": false, "issues": [{"message": "No test for the empty state", "file": "src/app.ts"}]}\n```'
