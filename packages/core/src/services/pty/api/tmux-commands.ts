@@ -82,11 +82,11 @@ export function buildTmuxShellLine(
     .filter((key) => TMUX_FORWARDED_ENV.test(key))
     .map((key) => `-e ${key}="$${key}"`)
     .join(' ');
-  const newSession = `${tmux} -u new-session -d ${forwardEnv ? `${forwardEnv} ` : ''}-s ${quotedName} ${quotedCmd}`;
+  const newSession = `${tmux} -u new-session -d ${forwardEnv ? `${forwardEnv} ` : ''}-s ${quotedName} -c "$OLDPWD" ${quotedCmd}`;
   // `new-session -e` is tmux 3.2+; Debian 11 and Ubuntu 20.04 still ship 3.0-3.1c, where the
   // flag is a usage error and the pane would die instead of merely losing its spinner. Fall
   // back to the plain spawn there: stale inherited env, exactly as before this forwarding.
-  const newSessionPlain = `${tmux} -u new-session -d -s ${quotedName} ${quotedCmd}`;
+  const newSessionPlain = `${tmux} -u new-session -d -s ${quotedName} -c "$OLDPWD" ${quotedCmd}`;
   const setIdentity = identity
     ? `${tmux} set-option -t ${exactOptionTarget} ${TMUX_IDENTITY_OPTION} ${quoteArg(encodeTmuxIdentity(identity), 'posix')} 2>/dev/null || true`
     : null;
@@ -97,9 +97,14 @@ export function buildTmuxShellLine(
   // pane, naming a session the app already names in its own UI, and it costs a row of the
   // agent's screen to do it. Off is the honest default for a detail the user did not choose.
   const hideStatus = `${tmux} set-option -t ${exactOptionTarget} status off 2>/dev/null || true`;
-  const ensureSession = forwardEnv
-    ? `(${checkExists} || ${newSession} || ${newSessionPlain})`
-    : `(${checkExists} || ${newSession})`;
+  // The tmux server is forked from whichever client first runs `new-session`, and keeps that
+  // client's cwd for its whole life. Run from a task worktree, the server's cwd becomes that
+  // worktree; once the task is deleted every pane the server spawns dies at startup ("current
+  // working directory was deleted") and only `attach-session` reports it as "can't find
+  // session". So `new-session` runs from `/` and the pane's directory is passed explicitly:
+  // after `cd /`, POSIX sh holds the pane's own cwd in `$OLDPWD`.
+  const spawn = forwardEnv ? `(${newSession} || ${newSessionPlain})` : newSession;
+  const ensureSession = `(${checkExists} || (cd / && ${spawn}))`;
   const configure = [setIdentity, enableMouse, setHistoryLimit, hideStatus]
     .filter((command): command is string => command !== null)
     .map((command) => `(${command})`)
