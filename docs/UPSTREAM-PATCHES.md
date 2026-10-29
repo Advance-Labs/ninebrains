@@ -1373,3 +1373,9 @@ Files: `apps/emdash-desktop/src/main/host/window.ts`, `apps/emdash-desktop/src/c
 |---|---|---|
 | `packages/core/src/services/pty/api/tmux-commands.ts` | `buildTmuxShellLine` runs `new-session` (both variants) from `cd /` and passes the pane's own directory explicitly with `-c "$OLDPWD"` | The tmux server keeps the cwd of the first client that starts it. Started from a task worktree, deleting that task left the server in a dead directory and every later pane died at startup, surfacing only as `can't find session` (#169) |
 | `packages/core/src/services/pty/api/tmux.test.ts` | New e2e case on an isolated `TMUX_TMPDIR`: spawn from worktree A, delete A, spawn from B; the pane is still created in B | Fails on the old line, passes on the new one |
+## 92. Retry a transient attach failure automatically (`fix/project-attach-auto-retry`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.ts` | `commitFailure` schedules a bounded retry (`retrySchedules.sequence([2s,5s,15s,30s,60s])`, `systemClock`) when the failure is `unexpected`; `startAttempt(..., isRetry)` bypasses the same-generation and non-eligible-failure guards for that retry; `cancelAttempt` clears the timer; manual `recover()` and a successful attach reset the count. `retrySchedule`/`clock` are injectable options | A 30s workspace-registry scan timeout surfaces as `unexpected`, which is not automatically eligible, and the local Host generation never changes, so the `attemptedHostGeneration` guard parked the Project until app restart (#125). Once the schedule is exhausted it waits for the manual Retry from #127 |
+| `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.test.ts` | New test: a first `open` timeout is retried automatically and attaches | Fails without the retry |
