@@ -8,6 +8,13 @@ import {
 import { err, ok, type Result } from '@emdash/shared';
 import { type Scope } from '@emdash/shared/concurrency';
 import { log } from '@emdash/shared/logger';
+import {
+  retrySchedules,
+  systemClock,
+  type Clock,
+  type RetrySchedule,
+  type TimerHandle,
+} from '@emdash/shared/scheduling';
 import { cell, observe, peek, type Cell } from '@emdash/wire/state';
 import type {
   AttachmentInvalidationCause,
@@ -51,7 +58,16 @@ export type CreateProjectAttachmentManagerOptions = {
   availability: HostAvailability;
   adapter: ProjectAttachmentAdapter;
   createAttemptId?: () => string;
+  /** Delays for automatic retries of a transient (`unexpected`) attach failure. */
+  retrySchedule?: RetrySchedule;
+  clock?: Clock;
 };
+
+// A transient stall (a 30s registry scan timeout, #125) must not park a Project until restart.
+// Bounded: after the last delay the Project waits for the user's manual Retry.
+const DEFAULT_ATTACH_RETRY_SCHEDULE = retrySchedules.sequence([
+  2_000, 5_000, 15_000, 30_000, 60_000,
+]);
 
 type AttachmentEntry = {
   projectId: string;
@@ -59,6 +75,8 @@ type AttachmentEntry = {
   hostScope?: Scope;
   state: Cell<ProjectAttachmentState>;
   leases: number;
+  retries: number;
+  retryTimer?: TimerHandle;
   project?: Project;
   provider?: ProjectProvider;
   providerReleased?: boolean;
@@ -99,6 +117,7 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
         scope: this.scope.child(projectId),
         state: cell<ProjectAttachmentState>({ kind: 'absent' }),
         leases: 0,
+        retries: 0,
       };
       this.entries.set(projectId, entry);
       void this.initializeEntry(entry);
@@ -116,6 +135,8 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
   recover(projectId: string): Promise<Result<void, ProjectRecoveryRequestError>> {
     const existing = this.recoveries.get(projectId);
     if (existing) return existing;
+    const retained = this.entries.get(projectId);
+    if (retained) retained.retries = 0;
     const request = this.performRecovery(projectId);
     this.recoveries.set(projectId, request);
     void request.then(
@@ -326,7 +347,7 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
     );
   }
 
-  private startAttempt(entry: AttachmentEntry, hostGeneration: number): void {
+  private startAttempt(entry: AttachmentEntry, hostGeneration: number, isRetry = false): void {
     if (
       this.entries.get(entry.projectId) !== entry ||
       this.releaseStarted ||
@@ -338,13 +359,18 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
     }
     const current = peek(entry.state);
     if (
+      !isRetry &&
       current.kind === 'absent' &&
       current.lastFailure &&
       !isAutomaticallyEligibleFailure(current.lastFailure)
     ) {
       return;
     }
-    if (current.kind === 'absent' && current.attemptedHostGeneration === hostGeneration) {
+    if (
+      !isRetry &&
+      current.kind === 'absent' &&
+      current.attemptedHostGeneration === hostGeneration
+    ) {
       return;
     }
     const attemptScope = entry.scope.child('attempt');
@@ -418,6 +444,7 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
         return;
       }
       entry.attempt = undefined;
+      entry.retries = 0;
       entry.project = currentProject;
       entry.provider = opened.data;
       entry.providerReleased = false;
@@ -463,6 +490,23 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
       this.options.availability.invalidate(projectHostRef(entry.project), failure);
     }
     void attempt.scope.dispose();
+    if (failure.type === 'unexpected') this.scheduleRetry(entry);
+  }
+
+  private scheduleRetry(entry: AttachmentEntry): void {
+    const delay = (this.options.retrySchedule ?? DEFAULT_ATTACH_RETRY_SCHEDULE).delayFor(
+      entry.retries
+    );
+    if (delay === undefined || this.releaseStarted || this.disposed) return;
+    entry.retries += 1;
+    entry.retryTimer = (this.options.clock ?? systemClock).schedule(delay, () => {
+      entry.retryTimer = undefined;
+      const project = entry.project;
+      if (!project || entry.provider || entry.attempt) return;
+      const state = this.options.availability.stateFor(projectHostRef(project));
+      if (state.kind === 'ready') this.startAttempt(entry, state.generation, true);
+      else this.scheduleRetry(entry);
+    });
   }
 
   private rejectStaleAttempt(
@@ -482,6 +526,8 @@ export class ProjectAttachmentManagerService implements ProjectAttachmentManager
   }
 
   private async cancelAttempt(entry: AttachmentEntry): Promise<void> {
+    void entry.retryTimer?.dispose();
+    entry.retryTimer = undefined;
     const attempt = entry.attempt;
     if (!attempt) return;
     entry.attempt = undefined;
