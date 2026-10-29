@@ -102,6 +102,18 @@ export function createMainWindow(): BrowserWindow {
   registerExternalLinkHandlers(mainWindow, rendererUrl);
   registerBrowserWebviewHandlers(mainWindow);
 
+  // Printing from Chromium's PDF viewer opens the native print panel, which
+  // segfaults inside AppKit's PrintJobControl on macOS 27 (#168). The app has
+  // no print feature, so swallow the shortcut; the viewer toolbar's Print
+  // button is removed via `#toolbar=0` in pdf-renderer.tsx.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const mod = input.meta || input.control;
+    const isPrint = input.key.toLowerCase() === 'p' && !input.shift && !input.alt;
+    if (input.type === 'keyDown' && mod && isPrint) {
+      event.preventDefault();
+    }
+  });
+
   // Window-first: show immediately with the theme-matching background instead
   // of waiting for ready-to-show. For a module-script page, ready-to-show only
   // fires once the whole renderer bundle has evaluated (DOMContentLoaded waits

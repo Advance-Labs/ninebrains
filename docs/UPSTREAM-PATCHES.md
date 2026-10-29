@@ -1348,3 +1348,9 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
+
+## 85. PDF viewer print no longer crashes macOS 27 (`fix/pdf-print-crash`)
+
+Chromium's built-in PDF viewer opens the native print panel, which segfaults in AppKit (`PJCSessionHasApplicationSetPrinter`, null session) on macOS 27 (#168). The PDF iframe URL carries `#toolbar=0` so the Print button is gone, and the main window swallows Cmd/Ctrl+P in `before-input-event`.
+
+Files: `apps/emdash-desktop/src/main/host/window.ts`, `apps/emdash-desktop/src/core/features/editor/browser/renderers/pdf-renderer.tsx`.

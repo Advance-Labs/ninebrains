@@ -5,8 +5,9 @@ interface PdfRendererProps {
 }
 
 /**
- * Renders PDF files with Chromium's built-in viewer (zoom, search, thumbnails,
- * print). Requires `webPreferences.plugins` on the host window.
+ * Renders PDF files with Chromium's built-in viewer (zoom via Cmd+wheel, search;
+ * toolbar and print are disabled, see #168). Requires `webPreferences.plugins`
+ * on the host window.
  */
 export function PdfRenderer({ file }: PdfRendererProps) {
   const fileName = file.path.split('/').pop() ?? file.path;
@@ -14,7 +15,8 @@ export function PdfRenderer({ file }: PdfRendererProps) {
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file.blob);
-    setUrl(objectUrl);
+    // `#toolbar=0` hides the viewer toolbar, whose Print button crashes macOS 27 (#168).
+    setUrl(`${objectUrl}#toolbar=0`);
     return () => URL.revokeObjectURL(objectUrl);
   }, [file.blob]);
 
