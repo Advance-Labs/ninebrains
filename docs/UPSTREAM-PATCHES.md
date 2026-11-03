@@ -1348,3 +1348,10 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
+
+## 88. Retry a transient attach failure automatically (`fix/project-attach-auto-retry`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.ts` | `commitFailure` schedules a bounded retry (`retrySchedules.sequence([2s,5s,15s,30s,60s])`, `systemClock`) when the failure is `unexpected`; `startAttempt(..., isRetry)` bypasses the same-generation and non-eligible-failure guards for that retry; `cancelAttempt` clears the timer; manual `recover()` and a successful attach reset the count. `retrySchedule`/`clock` are injectable options | A 30s workspace-registry scan timeout surfaces as `unexpected`, which is not automatically eligible, and the local Host generation never changes, so the `attemptedHostGeneration` guard parked the Project until app restart (#125). Once the schedule is exhausted it waits for the manual Retry from #127 |
+| `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.test.ts` | New test: a first `open` timeout is retried automatically and attaches | Fails without the retry |
