@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -435,4 +435,38 @@ describe('end-to-end against a real tmux server', () => {
       await rm(cwd, { recursive: true, force: true });
     }
   });
+
+  // Regression (#169): the tmux server inherits the cwd of the first client that starts it.
+  // If that is a task worktree, deleting the task leaves the server in a dead directory and
+  // every later pane dies at startup, surfacing only as "can't find session".
+  it.skipIf(!TMUX_AVAILABLE)(
+    'does not pin the server to the first task worktree, and spawns panes in their own cwd',
+    async () => {
+      const root = await mkdtemp('/tmp/nb-e2e-cwd-');
+      const first = join(root, 'first');
+      const second = join(root, 'second');
+      await mkdir(first);
+      await mkdir(second);
+      const { TMUX: _tmux, TMUX_PANE: _tmuxPane, ...inherited } = process.env;
+      const env = { ...inherited, TMUX_TMPDIR: root };
+      const tmux = createBoundExec({ file: 'tmux', cwd: root, env });
+      const spawn = (name: string, cwd: string) =>
+        createBoundExec({ file: '/bin/sh', cwd, env })
+          .exec(['-c', buildTmuxShellLine(name, 'sleep 60', `p:t:${name}`)])
+          .catch(() => {});
+      try {
+        await spawn('first', first);
+        await rm(first, { recursive: true, force: true });
+        await spawn('second', second);
+
+        const panes = await tmux.exec(
+          tmuxArgs(['list-panes', '-a', '-F', '#{session_name} #{pane_current_path}'])
+        );
+        expect(panes.stdout).toContain(`second ${await realpath(second)}`);
+      } finally {
+        await tmux.exec(tmuxArgs(['kill-server'])).catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
 });
