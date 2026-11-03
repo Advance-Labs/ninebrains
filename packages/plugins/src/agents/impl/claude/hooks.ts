@@ -24,6 +24,11 @@ function parseClaudeHookEvent(
   eventType: string,
   body: Record<string, unknown>
 ): CanonicalHookEvent {
+  if (eventType === 'subagent-start' || eventType === 'subagent-stop') {
+    const agentId = typeof body.agent_id === 'string' ? body.agent_id : '';
+    if (!agentId) return { kind: 'ignore' };
+    return { kind: 'subagent', phase: eventType === 'subagent-start' ? 'start' : 'stop', agentId };
+  }
   const event =
     eventType === 'notification'
       ? parseClaudeNotification(body)
@@ -54,6 +59,8 @@ export function buildClaudeHookConfig() {
       { hookKey: 'UserPromptSubmit', command: makeStdinHookCommand('start') },
       { hookKey: 'Notification', command: makeStdinHookCommand('notification') },
       { hookKey: 'Stop', command: makeStdinHookCommand('stop') },
+      { hookKey: 'SubagentStart', command: makeStdinHookCommand('subagent-start') },
+      { hookKey: 'SubagentStop', command: makeStdinHookCommand('subagent-stop') },
     ]),
     resolveConfigRoots: configRoots(envConfigRoot('CLAUDE_CONFIG_DIR', '.claude')),
     parseHookEvent: parseClaudeHookEvent,

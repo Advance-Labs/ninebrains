@@ -1348,3 +1348,16 @@ Separately, the assisted NSIS installer ignores `runAfterFinish` under `/S` unle
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.8 → 0.2.9 | Written by `pnpm run release:prepare 0.2.9`; `release.yml` refuses a version that does not match |
+
+## 89. The task spinner stays on while subagents run (`ninebrains/status-k0f2c`)
+
+Claude Code runs subagents in the background by default. The main turn ends, and `Stop` fires,
+while they are still working, so the task showed as completed with no spinner. When a subagent
+reported back the main agent resumed without a `UserPromptSubmit`, so nothing turned it back on.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/plugins/src/agents/impl/claude/hooks.ts` | `SubagentStart` / `SubagentStop` hooks installed and parsed by `agent_id` | The only signal that a subagent is still running |
+| `packages/core/src/services/agent-plugins/api/plugins/capabilities/hooks-types.ts` | `CanonicalHookEvent` gains `{ kind: 'subagent', phase, agentId }` | Carries subagent start/stop through the hook pipeline |
+| `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.ts` | Per-conversation set of running subagent ids; `stop` is ignored while it is non-empty; a subagent start sets `working`; the idle safety net, `resetToIdle` and `clear` drop the set | Keeps the spinner on until the last subagent finishes; a dropped `SubagentStop` cannot pin it on |
+| `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.test.ts`, `packages/plugins/src/agents/impl/claude/hooks.test.ts` | Tests for the above | Guards the regression |

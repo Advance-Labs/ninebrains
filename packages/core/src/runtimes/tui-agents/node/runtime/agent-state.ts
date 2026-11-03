@@ -23,6 +23,11 @@ export type ProviderSessionIdChangedHandler = (
 export type AgentStateChangedHandler = (conversationId: string, state: TuiAgentState) => void;
 
 export class TuiAgentStates {
+  // Ninebrains: subagent ids still running per conversation. Claude fires Stop when the main
+  // turn ends even while background subagents keep working, so Stop must not complete the
+  // conversation until this set drains.
+  private readonly runningSubagents = new Map<string, Set<string>>();
+
   constructor(
     private readonly sessions: TuiSessionsListModel,
     private readonly agentStates: TuiAgentStatesListModel,
@@ -52,6 +57,10 @@ export class TuiAgentStates {
       this.setProviderSessionId(conversationId, event.providerSessionId);
       return;
     }
+    if (event.kind === 'subagent') {
+      this.applySubagentEvent(conversationId, providerId, event.phase, event.agentId);
+      return;
+    }
 
     if (event.providerSessionId) {
       this.setProviderSessionId(conversationId, event.providerSessionId);
@@ -70,6 +79,9 @@ export class TuiAgentStates {
     }
 
     if (event.type === 'stop') {
+      // Main turn ended but background subagents are still running: stay 'working'. The main
+      // agent resumes when they report back, and its next Stop completes the conversation.
+      if (this.runningSubagents.get(conversationId)?.size) return;
       this.setStatus(conversationId, {
         providerId,
         source: 'hook',
@@ -154,7 +166,28 @@ export class TuiAgentStates {
   // prompt is left alone because it can legitimately sit with no further output.
   resetIdleIfWorking(conversationId: string): void {
     if (this.current(conversationId)?.status !== 'working') return;
+    // A dropped SubagentStop would otherwise pin the spinner forever; the silence that
+    // triggered this reset means nothing is running.
+    this.runningSubagents.delete(conversationId);
     this.setStatus(conversationId, { status: 'idle' });
+  }
+
+  private applySubagentEvent(
+    conversationId: string,
+    providerId: string | undefined,
+    phase: 'start' | 'stop',
+    agentId: string
+  ): void {
+    let running = this.runningSubagents.get(conversationId);
+    if (phase === 'stop') {
+      running?.delete(agentId);
+      return;
+    }
+    if (!running) this.runningSubagents.set(conversationId, (running = new Set()));
+    running.add(agentId);
+    // A subagent starting is work in progress, unless a prompt is waiting on the user.
+    if (this.current(conversationId)?.status === 'awaiting-input') return;
+    this.setStatus(conversationId, { providerId, source: 'hook', status: 'working' });
   }
 
   setProviderSessionId(conversationId: string, providerSessionId: string): void {
@@ -169,10 +202,12 @@ export class TuiAgentStates {
   }
 
   resetToIdle(conversationId: string): void {
+    this.runningSubagents.delete(conversationId);
     this.setStatus(conversationId, { status: 'idle' });
   }
 
   clear(conversationId: string): void {
+    this.runningSubagents.delete(conversationId);
     produceCell(this.agentStates.states.list, (draft) => {
       delete draft[conversationId];
     });

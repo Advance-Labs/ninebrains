@@ -28,6 +28,9 @@ export type NotificationType =
  *   every hook payload; the runtime adopts it whenever it differs from the stored id,
  *   so an in-session switch (Claude's `/resume`) is tracked without a dedicated event.
  * - kind: 'session' — carries a provider session id to persist on the conversation
+ * - kind: 'subagent' — a subagent started or finished. While any are running the
+ *   conversation stays 'working', even after the main turn's stop (background subagents
+ *   outlive the turn that launched them).
  * - kind: 'ignore'  — event should be silently dropped
  */
 export type CanonicalHookEvent =
@@ -41,4 +44,5 @@ export type CanonicalHookEvent =
       providerSessionId?: string;
     }
   | { kind: 'session'; providerSessionId: string }
+  | { kind: 'subagent'; phase: 'start' | 'stop'; agentId: string }
   | { kind: 'ignore' };

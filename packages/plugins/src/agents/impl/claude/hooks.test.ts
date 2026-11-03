@@ -110,4 +110,31 @@ describe('claude hooks', () => {
       { hooks: [{ type: 'command', command: makeStdinHookCommand('session-start') }] },
     ]);
   });
+
+  it('installs SubagentStart and SubagentStop hooks', async () => {
+    const files = new Map<string, string>();
+    await provider.behavior.hooks!.writeHooks(createMemoryFs(files), []);
+    const settings = JSON.parse(files.get(CLAUDE_SETTINGS_PATH)!);
+    expect(settings.hooks.SubagentStart).toEqual([
+      { hooks: [{ type: 'command', command: makeStdinHookCommand('subagent-start') }] },
+    ]);
+    expect(settings.hooks.SubagentStop).toEqual([
+      { hooks: [{ type: 'command', command: makeStdinHookCommand('subagent-stop') }] },
+    ]);
+  });
+
+  it('parses subagent hooks by agent_id', () => {
+    const parse = provider.behavior.hooks!.parseHookEvent!;
+    expect(parse('subagent-start', { agent_id: 'x', session_id: 's' })).toEqual({
+      kind: 'subagent',
+      phase: 'start',
+      agentId: 'x',
+    });
+    expect(parse('subagent-stop', { agent_id: 'x' })).toEqual({
+      kind: 'subagent',
+      phase: 'stop',
+      agentId: 'x',
+    });
+    expect(parse('subagent-stop', {})).toEqual({ kind: 'ignore' });
+  });
 });

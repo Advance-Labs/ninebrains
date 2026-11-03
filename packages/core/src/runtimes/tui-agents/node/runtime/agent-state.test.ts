@@ -210,4 +210,63 @@ describe('TuiAgentStates', () => {
     tracker.resetIdleIfWorking('await-conv');
     expect(peek(agentStates.states.list)['await-conv']?.status).toBe('awaiting-input');
   });
+
+  it('keeps working through the main Stop while background subagents run', () => {
+    const { tracker, agentStates } = createTracker();
+    const status = () => peek(agentStates.states.list)['conv-1']?.status;
+    const stop = { kind: 'status', type: 'stop' } as const;
+
+    tracker.applyCanonicalEvent('conv-1', 'claude', { kind: 'status', type: 'start' });
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'start',
+      agentId: 'a',
+    });
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'start',
+      agentId: 'b',
+    });
+    tracker.applyCanonicalEvent('conv-1', 'claude', stop);
+    expect(status()).toBe('working');
+
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'stop',
+      agentId: 'a',
+    });
+    tracker.applyCanonicalEvent('conv-1', 'claude', stop);
+    expect(status()).toBe('working');
+
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'stop',
+      agentId: 'b',
+    });
+    tracker.applyCanonicalEvent('conv-1', 'claude', stop);
+    expect(status()).toBe('completed');
+  });
+
+  it('a subagent start restores working after the main turn completed', () => {
+    const { tracker, agentStates } = createTracker();
+    tracker.applyCanonicalEvent('conv-1', 'claude', { kind: 'status', type: 'stop' });
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'start',
+      agentId: 'a',
+    });
+    expect(peek(agentStates.states.list)['conv-1']?.status).toBe('working');
+  });
+
+  it('the idle safety net drops stale subagents so a later Stop completes', () => {
+    const { tracker, agentStates } = createTracker();
+    tracker.applyCanonicalEvent('conv-1', 'claude', {
+      kind: 'subagent',
+      phase: 'start',
+      agentId: 'a',
+    });
+    tracker.resetIdleIfWorking('conv-1');
+    tracker.applyCanonicalEvent('conv-1', 'claude', { kind: 'status', type: 'stop' });
+    expect(peek(agentStates.states.list)['conv-1']?.status).toBe('completed');
+  });
 });
