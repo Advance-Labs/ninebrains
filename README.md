@@ -18,6 +18,7 @@
   <a href="https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/Advance-Labs/ninebrains/ci.yml?style=flat-square&labelColor=27272a&label=ci"></a>
   <img alt="Platforms: macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-fafafa?style=flat-square&labelColor=27272a">
   <img alt="Telemetry: none" src="https://img.shields.io/badge/telemetry-none-fafafa?style=flat-square&labelColor=27272a">
+  <a href="https://whobuildsagents.com/advancelabs.dev"><img src="https://whobuildsagents.com/badge/advancelabs.dev.svg" alt="MCP servers live" /></a>
 </p>
 
 <p align="center">
