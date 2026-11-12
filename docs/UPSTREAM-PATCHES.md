@@ -1389,3 +1389,12 @@ only parent-death signal.
 |---|---|---|
 | `packages/wire/src/worker/run-component-worker.ts` | `shutdown` races dispose against a 3 s timeout before `exit`; new 5 s parent poll (`process.ppid` change, injectable via `isParentAlive`) calls `shutdown` | A hung disposer or missed `disconnect` no longer strands the process; works after a main-process crash or SIGKILL |
 | `packages/wire/src/worker/run-component-worker.test.ts` | New test: worker exits when the parent is reported dead | Guards the watchdog |
+
+## 94. Index the cross-machine handoff and Pane UI plans (`ninebrains/cross-session-w2duw`)
+
+Two fork-only plans were added under `agents/plans/`; the plans list in the inherited agent docs
+index links them.
+
+| File | Change | Why |
+|---|---|---|
+| `agents/README.md` | Two entries under `plans/`: `cross-machine-handoff.md` and `pane-ui-adoptions.md` | Agents find staged plans through this index |
