@@ -1398,3 +1398,15 @@ index links them.
 | File | Change | Why |
 |---|---|---|
 | `agents/README.md` | Two entries under `plans/`: `cross-machine-handoff.md` and `pane-ui-adoptions.md` | Agents find staged plans through this index |
+## 95. System-mode theme slots and a theme contrast gate (`feat/theme-slots-contrast`)
+
+System mode used to follow the OS between fixed Light and Dark. It now reads a per-appearance slot, so the dark side can be Hardstyle. A new test fails CI when any registered theme drops below WCAG AA for body text, or below 3:1 for status colours.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/theme/src/core/contrast.test.ts` | New WCAG contrast test over every theme in the manifest | Stops a ramp change from shipping unreadable text |
+| `packages/theme/src/core/contract/semantic-template.ts`, `packages/theme/src/__generated__/semantic.css`, `packages/theme/src/__generated__/theme.css` | `foreground-success`, `-error`, `-info` move from step 9 to step 10 | Light and Solarized Light were under 3:1 on their tinted surfaces |
+| `src/core/primitives/app-settings/api/app-settings.ts`, `src/core/features/workbench/contributions/settings.ts`, `src/core/manifests/shared/settings-contributions.ts` | New `systemThemeSlots` setting (`{ light, dark }`, default Light/Dark) | Stored in the existing settings store; no migration |
+| `src/core/primitives/theme/browser/theme-provider.tsx`, `theme-classes.ts`, `index.ts`, `src/renderer/lib/providers/theme-provider.tsx` | System mode resolves through the slot; slots cached in localStorage | Applies the chosen theme |
+| `src/renderer/index.html`, `src/core/primitives/theme/node/theme-classes.test.ts` | Pre-paint script reads the cached slots | The first paint matches the slot; the test pins the key |
+| `src/core/features/settings/browser/components/ThemeCard.tsx` | Dark-slot select shown in System mode | The picker |

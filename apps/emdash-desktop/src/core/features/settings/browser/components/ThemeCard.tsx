@@ -1,9 +1,10 @@
 import { SelectableCard } from '@emdash/ui/react/primitives';
 import { Monitor, Moon, Sun, Zap, type LucideIcon } from 'lucide-react';
 import React from 'react';
+import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
 import type { Theme } from '@core/primitives/app-settings/api';
 import { captureTelemetry } from '@core/primitives/telemetry/browser/telemetry-client';
-import { useTheme } from '@core/primitives/theme/browser';
+import { SYSTEM_SLOT_OPTIONS, useTheme } from '@core/primitives/theme/browser';
 
 const themeOptions: Array<{
   value: Theme;
@@ -34,6 +35,7 @@ const themeOptions: Array<{
 
 const ThemeCard: React.FC = () => {
   const { theme, setTheme } = useTheme();
+  const { value: slots, update: updateSlots } = useAppSettingsKey('systemThemeSlots');
 
   const handleSetTheme = (next: Theme) => {
     if (theme !== next) {
@@ -59,6 +61,34 @@ const ThemeCard: React.FC = () => {
           </span>
         </SelectableCard>
       ))}
+      {theme === null &&
+        slots &&
+        (['light', 'dark'] as const).map((polarity) => {
+          const options = SYSTEM_SLOT_OPTIONS[polarity];
+          // A slot with a single candidate has nothing to choose.
+          if (options.length < 2) return null;
+          return (
+            <label
+              key={polarity}
+              className="col-span-full flex items-center justify-between gap-3 text-sm"
+            >
+              <span>When the system is {polarity}</span>
+              <select
+                className="rounded-md border border-border bg-background px-2 py-1"
+                value={slots[polarity]}
+                onChange={(e) =>
+                  updateSlots({ ...slots, [polarity]: e.target.value as typeof slots.dark })
+                }
+              >
+                {options.map((id) => (
+                  <option key={id} value={id}>
+                    {themeOptions.find((o) => o.value === id)?.label ?? id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        })}
     </div>
   );
 };

@@ -10,11 +10,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
-import type { Theme } from '@core/primitives/app-settings/api';
+import type { SystemThemeSlots, Theme } from '@core/primitives/app-settings/api';
 import {
   THEME_CLASS_DARK,
   THEME_CLASS_LIGHT,
   THEME_CLASSES,
+  THEME_SLOTS_STORAGE_KEY,
   THEME_STORAGE_KEY,
 } from './theme-classes';
 import { getNextTheme } from './theme-toggle-model';
@@ -63,6 +64,8 @@ export const ThemeContext = createContext<ThemeContextType | undefined>(undefine
 export interface ThemeProviderProps {
   readonly children: ReactNode;
   readonly theme: Theme;
+  /** Theme System mode picks per OS appearance; defaults to light/dark. */
+  readonly systemSlots?: SystemThemeSlots;
   readonly isLoading?: boolean;
   readonly onThemeChange: (theme: Theme) => void;
   readonly onThemeApplied?: (effectiveTheme: EffectiveTheme) => void;
@@ -71,12 +74,14 @@ export interface ThemeProviderProps {
 export function ThemeProvider({
   children,
   theme,
+  systemSlots,
   isLoading = false,
   onThemeChange,
   onThemeApplied,
 }: ThemeProviderProps) {
   const systemTheme = useSyncExternalStore(subscribeToSystemTheme, getSystemTheme);
-  const effectiveTheme: EffectiveTheme = theme ?? systemTheme;
+  const slotTheme = systemSlots?.[systemTheme === THEME_CLASS_DARK ? 'dark' : 'light'];
+  const effectiveTheme: EffectiveTheme = theme ?? slotTheme ?? systemTheme;
 
   useLayoutEffect(() => {
     if (isLoading) return;
@@ -91,6 +96,15 @@ export function ThemeProvider({
       // Local storage is only a startup paint cache; persisted settings remain authoritative.
     }
   }, [theme, isLoading]);
+
+  useEffect(() => {
+    if (isLoading || !systemSlots) return;
+    try {
+      localStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify(systemSlots));
+    } catch {
+      // Startup paint cache only.
+    }
+  }, [systemSlots, isLoading]);
 
   const setTheme = (newTheme: Theme) => {
     onThemeChange(newTheme);

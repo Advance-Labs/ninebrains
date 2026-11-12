@@ -9,11 +9,17 @@
         try {
           var raw = localStorage.getItem('emdash-theme');
           var pref = raw ? JSON.parse(raw) : null;
+          var osDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          // System mode: the user's chosen theme for this OS appearance (emdash-theme-slots).
+          var slots = JSON.parse(localStorage.getItem('emdash-theme-slots') || 'null') || {};
+          var slot = osDark ? slots.dark : slots.light;
           var effective =
             pref === 'emlight' || pref === 'emdark' || pref === 'emhardstyle'
               ? pref
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'emdark'
+              : osDark
+                ? slot === 'emhardstyle'
+                  ? 'emhardstyle'
+                  : 'emdark'
                 : 'emlight';
           document.documentElement.classList.add(effective);
           // sRGB approximations of the theme --background / --foreground

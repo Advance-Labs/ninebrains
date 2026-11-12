@@ -8,6 +8,7 @@ import {
   THEME_CLASS_HARDSTYLE,
   THEME_CLASS_LIGHT,
   THEME_CLASSES,
+  THEME_SLOTS_STORAGE_KEY,
   THEME_STORAGE_KEY,
 } from '../browser/theme-classes';
 
@@ -36,5 +37,6 @@ describe('theme class-name convergence with @emdash/theme', () => {
     expect(html).toContain(`'${THEME_CLASS_DARK}'`);
     expect(html).toContain(`'${THEME_CLASS_HARDSTYLE}'`);
     expect(html).toContain(`localStorage.getItem('${THEME_STORAGE_KEY}')`);
+    expect(html).toContain(`localStorage.getItem('${THEME_SLOTS_STORAGE_KEY}')`);
   });
 });

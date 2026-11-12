@@ -102,13 +102,13 @@ export const SEMANTIC_TEMPLATE = {
 
   // ── Semantic state sets ───────────────────────────────────────────────────
   // success → green
-  'foreground-success': 'green.9',
+  'foreground-success': 'green.10',
   'background-success': 'green.3',
   'background-success-hover': 'green.4',
   'border-success': 'green.7',
 
   // error → red
-  'foreground-error': 'red.9',
+  'foreground-error': 'red.10',
   'background-error': 'red.3',
   'background-error-hover': 'red.4',
   'border-error': 'red.7',
@@ -120,7 +120,7 @@ export const SEMANTIC_TEMPLATE = {
   'border-warning': 'amber.7',
 
   // info → blue
-  'foreground-info': 'blue.9',
+  'foreground-info': 'blue.10',
   'background-info': 'blue.3',
   'background-info-hover': 'blue.4',
   'border-info': 'blue.7',
