@@ -1361,3 +1361,9 @@ reported back the main agent resumed without a `UserPromptSubmit`, so nothing tu
 | `packages/core/src/services/agent-plugins/api/plugins/capabilities/hooks-types.ts` | `CanonicalHookEvent` gains `{ kind: 'subagent', phase, agentId }` | Carries subagent start/stop through the hook pipeline |
 | `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.ts` | Per-conversation set of running subagent ids; `stop` is ignored while it is non-empty; a subagent start sets `working`; the idle safety net, `resetToIdle` and `clear` drop the set | Keeps the spinner on until the last subagent finishes; a dropped `SubagentStop` cannot pin it on |
 | `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.test.ts`, `packages/plugins/src/agents/impl/claude/hooks.test.ts` | Tests for the above | Guards the regression |
+
+## 90. PDF viewer print no longer crashes macOS 27 (`fix/pdf-print-crash`)
+
+Chromium's built-in PDF viewer opens the native print panel, which segfaults in AppKit (`PJCSessionHasApplicationSetPrinter`, null session) on macOS 27 (#168). The PDF iframe URL carries `#toolbar=0` so the Print button is gone, and the main window swallows Cmd/Ctrl+P in `before-input-event`.
+
+Files: `apps/emdash-desktop/src/main/host/window.ts`, `apps/emdash-desktop/src/core/features/editor/browser/renderers/pdf-renderer.tsx`.
