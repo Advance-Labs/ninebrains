@@ -25,7 +25,8 @@ const STATUS_LABELS: Record<ActiveAgentStatusKind, string> = {
   working: 'Agent is working',
   'awaiting-input': 'Agent is awaiting input',
   error: 'Agent error',
-  completed: 'Agent completed',
+  // `completed` is only ever shown while unseen; it clears once the user views the conversation.
+  completed: 'Agent finished, not yet viewed',
 };
 
 function toCssLength(size: string | number) {

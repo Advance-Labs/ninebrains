@@ -7,7 +7,7 @@ const STATUSES: Array<{ label: string; status: AgentStatusKind }> = [
   { label: 'Working', status: 'working' },
   { label: 'Awaiting Input', status: 'awaiting-input' },
   { label: 'Error', status: 'error' },
-  { label: 'Completed', status: 'completed' },
+  { label: 'Completed (done, unseen)', status: 'completed' },
   { label: 'Idle (renders nothing)', status: 'idle' },
 ];
 
