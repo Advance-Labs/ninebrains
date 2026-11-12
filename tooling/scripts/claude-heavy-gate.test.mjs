@@ -18,6 +18,10 @@ describe('heavyCommandProblem', () => {
       'timeout 300 pnpm exec vitest run --project node',
       'cd packages/wire && pnpm run typecheck 2>&1 | tail -4',
       'pnpm nx run emdash-desktop:test',
+      "sh -c 'pnpm exec tsgo --noEmit'",
+      'timeout -k 5 300 pnpm test',
+      "echo gated.mjs; pnpm test",
+      "node tooling/scripts/gated.mjs pnpm run build && pnpm test",
     ]) {
       assert.ok(heavyCommandProblem(cmd), cmd);
     }
@@ -33,6 +37,7 @@ describe('heavyCommandProblem', () => {
       'pnpm exec nx show projects',
       'git push --force-with-lease origin HEAD:fix/x',
       'node tooling/scripts/gated.mjs pnpm run typecheck',
+      "cd apps/x && node /r/tooling/scripts/gated.mjs sh -c 'pnpm test && pnpm run build'",
     ]) {
       assert.equal(heavyCommandProblem(cmd), null, cmd);
     }
@@ -58,7 +63,7 @@ describe('gated', () => {
       },
       run: (_cmd, _args, opts) => {
         assert.ok(held);
-        assert.equal(opts.env.NINEBRAINS_GATE_HELD, '1');
+        assert.equal(opts.env.NINEBRAINS_GATE_HELD, String(process.pid));
         return { status: 3 };
       },
     });
@@ -66,7 +71,16 @@ describe('gated', () => {
     assert.equal(held, false);
   });
 
-  it('never takes a second slot when one is already held', () => {
-    assert.doesNotThrow(() => acquireGateSlot({ env: { NINEBRAINS_GATE_HELD: '1' }, dir: '/nonexistent' })());
+  it('reuses a held slot only while its holder is alive', () => {
+    const held = { NINEBRAINS_GATE_HELD: String(process.pid) };
+    assert.doesNotThrow(() => acquireGateSlot({ env: held, dir: '/nonexistent' })());
+    let slept = false;
+    acquireGateSlot({
+      env: { NINEBRAINS_GATE_HELD: '999999999' },
+      slots: 1,
+      dir: '/nonexistent/x',
+      sleep: () => (slept = true),
+    })();
+    assert.equal(slept, false); // dead holder: fell through to a normal acquire (here: no dir)
   });
 });

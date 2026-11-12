@@ -21,6 +21,7 @@ const HEAVY_NX = new Set(['affected', 'run-many', 'build', 'test', 'typecheck'])
 const TOOL_PAIRS = { playwright: 'test', next: 'build', 'electron-vite': 'build' };
 const PM = new Set(['pnpm', 'npm', 'yarn']);
 const FLAGS_WITH_VALUE = new Set(['--dir', '-C', '--filter', '-F', '--prefix', '--workspace']);
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash']);
 const PREFIXES = new Set(['time', 'nice', 'command', 'env', 'exec']);
 
 const isScriptHeavy = (name) => HEAVY_SCRIPTS.has(String(name).split(':')[0]);
@@ -38,10 +39,18 @@ function segmentProblem(segment) {
   const words = segment.trim().split(/\s+/).filter(Boolean);
   for (;;) {
     if (/^\w+=/.test(words[0] ?? '') || PREFIXES.has(words[0])) words.shift();
-    else if (words[0] === 'timeout') words.splice(0, 2);
+    else if (words[0] === 'timeout') {
+      words.shift();
+      // Its flags, their values and the duration: `timeout -k 5 300 cmd`.
+      while (/^(-|\d+(\.\d+)?[smhd]?$)/.test(words[0] ?? '')) words.shift();
+    }
     else break;
   }
   let cmd = words.shift();
+  // `sh -c '<script>'`: judge the script itself, quotes dropped.
+  if (SHELLS.has(cmd) && words[0] === '-c') {
+    return heavyCommandProblem(words.slice(1).join(' ').replace(/^['"]|['"]$/g, ''));
+  }
   if (cmd === 'npx' || cmd === 'bunx') cmd = nextWord(words);
   if (PM.has(cmd)) {
     const verb = nextWord(words);
@@ -62,8 +71,14 @@ function segmentProblem(segment) {
 }
 
 /** The heavy part of a Bash command, or null when it is light or already gated. */
+// Gated only when the whole command is one gated.mjs call (optionally after a `cd`), not whenever
+// the text mentions it: `node gated.mjs x && pnpm test` still runs the test outside the slot.
+const GATED_CALL = /^\s*(cd\s+\S+\s*&&\s*)?node\s+\S*\/gated\.mjs\s+(sh|bash)\s+-c\s+'[^']*(?:'\\''[^']*)*'\s*$/;
+const GATED_SIMPLE = /^\s*(cd\s+\S+\s*&&\s*)?node\s+\S*gated\.mjs\s+[^;&|()\n'"]+$/;
+
 export function heavyCommandProblem(command) {
-  if (typeof command !== 'string' || command.includes('gated.mjs')) return null;
+  if (typeof command !== 'string') return null;
+  if (GATED_CALL.test(command) || GATED_SIMPLE.test(command)) return null;
   for (const segment of command.split(/&&|\|\||[;|&()\n]/)) {
     const problem = segmentProblem(segment);
     if (problem) return problem;
