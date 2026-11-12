@@ -19,8 +19,10 @@ function store(agentStatus: Conversation['agentStatus'], seen: boolean): Convers
 }
 
 function taskStatus(conversations: ConversationStore[]) {
-  const get = Object.getOwnPropertyDescriptor(ConversationManagerStore.prototype, 'taskStatus')
-    ?.get;
+  const get = Object.getOwnPropertyDescriptor(
+    ConversationManagerStore.prototype,
+    'taskStatus'
+  )?.get;
   return get?.call({ conversations: new Map(conversations.map((c, i) => [String(i), c])) });
 }
 
@@ -31,7 +33,9 @@ describe('done, unseen status', () => {
     expect(taskStatus([conversation])).toBe('completed');
 
     conversation.markSeen();
-    await vi.waitFor(() => expect(markConversationSeen).toHaveBeenCalledWith({ conversationId: 'c1' }));
+    await vi.waitFor(() =>
+      expect(markConversationSeen).toHaveBeenCalledWith({ conversationId: 'c1' })
+    );
     expect(conversation.indicatorStatus).toBeNull();
     expect(taskStatus([conversation])).toBeNull();
   });
