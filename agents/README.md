@@ -25,6 +25,8 @@ This directory is the system of record for agent-facing repo guidance. Keep topi
 - `plans/`
   - staged build plans for work that spans several PRs
   - [`detached-sessions.md`](plans/detached-sessions.md) — agents keep working while the app is closed or updating: what already works, the tmux availability gate, and the task sequence
+  - [`cross-machine-handoff.md`](plans/cross-machine-handoff.md) — continue a task on another machine (handoff bundle over git) and shared, searchable memory of past agent work
+  - [`pane-ui-adoptions.md`](plans/pane-ui-adoptions.md) — UI audit of Pane (AGPL: ideas only, no code) and the ranked list of what to adopt
 - `risky-areas/`
   - places where incorrect changes are expensive
 - `conventions/`
