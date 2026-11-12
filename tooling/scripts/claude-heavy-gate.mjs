@@ -16,10 +16,10 @@ import { fileURLToPath } from 'node:url';
 // ponytail: a word-level look at what each shell segment runs, not a shell parser. Heavy work
 // behind an unfamiliar script or tool name slips through; add the name here when one shows up.
 const HEAVY_TOOLS = new Set(['tsgo', 'tsc', 'vitest']);
-const HEAVY_SCRIPTS = new Set(['typecheck', 'test', 'build', 'check', 'install', 'i']);
+const HEAVY_SCRIPTS = new Set(['typecheck', 'test', 'build', 'check', 'install', 'i', 'ci']);
 const HEAVY_NX = new Set(['affected', 'run-many', 'build', 'test', 'typecheck']);
 const TOOL_PAIRS = { playwright: 'test', next: 'build', 'electron-vite': 'build' };
-const PM = new Set(['pnpm', 'npm', 'yarn']);
+const PM = new Set(['pnpm', 'npm', 'yarn', 'bun']);
 const FLAGS_WITH_VALUE = new Set(['--dir', '-C', '--filter', '-F', '--prefix', '--workspace']);
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash']);
 const PREFIXES = new Set(['time', 'nice', 'command', 'env', 'exec']);
@@ -56,7 +56,7 @@ function segmentProblem(segment) {
     const verb = nextWord(words);
     if (verb === 'exec' || verb === 'dlx') cmd = nextWord(words);
     else if (verb === 'run') return isScriptHeavy(nextWord(words)) ? segment.trim() : null;
-    else if (verb === 'nx') cmd = 'nx';
+    else if (verb === 'nx' || verb === 'turbo') cmd = verb;
     else return isScriptHeavy(verb) ? segment.trim() : null;
   }
   if (HEAVY_TOOLS.has(cmd)) return segment.trim();
@@ -65,6 +65,11 @@ function segmentProblem(segment) {
     if (HEAVY_NX.has(verb) || (verb === 'run' && isScriptHeavy(nextWord(words)?.split(':')[1]))) {
       return segment.trim();
     }
+  }
+  if (cmd === 'turbo') {
+    let verb = nextWord(words);
+    if (verb === 'run') verb = nextWord(words);
+    if (isScriptHeavy(verb)) return segment.trim();
   }
   if (TOOL_PAIRS[cmd] && nextWord(words) === TOOL_PAIRS[cmd]) return segment.trim();
   return null;
