@@ -1361,3 +1361,12 @@ reported back the main agent resumed without a `UserPromptSubmit`, so nothing tu
 | `packages/core/src/services/agent-plugins/api/plugins/capabilities/hooks-types.ts` | `CanonicalHookEvent` gains `{ kind: 'subagent', phase, agentId }` | Carries subagent start/stop through the hook pipeline |
 | `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.ts` | Per-conversation set of running subagent ids; `stop` is ignored while it is non-empty; a subagent start sets `working`; the idle safety net, `resetToIdle` and `clear` drop the set | Keeps the spinner on until the last subagent finishes; a dropped `SubagentStop` cannot pin it on |
 | `packages/core/src/runtimes/tui-agents/node/runtime/agent-state.test.ts`, `packages/plugins/src/agents/impl/claude/hooks.test.ts` | Tests for the above | Guards the regression |
+
+## 90. Agents' heavy commands take a gate slot (`perf/gate-agent-heavy-commands`)
+
+Part of #158. One task's 7 subagents ran install, typecheck, test and build side by side in
+separate worktrees outside the pre-push gate (#161), swap reached ~28 GB and macOS killed the app.
+
+| File | Change | Why |
+| --- | --- | --- |
+| `.claude/settings.json` | Bash `PreToolUse` hook running `tooling/scripts/claude-heavy-gate.mjs` | Denies heavy commands run outside a gate slot and hands the agent the gated command |
