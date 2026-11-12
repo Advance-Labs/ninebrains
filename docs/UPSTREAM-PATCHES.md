@@ -1410,3 +1410,14 @@ System mode used to follow the OS between fixed Light and Dark. It now reads a p
 | `src/core/primitives/theme/browser/theme-provider.tsx`, `theme-classes.ts`, `index.ts`, `src/renderer/lib/providers/theme-provider.tsx` | System mode resolves through the slot; slots cached in localStorage | Applies the chosen theme |
 | `src/renderer/index.html`, `src/core/primitives/theme/node/theme-classes.test.ts` | Pre-paint script reads the cached slots | The first paint matches the slot; the test pins the key |
 | `src/core/features/settings/browser/components/ThemeCard.tsx` | Dark-slot select shown in System mode | The picker |
+## 96. The completed status says it is unseen (`feat/status-grammar`)
+
+`completed` already behaves as "done, unseen": the conversation store only shows it while
+`agentStatusSeen` is false, and viewing the conversation clears it. The tooltip still read
+"Agent completed", which does not say why the dot goes away.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/ui/src/react/components/agent-status/agent-status.tsx` | `completed` label → "Agent finished, not yet viewed" | Names the state the dot actually means |
+| `packages/ui/src/react/components/agent-status/agent-status.stories.tsx` | Story label "Completed (done, unseen)" | The story covers every state |
+| `apps/emdash-desktop/src/core/features/conversations/api/browser/conversation-seen-status.browser.test.ts` | New test of seen/clear and task-level ranking | Guards the behaviour that was untested |
