@@ -1367,3 +1367,9 @@ reported back the main agent resumed without a `UserPromptSubmit`, so nothing tu
 Chromium's built-in PDF viewer opens the native print panel, which segfaults in AppKit (`PJCSessionHasApplicationSetPrinter`, null session) on macOS 27 (#168). The PDF iframe URL carries `#toolbar=0` so the Print button is gone, and the main window swallows Cmd/Ctrl+P in `before-input-event`.
 
 Files: `apps/emdash-desktop/src/main/host/window.ts`, `apps/emdash-desktop/src/core/features/editor/browser/renderers/pdf-renderer.tsx`.
+## 91. tmux server is never born in a task worktree (`fix/tmux-server-cwd`)
+
+| File | Change | Why |
+|---|---|---|
+| `packages/core/src/services/pty/api/tmux-commands.ts` | `buildTmuxShellLine` runs `new-session` (both variants) from `cd /` and passes the pane's own directory explicitly with `-c "$OLDPWD"` | The tmux server keeps the cwd of the first client that starts it. Started from a task worktree, deleting that task left the server in a dead directory and every later pane died at startup, surfacing only as `can't find session` (#169) |
+| `packages/core/src/services/pty/api/tmux.test.ts` | New e2e case on an isolated `TMUX_TMPDIR`: spawn from worktree A, delete A, spawn from B; the pane is still created in B | Fails on the old line, passes on the new one |
