@@ -3,6 +3,7 @@ import { runtimeHostUnavailable } from '@emdash/core/primitives/runtime-resoluti
 import { RuntimeBroker, type HostRuntimesClient } from '@emdash/core/services/runtime-broker/api';
 import { err, ok } from '@emdash/shared';
 import { createScope } from '@emdash/shared/concurrency';
+import { retrySchedules } from '@emdash/shared/scheduling';
 import { deferred } from '@emdash/shared/testing';
 import type { Connection } from '@emdash/wire/rpc';
 import { peek } from '@emdash/wire/state';
@@ -768,6 +769,41 @@ describe('ProjectAttachmentManager', () => {
         message: 'stat exploded',
       },
     });
+  });
+
+  it('retries a transient attach timeout automatically instead of parking until restart', async () => {
+    const scope = createScope({ label: 'project-attachment-manager-test' });
+    const availability = createWorkerHostAvailability({
+      scope,
+      readiness: { prepare: async () => ok() },
+    });
+    const project = localProject();
+    const provider = projectProvider();
+    const open = vi
+      .fn<ProjectAttachmentAdapter['open']>()
+      .mockResolvedValueOnce(
+        err({ type: 'error', message: 'Wire call get timed out after 30000ms' })
+      )
+      .mockResolvedValueOnce(ok(provider));
+    const manager = createProjectAttachmentManager({
+      scope,
+      availability,
+      retrySchedule: retrySchedules.fixed(5, 2),
+      adapter: {
+        loadProject: async () => project,
+        statRepository: async () => ok({ type: 'directory' as const }),
+        open,
+      },
+    });
+    const owner = createScope({ label: 'project-owner' });
+    const state = manager.track(project.id, owner);
+
+    await vi.waitFor(() => expect(peek(state).kind).toBe('attached'));
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(manager.requireAttached(project.id)).toEqual(ok(provider));
+
+    await owner.dispose();
+    await scope.dispose();
   });
 
   it('recovers an automatically eligible attachment runtime failure on a fresh Host generation', async () => {
