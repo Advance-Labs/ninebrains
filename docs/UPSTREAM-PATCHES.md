@@ -1379,3 +1379,13 @@ Files: `apps/emdash-desktop/src/main/host/window.ts`, `apps/emdash-desktop/src/c
 |---|---|---|
 | `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.ts` | `commitFailure` schedules a bounded retry (`retrySchedules.sequence([2s,5s,15s,30s,60s])`, `systemClock`) when the failure is `unexpected`; `startAttempt(..., isRetry)` bypasses the same-generation and non-eligible-failure guards for that retry; `cancelAttempt` clears the timer; manual `recover()` and a successful attach reset the count. `retrySchedule`/`clock` are injectable options | A 30s workspace-registry scan timeout surfaces as `unexpected`, which is not automatically eligible, and the local Host generation never changes, so the `attemptedHostGeneration` guard parked the Project until app restart (#125). Once the schedule is exhausted it waits for the manual Retry from #127 |
 | `apps/emdash-desktop/src/core/features/projects/node/project-attachment-manager.test.ts` | New test: a first `open` timeout is retried automatically and attaches | Fails without the retry |
+## 93. Component workers exit when orphaned (`fix/orphaned-component-workers`)
+
+Workers survived app exit and were reparented to PID 1 (#126). Shutdown waited on `scope.dispose()`
+with no bound, so one hung disposer meant `exit()` never ran, and a missed IPC `disconnect` was the
+only parent-death signal.
+
+| File | Change | Why |
+|---|---|---|
+| `packages/wire/src/worker/run-component-worker.ts` | `shutdown` races dispose against a 3 s timeout before `exit`; new 5 s parent poll (`process.ppid` change, injectable via `isParentAlive`) calls `shutdown` | A hung disposer or missed `disconnect` no longer strands the process; works after a main-process crash or SIGKILL |
+| `packages/wire/src/worker/run-component-worker.test.ts` | New test: worker exits when the parent is reported dead | Guards the watchdog |
