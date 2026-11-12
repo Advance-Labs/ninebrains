@@ -98,7 +98,10 @@ export function acquireGateSlot({
   pollMs = 2_000,
   maxWaitMs = 30 * 60_000,
   now = Date.now,
+  env = process.env,
 } = {}) {
+  // Already inside a slot (gated.mjs sets this): taking a second one would deadlock two holders.
+  if (env.NINEBRAINS_GATE_HELD) return () => {};
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   } catch {

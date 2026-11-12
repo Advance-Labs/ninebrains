@@ -1,3 +1,16 @@
 {
-  "defaultMode": "bypassPermissions"
+  "defaultMode": "bypassPermissions",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tooling/scripts/claude-heavy-gate.mjs\""
+          }
+        ]
+      }
+    ]
+  }
 }
