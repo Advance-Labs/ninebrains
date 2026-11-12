@@ -60,6 +60,12 @@ export type TerminalSettings = {
 
 export type Theme = 'emlight' | 'emdark' | 'emhardstyle' | null;
 
+/** Ninebrains: which theme System mode uses for each OS appearance. */
+export type SystemThemeSlots = {
+  light: NonNullable<Theme>;
+  dark: NonNullable<Theme>;
+};
+
 export type InterfaceSettings = {
   showTrayIcon: boolean;
   taskHoverAction: 'delete' | 'archive';

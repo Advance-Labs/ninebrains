@@ -17,6 +17,7 @@ import {
   interfaceSettingsContribution,
   keyboardSettingsContribution,
   openInSettingsContribution,
+  systemThemeSlotsSettingsContribution,
   themeSettingsContribution,
 } from '@core/features/workbench/contributions/settings';
 import type { SettingsValues } from '@core/primitives/settings/api';
@@ -39,6 +40,7 @@ export const appSettingsSchemaContributions = {
   keyboard: keyboardSettingsContribution,
   notifications: notificationSettingsContribution,
   theme: themeSettingsContribution,
+  systemThemeSlots: systemThemeSlotsSettingsContribution,
   openIn: openInSettingsContribution,
   interface: interfaceSettingsContribution,
   terminal: terminalSettingsContribution,

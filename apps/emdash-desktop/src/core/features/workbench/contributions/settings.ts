@@ -4,6 +4,7 @@ import type {
   InterfaceSettings,
   KeyboardSettings,
   OpenInSettings,
+  SystemThemeSlots,
   Theme,
 } from '@core/primitives/app-settings/api';
 import { openInAppIdSchema } from '@core/primitives/open-in-apps/api/open-in-apps';
@@ -40,6 +41,12 @@ const themeSchema = z
   .optional()
   .default(null);
 
+// Ninebrains: a slot must hold a theme of its own polarity; anything else falls back.
+const systemThemeSlotsSchema = z.object({
+  light: z.enum(['emlight']).catch('emlight'),
+  dark: z.enum(['emdark', 'emhardstyle']).catch('emdark'),
+});
+
 const openInSettingsSchema = z.object({
   default: openInAppIdSchema,
   hidden: z.array(openInAppIdSchema),
@@ -75,6 +82,15 @@ export const themeSettingsContribution = defineSettingsContribution<'theme', The
   key: 'theme',
   schema: themeSchema,
   defaults: null,
+});
+
+export const systemThemeSlotsSettingsContribution = defineSettingsContribution<
+  'systemThemeSlots',
+  SystemThemeSlots
+>({
+  key: 'systemThemeSlots',
+  schema: systemThemeSlotsSchema.catch({ light: 'emlight', dark: 'emdark' }),
+  defaults: { light: 'emlight', dark: 'emdark' },
 });
 
 export const openInSettingsContribution = defineSettingsContribution<'openIn', OpenInSettings>({

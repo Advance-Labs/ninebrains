@@ -1,6 +1,7 @@
 export {
   THEME_CLASS_DARK,
   THEME_CLASS_LIGHT,
+  SYSTEM_SLOT_OPTIONS,
   THEME_CLASSES,
   THEME_STORAGE_KEY,
 } from './theme-classes';

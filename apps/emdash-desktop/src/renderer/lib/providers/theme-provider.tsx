@@ -5,11 +5,13 @@ import { ThemeProvider as CoreThemeProvider } from '@core/primitives/theme/brows
 
 export function ThemeProvider({ children }: { readonly children: ReactNode }) {
   const { value, isLoading, update } = useAppSettingsKey('theme');
+  const { value: systemSlots } = useAppSettingsKey('systemThemeSlots');
   const handleThemeApplied = useCallback(() => applyThemeToAll(), []);
 
   return (
     <CoreThemeProvider
       theme={value ?? null}
+      systemSlots={systemSlots}
       isLoading={isLoading}
       onThemeChange={update}
       onThemeApplied={handleThemeApplied}
