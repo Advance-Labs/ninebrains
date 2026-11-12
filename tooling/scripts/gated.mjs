@@ -5,7 +5,7 @@
  *   node tooling/scripts/gated.mjs pnpm run typecheck
  *   node tooling/scripts/gated.mjs sh -c 'pnpm install && pnpm exec vitest run x.test.ts'
  *
- * The child gets NINEBRAINS_GATE_HELD=1, so a pre-push hook or nested gated.mjs inside it reuses
+ * The child gets NINEBRAINS_GATE_HELD=<this pid>, so a pre-push hook or nested gated.mjs inside it reuses
  * this slot rather than waiting on a second one.
  */
 import { spawnSync } from 'node:child_process';
@@ -20,7 +20,7 @@ export function runGated(argv, { env = process.env, acquire = acquireGateSlot, r
   }
   const release = acquire({ env, log: console.error });
   try {
-    const result = run(argv[0], argv.slice(1), { stdio: 'inherit', env: { ...env, NINEBRAINS_GATE_HELD: '1' } });
+    const result = run(argv[0], argv.slice(1), { stdio: 'inherit', env: { ...env, NINEBRAINS_GATE_HELD: String(process.pid) } });
     if (result.error) {
       console.error(`gated: ${result.error.message}`);
       return 127;
