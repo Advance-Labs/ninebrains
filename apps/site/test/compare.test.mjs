@@ -87,6 +87,12 @@ test('the validator refuses a claim sourced anywhere else', () => {
   const other = structuredClone(base);
   other.cells.what.source = 'https://github.com/someoneelse/x';
   assert.throws(() => validate(other), /not their own docs/);
+  const script = structuredClone(base);
+  script.cells.what.source = 'javascript://x.dev/%0Aalert(1)';
+  assert.throws(() => validate(script), /not their own docs/);
+  const date = structuredClone(base);
+  date.checked = '2026-11-13" onmouseover="x';
+  assert.throws(() => validate(date), /bad checked/);
   const unsourced = structuredClone(base);
   delete unsourced.chooseThem[0].source;
   assert.throws(() => validate(unsourced), /no source/);

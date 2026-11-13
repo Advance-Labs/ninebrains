@@ -92,12 +92,16 @@ export function validate(c) {
     if (c[k] == null) throw new Error(`${where}: missing ${k}`);
   }
   if (!/^[a-z0-9-]+$/.test(c.slug)) throw new Error(`${where}: bad slug`);
+  for (const k of ['checked', 'published', 'updated']) {
+    if (c[k] != null && !/^\d{4}-\d{2}-\d{2}$/.test(c[k])) throw new Error(`${where}: bad ${k}`);
+  }
   const words = c.answer.trim().split(/\s+/).length;
   if (words < 40 || words > 70) throw new Error(`${where}: answer is ${words} words, needs 40-70`);
   // A bare domain matches it and its subdomains; `github.com/owner` matches only that owner's
   // repos, so a shared host cannot launder a third-party source.
   const own = (u) => {
-    const { hostname, pathname } = new URL(u);
+    const { protocol, hostname, pathname } = new URL(u);
+    if (protocol !== 'https:') return false;
     const host = hostname.replace(/^www\./, '');
     return c.hosts.some((h) =>
       h.includes('/')

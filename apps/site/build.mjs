@@ -103,8 +103,9 @@ function buildCompare() {
     .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
     .sort((a, b) => a.name.localeCompare(b.name));
   for (const c of all) {
+    const html = renderPage(c); // validates the slug before it names a folder
     mkdirSync(join(DIST, 'compare', c.slug), { recursive: true });
-    writeFileSync(join(DIST, 'compare', c.slug, 'index.html'), renderPage(c));
+    writeFileSync(join(DIST, 'compare', c.slug, 'index.html'), html);
   }
   writeFileSync(join(DIST, 'compare', 'index.html'), renderIndex(all));
   const urls = ['/compare/', ...all.map((c) => `/compare/${c.slug}/`)]
