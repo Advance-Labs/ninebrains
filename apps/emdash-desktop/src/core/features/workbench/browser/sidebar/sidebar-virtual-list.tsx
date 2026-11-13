@@ -23,18 +23,21 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { observer } from 'mobx-react-lite';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { projectViewDef } from '@core/features/projects/contributions/views';
 import { getTaskStore } from '@core/features/tasks/api/browser/task-state/task-selectors';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
+import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
 import { type SidebarRow } from '@core/features/workbench/browser/sidebar/sidebar-store';
 import { getSidebarStore } from '@core/features/workbench/contributions/browser/app-stores';
 import {
+  useNavigate,
   useViewParams,
   useWorkspaceSlots,
 } from '@core/primitives/navigation/browser/navigation-hooks';
 import { SidebarProjectItem } from './project-item';
+import { treeKeyAction, treeRowMetas, type TreeRowMeta } from './sidebar-tree-keys';
 import { SidebarTaskItem } from './task-item';
 
 const ROW_HEIGHT = 32;
@@ -69,6 +72,82 @@ export const SidebarVirtualList = observer(function SidebarVirtualList() {
     estimateSize: () => ROW_HEIGHT,
     overscan: 8,
   });
+
+  // Keyboard navigation: the tree is one tab stop and names its focused row through
+  // aria-activedescendant, so focus never has to chase rows the virtualizer unmounts.
+  const { navigate } = useNavigate();
+  const treeId = useId();
+  const metas = useMemo(() => treeRowMetas(rows), [rows]);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const [treeFocused, setTreeFocused] = useState(false);
+  const lastFocusedIndexRef = useRef(0);
+  const selectedKey =
+    currentView === 'task' && taskParams.projectId && taskParams.taskId
+      ? toTaskDndId(taskParams.projectId, taskParams.taskId)
+      : (currentView === 'project' || currentView === 'task') &&
+          (taskParams.projectId ?? projectParams.projectId)
+        ? toProjectDndId((taskParams.projectId ?? projectParams.projectId)!)
+        : null;
+  const keyedIndex = focusedKey ? allDndIds.indexOf(focusedKey) : -1;
+  // A row can disappear under the cursor (collapse, delete); stay near where it was.
+  const focusedIndex =
+    keyedIndex >= 0 || !focusedKey || rows.length === 0
+      ? keyedIndex
+      : Math.min(lastFocusedIndexRef.current, rows.length - 1);
+  if (focusedIndex >= 0) lastFocusedIndexRef.current = focusedIndex;
+
+  useEffect(() => {
+    if (treeFocused && focusedIndex >= 0)
+      virtualizer.scrollToIndex(focusedIndex, { align: 'auto' });
+  }, [treeFocused, focusedIndex, virtualizer]);
+
+  function openRow(index: number, toggleProjects: boolean) {
+    const row = rows[index];
+    if (!row) return;
+    if (row.kind === 'task') {
+      navigate(taskViewDef({ projectId: row.projectId, taskId: row.taskId }));
+    } else if (toggleProjects) {
+      getSidebarStore().toggleProjectExpanded(row.projectId);
+    } else {
+      navigate(projectViewDef({ projectId: row.projectId }));
+    }
+  }
+
+  function handleTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    // Only when the tree itself has focus: keys typed into an input or pressed on a row's own
+    // buttons keep their normal meaning.
+    if (event.target !== event.currentTarget) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const store = getSidebarStore();
+    const action = treeKeyAction(rows, Math.max(focusedIndex, 0), event.key, (id) =>
+      store.expandedProjectIds.has(id)
+    );
+    if (!action) return;
+    event.preventDefault();
+    switch (action.type) {
+      case 'focus':
+        setFocusedKey(allDndIds[action.index] ?? null);
+        break;
+      case 'expand':
+      case 'collapse':
+        store.toggleProjectExpanded(action.projectId);
+        break;
+      case 'open':
+        openRow(action.index, false);
+        break;
+      case 'activate':
+        openRow(action.index, true);
+        break;
+    }
+  }
+
+  function handleTreeFocus(event: React.FocusEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    setTreeFocused(true);
+    if (focusedIndex < 0) {
+      setFocusedKey(selectedKey && allDndIds.includes(selectedKey) ? selectedKey : allDndIds[0]!);
+    }
+  }
 
   // Scroll the active project/task into view only when the navigation target itself
   // changes, plus the active task's project expansion state. Re-running on every
@@ -205,12 +284,40 @@ export const SidebarVirtualList = observer(function SidebarVirtualList() {
       onDragCancel={clearDragPointerY}
     >
       <SortableContext items={allDndIds} strategy={verticalListSortingStrategy}>
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-3">
+        <div
+          ref={scrollRef}
+          role="tree"
+          aria-label="Projects and tasks"
+          tabIndex={0}
+          aria-activedescendant={
+            treeFocused && focusedKey && focusedIndex >= 0
+              ? `${treeId}${allDndIds[focusedIndex]}`
+              : undefined
+          }
+          {...focusRegionAttr('sidebar')}
+          onKeyDown={handleTreeKeyDown}
+          onFocus={handleTreeFocus}
+          onBlur={(event) => {
+            if (event.target === event.currentTarget) setTreeFocused(false);
+          }}
+          className="group/tree min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-3 outline-none"
+        >
           <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
             {virtualizer.getVirtualItems().map((vItem) => {
               const row = rows[vItem.index];
               if (!row) return null;
               const dndId = rowToDndId(row);
+              const meta = metas[vItem.index]!;
+              const rowAria = {
+                id: `${treeId}${dndId}`,
+                meta,
+                focused: vItem.index === focusedIndex,
+                selected: dndId === selectedKey,
+                expanded:
+                  row.kind === 'project'
+                    ? getSidebarStore().expandedProjectIds.has(row.projectId)
+                    : undefined,
+              };
               const vStyle: React.CSSProperties = {
                 position: 'absolute',
                 top: vItem.start,
@@ -220,13 +327,18 @@ export const SidebarVirtualList = observer(function SidebarVirtualList() {
               };
               if (row.kind === 'project') {
                 return (
-                  <SortableRow key={row.projectId} dndId={dndId} style={vStyle}>
+                  <SortableRow key={row.projectId} dndId={dndId} style={vStyle} aria={rowAria}>
                     <SidebarProjectItem projectId={row.projectId} />
                   </SortableRow>
                 );
               }
               return (
-                <SortableRow key={`${row.projectId}:${row.taskId}`} dndId={dndId} style={vStyle}>
+                <SortableRow
+                  key={`${row.projectId}:${row.taskId}`}
+                  dndId={dndId}
+                  style={vStyle}
+                  aria={rowAria}
+                >
                   <SidebarTaskItem projectId={row.projectId} taskId={row.taskId} />
                 </SortableRow>
               );
@@ -359,10 +471,17 @@ function InsertionIndicator({ pointerY }: { pointerY: number | null }) {
 interface SortableRowProps {
   dndId: string;
   style: React.CSSProperties;
+  aria: {
+    id: string;
+    meta: TreeRowMeta;
+    focused: boolean;
+    selected: boolean;
+    expanded: boolean | undefined;
+  };
   children: React.ReactNode;
 }
 
-function SortableRow({ dndId, style, children }: SortableRowProps) {
+function SortableRow({ dndId, style, aria, children }: SortableRowProps) {
   const { setNodeRef, transform, transition, isDragging, listeners } = useSortable({
     id: dndId,
   });
@@ -376,7 +495,20 @@ function SortableRow({ dndId, style, children }: SortableRowProps) {
   };
 
   return (
-    <div ref={setNodeRef} style={combinedStyle} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={combinedStyle}
+      id={aria.id}
+      role="treeitem"
+      aria-level={aria.meta.level}
+      aria-posinset={aria.meta.posInSet}
+      aria-setsize={aria.meta.setSize}
+      aria-selected={aria.selected}
+      aria-expanded={aria.expanded}
+      data-focused={aria.focused}
+      className="group-focus-visible/tree:data-[focused=true]:ring-ring rounded-lg group-focus-visible/tree:data-[focused=true]:ring-2 group-focus-visible/tree:data-[focused=true]:ring-inset"
+      {...listeners}
+    >
       {children}
     </div>
   );

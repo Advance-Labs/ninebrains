@@ -13,6 +13,7 @@ import {
 } from '@core/features/terminals/browser/task-terminal/terminal-drawer-tab-bar';
 import { resolveTerminalPanelActiveItem } from '@core/features/terminals/browser/task-terminal/terminal-panel-selection';
 import { TerminalPtyContent } from '@core/features/terminals/browser/task-terminal/terminal-pty-content';
+import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
 import { usePaneScope } from '@core/features/workbench/api/browser/tabs/use-pane-scope';
 import {
   useTaskComposition,
@@ -221,6 +222,7 @@ export const TerminalsPanel = observer(function TerminalsPanel() {
     <ViewScopeInstanceProvider instance={paneScopeInstance}>
       <div
         ref={attachPaneScope}
+        {...focusRegionAttr('bottom')}
         tabIndex={-1}
         className="surface-paper flex h-full flex-col bg-(--em-surface)"
         onPointerDownCapture={(event) => event.currentTarget.focus({ preventScroll: true })}

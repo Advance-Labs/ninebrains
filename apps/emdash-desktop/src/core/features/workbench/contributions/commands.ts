@@ -234,6 +234,36 @@ export const zenModeCommand = defineCommand({
   }),
 });
 
+// Mod+0 is Electron's zoom reset (View menu), so the sidebar takes Mod+Shift+0, next to the
+// task view's Mod+Shift+1 to 3. Region cycling must work from the terminal, so it opts in.
+export const focusSidebarCommand = defineCommand({
+  id: 'workbench.focusSidebar',
+  title: 'Focus Sidebar',
+  description: 'Move keyboard focus to the project and task list',
+  category: 'View',
+  keybinding: keybinding.settings('focusSidebar', 'Mod+Shift+0', {
+    allowWhenTerminalFocused: true,
+  }),
+});
+
+export const focusNextRegionCommand = defineCommand({
+  id: 'workbench.focusNextRegion',
+  title: 'Focus Next Region',
+  description: 'Cycle keyboard focus: sidebar, main area, terminal drawer, right sidebar',
+  category: 'View',
+  keybinding: keybinding.settings('focusNextRegion', 'F6', { allowWhenTerminalFocused: true }),
+});
+
+export const focusPreviousRegionCommand = defineCommand({
+  id: 'workbench.focusPreviousRegion',
+  title: 'Focus Previous Region',
+  description: 'Cycle keyboard focus backwards through the window regions',
+  category: 'View',
+  keybinding: keybinding.settings('focusPreviousRegion', 'Shift+F6', {
+    allowWhenTerminalFocused: true,
+  }),
+});
+
 export const WINDOW_COMMAND_DEFS = [
   settingsCommand,
   newProjectCommand,
@@ -247,6 +277,9 @@ export const WINDOW_COMMAND_DEFS = [
   confirmCommand,
   toggleLeftSidebarCommand,
   zenModeCommand,
+  focusSidebarCommand,
+  focusNextRegionCommand,
+  focusPreviousRegionCommand,
 ] as const;
 
 export const WORKBENCH_COMMAND_DEFS = [
