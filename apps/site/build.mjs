@@ -85,7 +85,10 @@ function build() {
     throw new Error(`site: refusing to stamp version ${JSON.stringify(version)}`);
   }
   const page = join(DIST, 'index.html');
-  writeFileSync(page, readFileSync(page, 'utf8').replaceAll('__VERSION__', () => version));
+  writeFileSync(
+    page,
+    readFileSync(page, 'utf8').replaceAll('__VERSION__', () => version)
+  );
   console.log(`site: built ${DIST}`);
 }
 
