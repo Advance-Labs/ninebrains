@@ -59,7 +59,7 @@ Freebuff, free, in the same worktree. One click opens it and copies a handoff no
 
 Q: What is Ninebrains?
 A: An open-source desktop workbench for running several coding agents at once on one repository,
-each isolated in its own git worktree, coordinated by a central Brain and checked by independent
+each isolated in its own git worktree, coordinated by a central Brain and checked by
 verification gates.
 
 Q: Which agents does it run?
@@ -76,8 +76,8 @@ practical ceiling is your machine and your provider's rate limits.
 
 Q: How is it different from running git worktrees in tmux myself?
 A: Worktrees and panes are the easy half, and Ninebrains does that for you. It adds a plan that
-knows which job depends on which, a mailbox so lanes can talk, and a gate that makes a second,
-independent agent prove the work before it counts as done.
+knows which job depends on which, a mailbox so lanes can talk, and a gate that makes a second agent,
+with read-only tools in a disposable checkout, prove the work before it counts as done.
 
 Q: How does Ninebrains compare with Claude Code on its own, and with Emdash?
 A: They are layers, not rivals. Ninebrains launches Claude Code unchanged, and it is a fork of
@@ -107,6 +107,23 @@ SHA256 and avoids the Gatekeeper warning on macOS.
 
 Q: Who makes Ninebrains?
 A: Advance Labs Inc., an independent Canadian lab in London, Ontario. https://advancelabs.dev
+
+## Compare
+
+How Ninebrains compares with other parallel coding-agent tools, with each claim about them sourced
+from their own documentation and dated: https://ninebrains.dev/compare/
+
+- Paradev (formerly Superset): https://ninebrains.dev/compare/ninebrains-vs-paradev/
+- Pane: https://ninebrains.dev/compare/ninebrains-vs-pane/
+- Cursor: https://ninebrains.dev/compare/ninebrains-vs-cursor/
+- Conductor (conductor.build): https://ninebrains.dev/compare/ninebrains-vs-conductor/
+- Google Conductor: https://ninebrains.dev/compare/ninebrains-vs-google-conductor/
+- Emdash: https://ninebrains.dev/compare/ninebrains-vs-emdash/
+- Claude Squad: https://ninebrains.dev/compare/ninebrains-vs-claude-squad/
+- Vibe Kanban: https://ninebrains.dev/compare/ninebrains-vs-vibe-kanban/
+- Maestro: https://ninebrains.dev/compare/ninebrains-vs-maestro/
+- Orca: https://ninebrains.dev/compare/ninebrains-vs-orca/
+- git worktrees and tmux by hand: https://ninebrains.dev/compare/ninebrains-vs-manual-worktrees/
 
 ## Related
 

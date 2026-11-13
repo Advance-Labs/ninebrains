@@ -1,0 +1,67 @@
+{
+  "slug": "ninebrains-vs-vibe-kanban",
+  "name": "Vibe Kanban",
+  "url": "https://www.vibekanban.com",
+  "hosts": ["vibekanban.com", "github.com/BloopAI"],
+  "title": "Ninebrains vs Vibe Kanban",
+  "description": "Looking at Vibe Kanban, or for an alternative now that its company has shut down? How it compares with Ninebrains on planning, isolation, checks and maintenance.",
+  "summary": "Kanban planning for 10+ agents. Company shut down; now community-maintained.",
+  "answer": "Vibe Kanban plans coding-agent work on a kanban board and runs each task in a workspace with its own branch, terminal and dev server. Its company, bloop, shut down in April 2026, and the project is now community-maintained. Choose it for kanban planning across many agents; choose Ninebrains for a dependency-aware job graph and checks that must pass before work counts as done.",
+  "note": "Vibe Kanban’s own site says it is sunsetting: bloop, the company behind it, shut down on April 10, 2026, and the project continues as open source and community-maintained.",
+  "cells": {
+    "what": {
+      "text": "Kanban issues to plan work, and workspaces where coding agents execute it.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    "licence": {
+      "text": "Apache-2.0.",
+      "source": "https://github.com/BloopAI/vibe-kanban/blob/main/LICENSE"
+    },
+    "price": {
+      "text": "Paid subscriptions were ended and refunded when the company shut down.",
+      "source": "https://www.vibekanban.com/blog/shutdown"
+    },
+    "agents": {
+      "text": "10+ agents, including Claude Code, Codex, Gemini CLI, GitHub Copilot, Amp, Cursor and OpenCode.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    "isolation": {
+      "text": "Each workspace gives an agent a branch, a terminal and a dev server.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    "planning": {
+      "text": "A kanban board to create, prioritise and assign issues. A dependency graph is not described.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    "verification": {
+      "text": "Review diffs and leave inline comments that go straight back to the agent.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    "telemetry": {
+      "text": "Optional PostHog analytics, off when no API key is set at build time.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You think in kanban cards and want to plan privately or with a team.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    {
+      "text": "You want a built-in browser preview with devtools and device emulation.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    },
+    {
+      "text": "You switch between many agents: it supports 10+.",
+      "source": "https://github.com/BloopAI/vibe-kanban"
+    }
+  ],
+  "chooseUs": [
+    "You want a grid of lanes with each agent’s status driven by its own hooks, and a browser, editor and terminal per lane.",
+    "You want dependencies between jobs, so work is handed out as it unblocks.",
+    "You want completion blocked until configured checks pass, rather than review left until the end."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

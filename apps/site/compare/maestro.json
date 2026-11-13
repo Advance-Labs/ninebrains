@@ -1,0 +1,58 @@
+{
+  "slug": "ninebrains-vs-maestro",
+  "name": "Maestro",
+  "url": "https://runmaestro.ai",
+  "hosts": ["runmaestro.ai", "github.com/RunMaestro"],
+  "title": "Ninebrains vs Maestro",
+  "description": "Ninebrains vs Maestro, the cross-platform desktop app for orchestrating fleets of AI agents: Auto Run playbooks and group chat compared with a job graph and verification gates.",
+  "summary": "Cross-platform agent fleet app: Auto Run playbooks, group chat, phone control. AGPL.",
+  "answer": "Maestro is a cross-platform desktop app for orchestrating many AI agents across projects, with Auto Run playbooks for long unattended sessions, group chat between agents and phone control. Worktrees are optional. Choose Maestro for long unattended runs and multi-agent conversation; choose Ninebrains for worktree-first lanes, a dependency-aware job graph and checks that block completion.",
+  "cells": {
+    "what": {
+      "text": "A cross-platform desktop app for orchestrating your fleet of AI agents and projects.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    },
+    "licence": {
+      "text": "AGPL-3.0.",
+      "source": "https://github.com/RunMaestro/Maestro/blob/main/LICENSE"
+    },
+    "platforms": {
+      "text": "macOS, Windows and Linux builds.",
+      "source": "https://github.com/RunMaestro/Maestro/releases"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, OpenCode, Factory Droid, and Copilot-CLI, Qwen3 Coder and Oh My Pi in beta.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    },
+    "isolation": {
+      "text": "Optional: worktree sub-agents from the git branch menu, each in its own directory.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    },
+    "planning": {
+      "text": "Auto Run: a file-based task runner that works through markdown checklists or a free-text goal.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want long unattended sessions: Auto Run works through playbooks for hours.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    },
+    {
+      "text": "You want agents to talk to each other: a moderator agent routes questions in Group Chat.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    },
+    {
+      "text": "You want to monitor and control agents from your phone.",
+      "source": "https://github.com/RunMaestro/Maestro"
+    }
+  ],
+  "chooseUs": [
+    "You want every agent in its own worktree by default, not as an option.",
+    "You want jobs with dependencies, handed out as they unblock, rather than a checklist per agent.",
+    "You want completion blocked until tests, a screenshot check or a read-only reviewer pass, and an Apache-2.0 licence."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

@@ -1,0 +1,77 @@
+{
+  "slug": "ninebrains-vs-paradev",
+  "name": "Paradev (formerly Superset)",
+  "url": "https://paradev.com",
+  "hosts": ["paradev.com", "github.com/ParadevAI"],
+  "title": "Ninebrains vs Paradev (formerly Superset)",
+  "description": "Ninebrains vs Paradev, the parallel coding-agent app formerly called Superset: licence, platforms, isolation, planning and checks before done, sourced from Paradev’s own docs.",
+  "summary": "Polished worktree app for many CLI agents, MIT, macOS first. Formerly Superset.",
+  "answer": "Paradev, formerly Superset, and Ninebrains both run CLI coding agents in parallel, one git worktree per task. Choose Paradev for a polished review and pull-request workflow, broad agent support and its mobile and remote features. Choose Ninebrains when you want a dependency-aware job graph and work that is blocked from counting as done until configured checks pass.",
+  "note": "Paradev was previously named Superset, and its CLI command is still superset. It is unrelated to Apache Superset, the business intelligence tool.",
+  "cells": {
+    "what": {
+      "text": "A desktop app for running CLI coding agents in parallel, each task with its own git worktree, branch and terminals.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "licence": {
+      "text": "MIT.",
+      "source": "https://github.com/ParadevAI/Paradev/blob/HEAD/LICENSE.md"
+    },
+    "price": {
+      "text": "The desktop app is free. Paid plans, from $20 per user per month, add features such as automations.",
+      "source": "https://paradev.com/pricing"
+    },
+    "platforms": {
+      "text": "macOS (Apple Silicon and Intel). Linux as an experimental AppImage. Windows is not yet available.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, OpenCode, Gemini CLI, Cursor Agent, or any other CLI agent.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "isolation": {
+      "text": "A git worktree per task. Their README notes worktrees separate working files and do not sandbox processes or prevent merge conflicts.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "planning": {
+      "text": "A built-in chat with plan review. A task dependency graph is not described.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "verification": {
+      "text": "Review tools: a Changes pane, a pull-request pane with checks and review threads, and a browser preview. You run the relevant tests yourself.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    "telemetry": {
+      "text": "Their privacy policy says usage data is processed by analytics providers such as PostHog. A statement specific to the desktop app was not found.",
+      "source": "https://paradev.com/privacy"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want a polished review loop: diff, commit, pull request, checks and merge without leaving the app, plus a browser preview per worktree.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    {
+      "text": "You run many different agents, or want an iPhone and iPad app, remote hosts or scheduled automations.",
+      "source": "https://github.com/ParadevAI/Paradev"
+    },
+    {
+      "text": "You prefer an MIT licence.",
+      "source": "https://github.com/ParadevAI/Paradev/blob/HEAD/LICENSE.md"
+    }
+  ],
+  "chooseUs": [
+    "You want work planned as a graph of jobs with dependencies and handed to idle agents as it unblocks.",
+    "You want completion blocked until configured checks pass, with a reviewer that has read-only tools in a disposable checkout.",
+    "You need Windows support today, or want no telemetry at all."
+  ],
+  "faq": [
+    {
+      "q": "Is Paradev the same as Superset?",
+      "a": "Yes. Paradev’s README says it was previously named Superset and that the CLI command is still superset. It is unrelated to Apache Superset."
+    }
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

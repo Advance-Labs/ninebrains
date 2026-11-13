@@ -1,0 +1,59 @@
+{
+  "slug": "ninebrains-vs-conductor",
+  "name": "Conductor",
+  "url": "https://www.conductor.build",
+  "hosts": ["conductor.build"],
+  "title": "Ninebrains vs Conductor (conductor.build)",
+  "description": "Ninebrains vs Conductor, the Mac app for running Claude Code, Codex, Cursor and OpenCode agents in parallel worktrees: platforms, source, telemetry and checks, sourced.",
+  "summary": "Mac-native app for parallel agents in worktrees with a pre-merge Checks tab.",
+  "answer": "Conductor and Ninebrains both run coding agents in parallel, each in its own git worktree. Conductor is a polished Mac app with a pre-merge Checks tab that gathers CI status, review threads and todos. Ninebrains is open source and cross-platform, plans work as a job graph, and blocks completion until configured checks such as tests and a reviewer pass.",
+  "note": "This page is about conductor.build. Google also has a product called Conductor, a planning and review extension for Gemini CLI; see Ninebrains vs Google Conductor.",
+  "cells": {
+    "what": {
+      "text": "An app that runs Claude Code, Codex, Cursor and OpenCode agents in parallel, in isolated workspaces on your Mac.",
+      "source": "https://www.conductor.build/docs/"
+    },
+    "platforms": {
+      "text": "Mac.",
+      "source": "https://www.conductor.build/docs/"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, Cursor and OpenCode.",
+      "source": "https://www.conductor.build/docs/"
+    },
+    "isolation": {
+      "text": "Git worktrees, which they describe as development isolation, not a security boundary.",
+      "source": "https://www.conductor.build/docs/concepts/workspaces-and-branches"
+    },
+    "verification": {
+      "text": "A Checks tab that collects CI status, PR comments and todos before merge, and may block or discourage merging while required work is open.",
+      "source": "https://www.conductor.build/docs/reference/checks"
+    },
+    "telemetry": {
+      "text": "Limited analytics from the app, such as crash logs and which features are used.",
+      "source": "https://www.conductor.build/privacy"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You are on a Mac and want a polished, native flow from diff to pull request to merge to archive.",
+      "source": "https://www.conductor.build/docs/"
+    },
+    {
+      "text": "You want Cursor and OpenCode agents alongside Claude Code and Codex.",
+      "source": "https://www.conductor.build/docs/"
+    },
+    {
+      "text": "You want one pre-merge view of CI status, review threads and todos.",
+      "source": "https://www.conductor.build/docs/reference/checks"
+    }
+  ],
+  "chooseUs": [
+    "You are on Windows or Linux, or want the source code under Apache-2.0.",
+    "You want work planned as a dependency graph and dispatched to idle lanes.",
+    "You want checks to run before work counts as done, not only before merge: tests, screenshots and a read-only reviewer, with retries."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

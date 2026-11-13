@@ -1,0 +1,70 @@
+{
+  "slug": "ninebrains-vs-pane",
+  "name": "Pane",
+  "url": "https://runpane.com",
+  "hosts": ["runpane.com", "github.com/greenfield-inc"],
+  "title": "Ninebrains vs Pane",
+  "description": "Ninebrains vs Pane (RunPane by Dcouple): two open-source desktop apps for parallel coding agents, compared on licence, telemetry, planning and checks, with sources.",
+  "summary": "Keyboard-first, AGPL, free, strong on Windows, WSL and remote control.",
+  "answer": "Pane and Ninebrains are both free, open-source desktop apps that run coding agents in parallel, one git worktree each. Choose Pane for a keyboard-first terminal workflow, WSL support, remote and phone control, and scheduled Loops. Choose Ninebrains for a dependency-aware job graph, checks that block completion until they pass, an Apache-2.0 licence and no telemetry.",
+  "cells": {
+    "what": {
+      "text": "A terminal-first, open-source agent manager for running any CLI agent in parallel.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    "licence": {
+      "text": "AGPL-3.0.",
+      "source": "https://github.com/greenfield-inc/Pane/blob/HEAD/LICENSE"
+    },
+    "price": {
+      "text": "Free. No paid plan, seat fee or usage fee.",
+      "source": "https://runpane.com/pricing.md"
+    },
+    "platforms": {
+      "text": "Windows, WSL, macOS and Linux.",
+      "source": "https://runpane.com"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, Cursor Agent, Aider, Goose, or any CLI tool.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    "isolation": {
+      "text": "One pane per feature, one git worktree each.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    "planning": {
+      "text": "Pane Chat, a global orchestrator terminal that coordinates agents across panes and worktrees. A task dependency graph is not described.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    "verification": {
+      "text": "A built-in diff viewer, approvals, and bundled reviewer and verify helper agents. An enforced gate before done is not described.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    "telemetry": {
+      "text": "Product analytics are on by default, through PostHog, and can be tied to your GitHub username or git email. You can turn them off in Settings.",
+      "source": "https://runpane.com/privacy"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You work keyboard-first in terminals, or on Windows through WSL.",
+      "source": "https://runpane.com"
+    },
+    {
+      "text": "You want to drive agents on a remote machine from the desktop, a browser or your phone.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    },
+    {
+      "text": "You want agents on a schedule: Loops run an agent on a cron schedule in a fresh worktree.",
+      "source": "https://github.com/greenfield-inc/Pane"
+    }
+  ],
+  "chooseUs": [
+    "You want a plan with dependencies, dispatched to idle lanes, rather than coordinating agents by chat.",
+    "You want completion blocked until configured checks pass, with three attempts before a job blocks.",
+    "You want Apache-2.0 rather than AGPL-3.0, or no product analytics at all."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}
