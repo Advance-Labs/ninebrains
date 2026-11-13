@@ -1188,7 +1188,7 @@
           verifies the build attestation, and installs nothing if that fails.
         </p>
         <pre><code>shasum -a 256 -c SHA256SUMS --ignore-missing
-gh attestation verify Ninebrains-__VERSION__-mac-arm64.dmg --repo Advance-Labs/ninebrains</code></pre>
+gh attestation verify Ninebrains-*-mac-arm64.dmg --repo Advance-Labs/ninebrains</code></pre>
         <p>
           A checksum proves you have the exact bytes the release published. It does not prove who
           built them, so only install from <code>github.com/Advance-Labs/ninebrains</code> or this

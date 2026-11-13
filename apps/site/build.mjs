@@ -80,8 +80,12 @@ function build() {
   const { version } = JSON.parse(
     readFileSync(join(REPO, 'apps/emdash-desktop/package.json'), 'utf8')
   );
+  // It lands inside a JSON-LD script, so anything but plain semver fails the build.
+  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
+    throw new Error(`site: refusing to stamp version ${JSON.stringify(version)}`);
+  }
   const page = join(DIST, 'index.html');
-  writeFileSync(page, readFileSync(page, 'utf8').replaceAll('__VERSION__', version));
+  writeFileSync(page, readFileSync(page, 'utf8').replaceAll('__VERSION__', () => version));
   console.log(`site: built ${DIST}`);
 }
 

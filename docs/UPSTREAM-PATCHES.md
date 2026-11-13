@@ -1421,3 +1421,11 @@ System mode used to follow the OS between fixed Light and Dark. It now reads a p
 | `packages/ui/src/react/components/agent-status/agent-status.tsx` | `completed` label → "Agent finished, not yet viewed" | Names the state the dot actually means |
 | `packages/ui/src/react/components/agent-status/agent-status.stories.tsx` | Story label "Completed (done, unseen)" | The story covers every state |
 | `apps/emdash-desktop/src/core/features/conversations/api/browser/conversation-seen-status.browser.test.ts` | New test of seen/clear and task-level ranking | Guards the behaviour that was untested |
+## 97. README version references stay current (`ninebrains/aeo-seo-gf8jr`)
+
+The README said v0.1.0 was out while v0.2.9 was shipping, which search and answer engines quoted
+back as the project's state.
+
+| File | Change | Why |
+|---|---|---|
+| `README.md` | Live release and stars badges; status line and download table no longer name a version | The README cannot fall behind a release again |
