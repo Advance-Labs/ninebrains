@@ -1,0 +1,73 @@
+{
+  "slug": "ninebrains-vs-cursor",
+  "name": "Cursor",
+  "url": "https://cursor.com",
+  "hosts": ["cursor.com"],
+  "title": "Ninebrains vs Cursor",
+  "description": "Ninebrains vs Cursor: an agentic code editor with cloud agents and Bugbot reviews, compared with an open-source workbench for parallel Claude Code and Codex agents.",
+  "summary": "Full AI editor with worktrees, cloud agents and Bugbot reviews. Paid tiers.",
+  "answer": "Cursor is an AI code editor whose Agent can run in parallel git worktrees or in cloud VMs, with Bugbot reviewing pull requests. Ninebrains is not an editor: it runs the Claude Code and Codex CLIs you already use in parallel lanes. Choose Cursor for the best integrated editing loop; choose Ninebrains for an open-source, local job graph with checks that block completion.",
+  "cells": {
+    "what": {
+      "text": "An AI code editor. Agent completes coding tasks, runs terminal commands and edits code.",
+      "source": "https://cursor.com/docs/agent/overview"
+    },
+    "price": {
+      "text": "A free tier with limited agent requests. Cloud agents and Bugbot code reviews are on higher paid plans.",
+      "source": "https://cursor.com/pricing"
+    },
+    "platforms": {
+      "text": "macOS, Windows and Linux.",
+      "source": "https://cursor.com/download"
+    },
+    "agents": {
+      "text": "Cursor’s own Agent, with a choice of frontier models.",
+      "source": "https://cursor.com/docs/agent/overview"
+    },
+    "isolation": {
+      "text": "Local git worktrees per task, or cloud agents in isolated VMs.",
+      "source": "https://cursor.com/docs/configuration/worktrees"
+    },
+    "planning": {
+      "text": "Plan Mode writes an implementation plan before code; for larger work a coordinator agent delegates to other agents.",
+      "source": "https://cursor.com/docs/agent/planning"
+    },
+    "verification": {
+      "text": "Bugbot reviews pull requests for bugs and security issues, with Autofix. Cloud agents record screenshots, videos and logs of how they verified their work.",
+      "source": "https://cursor.com/docs/bugbot"
+    },
+    "telemetry": {
+      "text": "Privacy Mode stops them training on your data. A general telemetry statement was not found.",
+      "source": "https://cursor.com/security"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "One developer wants the best integrated editing loop: an editor and its agent in one product.",
+      "source": "https://cursor.com/docs/agent/overview"
+    },
+    {
+      "text": "You want agents in cloud VMs that can drive a browser and desktop and keep running without your laptop.",
+      "source": "https://cursor.com/docs/cloud-agent"
+    },
+    {
+      "text": "You want managed pull-request review with automatic fixes.",
+      "source": "https://cursor.com/docs/bugbot"
+    },
+    {
+      "text": "You want to compare models on one task: /best-of-n runs it across models, each in its own worktree.",
+      "source": "https://cursor.com/docs/configuration/worktrees"
+    }
+  ],
+  "chooseUs": [
+    "You already use Claude Code or Codex in a terminal and want to keep them, with your own subscription login.",
+    "You want open source and local-first, with no telemetry.",
+    "You want a dependency-aware job graph and completion blocked until configured checks pass, before a pull request exists."
+  ],
+  "limits": [
+    "Ninebrains is not an editor replacement. It has a Monaco editor per lane, but you will likely keep your own editor alongside it."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

@@ -1,0 +1,66 @@
+{
+  "slug": "ninebrains-vs-emdash",
+  "name": "Emdash",
+  "url": "https://emdash.com",
+  "hosts": ["emdash.com", "github.com/generalaction"],
+  "title": "Ninebrains vs Emdash",
+  "description": "Ninebrains is a fork of Emdash. What it keeps, what it adds (lanes, the Brain job graph, verification gates) and when Emdash itself is the better choice.",
+  "summary": "Ninebrains’ upstream. Broad agent and issue-tracker support, SSH remotes.",
+  "answer": "Ninebrains is a fork of Emdash, the open-source desktop app for running coding agents in parallel git worktrees, so it keeps Emdash’s worktrees, diffs, pull requests and integrations. Choose Emdash for its many agent CLIs, issue-tracker hand-off and SSH remotes. Choose Ninebrains for a 2x2 lanes grid, a dependency-aware job graph, checks that block completion, and no telemetry.",
+  "note": "Emdash’s website now calls the open-source app Emdash Classic. It says Classic still gets fixes, but new development has moved to Emdash 2.0. This page compares the open-source app.",
+  "cells": {
+    "what": {
+      "text": "A desktop app for running AI coding agents in parallel, each task in its own git worktree.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    "licence": {
+      "text": "Apache-2.0.",
+      "source": "https://github.com/generalaction/emdash/blob/main/LICENSE.md"
+    },
+    "platforms": {
+      "text": "macOS, Windows and Linux.",
+      "source": "https://emdash.com"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, OpenCode, Amp and more.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    "isolation": {
+      "text": "A git worktree and branch per agent, locally or on remote machines over SSH.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    "verification": {
+      "text": "Review diffs, create pull requests and inspect CI checks from one place.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    "telemetry": {
+      "text": "Optional telemetry sent to PostHog, which you can turn off in Settings or with TELEMETRY_ENABLED=false.",
+      "source": "https://emdash.com/docs/telemetry"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You use many agent CLIs: Emdash runs Claude Code, Codex, OpenCode, Amp and more.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    {
+      "text": "You hand issues to agents from Linear, GitHub, Jira, GitLab and other trackers.",
+      "source": "https://github.com/generalaction/emdash"
+    },
+    {
+      "text": "You run agents on remote machines over SSH.",
+      "source": "https://github.com/generalaction/emdash"
+    }
+  ],
+  "chooseUs": [
+    "You want four agents visible at once in a 2x2 grid of lanes, across worktrees and tabs.",
+    "You want a job graph with dependencies and a planner canvas, dispatched to idle lanes.",
+    "You want completion blocked until configured checks pass, and no telemetry endpoint at all."
+  ],
+  "limits": [
+    "Lanes support Claude Code and Codex today. Other agents, and SSH remotes, still work in Emdash-style tasks inside Ninebrains."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

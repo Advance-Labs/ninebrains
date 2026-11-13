@@ -1,0 +1,61 @@
+{
+  "slug": "ninebrains-vs-google-conductor",
+  "name": "Google Conductor",
+  "url": "https://github.com/gemini-cli-extensions/conductor",
+  "hosts": ["github.com/gemini-cli-extensions", "developers.googleblog.com"],
+  "title": "Ninebrains vs Google Conductor",
+  "description": "Ninebrains vs Conductor, the spec-driven planning and automated review extension for Gemini CLI, Antigravity and Claude Code. Different jobs, and how they fit together.",
+  "summary": "Spec-driven planning and automated review inside one agent. Does not run agents in parallel.",
+  "answer": "Google Conductor is an extension that adds spec-driven development to one coding agent: it writes a spec and plan, then its automated review checks the code against the plan, style guides, tests and basic security. It does not run agents in parallel. Ninebrains runs many agents in parallel worktrees, plans across them, and blocks completion until configured checks pass.",
+  "note": "This page is about the Conductor extension in the gemini-cli-extensions organisation. It is a different product from conductor.build, the Mac app; see Ninebrains vs Conductor.",
+  "cells": {
+    "what": {
+      "text": "A plugin for AI coding agents, including Antigravity and Claude Code, that enables spec-driven development.",
+      "source": "https://github.com/gemini-cli-extensions/conductor"
+    },
+    "licence": {
+      "text": "Apache-2.0.",
+      "source": "https://github.com/gemini-cli-extensions/conductor/blob/main/LICENSE"
+    },
+    "agents": {
+      "text": "Gemini CLI, Antigravity and Claude Code, as an extension or plugin inside the agent.",
+      "source": "https://github.com/gemini-cli-extensions/conductor"
+    },
+    "planning": {
+      "text": "Tracks: each feature or bug gets a spec.md and a plan.md of phases and tasks.",
+      "source": "https://github.com/gemini-cli-extensions/conductor"
+    },
+    "verification": {
+      "text": "Automated review: static and logic analysis, checks against plan.md and spec.md, style guides, the test suite, and a basic security scan, with findings by severity.",
+      "source": "https://developers.googleblog.com/conductor-update-introducing-automated-reviews/"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want spec-first planning that lives in your repository as version-controlled files.",
+      "source": "https://github.com/gemini-cli-extensions/conductor"
+    },
+    {
+      "text": "You want a review step inside the agent that checks code against the plan, runs your tests and flags basic security issues.",
+      "source": "https://developers.googleblog.com/conductor-update-introducing-automated-reviews/"
+    },
+    {
+      "text": "You want git-aware revert by logical unit of work: track, phase or task.",
+      "source": "https://github.com/gemini-cli-extensions/conductor"
+    }
+  ],
+  "chooseUs": [
+    "You want several agents working at once, each in its own worktree, instead of one agent at a time.",
+    "You want the check to run as a separate agent in a disposable checkout, not inside the session that wrote the code.",
+    "You want a desktop app with a grid of lanes, a planner canvas and dispatch to idle agents."
+  ],
+  "faq": [
+    {
+      "q": "Can I use Google Conductor and Ninebrains together?",
+      "a": "They do different jobs. Conductor is a plugin inside an agent such as Claude Code; Ninebrains launches the Claude Code CLI unchanged in each lane, so an extension you install for Claude Code is available there too."
+    }
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

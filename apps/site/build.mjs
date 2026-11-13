@@ -14,6 +14,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   watch,
@@ -22,6 +23,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderIndex, renderPage } from './compare.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '../..');
@@ -89,7 +91,28 @@ function build() {
     page,
     readFileSync(page, 'utf8').replaceAll('__VERSION__', () => version)
   );
+  buildCompare();
   console.log(`site: built ${DIST}`);
+}
+
+/** One page per `compare/*.json`, an index, and their sitemap entries. See compare.mjs. */
+function buildCompare() {
+  const dir = join(HERE, 'compare');
+  const all = readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const c of all) {
+    const html = renderPage(c); // validates the slug before it names a folder
+    mkdirSync(join(DIST, 'compare', c.slug), { recursive: true });
+    writeFileSync(join(DIST, 'compare', c.slug, 'index.html'), html);
+  }
+  writeFileSync(join(DIST, 'compare', 'index.html'), renderIndex(all));
+  const urls = ['/compare/', ...all.map((c) => `/compare/${c.slug}/`)]
+    .map((p) => `  <url><loc>https://ninebrains.dev${p}</loc></url>`)
+    .join('\n');
+  const sitemap = join(DIST, 'sitemap.xml');
+  writeFileSync(sitemap, readFileSync(sitemap, 'utf8').replace('</urlset>', `${urls}\n</urlset>`));
 }
 
 build();
@@ -107,6 +130,7 @@ if (process.argv.includes('--watch')) {
     }, 80);
   };
   watch(SRC, { recursive: true }, rebuild);
+  watch(join(HERE, 'compare'), { recursive: true }, rebuild);
   if (existsSync(PUBLIC)) watch(PUBLIC, { recursive: true }, rebuild);
   console.log('site: watching src/ and public/');
 }

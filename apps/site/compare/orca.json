@@ -1,0 +1,70 @@
+{
+  "slug": "ninebrains-vs-orca",
+  "name": "Orca",
+  "url": "https://orca.dev",
+  "hosts": ["orca.dev", "github.com/stablyai"],
+  "title": "Ninebrains vs Orca",
+  "description": "Ninebrains vs Orca, the open-source agent development environment for running Claude Code, Codex and other agents in parallel worktrees: remotes, telemetry, planning and checks.",
+  "summary": "MIT, cross-platform, worktree per agent, strong on remotes and cloud VMs.",
+  "answer": "Orca and Ninebrains are both free, open-source, cross-platform apps that run Claude Code, Codex and other agents in parallel, each in its own git worktree. Choose Orca for SSH hosts, cloud VMs, a mobile companion and very broad agent support. Choose Ninebrains for a dependency-aware job graph, checks that block completion until they pass, and no telemetry.",
+  "cells": {
+    "what": {
+      "text": "An agent development environment that runs Claude Code, Codex and any other coding agent in parallel.",
+      "source": "https://orca.dev/"
+    },
+    "licence": {
+      "text": "MIT.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    "price": {
+      "text": "Free, using your own agent subscriptions.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    "platforms": {
+      "text": "macOS, Windows and Linux.",
+      "source": "https://orca.dev/"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, OpenCode, Grok and any other agent CLI.",
+      "source": "https://orca.dev/"
+    },
+    "isolation": {
+      "text": "A git worktree per agent, locally, on an SSH host or in a cloud VM.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    "planning": {
+      "text": "Coordinator agents that run worker agents, and task intake from GitHub and Linear. A dependency graph is not described.",
+      "source": "https://orca.dev/"
+    },
+    "verification": {
+      "text": "Diff review with line notes sent back to the agent, and failing checks or PR comments sent back to fix.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    "telemetry": {
+      "text": "Anonymous usage telemetry with no content, which you can turn off in Settings or with DO_NOT_TRACK=1.",
+      "source": "https://orca.dev/docs/telemetry"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want agents on SSH hosts or a cloud VM per worktree, still running while your laptop sleeps.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    {
+      "text": "You want agents to drive Orca itself from the command line: create worktrees, start workers, schedule automations.",
+      "source": "https://github.com/stablyai/orca"
+    },
+    {
+      "text": "You want an MIT licence and a very fast release cadence.",
+      "source": "https://github.com/stablyai/orca"
+    }
+  ],
+  "chooseUs": [
+    "You want jobs with dependencies, handed to idle lanes as they unblock.",
+    "You want completion blocked until configured checks pass, before you review, with three attempts before a job blocks.",
+    "You want no telemetry at all, rather than anonymous telemetry you opt out of."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

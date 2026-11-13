@@ -1,0 +1,53 @@
+{
+  "slug": "ninebrains-vs-manual-worktrees",
+  "name": "git worktrees and tmux",
+  "url": "https://git-scm.com/docs/git-worktree",
+  "hosts": ["git-scm.com", "github.com/tmux"],
+  "title": "Ninebrains vs running git worktrees and tmux yourself",
+  "description": "Do you need a tool to run coding agents in parallel, or are git worktree and tmux enough? What Ninebrains adds on top, and when the manual setup is the better choice.",
+  "summary": "Maximum composability, nothing to install. You build the plan and the checks yourself.",
+  "answer": "You can run Claude Code or Codex in parallel with nothing but git worktree and tmux, and for a power user who wants full control that is often enough. Ninebrains does the worktrees and panes for you, then adds what the manual setup lacks: a job graph with dependencies, a mailbox between lanes, and checks that must pass before work counts as done.",
+  "note": "Here the other column describes git and tmux themselves. Anything a manual setup has beyond them is whatever you script yourself.",
+  "cells": {
+    "what": {
+      "text": "git worktree lets one repository check out more than one branch at a time, each in its own working tree. tmux is a terminal multiplexer.",
+      "source": "https://git-scm.com/docs/git-worktree"
+    },
+    "licence": {
+      "text": "git is free and open source.",
+      "source": "https://git-scm.com/"
+    },
+    "price": {
+      "text": "Free.",
+      "source": "https://git-scm.com/"
+    },
+    "isolation": {
+      "text": "One working tree per branch, sharing one repository.",
+      "source": "https://git-scm.com/docs/git-worktree"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want maximum composability and already live in tmux: git worktree add plus a pane per agent is a few commands.",
+      "source": "https://git-scm.com/docs/git-worktree"
+    },
+    {
+      "text": "You want nothing new installed and nothing between you and the agents’ terminals.",
+      "source": "https://github.com/tmux/tmux"
+    }
+  ],
+  "chooseUs": [
+    "You want the worktrees, branches, terminals and cleanup handled for you, with a grid that shows each agent’s status.",
+    "You want a plan that knows which job depends on which, and hands ready jobs to idle agents.",
+    "You want a second run, with read-only tools in a disposable checkout, to check the work before you read it."
+  ],
+  "faq": [
+    {
+      "q": "Do git worktrees prevent merge conflicts between agents?",
+      "a": "No. Worktrees stop agents overwriting each other’s files at the same time. Two branches can still conflict when you merge them, and neither git nor Ninebrains removes that."
+    }
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

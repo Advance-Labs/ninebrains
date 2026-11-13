@@ -1,0 +1,54 @@
+{
+  "slug": "ninebrains-vs-claude-squad",
+  "name": "Claude Squad",
+  "url": "https://github.com/smtg-ai/claude-squad",
+  "hosts": ["github.com/smtg-ai", "smtg-ai.github.io"],
+  "title": "Ninebrains vs Claude Squad",
+  "description": "Ninebrains vs Claude Squad: a terminal app that manages parallel Claude Code, Codex and Gemini sessions in tmux and git worktrees, compared with a desktop workbench with checks.",
+  "summary": "Lightweight terminal app: tmux plus worktrees, any local agent. AGPL.",
+  "answer": "Claude Squad is a lightweight terminal app that runs several agents, such as Claude Code, Codex and Gemini, each in a tmux session and a git worktree, all managed from one terminal window. Choose it if you live in the terminal. Choose Ninebrains for a desktop grid, a dependency-aware job graph, and checks that must pass before work counts as done.",
+  "cells": {
+    "what": {
+      "text": "A terminal app that manages multiple Claude Code, Codex, Gemini and other local agents in separate workspaces.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    },
+    "licence": {
+      "text": "AGPL-3.0.",
+      "source": "https://github.com/smtg-ai/claude-squad/blob/main/LICENSE.md"
+    },
+    "agents": {
+      "text": "Claude Code, Codex, Gemini, Aider and other local agents.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    },
+    "isolation": {
+      "text": "tmux for a terminal session per agent, and git worktrees for a branch per session.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    },
+    "verification": {
+      "text": "You review changes before applying them, and check them out before pushing.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    }
+  },
+  "chooseThem": [
+    {
+      "text": "You want to stay in one terminal window, with nothing heavier than tmux.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    },
+    {
+      "text": "You want tasks to run in the background, including in auto-accept mode.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    },
+    {
+      "text": "You want to run any local CLI agent by passing its command.",
+      "source": "https://github.com/smtg-ai/claude-squad"
+    }
+  ],
+  "chooseUs": [
+    "You want a desktop grid of lanes with an editor, diffs and a browser per lane.",
+    "You want a job graph with dependencies, dispatched to idle agents.",
+    "You want completion blocked until tests, a screenshot check or a read-only reviewer pass, with retries."
+  ],
+  "checked": "2026-11-13",
+  "published": "2026-11-13",
+  "updated": "2026-11-13"
+}

@@ -23,7 +23,7 @@ test('ships every asset the page references', () => {
     const path = match[1];
     if (path.startsWith('//')) continue;
     assert.doesNotThrow(
-      () => readFileSync(join(DIST, path.slice(1))),
+      () => readFileSync(join(DIST, path.slice(1), path.endsWith('/') ? 'index.html' : '')),
       `referenced but not built: ${path}`
     );
   }
