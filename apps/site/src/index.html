@@ -89,7 +89,7 @@
         "url": "https://ninebrains.dev/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Windows, Linux",
-        "softwareVersion": "0.1.0",
+        "softwareVersion": "__VERSION__",
         "downloadUrl": "https://github.com/Advance-Labs/ninebrains/releases/latest",
         "description": "Open-source desktop workbench that runs parallel Claude Code and Codex agents, each in its own git worktree, with a central Brain and independent verification gates.",
         "license": "https://www.apache.org/licenses/LICENSE-2.0",
@@ -1188,7 +1188,7 @@
           verifies the build attestation, and installs nothing if that fails.
         </p>
         <pre><code>shasum -a 256 -c SHA256SUMS --ignore-missing
-gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebrains</code></pre>
+gh attestation verify Ninebrains-*-mac-arm64.dmg --repo Advance-Labs/ninebrains</code></pre>
         <p>
           A checksum proves you have the exact bytes the release published. It does not prove who
           built them, so only install from <code>github.com/Advance-Labs/ninebrains</code> or this

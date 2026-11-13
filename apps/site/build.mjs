@@ -9,7 +9,16 @@
  * 3D intro is hand-written WebGL. `public/` (the install scripts) is copied to the site root as-is.
  * The whole build is a file copy on purpose.
  */
-import { cpSync, existsSync, mkdirSync, realpathSync, rmSync, watch } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  watch,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +74,21 @@ function build() {
     if (!existsSync(source)) throw new Error(`site: missing asset ${from}`);
     cpSync(source, join(DIST, 'assets', name));
   }
+
+  // The structured data and the verify dialog name the release. Stamp it from the app's own
+  // package.json so search engines and answer engines never quote a release we shipped months ago.
+  const { version } = JSON.parse(
+    readFileSync(join(REPO, 'apps/emdash-desktop/package.json'), 'utf8')
+  );
+  // It lands inside a JSON-LD script, so anything but plain semver fails the build.
+  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
+    throw new Error(`site: refusing to stamp version ${JSON.stringify(version)}`);
+  }
+  const page = join(DIST, 'index.html');
+  writeFileSync(
+    page,
+    readFileSync(page, 'utf8').replaceAll('__VERSION__', () => version)
+  );
   console.log(`site: built ${DIST}`);
 }
 

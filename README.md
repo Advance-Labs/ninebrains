@@ -15,6 +15,8 @@
 
 <p align="center">
   <a href="LICENSE.md"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-fafafa?style=flat-square&labelColor=27272a"></a>
+  <a href="https://github.com/Advance-Labs/ninebrains/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Advance-Labs/ninebrains?style=flat-square&labelColor=27272a&color=fafafa&label=release"></a>
+  <a href="https://github.com/Advance-Labs/ninebrains/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Advance-Labs/ninebrains?style=flat-square&labelColor=27272a&color=fafafa"></a>
   <a href="https://github.com/Advance-Labs/ninebrains/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/Advance-Labs/ninebrains/ci.yml?style=flat-square&labelColor=27272a&label=ci"></a>
   <img alt="Platforms: macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-fafafa?style=flat-square&labelColor=27272a">
   <img alt="Telemetry: none" src="https://img.shields.io/badge/telemetry-none-fafafa?style=flat-square&labelColor=27272a">
@@ -56,7 +58,7 @@ Ninebrains is a fork of [Emdash](https://github.com/generalaction/emdash) by Gen
 also get its worktrees, terminals, Monaco editor, diffs, pull requests, issue integrations, MCP
 servers, skills and automations.
 
-> **Status:** [v0.1.0](https://github.com/Advance-Labs/ninebrains/releases/latest) is out for macOS, Windows and Linux. It is an early release, and builds are not yet code-signed.
+> **Status:** early but shipping often. The [latest release](https://github.com/Advance-Labs/ninebrains/releases/latest) is out for macOS, Windows and Linux; builds are not yet code-signed.
 
 ## Features
 
@@ -188,12 +190,12 @@ Get the latest build from [GitHub Releases](https://github.com/Advance-Labs/nine
 
 | OS | File |
 |---|---|
-| macOS, Apple Silicon | `Ninebrains-0.1.0-mac-arm64.dmg` |
-| macOS, Intel | `Ninebrains-0.1.0-mac-x64.dmg` |
-| Windows | `Ninebrains-0.1.0-win-x64.exe` |
-| Linux | `Ninebrains-0.1.0-linux-x86_64.AppImage` or `…-linux-amd64.deb` |
+| macOS, Apple Silicon | `Ninebrains-<version>-mac-arm64.dmg` |
+| macOS, Intel | `Ninebrains-<version>-mac-x64.dmg` |
+| Windows | `Ninebrains-<version>-win-x64.exe` |
+| Linux | `Ninebrains-<version>-linux-x86_64.AppImage` or `…-linux-amd64.deb` |
 
-v0.1 builds are **not code-signed**. macOS Gatekeeper and Windows SmartScreen will warn you, and
+Builds are **not code-signed** yet. macOS Gatekeeper and Windows SmartScreen will warn you, and
 that is the layer the one-line installer and the in-app updater work around, not through. Updates
 installed from **inside** the app are signed with Ninebrains' own Ed25519 update key; check every
 **manual** download against the release's `SHA256SUMS` file and build attestation before you open
@@ -201,7 +203,7 @@ it:
 
 ```bash
 shasum -a 256 -c SHA256SUMS --ignore-missing
-gh attestation verify Ninebrains-0.1.0-mac-arm64.dmg --repo Advance-Labs/ninebrains
+gh attestation verify Ninebrains-<version>-mac-arm64.dmg --repo Advance-Labs/ninebrains
 ```
 
 [docs/RELEASING.md](docs/RELEASING.md) covers Windows and Linux, and how to open an unsigned app.

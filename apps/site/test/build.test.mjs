@@ -39,7 +39,10 @@ test('carries the head tags search and social cards need', () => {
   assert.match(flat, /<link rel="canonical" href="https:\/\/[^"]+"/);
   assert.match(flat, /<meta name="twitter:card" content="summary_large_image"/);
   assert.match(flat, /"@type": "SoftwareApplication"/);
-  assert.match(flat, /"softwareVersion": "0\.1\.0"/);
+  const pkg = join(APP, '../emdash-desktop/package.json');
+  const { version } = JSON.parse(readFileSync(pkg, 'utf8'));
+  assert.ok(flat.includes(`"softwareVersion": "${version}"`), 'stamps the shipped version');
+  assert.ok(!html.includes('__VERSION__'), 'leaves no version placeholder unstamped');
 });
 
 test('every image has alt text', () => {
