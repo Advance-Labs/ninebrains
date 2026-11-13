@@ -11,6 +11,7 @@ import {
   taskHostActionAvailability,
 } from '@core/features/tasks/api/browser/task-state/task-selectors';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
+import { cycleFocusRegion, focusRegion } from '@core/features/workbench/api/browser/focus-regions';
 import { applyHistoryEntry } from '@core/features/workbench/browser/nav-buttons';
 import { useWorkspaceLayoutContext } from '@core/features/workbench/contributions/browser/layout-provider';
 import { openModal } from '@core/manifests/browser/modal-api';
@@ -37,7 +38,7 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
   const { currentView } = useWorkspaceSlots();
   const taskParams = useViewParams(taskViewDef);
   const projectParams = useViewParams(projectViewDef);
-  const { toggleLeftSidebar, toggleZenMode } = useWorkspaceLayoutContext();
+  const { isLeftOpen, toggleLeftSidebar, toggleZenMode } = useWorkspaceLayoutContext();
 
   const currentProjectId =
     currentView === 'task'
@@ -120,6 +121,24 @@ export function WindowScope({ children }: { readonly children: ReactNode }) {
     }),
     'workbench.toggleLeftSidebar': () => ({
       execute: () => toggleLeftSidebar(),
+    }),
+    'workbench.focusSidebar': () => ({
+      execute: () => {
+        if (focusRegion('sidebar')) return;
+        if (!isLeftOpen) toggleLeftSidebar();
+        // The sidebar mounts on the next render; retry for a few frames.
+        let frames = 0;
+        const retry = () => {
+          if (!focusRegion('sidebar') && ++frames < 10) requestAnimationFrame(retry);
+        };
+        requestAnimationFrame(retry);
+      },
+    }),
+    'workbench.focusNextRegion': () => ({
+      execute: () => void cycleFocusRegion(1),
+    }),
+    'workbench.focusPreviousRegion': () => ({
+      execute: () => void cycleFocusRegion(-1),
     }),
     'devPerf.processPanel': () => ({
       execute: () => {
