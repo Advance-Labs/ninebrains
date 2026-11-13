@@ -25,6 +25,7 @@ import {
   type TerminalDrawerDragData,
 } from '@core/features/terminals/api/browser/task-terminal/terminal-drag';
 import { TerminalsPanel } from '@core/features/terminals/contributions/browser/task-terminal/terminal-panel';
+import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
 import { useTaskComposition } from '@core/features/workbench/api/browser/task-composition-context';
 import { PaneProvider } from '@core/features/workbench/contributions/browser/tabs/pane-provider';
 import { createLayoutStorage, type MementoLayoutStorage } from '@core/primitives/mementos/browser';
@@ -116,7 +117,9 @@ export const TaskMainColumn = observer(function TaskMainColumn() {
     >
       <Resizable.Group orientation="vertical" id="task-main-vertical" {...drawerBinding.groupProps}>
         <Resizable.Panel id="task-main-content" minSize="30%">
-          <SplitPaneLayout storage={layoutStorage} />
+          <div {...focusRegionAttr('main')} tabIndex={-1} className="h-full outline-none">
+            <SplitPaneLayout storage={layoutStorage} />
+          </div>
         </Resizable.Panel>
         {/* Closed = panel AND handle unmounted (sync contract: never program
             the panels). Terminal content survives the unmount because each

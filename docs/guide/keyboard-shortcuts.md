@@ -75,6 +75,33 @@ These have no key, and are in the command palette: View terminals, the browser's
 Reload, Focus URL and Open externally, Git fetch, pull and push, Pin task, and Convert to regular
 task.
 
+## Moving between regions
+
+You can drive the whole window without a mouse. F6 and Shift+F6 move focus through the sidebar,
+the main area, the terminal drawer and the right sidebar, in that order. A region that is closed
+is skipped. They work while a terminal has focus.
+
+| Command | Keys |
+|---|---|
+| Focus sidebar (opens it if hidden) | Mod+Shift+0 |
+| Next region / Previous region (works in terminal) | F6 / Shift+F6 |
+
+Mod+0 is not used, because Electron already uses it to reset the zoom.
+
+## Sidebar list
+
+Press Mod+Shift+0, then use these keys. The keys apply while the list has focus, so typing in a
+text field is not affected.
+
+| Keys | Does |
+|---|---|
+| Down / Up, or j / k | Move to the next or previous row |
+| Home / End | Jump to the first or last row |
+| Right | Expand a project, or move to its first task |
+| Left | Collapse a project, or move from a task to its project |
+| Enter | Open the project or task |
+| Space | Open a task, or expand or collapse a project |
+
 ## Editor and terminal
 
 | Command | Keys |

@@ -1421,3 +1421,14 @@ System mode used to follow the OS between fixed Light and Dark. It now reads a p
 | `packages/ui/src/react/components/agent-status/agent-status.tsx` | `completed` label → "Agent finished, not yet viewed" | Names the state the dot actually means |
 | `packages/ui/src/react/components/agent-status/agent-status.stories.tsx` | Story label "Completed (done, unseen)" | The story covers every state |
 | `apps/emdash-desktop/src/core/features/conversations/api/browser/conversation-seen-status.browser.test.ts` | New test of seen/clear and task-level ranking | Guards the behaviour that was untested |
+
+## 97. Keyboard-only sidebar and region focus (`feat/keyboard-navigation`)
+
+The sidebar tree takes arrow, `j`/`k`, Home/End, Enter and Space keys, and F6 / Shift+F6 cycle focus through the sidebar, main area, terminal drawer and right sidebar. New files: `workbench/api/browser/focus-regions.ts` (region order and DOM focus), `workbench/browser/sidebar/sidebar-tree-keys.ts` (pure key mapping), and their tests.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/workbench/browser/sidebar/sidebar-virtual-list.tsx` | `role="tree"` with `aria-activedescendant`, `treeitem` rows, key handler, scroll the focused row into view | Keyboard control of the virtualized list |
+| `src/core/features/workbench/contributions/commands.ts`, `palette.ts`, `src/core/features/workbench/browser/window-scope.tsx` | Commands `workbench.focusSidebar` (Mod+Shift+0), `focusNextRegion` (F6), `focusPreviousRegion` (Shift+F6) | Rebindable in Settings; Mod+0 is Electron zoom reset |
+| `src/core/features/tasks/browser/view/task-main-column.tsx`, `task-sidebar.tsx`, `src/core/features/terminals/contributions/browser/task-terminal/terminal-panel.tsx` | `data-focus-region` marker on the main area, right sidebar and terminal drawer | F6 finds the regions that are on screen |
+| `docs/guide/keyboard-shortcuts.md` | New sections for region focus and the sidebar list | User docs |

@@ -2,6 +2,7 @@ import { observer } from 'mobx-react-lite';
 import { SidebarConversationsList } from '@core/features/conversations/contributions/browser/sidebar-conversations-list';
 import { EditorFileTree } from '@core/features/editor/contributions/browser/editor-file-tree';
 import { ChangesPanel } from '@core/features/source-control/contributions/browser/changes-panel';
+import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
 import { useTaskComposition } from '@core/features/workbench/api/browser/task-composition-context';
 
 /**
@@ -23,7 +24,11 @@ export const TaskSidebar = observer(function TaskSidebar() {
   const activeTab = taskView.sidebarTab;
 
   return (
-    <div className="h-full min-h-0 overflow-hidden">
+    <div
+      {...focusRegionAttr('right')}
+      tabIndex={-1}
+      className="h-full min-h-0 overflow-hidden outline-none"
+    >
       {activeTab === 'conversations' && <SidebarConversationsList />}
       {activeTab === 'changes' && <ChangesPanel />}
       {activeTab === 'files' && <EditorFileTree />}
