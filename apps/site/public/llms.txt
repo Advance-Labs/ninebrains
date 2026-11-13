@@ -69,6 +69,31 @@ Q: How do agents avoid conflicting with each other?
 A: Each lane works in its own git worktree and branch, so lanes cannot write to each other's
 files.
 
+Q: How do I run several Claude Code agents in parallel on one repository?
+A: Open the repository in Ninebrains and start lanes. Each lane runs your own `claude` or `codex`
+CLI in its own git worktree and branch, four lanes to a tab and as many tabs as you want. The
+practical ceiling is your machine and your provider's rate limits.
+
+Q: How is it different from running git worktrees in tmux myself?
+A: Worktrees and panes are the easy half, and Ninebrains does that for you. It adds a plan that
+knows which job depends on which, a mailbox so lanes can talk, and a gate that makes a second,
+independent agent prove the work before it counts as done.
+
+Q: How does Ninebrains compare with Claude Code on its own, and with Emdash?
+A: They are layers, not rivals. Ninebrains launches Claude Code unchanged, and it is a fork of
+Emdash. Claude Code alone is one agent per terminal. Emdash adds worktrees, split panes and many
+agent CLIs. Ninebrains adds a 2x2 grid of lanes, a Brain job graph with a planner canvas,
+verification gates (three attempts, then blocked), and no telemetry.
+
+Q: Can agents review each other's work?
+A: Yes, through gates. The reviewer gate runs a fresh agent with read-only tools in a disposable
+checkout, and it can be a different provider from the one that wrote the code.
+
+Q: Do I need an API key?
+A: No. Ninebrains starts the CLIs you are already logged in to, so a Claude or ChatGPT
+subscription login works as it does in your terminal. An API key or local model server is
+optional, set per lane, and stored in your OS keychain.
+
 Q: Does Ninebrains see my API keys or logins?
 A: No. It runs the CLIs you are already logged in to and never touches your credentials.
 
