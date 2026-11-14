@@ -80,6 +80,21 @@
     <link rel="preconnect" href="https://advancelabs.dev" />
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/transition.css" />
+    <!-- Page transitions to and from /compare/. Arriving by one, the content sweeps in already
+         open, so the loading mark would only flash: transition.js marks the root `vt-arrive`,
+         the rule below hides the mark, and site.js finds it hidden and skips the opening. -->
+    <script src="/transition.js"></script>
+    <link rel="expect" href="#foot" blocking="render" />
+    <style>
+      .vt-arrive #intro {
+        display: none;
+      }
+      /* The eclipse is already on screen from the page we left: no fade-in, it just stays. */
+      .vt-arrive #scene {
+        transition: none;
+      }
+    </style>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -142,6 +157,7 @@
         <span>ninebrains</span>
       </a>
       <nav>
+        <a href="/compare/">Compare</a>
         <a href="https://ninebrains.dev/docs">Docs</a>
         <a href="https://github.com/Advance-Labs/ninebrains">GitHub</a>
       </nav>
@@ -1155,7 +1171,7 @@
       </div>
     </main>
 
-    <footer>
+    <footer id="foot">
       <p>
         Apache-2.0, a fork of <a href="https://github.com/generalaction/emdash">Emdash</a>. Runs the
         CLIs you are logged in to and never touches your credentials.

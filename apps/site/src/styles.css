@@ -162,6 +162,8 @@ footer {
   font-size: 17px;
   letter-spacing: -0.02em;
   text-decoration: none;
+  /* Glides into the /compare/ pages' header; see transition.css. */
+  view-transition-name: nb-brand;
 }
 
 .mark {

@@ -1,0 +1,75 @@
+/*
+ * The move between the homepage and the /compare/ pages (cross-document view transitions).
+ * Linked from both pages; transition.js names the parts per direction.
+ *
+ *  - root: the header and the background. Both pages draw the same eclipse in the same place, so
+ *    a short cross-fade reads as nothing moving; only what differs (the homepage cubes) dissolves.
+ *  - nb-out / nb-foot-out: the leaving page's content sinks back, dimmer and blurred.
+ *  - nb-in / nb-foot-in: the arriving content is swept in by a soft-edged circle growing out of
+ *    the eclipse in the bottom-right corner, while the eclipse itself flares (stage.js, flow.js).
+ *
+ * Browsers without cross-document view transitions just navigate. Reduced motion gets none.
+ */
+@property --nb-reveal {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::view-transition-group(root) {
+    animation-duration: 0.6s;
+  }
+
+  ::view-transition-group(nb-out),
+  ::view-transition-group(nb-foot-out),
+  ::view-transition-group(nb-in),
+  ::view-transition-group(nb-foot-in) {
+    animation: none;
+  }
+
+  ::view-transition-old(nb-out),
+  ::view-transition-old(nb-foot-out) {
+    animation: nb-sink 0.55s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  ::view-transition-new(nb-in),
+  ::view-transition-new(nb-foot-in) {
+    /* Centred near the eclipse: the content's right edge, one viewport down from its top (a long
+       /compare/ page's box runs far below the window, so 100% would start the sweep off-screen). */
+    mask-image: radial-gradient(
+      circle at 100% 100vh,
+      #000 var(--nb-reveal),
+      transparent calc(var(--nb-reveal) + 260px)
+    );
+    animation: nb-sweep 1s cubic-bezier(0.55, 0, 0.25, 1) both;
+  }
+
+  ::view-transition-group(nb-brand) {
+    animation-duration: 0.6s;
+  }
+}
+
+@keyframes nb-sink {
+  to {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translate(-24px, -12px) scale(0.97);
+  }
+}
+
+@keyframes nb-sweep {
+  from {
+    --nb-reveal: 0px;
+    filter: blur(6px);
+  }
+  to {
+    /* Past the far corner: a window's diagonal is at most ~1.42 x its longer side. */
+    --nb-reveal: calc(142vmax + 260px);
+    filter: blur(0);
+  }
+}
