@@ -161,6 +161,8 @@ const head = ({ title, description, path, extra = '' }) => `<!doctype html>
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/compare.css" />
     <link rel="stylesheet" href="/transition.css" />
+    <script src="/transition.js"></script>
+    <link rel="expect" href="#foot" blocking="render" />
     <!-- Render-blocking so the background is already drawn in the frame a transition captures. -->
     <script type="module" src="/flow.js" blocking="render"></script>
 ${extra}  </head>
@@ -171,12 +173,12 @@ ${extra}  </head>
         <svg class="mark" viewBox="0 0 70 70" aria-hidden="true" focusable="false">${MARK}</svg>
         <span>ninebrains</span>
       </a>
-      <nav><a href="/compare/">Compare</a><a href="/docs/">Docs</a><a href="https://github.com/Advance-Labs/ninebrains">GitHub</a></nav>
+      <nav><a href="/compare/">Compare</a><a href="https://ninebrains.dev/docs">Docs</a><a href="https://github.com/Advance-Labs/ninebrains">GitHub</a></nav>
     </header>
     <main>`;
 
 const foot = `    </main>
-    <footer>
+    <footer id="foot">
       <p>Apache-2.0, a fork of <a href="https://github.com/generalaction/emdash">Emdash</a>. Built by <a href="https://advancelabs.dev">${ORG}</a></p>
       <p><a href="/compare/">All comparisons</a> · <a href="/docs/gates/">How gates work</a> · <a href="/docs/lanes/">Lanes</a> · <a href="/llms.txt">llms.txt</a></p>
     </footer>

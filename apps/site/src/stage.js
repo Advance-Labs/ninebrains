@@ -1419,7 +1419,25 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  /**
+   * The surge: 0 to 1 and back over 1.2s after the page arrives by a view transition
+   * (transition.js sets `nbSurgeAt`). The eclipse swells toward the sweeping text, the field and
+   * dust brighten, and the cubes flash, so the scene answers the transition.
+   */
+  function surge(now) {
+    const at = globalThis.nbSurgeAt;
+    if (reduced || at == null) return 0;
+    const k = (now - at) / 1200;
+    if (k <= 0 || k >= 1) return 0;
+    const e = k < 0.22 ? k / 0.22 : 1 - (k - 0.22) / 0.78;
+    return e * e * (3 - 2 * e);
+  }
+
+  /** This frame's surge, shared by the field, the dust and the cubes (drawLayer). */
+  let flare = 0;
+
   function draw(now) {
+    flare = surge(now);
     resize();
     const colors = palette();
     const ground = GROUND.dark;
@@ -1441,11 +1459,12 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.uniform2f(field.u.uRes, width, height);
     gl.uniform1f(field.u.uDpr, dpr);
     gl.uniform2f(field.u.uCenter, center[0], center[1]);
-    gl.uniform1f(field.u.uRadius, g.radius);
+    const radius = g.radius + 28 * g.scale * flare;
+    gl.uniform1f(field.u.uRadius, radius);
     gl.uniform1f(field.u.uScale, g.scale);
     gl.uniform1f(field.u.uFrame, frames);
     gl.uniform1f(field.u.uWaveK, g.waveK);
-    gl.uniform1f(field.u.uLight, 0);
+    gl.uniform1f(field.u.uLight, 0.3 * flare);
     gl.uniform3fv(field.u.uBase, colors.base);
     gl.uniform3fv(field.u.uEdge, colors.edge);
     gl.uniform3fv(field.u.uSky, colors.sky);
@@ -1460,13 +1479,13 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.uniform2f(dust.u.uRes, width, height);
     gl.uniform1f(dust.u.uDpr, dpr);
     gl.uniform2f(dust.u.uCenter, center[0], center[1]);
-    gl.uniform1f(dust.u.uRadius, g.radius);
+    gl.uniform1f(dust.u.uRadius, radius);
     gl.uniform1f(dust.u.uScale, g.scale);
     gl.uniform1f(dust.u.uFrame, frames);
     gl.uniform2f(dust.u.uArc, g.arc[0], g.arc[1]);
     gl.uniform1f(dust.u.uDepth, g.depth);
     gl.uniform3fv(dust.u.uSilver, colors.silver);
-    gl.uniform1f(dust.u.uDustAlpha, colors.dustAlpha);
+    gl.uniform1f(dust.u.uDustAlpha, colors.dustAlpha * (1 + 1.6 * flare));
     gl.drawArrays(gl.POINTS, 0, g.count);
 
     // 3. the diorama: floor, shadows, cubes and wires, framed into the safe rectangle
@@ -1581,7 +1600,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
         cube.u.uSize,
         a.s.map((v) => Math.max(v, 1e-3))
       );
-      gl.uniform1f(cube.u.uBright, a.b * (0.55 + 0.45 * dim));
+      gl.uniform1f(cube.u.uBright, a.b * (0.55 + 0.45 * dim) * (1 + 0.7 * flare));
       gl.uniform1f(cube.u.uAlpha, a.a);
       gl.uniform4fv(cube.u.uTint, a.tint);
       gl.uniform1f(cube.u.uRound, a.round ?? 0);

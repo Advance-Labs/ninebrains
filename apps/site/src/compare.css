@@ -39,8 +39,8 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px var(--gutter);
-  border-bottom: 1px solid var(--line);
+  height: clamp(48px, 7vh, 64px);
+  padding: 0 var(--gutter);
 }
 .top .brand {
   display: inline-flex;
@@ -68,11 +68,13 @@ a:hover {
   z-index: -1;
   pointer-events: none;
 }
-.top,
 footer {
   position: relative;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
+}
+.top {
+  position: relative;
 }
 main {
   position: relative;
@@ -89,7 +91,7 @@ article {
 }
 .top nav {
   display: flex;
-  gap: 20px;
+  gap: 22px;
   font-size: 14px;
 }
 .top nav a {

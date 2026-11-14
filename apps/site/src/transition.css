@@ -1,10 +1,12 @@
 /*
  * The move between the homepage and the /compare/ pages (cross-document view transitions).
- * Linked from both, so both sides of a navigation opt in with the same rules.
+ * Linked from both pages; transition.js names the parts per direction.
  *
- * The new page is revealed by a soft-edged circle sweeping out of the bottom-right corner, where
- * the eclipse sits on both pages, while the old page sinks back: dimmer, blurred, a touch smaller.
- * The brand mark (`view-transition-name: nb-brand`) glides between the two headers.
+ *  - root: the header and the background. Both pages draw the same eclipse in the same place, so
+ *    a short cross-fade reads as nothing moving; only what differs (the homepage cubes) dissolves.
+ *  - nb-out / nb-foot-out: the leaving page's content sinks back, dimmer and blurred.
+ *  - nb-in / nb-foot-in: the arriving content is swept in by a soft-edged circle growing out of
+ *    the eclipse in the bottom-right corner, while the eclipse itself flares (stage.js, flow.js).
  *
  * Browsers without cross-document view transitions just navigate. Reduced motion gets none.
  */
@@ -20,43 +22,54 @@
   }
 
   ::view-transition-group(root) {
-    animation-duration: 0.9s;
+    animation-duration: 0.6s;
   }
 
-  ::view-transition-old(root) {
-    animation: nb-sink 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+  ::view-transition-group(nb-out),
+  ::view-transition-group(nb-foot-out),
+  ::view-transition-group(nb-in),
+  ::view-transition-group(nb-foot-in) {
+    animation: none;
   }
 
-  ::view-transition-new(root) {
-    /* The circle's edge is a gradient, not a hard clip, so the page arrives like a tide. */
+  ::view-transition-old(nb-out),
+  ::view-transition-old(nb-foot-out) {
+    animation: nb-sink 0.55s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  ::view-transition-new(nb-in),
+  ::view-transition-new(nb-foot-in) {
+    /* Centred near the eclipse: the content's right edge, one viewport down from its top (a long
+       /compare/ page's box runs far below the window, so 100% would start the sweep off-screen). */
     mask-image: radial-gradient(
-      circle at 100% 100%,
+      circle at 100% 100vh,
       #000 var(--nb-reveal),
-      transparent calc(var(--nb-reveal) + 220px)
+      transparent calc(var(--nb-reveal) + 260px)
     );
-    animation: nb-reveal 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+    animation: nb-sweep 1s cubic-bezier(0.55, 0, 0.25, 1) both;
   }
 
   ::view-transition-group(nb-brand) {
-    animation-duration: 0.7s;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    animation-duration: 0.6s;
   }
 }
 
 @keyframes nb-sink {
   to {
-    opacity: 0.15;
-    filter: blur(10px);
-    transform: scale(0.96);
+    opacity: 0;
+    filter: blur(12px);
+    transform: translate(-24px, -12px) scale(0.97);
   }
 }
 
-@keyframes nb-reveal {
+@keyframes nb-sweep {
   from {
     --nb-reveal: 0px;
+    filter: blur(6px);
   }
   to {
-    /* Past the far corner: a window's diagonal is at most ~1.42 x its longer side, plus the edge. */
-    --nb-reveal: calc(142vmax + 220px);
+    /* Past the far corner: a window's diagonal is at most ~1.42 x its longer side. */
+    --nb-reveal: calc(142vmax + 260px);
+    filter: blur(0);
   }
 }
