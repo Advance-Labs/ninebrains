@@ -79,7 +79,9 @@ main {
 }
 /* Long-form text never sits directly on the brightest dust. */
 article {
-  text-shadow: 0 0 18px #000, 0 0 6px #000;
+  text-shadow:
+    0 0 18px #000,
+    0 0 6px #000;
 }
 .table {
   background: rgba(0, 0, 0, 0.72);
