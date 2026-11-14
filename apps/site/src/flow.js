@@ -1,16 +1,17 @@
 /**
- * The background for the reading pages (/compare/): a 2D-canvas echo of the homepage stage.
+ * The background for the reading pages (/compare/): a 2D-canvas port of the homepage stage's field
+ * and dust (stage.js), so the eclipse holds still when a page transition swaps the two pages.
  *
- * The limb of a huge off-screen circle sits in the bottom-right corner, at exactly the homepage's
- * geometry (stage.js `limb()`), so the eclipse holds still when a page transition swaps the two.
- * It is drawn once per resize as a dithered field of 2px cells in three greys. Dust drifts off it along a slow flow field, snapped
- * to the same 2px grid, and a brightness wave travels along the rim by biasing where dust is born.
+ * Same geometry (stage.js `limb()`): a huge circle whose centre sits far up and to the left, its
+ * edge crossing the bottom-right corner. Same field: outside the circle a bright edge, then three
+ * dithered tiers of grey falling away (sky, mid, far), drawn once per resize in 2px cells. Same
+ * dust: specks that sink slowly inward from the rim, each to its own depth, wandering a little.
  *
- * When the page arrives by a view transition, the eclipse surges (see transition.js): it swells
- * toward the sweeping text, brightens, and throws a burst of dust.
+ * When the page arrives by a view transition (transition.js sets `nbSurgeAt`) the eclipse surges
+ * with the sweeping text: the rim moves in toward it, glows, and the dust brightens and quickens.
  *
- * It is decoration: no WebGL, no dependency, a few hundred rects a frame. The loop stops while the
- * tab is hidden; under reduced motion it draws one still frame. Any failure leaves the black page.
+ * Decoration only: no WebGL, no dependency. The loop stops while the tab is hidden; under reduced
+ * motion it draws one still frame. Any failure leaves the black page.
  */
 
 const canvas = document.getElementById('flow');
@@ -19,8 +20,8 @@ const ctx = canvas && canvas.getContext('2d');
 if (ctx) {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const CELL = 2;
-  const GREYS = ['#2e2e2e', '#7a7a7a', '#d6d6d6'];
-  const COUNT = 1300;
+  /** far, mid, sky: the stage's three inks, darkest first. */
+  const GREYS = ['#3a3a3a', '#8c8c8c', '#e6e6e6'];
   const rim = document.createElement('canvas');
   const rctx = rim.getContext('2d');
   let W = 0;
@@ -28,11 +29,10 @@ if (ctx) {
   let R = 0;
   let cx = 0;
   let cy = 0;
-  let t1 = 0;
-  let t2 = 0;
-  /** Unit vector from the circle's centre to the middle of the visible rim (up and to the left). */
-  let out = [0, 0];
-  let burst = false;
+  let scale = 1;
+  let arc = [0, 0];
+  /** Unit vector from the rim's middle toward the circle's centre: up and to the left. */
+  let inward = [0, 0];
   let dust = [];
   let last = 0;
   let frame = 0;
@@ -47,30 +47,16 @@ if (ctx) {
     return e * e * (3 - 2 * e);
   };
 
-  const born = (t, scatter) => {
-    // Two births in five land near the travelling wave, so a bright run moves along the rim.
-    const mid = (t1 + t2) / 2;
-    const half = (t2 - t1) / 2 + 0.08;
-    const wave = mid + Math.sin(t * 0.00011) * half * 0.9;
-    // Born only where the rim is on screen, so every particle can be seen drifting away.
-    let a = mid;
-    for (let tries = 0; tries < 12; tries++) {
-      a =
-        Math.random() < 0.4
-          ? wave + (Math.random() - 0.5) * 0.18
-          : mid + (Math.random() * 2 - 1) * half;
-      const x = cx + Math.cos(a) * R;
-      const y = cy + Math.sin(a) * R;
-      if (x > -20 && x < W + 20 && y > -20 && y < H + 20) break;
-    }
-    const r = R + Math.random() * 6;
-    const life = 7000 + Math.random() * 9000;
+  /** One speck, seeded as stage.js's dust vertex shader seeds it. */
+  const speck = () => {
+    const maxDepth = Math.max(420 * scale * (1 - Math.cbrt(Math.random())), 14 * scale);
     return {
-      x: cx + Math.cos(a) * r,
-      y: cy + Math.sin(a) * r,
-      age: scatter ? Math.random() * life : 0,
-      life,
-      glow: 0.55 + Math.random() * 0.45,
+      theta: arc[0] + Math.random() * (arc[1] - arc[0]),
+      maxDepth,
+      speed: (0.14 + Math.random() * 0.22) * scale,
+      depth: Math.random() * maxDepth,
+      freq: 0.004 + Math.random() * 0.011,
+      phase: Math.random() * Math.PI * 2,
     };
   };
 
@@ -84,7 +70,9 @@ if (ctx) {
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // stage.js limb(): the rim crosses the bottom edge at 52% and the right edge at 44% height.
+
+    // stage.js limb(), in y-down canvas space.
+    scale = Math.min(Math.max(Math.sqrt((W * H) / (1920 * 1080)), 0.5), 2);
     const portrait = H > W;
     const p1 = [W * (portrait ? 0.3 : 0.52), H];
     const p2 = [W, H * (portrait ? 0.62 : 0.44)];
@@ -97,25 +85,36 @@ if (ctx) {
     cy = (p1[1] + p2[1]) / 2 + normal[1] * reach * sign;
     R = Math.hypot(p1[0] - cx, p1[1] - cy);
     const theta = (p) => Math.atan2(p[1] - cy, p[0] - cx);
-    [t1, t2] = [theta(p1), theta(p2)].sort((a, b) => a - b);
-    const m = (t1 + t2) / 2;
-    out = [Math.cos(m), Math.sin(m)];
-    paintRim();
-    dust = Array.from({ length: still ? COUNT / 2 : COUNT }, () => born(0, true));
+    const [a, b] = [theta(p1), theta(p2)].sort((x, y) => x - y);
+    arc = [a - 0.08, b + 0.08];
+    const m = (a + b) / 2;
+    inward = [-Math.cos(m), -Math.sin(m)];
+
+    paintField();
+    const count = Math.round(Math.min(Math.max((W * H) / 260, 1800), 7000));
+    dust = Array.from({ length: count }, speck);
   };
 
-  /** The limb: bright at the edge, fading into the body inside and into grain outside. */
-  const paintRim = () => {
+  /** The field outside the circle: stage.js's sky, mid and far inks as dither probabilities. */
+  const paintField = () => {
     rctx.clearRect(0, 0, W, H);
     const cells = [[], [], []];
+    const s = scale;
     for (let y = 0; y < H; y += CELL) {
       for (let x = 0; x < W; x += CELL) {
-        const d = Math.hypot(x - cx, y - cy) - R; // negative inside the circle
-        if (d > 90 || d < -220) continue;
-        const v = d < 0 ? 0.9 * Math.exp(d / 55) : 0.75 * Math.exp(-d / 9);
+        const d = Math.hypot(x - cx, y - cy) - R;
+        if (d < 0) continue;
+        if (d < 5 * s) {
+          cells[2].push(x, y);
+          continue;
+        }
+        const sky = Math.exp(-d / (14 * s));
+        const mid = Math.exp(-d / (120 * s)) * Math.min(1, d / (10 * s)) * 0.85;
+        const far = Math.exp(-d / (600 * s)) * Math.min(1, d / (30 * s)) * 0.7;
         const r = Math.random();
-        if (r > v) continue;
-        cells[v > 0.6 && r < v * 0.5 ? 2 : v > 0.25 ? 1 : 0].push(x, y);
+        if (r < sky) cells[2].push(x, y);
+        else if (r < sky + mid) cells[1].push(x, y);
+        else if (r < Math.min(1, sky + mid + far)) cells[0].push(x, y);
       }
     }
     cells.forEach((list, i) => {
@@ -128,42 +127,39 @@ if (ctx) {
     const dt = last ? Math.min(t - last, 50) : 16;
     last = t;
     const flare = surge(t);
-    if (flare > 0 && !burst) {
-      // The sweep has started: a fresh wave of dust leaves the rim with the text.
-      burst = true;
-      for (let i = 0; i < dust.length; i++) if (Math.random() < 0.45) dust[i] = born(t, false);
-    }
     ctx.clearRect(0, 0, W, H);
-    // The rim swells outward, toward the content, and glows while the text sweeps in.
-    const push = 28 * flare;
-    ctx.drawImage(rim, out[0] * push, out[1] * push, W, H);
+
+    // The rim moves in toward the sweeping text and glows while the surge lasts.
+    const push = 16 * scale * flare;
+    const ox = inward[0] * push;
+    const oy = inward[1] * push;
+    ctx.drawImage(rim, ox, oy, W, H);
     if (flare > 0.01) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.7 * flare;
-      ctx.drawImage(rim, out[0] * push, out[1] * push, W, H);
+      ctx.globalAlpha = 0.35 * flare;
+      ctx.drawImage(rim, ox, oy, W, H);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    // Dust sinks inward from the rim to its own depth, then starts again at the rim.
+    const frames = dt / (1000 / 60);
     const levels = [[], [], []];
-    for (let i = 0; i < dust.length; i++) {
-      let p = dust[i];
-      p.age += still ? 0 : dt;
-      if (p.age > p.life) p = dust[i] = born(t, false);
-      const dx = p.x - cx;
-      const dy = p.y - cy;
-      const dist = Math.hypot(dx, dy) || 1;
-      // Outward from the limb, bent by a slow, smooth flow field.
-      const a =
-        Math.sin(p.x * 0.0031 + t * 0.00021) * 1.4 + Math.cos(p.y * 0.0027 - t * 0.00017) * 1.4;
-      const s = dt * 0.042 * (1 + 2.5 * flare);
-      p.x += ((dx / dist) * 0.55 + Math.cos(a) * 0.7) * s;
-      p.y += ((dy / dist) * 0.55 + Math.sin(a) * 0.7) * s;
-      const f = p.age / p.life;
-      const v = p.glow * Math.min(1, f * 6) * (1 - f) * (1 - f) * (1 + flare);
-      if (v < 0.08) continue;
-      levels[v > 0.55 ? 2 : v > 0.25 ? 1 : 0].push(
-        Math.round(p.x / CELL) * CELL,
-        Math.round(p.y / CELL) * CELL
+    for (const p of dust) {
+      if (!still) p.depth = (p.depth + p.speed * frames * (1 + 1.5 * flare)) % p.maxDepth;
+      const radius = R - p.depth;
+      const wander = ((-0.06 * scale) / p.freq) * Math.cos((t / 16.67) * p.freq + p.phase);
+      const a = p.theta + wander / radius;
+      const x = cx + Math.cos(a) * radius + ox;
+      const y = cy + Math.sin(a) * radius + oy;
+      if (x < 0 || y < 0 || x > W || y > H) continue;
+      const tail = (p.maxDepth - p.depth) / (p.maxDepth * 0.25);
+      const fade = Math.max(0, Math.min(1, p.depth / 3, tail));
+      const v = fade * (0.75 + 0.6 * flare);
+      if (v < 0.12) continue;
+      levels[v > 0.85 ? 2 : v > 0.45 ? 1 : 0].push(
+        Math.round(x / CELL) * CELL,
+        Math.round(y / CELL) * CELL
       );
     }
     levels.forEach((list, i) => {

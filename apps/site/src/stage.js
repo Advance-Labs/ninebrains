@@ -1421,7 +1421,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
 
   /**
    * The surge: 0 to 1 and back over 1.2s after the page arrives by a view transition
-   * (transition.js sets `nbSurgeAt`). The eclipse swells toward the sweeping text, the field and
+   * (transition.js sets `nbSurgeAt`). The eclipse moves in toward the sweeping text, the field and
    * dust brighten, and the cubes flash, so the scene answers the transition.
    */
   function surge(now) {
@@ -1459,12 +1459,13 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.uniform2f(field.u.uRes, width, height);
     gl.uniform1f(field.u.uDpr, dpr);
     gl.uniform2f(field.u.uCenter, center[0], center[1]);
-    const radius = g.radius + 28 * g.scale * flare;
+    // The centre sits up and to the left, so a smaller radius moves the rim in toward the text.
+    const radius = g.radius - 16 * g.scale * flare;
     gl.uniform1f(field.u.uRadius, radius);
     gl.uniform1f(field.u.uScale, g.scale);
     gl.uniform1f(field.u.uFrame, frames);
     gl.uniform1f(field.u.uWaveK, g.waveK);
-    gl.uniform1f(field.u.uLight, 0.3 * flare);
+    gl.uniform1f(field.u.uLight, 0.2 * flare);
     gl.uniform3fv(field.u.uBase, colors.base);
     gl.uniform3fv(field.u.uEdge, colors.edge);
     gl.uniform3fv(field.u.uSky, colors.sky);
