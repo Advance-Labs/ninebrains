@@ -80,6 +80,19 @@
     <link rel="preconnect" href="https://advancelabs.dev" />
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/transition.css" />
+    <!-- Arriving by a view transition from /compare/: the page sweeps in already open, so the
+         loading mark would only flash. site.js finds it hidden and skips the opening. -->
+    <script>
+      addEventListener('pagereveal', (e) => {
+        if (e.viewTransition) document.documentElement.classList.add('vt-arrive');
+      });
+    </script>
+    <style>
+      .vt-arrive #intro {
+        display: none;
+      }
+    </style>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",

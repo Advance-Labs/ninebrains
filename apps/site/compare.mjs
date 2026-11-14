@@ -160,7 +160,9 @@ const head = ({ title, description, path, extra = '' }) => `<!doctype html>
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/compare.css" />
-    <script type="module" src="/flow.js"></script>
+    <link rel="stylesheet" href="/transition.css" />
+    <!-- Render-blocking so the background is already drawn in the frame a transition captures. -->
+    <script type="module" src="/flow.js" blocking="render"></script>
 ${extra}  </head>
   <body>
     <canvas id="flow" aria-hidden="true"></canvas>

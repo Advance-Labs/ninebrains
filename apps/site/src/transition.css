@@ -1,0 +1,62 @@
+/*
+ * The move between the homepage and the /compare/ pages (cross-document view transitions).
+ * Linked from both, so both sides of a navigation opt in with the same rules.
+ *
+ * The new page is revealed by a soft-edged circle sweeping out of the bottom-right corner, where
+ * the eclipse sits on both pages, while the old page sinks back: dimmer, blurred, a touch smaller.
+ * The brand mark (`view-transition-name: nb-brand`) glides between the two headers.
+ *
+ * Browsers without cross-document view transitions just navigate. Reduced motion gets none.
+ */
+@property --nb-reveal {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::view-transition-group(root) {
+    animation-duration: 0.9s;
+  }
+
+  ::view-transition-old(root) {
+    animation: nb-sink 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  ::view-transition-new(root) {
+    /* The circle's edge is a gradient, not a hard clip, so the page arrives like a tide. */
+    mask-image: radial-gradient(
+      circle at 100% 100%,
+      #000 var(--nb-reveal),
+      transparent calc(var(--nb-reveal) + 220px)
+    );
+    animation: nb-reveal 0.9s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  ::view-transition-group(nb-brand) {
+    animation-duration: 0.7s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes nb-sink {
+  to {
+    opacity: 0.15;
+    filter: blur(10px);
+    transform: scale(0.96);
+  }
+}
+
+@keyframes nb-reveal {
+  from {
+    --nb-reveal: 0px;
+  }
+  to {
+    /* Past the far corner: a window's diagonal is at most ~1.42 x its longer side, plus the edge. */
+    --nb-reveal: calc(142vmax + 220px);
+  }
+}

@@ -162,7 +162,7 @@ footer {
   font-size: 17px;
   letter-spacing: -0.02em;
   text-decoration: none;
-  /* Glides into the /compare/ pages' header; see compare.css. */
+  /* Glides into the /compare/ pages' header; see transition.css. */
   view-transition-name: nb-brand;
 }
 
@@ -2673,32 +2673,5 @@ html.intro:not(.intro-reveal) .hms-slot {
   human-machine-swapper {
     --hms-top: auto;
     --hms-bottom: calc(var(--foot-h) + 12px);
-  }
-}
-
-/* Cross-page transition to and from /compare/; the keyframes and timing live in compare.css. */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
-  }
-  ::view-transition-old(root) {
-    animation: nb-out 0.32s cubic-bezier(0.65, 0, 0.35, 1) both;
-  }
-  ::view-transition-new(root) {
-    animation: nb-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-}
-@keyframes nb-out {
-  to {
-    opacity: 0;
-    filter: blur(8px);
-    transform: scale(0.985);
-  }
-}
-@keyframes nb-in {
-  from {
-    opacity: 0;
-    filter: blur(10px);
-    transform: translateY(16px);
   }
 }

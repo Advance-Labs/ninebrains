@@ -211,38 +211,3 @@ footer p {
   max-width: 820px;
   margin: 4px auto;
 }
-
-/*
- * Moving between the homepage and these pages: the old page blurs away, the new one settles in,
- * and the brand mark glides between the two headers (styles.css names it the same). Browsers
- * without cross-document view transitions just navigate.
- */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
-  }
-  ::view-transition-old(root) {
-    animation: nb-out 0.32s cubic-bezier(0.65, 0, 0.35, 1) both;
-  }
-  ::view-transition-new(root) {
-    animation: nb-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  ::view-transition-group(nb-brand) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-}
-@keyframes nb-out {
-  to {
-    opacity: 0;
-    filter: blur(8px);
-    transform: scale(0.985);
-  }
-}
-@keyframes nb-in {
-  from {
-    opacity: 0;
-    filter: blur(10px);
-    transform: translateY(16px);
-  }
-}
