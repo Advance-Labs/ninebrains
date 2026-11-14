@@ -57,6 +57,21 @@ const LIMITS = [
   'Windows and Linux builds come from the same CI, but the tests gate has no OS sandbox there, and Windows paths are not yet tested.',
 ];
 
+/** The Ninebrains mark, the same nine boxes as the homepage's `#mark` symbol. */
+const MARK = [
+  [7.5, 7.5],
+  [7.5, 28.5],
+  [7.5, 49.5],
+  [28.5, 7.5],
+  [28.5, 49.5],
+  [49.5, 7.5],
+  [49.5, 28.5],
+  [49.5, 49.5],
+]
+  .map(([x, y]) => `<rect x="${x}" y="${y}" width="13" height="13" rx="2" />`)
+  .concat('<rect x="25" y="25" width="20" height="20" rx="2" />')
+  .join('');
+
 const esc = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -145,10 +160,15 @@ const head = ({ title, description, path, extra = '' }) => `<!doctype html>
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="llms" href="/llms.txt" />
     <link rel="stylesheet" href="/compare.css" />
+    <script type="module" src="/flow.js"></script>
 ${extra}  </head>
   <body>
+    <canvas id="flow" aria-hidden="true"></canvas>
     <header class="top">
-      <a class="brand" href="/">ninebrains</a>
+      <a class="brand" href="/" aria-label="Ninebrains home">
+        <svg class="mark" viewBox="0 0 70 70" aria-hidden="true" focusable="false">${MARK}</svg>
+        <span>ninebrains</span>
+      </a>
       <nav><a href="/compare/">Compare</a><a href="/docs/">Docs</a><a href="https://github.com/Advance-Labs/ninebrains">GitHub</a></nav>
     </header>
     <main>`;
