@@ -8,7 +8,9 @@
  * dust: specks that sink slowly inward from the rim, each to its own depth, wandering a little.
  *
  * When the page arrives by a view transition (transition.js sets `nbSurgeAt`) the eclipse surges
- * with the sweeping text: the rim moves in toward it, glows, and the dust brightens and quickens.
+ * with the sweeping text: the rim glows and the dust brightens and quickens. The rim itself never
+ * moves with it; it follows only the homepage's mouse parallax, whose position is carried across
+ * the page change (sessionStorage `nb:pointer`, shared with stage.js) so the eclipse never jumps.
  *
  * Decoration only: no WebGL, no dependency. The loop stops while the tab is hidden; under reduced
  * motion it draws one still frame. Any failure leaves the black page.
@@ -31,8 +33,25 @@ if (ctx) {
   let cy = 0;
   let scale = 1;
   let arc = [0, 0];
-  /** Unit vector from the rim's middle toward the circle's centre: up and to the left. */
-  let inward = [0, 0];
+  // Mouse parallax, as stage.js: a target in [-1, 1] and an eased copy that drives the shift.
+  let pointer = [0, 0];
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('nb:pointer') ?? 'null');
+    if (Array.isArray(saved) && saved.length === 2) pointer = saved.map(Number);
+  } catch {}
+  let smooth = [...pointer];
+  addEventListener(
+    'pointermove',
+    (e) => {
+      if (e.pointerType === 'mouse') pointer = [(e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1];
+    },
+    { passive: true }
+  );
+  addEventListener('pageswap', () => {
+    try {
+      sessionStorage.setItem('nb:pointer', JSON.stringify(smooth));
+    } catch {}
+  });
   let dust = [];
   let last = 0;
   let frame = 0;
@@ -87,8 +106,6 @@ if (ctx) {
     const theta = (p) => Math.atan2(p[1] - cy, p[0] - cx);
     const [a, b] = [theta(p1), theta(p2)].sort((x, y) => x - y);
     arc = [a - 0.08, b + 0.08];
-    const m = (a + b) / 2;
-    inward = [-Math.cos(m), -Math.sin(m)];
 
     paintField();
     const count = Math.round(Math.min(Math.max((W * H) / 260, 1800), 7000));
@@ -129,10 +146,11 @@ if (ctx) {
     const flare = surge(t);
     ctx.clearRect(0, 0, W, H);
 
-    // The rim moves in toward the sweeping text and glows while the surge lasts.
-    const push = 16 * scale * flare;
-    const ox = inward[0] * push;
-    const oy = inward[1] * push;
+    // stage.js shifts its field by (-14, +10) * pointer in GL's y-up space: (-14, -10) here.
+    if (!still) smooth = smooth.map((v, i) => v + (pointer[i] - v) * 0.06);
+    const ox = still ? 0 : smooth[0] * -14;
+    const oy = still ? 0 : smooth[1] * -10;
+    // The rim glows while the surge lasts; it never moves with it.
     ctx.drawImage(rim, ox, oy, W, H);
     if (flare > 0.01) {
       ctx.globalCompositeOperation = 'lighter';
