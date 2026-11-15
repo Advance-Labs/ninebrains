@@ -246,7 +246,7 @@ test('the loading mark paints before any script and can never strand the page', 
 
 /**
  * The domain move (docs/strategy/decisions.md, 2026-09-25) is only worth anything if every
- * built surface agrees on one hostname. `ninebrains.runs-on.dev` 301s here from vercel.json,
+ * built surface agrees on one hostname. `ninebrains.runs-on.dev` 301s here (Vercel domain redirect),
  * so nothing the build emits should still name it.
  */
 test('every built surface names ninebrains.dev and nothing names the old subdomain', () => {

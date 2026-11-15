@@ -46,7 +46,8 @@ Astro emits `ninebrains.dev/docs/…` canonicals for it via `DOCS_SITE_URL` and 
 
 `ninebrains.runs-on.dev` stays attached to the same Vercel project purely as a 301 redirect, so
 the install URLs already published in release notes keep working. It is never a second live
-surface: `vercel.json` redirects every request on that host, and the canonical tag on every page
+surface: the Vercel domain setting 301s every request on that host (Project → Domains, not
+`vercel.json`; a host-matched rule there never fired), and the canonical tag on every page
 points at `ninebrains.dev`. The subdomain remains claimed in the registry at
 [zordhalo/runs-on.dev](https://github.com/zordhalo/runs-on.dev) so it cannot be taken over while
 old links still point at it.
