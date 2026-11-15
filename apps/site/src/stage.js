@@ -1103,8 +1103,19 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
   let height = 1;
   let dpr = 1;
   let geometry = null;
+  // The parallax position carries across a page change (flow.js reads and writes the same key),
+  // so the eclipse is exactly where the last page left it.
   let pointer = [0, 0];
-  let smoothPointer = [0, 0];
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('nb:pointer') ?? 'null');
+    if (Array.isArray(saved) && saved.length === 2) pointer = saved.map(Number);
+  } catch {}
+  let smoothPointer = [...pointer];
+  addEventListener('pageswap', () => {
+    try {
+      sessionStorage.setItem('nb:pointer', JSON.stringify(smoothPointer));
+    } catch {}
+  });
   let frame = 0;
   let running = false;
 
@@ -1421,7 +1432,7 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
 
   /**
    * The surge: 0 to 1 and back over 1.2s after the page arrives by a view transition
-   * (transition.js sets `nbSurgeAt`). The eclipse moves in toward the sweeping text, the field and
+   * (transition.js sets `nbSurgeAt`). The eclipse glows as the text sweeps in, the field and
    * dust brighten, and the cubes flash, so the scene answers the transition.
    */
   function surge(now) {
@@ -1459,8 +1470,8 @@ export function createStage(canvas, { reduced, sceneTime, scene, durations, debu
     gl.uniform2f(field.u.uRes, width, height);
     gl.uniform1f(field.u.uDpr, dpr);
     gl.uniform2f(field.u.uCenter, center[0], center[1]);
-    // The centre sits up and to the left, so a smaller radius moves the rim in toward the text.
-    const radius = g.radius - 16 * g.scale * flare;
+    // The rim never moves with the surge (a step reads as a bounce); it only glows.
+    const radius = g.radius;
     gl.uniform1f(field.u.uRadius, radius);
     gl.uniform1f(field.u.uScale, g.scale);
     gl.uniform1f(field.u.uFrame, frames);

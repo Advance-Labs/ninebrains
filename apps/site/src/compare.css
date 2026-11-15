@@ -68,11 +68,6 @@ a:hover {
   z-index: -1;
   pointer-events: none;
 }
-footer {
-  position: relative;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
-}
 .top {
   position: relative;
 }
@@ -203,13 +198,82 @@ tr:last-child > * {
   font-size: 14px;
 }
 
+/* The homepage's footer bar, fixed to the bottom here because these pages scroll. */
 footer {
-  border-top: 1px solid var(--line);
-  padding: 24px var(--gutter);
-  color: var(--dim);
-  font-size: 13px;
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 2;
+  /* Taller than the homepage's 34px row: text scrolls under it here, so the bottom 34px are a
+     solid band (the text sits where the homepage's does) and only the extra height fades. */
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 0 var(--gutter) 7px;
+  font-size: 12px;
+  color: #6b6b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  background: linear-gradient(to top, #000 34px, transparent);
+  text-shadow: 0 0 8px #000;
 }
 footer p {
-  max-width: 820px;
-  margin: 4px auto;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+footer nav {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+}
+footer a {
+  color: var(--dim);
+  text-decoration: none;
+}
+footer a:hover {
+  color: var(--fg);
+}
+@media (max-width: 1000px) {
+  footer p {
+    display: none;
+  }
+}
+main {
+  padding-bottom: 96px;
+}
+/*
+ * Below 900px the homepage drops its footer for the mobile rail. These pages keep theirs, but as
+ * an ordinary footer at the end of the page that wraps, so no link is ever clipped off the edge.
+ */
+@media (max-width: 899px) {
+  footer {
+    height: auto;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 24px var(--gutter) 32px;
+    white-space: normal;
+    border-top: 1px solid var(--line);
+    /* The page ends over the eclipse's brightest corner: give the links something to sit on. */
+    position: relative;
+    background: #000;
+  }
+  footer p {
+    display: block;
+    flex-basis: 100%;
+  }
+  footer nav {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  main {
+    padding-bottom: 32px;
+  }
+}
+.related {
+  margin-top: 32px;
+  color: var(--dim);
+  font-size: 14px;
 }

@@ -177,10 +177,20 @@ ${extra}  </head>
     </header>
     <main>`;
 
+/** The homepage's footer, byte for byte in content, so it stays put across a page transition. */
 const foot = `    </main>
     <footer id="foot">
-      <p>Apache-2.0, a fork of <a href="https://github.com/generalaction/emdash">Emdash</a>. Built by <a href="https://advancelabs.dev">${ORG}</a></p>
-      <p><a href="/compare/">All comparisons</a> · <a href="/docs/gates/">How gates work</a> · <a href="/docs/lanes/">Lanes</a> · <a href="/llms.txt">llms.txt</a></p>
+      <p>
+        Apache-2.0, a fork of <a href="https://github.com/generalaction/emdash">Emdash</a>. Runs the
+        CLIs you are logged in to and never touches your credentials.
+      </p>
+      <nav>
+        <a href="/compare/">Compare</a>
+        <a href="https://github.com/Advance-Labs/ninebrains/blob/main/docs/SECURITY.md">Security</a>
+        <a href="https://github.com/Advance-Labs/ninebrains/blob/main/LICENSE.md">Licence</a>
+        <a href="https://advancelabs.dev/lab/ninebrains">Built by Advance Labs</a>
+        <a href="https://advancelabs.dev">© 2026 Advance Labs Inc.</a>
+      </nav>
     </footer>
   </body>
 </html>
@@ -299,6 +309,7 @@ ${
           ${sources.map((u) => `<li><a href="${esc(u)}" rel="nofollow">${esc(u)}</a>, checked ${human(c.checked)}</li>`).join('\n          ')}
           <li><a href="https://github.com/Advance-Labs/ninebrains">github.com/Advance-Labs/ninebrains</a>, for every Ninebrains row</li>
         </ul>
+        <p class="related">Related: <a href="/compare/">All comparisons</a> · <a href="/docs/gates/">How gates work</a> · <a href="/docs/lanes/">Lanes</a> · <a href="/llms.txt">llms.txt</a></p>
       </article>
 ${foot}`;
 }

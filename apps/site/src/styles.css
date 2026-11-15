@@ -198,12 +198,15 @@ footer {
   align-items: center;
   gap: 18px;
   padding: 0 var(--gutter);
-  border-top: 1px solid var(--line);
   font-size: 12px;
   color: var(--faint);
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* No hard edge cutting the eclipse off: the bar fades in from transparent (compare.css matches). */
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--bg) 82%, transparent) 55%,
+    transparent
+  );
+  text-shadow: 0 0 8px var(--bg);
   white-space: nowrap;
   overflow: hidden;
 }
