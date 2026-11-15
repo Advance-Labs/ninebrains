@@ -214,7 +214,7 @@ footer {
   color: #6b6b6b;
   white-space: nowrap;
   overflow: hidden;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.94) 34px, transparent);
+  background: linear-gradient(to top, #000 34px, transparent);
   text-shadow: 0 0 8px #000;
 }
 footer p {
@@ -241,6 +241,36 @@ footer a:hover {
 }
 main {
   padding-bottom: 96px;
+}
+/*
+ * Below 900px the homepage drops its footer for the mobile rail. These pages keep theirs, but as
+ * an ordinary footer at the end of the page that wraps, so no link is ever clipped off the edge.
+ */
+@media (max-width: 899px) {
+  footer {
+    height: auto;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 24px var(--gutter) 32px;
+    white-space: normal;
+    border-top: 1px solid var(--line);
+    /* The page ends over the eclipse's brightest corner: give the links something to sit on. */
+    position: relative;
+    background: #000;
+  }
+  footer p {
+    display: block;
+    flex-basis: 100%;
+  }
+  footer nav {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  main {
+    padding-bottom: 32px;
+  }
 }
 .related {
   margin-top: 32px;
