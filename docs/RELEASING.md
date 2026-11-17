@@ -123,7 +123,7 @@ the workflow refuses a published version, and a changed tag breaks everyone's ch
 |---|---|---|---|
 | `preflight` | ubuntu-latest | `contents: read`, `checks: read` | Refuses refs other than `main`/`release/*` and commits without a green `ci-ok`; checks the version input against `package.json`; resolves the canary version; pulls the notes from `CHANGELOG.md`; runs the SEC-36/SEC-37 node tests |
 | `e2e` | ubuntu-22.04 | `contents: read` | `e2e.yml`: the built app under xvfb with the fake agent. The draft is not created unless it passes |
-| `build` ×3 | macos-14, windows-2022, ubuntu-22.04 | `contents: read` | `pnpm run build`, then `build.ts` in local mode; `verify-mac.ts` on macOS; uploads installers as workflow artifacts |
+| `build` ×3 | macos-15, windows-2022, ubuntu-22.04 | `contents: read` | `pnpm run build`, then `build.ts` in local mode; `verify-mac.ts` on macOS; uploads installers as workflow artifacts |
 | `attest` | ubuntu-latest | `id-token`, `attestations: write` | Build-provenance attestations. Runs because the repo is public; a private repo would skip it (see below) |
 | `release` | ubuntu-latest | `contents: write` | Writes and verifies `SHA256SUMS`, signs `SHA256SUMS.json` with the repo's `NINEBRAINS_UPDATE_SIGNING_KEY` secret (`sign-update-digest.mjs`, fails closed if it is not set), creates or reuses the draft, uploads with `--clobber`, deletes stale assets, then re-downloads the draft and re-verifies |
 

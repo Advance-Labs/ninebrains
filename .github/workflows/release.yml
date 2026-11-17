@@ -145,7 +145,7 @@ jobs:
         include:
           # Apple Silicon runner; build.ts builds arm64 and x64 in turn, rebuilding native modules
           # for each arch.
-          - os: macos-14
+          - os: macos-15
             platform: mac
             arch: both
             windows-native: 'false'

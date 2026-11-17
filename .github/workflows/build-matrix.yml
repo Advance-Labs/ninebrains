@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             package-flags: --mac --dir
             windows-native: 'false'
           - os: windows-2022
