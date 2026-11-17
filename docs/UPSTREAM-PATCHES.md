@@ -1439,3 +1439,9 @@ xterm did not have, and typed input overwrote the status line.
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/src/core/features/terminals/browser/pty/use-pty.ts` | `measureAndResize` sends the pane's current cols/rows to this session's backend after calibrating | Every mount (new conversation, tab switch, rehydrate) leaves the PTY at the size xterm shows; also seeds `reconcileSize` |
+
+## 99. Release 0.2.10 (`chore/release-0.2.10`)
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/package.json` | `version` 0.2.9 → 0.2.10 | Written by `pnpm run release:prepare 0.2.10`; `release.yml` refuses a version that does not match |
