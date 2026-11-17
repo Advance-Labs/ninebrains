@@ -1429,3 +1429,13 @@ back as the project's state.
 | File | Change | Why |
 |---|---|---|
 | `README.md` | Live release and stars badges; status line and download table no longer name a version | The README cannot fall behind a release again |
+## 98. A new conversation's PTY takes the pane size on mount (`ninebrains/new-conversation-digpb`)
+
+A conversation opened into a pane that had already calibrated kept its spawn size (seen: 153x88
+beside 163x51 siblings). `calibrateCell` returns early when the cell metrics are unchanged, so the
+mount resized only the xterm grid and never the backend; tmux then painted at absolute rows the
+xterm did not have, and typed input overwrote the status line.
+
+| File | Change | Why |
+|---|---|---|
+| `apps/emdash-desktop/src/core/features/terminals/browser/pty/use-pty.ts` | `measureAndResize` sends the pane's current cols/rows to this session's backend after calibrating | Every mount (new conversation, tab switch, rehydrate) leaves the PTY at the size xterm shows; also seeds `reconcileSize` |
