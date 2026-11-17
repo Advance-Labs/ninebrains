@@ -182,11 +182,17 @@ export function usePty(
         // broadcasts runtime resize calls to all sessions. The MobX reaction below
         // applies term.resize() when controllerDims changes.
         pane.calibrateCell(cell.width, cell.height);
+        // Ninebrains: calibrateCell only broadcasts when the cell size or pane size changes,
+        // so a session mounting into an already-calibrated pane (a new
+        // conversation) would keep its spawn size while xterm shows the pane
+        // size. Tell this session's backend the pane size directly.
+        const dims = pane.getCurrentDimensions();
+        if (dims) pty.resizeBackend(dims.cols, dims.rows);
       } catch (e) {
         log.warn('useTerminal: measureAndResize failed', { sessionId, error: e });
       }
     },
-    [sessionId]
+    [sessionId, pty]
   );
 
   // Stable ref so the retry setTimeout inside measureAndResize always calls
