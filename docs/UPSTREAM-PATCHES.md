@@ -1445,3 +1445,10 @@ xterm did not have, and typed input overwrote the status line.
 | File | Change | Why |
 |---|---|---|
 | `apps/emdash-desktop/package.json` | `version` 0.2.9 → 0.2.10 | Written by `pnpm run release:prepare 0.2.10`; `release.yml` refuses a version that does not match |
+
+## 100. Release builds run on macos-15 (`ci/release-macos-15`)
+
+| File | Change | Why |
+|---|---|---|
+| `.github/workflows/release.yml`, `.github/workflows/build-matrix.yml` | mac runner `macos-14` → `macos-15` | GitHub retired the macos-14 image: the 0.2.10 run's mac job was cancelled with "The configuration 'macos-14-arm64-us-default' is not supported" |
+| `docs/RELEASING.md` | runner table updated | Matches the workflow |
