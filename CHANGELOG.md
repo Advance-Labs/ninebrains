@@ -6,6 +6,29 @@ Hand-written notes go under Unreleased and move into the next release.
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-17
+
+A task now keeps its spinner while Claude's background subagents are still working, instead of
+showing as done when the main turn ends. The app adds the `SubagentStart` and `SubagentStop` hooks
+to Claude's settings the first time it starts; **restart any conversation that was already open**,
+because Claude reads its hooks when a session starts. A new conversation's terminal also takes the
+pane's size right away, so typed text no longer overwrites the status line.
+
+### Features
+
+- **agent-status:** say that a completed status is unseen (#181) (0d7b58b)
+- **theme:** System-mode light/dark slots and a WCAG contrast gate (#182) (4ff6a87)
+
+### Fixes
+
+- **agent-status:** keep the task spinner on while subagents run (#177) (372ed5c)
+- **terminals:** resize a new conversation's PTY to the pane on mount (#192) (ad533e3)
+- **wire:** exit component workers when the parent dies or disposal hangs (#171) (9148a31)
+- **projects:** retry a transient attach failure automatically with backoff (#173) (f03ed6a)
+- **gates:** fail a review over a truncated diff, and add the rigor-table test (#174) (91b5da3)
+- **pty:** start the tmux server from / so a deleted worktree cannot poison it (#172) (0fbf7de)
+- **pdf-viewer:** stop Print in the PDF viewer crashing the app on macOS 27 (#170) (303eed9)
+
 ## [0.2.9] - 2026-10-22
 
 In-app updates work on Windows again. Before this release the update downloaded and the pill said
