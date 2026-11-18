@@ -1452,3 +1452,16 @@ xterm did not have, and typed input overwrote the status line.
 |---|---|---|
 | `.github/workflows/release.yml`, `.github/workflows/build-matrix.yml` | mac runner `macos-14` → `macos-15` | GitHub retired the macos-14 image: the 0.2.10 run's mac job was cancelled with "The configuration 'macos-14-arm64-us-default' is not supported" |
 | `docs/RELEASING.md` | runner table updated | Matches the workflow |
+
+## 102. Keyboard-only sidebar and region focus (`feat/keyboard-navigation`)
+
+The sidebar tree takes arrow, `j`/`k`, Home/End, Enter and Space keys, and F6 / Shift+F6 cycle focus through the sidebar, main area, terminal drawer and right sidebar. New files: `workbench/api/browser/focus-regions.ts` (region order and DOM focus), `workbench/browser/sidebar/sidebar-tree-keys.ts` (pure key mapping), and their tests.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/workbench/browser/sidebar/sidebar-virtual-list.tsx` | `role="tree"` with `aria-activedescendant`, `treeitem` rows, key handler, scroll the focused row into view | Keyboard control of the virtualized list |
+| `src/core/features/workbench/contributions/commands.ts`, `palette.ts`, `src/core/features/workbench/browser/window-scope.tsx` | Commands `workbench.focusSidebar` (Mod+Shift+0), `focusNextRegion` (F6), `focusPreviousRegion` (Shift+F6) | Rebindable in Settings; Mod+0 is Electron zoom reset |
+| `src/core/features/tasks/browser/view/task-main-column.tsx`, `task-sidebar.tsx`, `src/core/features/terminals/contributions/browser/task-terminal/terminal-panel.tsx` | `data-focus-region` marker on the main area, right sidebar and terminal drawer | F6 finds the regions that are on screen |
+| `docs/guide/keyboard-shortcuts.md` | New sections for region focus and the sidebar list | User docs |
+| `src/core/features/workbench/api/browser/focus-regions.ts` | `focusRegion` for main/bottom focuses the input that last had focus, else the first visible one (laid out, not under `[hidden]`, `aria-hidden` or `inert`), and returns false when every input is hidden; F6 then skips that region | A hidden xterm helper textarea in an inactive tab took the focus call silently while `focusRegion` returned true |
+| `src/core/features/workbench/browser/sidebar/sidebar-virtual-list.tsx` | `lastFocusedIndexRef` is written in an effect, not during render | Render must not mutate refs |
