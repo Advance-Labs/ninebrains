@@ -98,7 +98,11 @@ export function acquireGateSlot({
   pollMs = 2_000,
   maxWaitMs = 30 * 60_000,
   now = Date.now,
+  env = process.env,
 } = {}) {
+  // Already inside a slot: gated.mjs sets this to its own pid. Taking a second slot would deadlock
+  // two holders. A value left over in a long-lived shell after that pid exits counts for nothing.
+  if (env.NINEBRAINS_GATE_HELD && pidAlive(Number(env.NINEBRAINS_GATE_HELD))) return () => {};
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   } catch {

@@ -1452,3 +1452,14 @@ xterm did not have, and typed input overwrote the status line.
 |---|---|---|
 | `.github/workflows/release.yml`, `.github/workflows/build-matrix.yml` | mac runner `macos-14` → `macos-15` | GitHub retired the macos-14 image: the 0.2.10 run's mac job was cancelled with "The configuration 'macos-14-arm64-us-default' is not supported" |
 | `docs/RELEASING.md` | runner table updated | Matches the workflow |
+
+## 101. Agents' heavy commands take a gate slot (`perf/gate-agent-heavy-commands`)
+
+Part of #158. One task's 7 subagents ran install, typecheck, test and build side by side in
+separate worktrees outside the pre-push gate (#161), swap reached ~28 GB and macOS killed the app.
+
+| File | Change | Why |
+| --- | --- | --- |
+| `.claude/settings.json` | Bash `PreToolUse` hook running `tooling/scripts/claude-heavy-gate.mjs` | Denies heavy commands run outside a gate slot and hands the agent the gated command |
+| `tooling/scripts/gated.mjs` | Async `spawn` in its own process group; SIGINT/SIGTERM/SIGHUP forwarded to the group, slot released after the child exits | A killed gate (tool timeout) no longer leaves heavy work running without a slot |
+| `tooling/scripts/claude-heavy-gate.mjs` | `*:watch` scripts and `--watch` runs are not heavy; segments are split outside quotes only; the suggested `gated.mjs` path is shell-quoted and the quoted form is recognised as gated | Watch runs would hold a slot for hours; quoted operators were misread; paths with spaces were denied forever |
