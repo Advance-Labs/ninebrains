@@ -24,7 +24,38 @@ const FLAGS_WITH_VALUE = new Set(['--dir', '-C', '--filter', '-F', '--prefix', '
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash']);
 const PREFIXES = new Set(['time', 'nice', 'command', 'env', 'exec']);
 
-const isScriptHeavy = (name) => HEAVY_SCRIPTS.has(String(name).split(':')[0]);
+// A watch run lasts hours; gating it would hold a slot for that long.
+const WATCH_SCRIPT = /(^|:)watch$/;
+const isScriptHeavy = (name) =>
+  HEAVY_SCRIPTS.has(String(name).split(':')[0]) && !WATCH_SCRIPT.test(String(name));
+const WATCH_FLAG = /^--watch\w*(=.*)?$/;
+
+/** Split on `&& || ; | & ( )` and newlines, except inside single or double quotes. */
+// ponytail: a `$(...)` substitution hidden inside double quotes is not inspected; parse it if it shows up.
+function splitSegments(command) {
+  const segments = [];
+  let current = '';
+  let quote = null;
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (quote) {
+      if (c === '\\' && quote === '"') current += c + (command[++i] ?? '');
+      else {
+        if (c === quote) quote = null;
+        current += c;
+      }
+    } else if (c === '\\') current += c + (command[++i] ?? '');
+    else if (c === "'" || c === '"') {
+      quote = c;
+      current += c;
+    } else if ('&|;()\n'.includes(c)) {
+      segments.push(current);
+      current = '';
+    } else current += c;
+  }
+  segments.push(current);
+  return segments;
+}
 
 /** The first word in `words` that is not a flag (or a flag's value), removing everything before it. */
 function nextWord(words) {
@@ -37,19 +68,24 @@ function nextWord(words) {
 
 function segmentProblem(segment) {
   const words = segment.trim().split(/\s+/).filter(Boolean);
+  if (words.some((w) => WATCH_FLAG.test(w))) return null;
   for (;;) {
     if (/^\w+=/.test(words[0] ?? '') || PREFIXES.has(words[0])) words.shift();
     else if (words[0] === 'timeout') {
       words.shift();
       // Its flags, their values and the duration: `timeout -k 5 300 cmd`.
       while (/^(-|\d+(\.\d+)?[smhd]?$)/.test(words[0] ?? '')) words.shift();
-    }
-    else break;
+    } else break;
   }
   let cmd = words.shift();
   // `sh -c '<script>'`: judge the script itself, quotes dropped.
   if (SHELLS.has(cmd) && words[0] === '-c') {
-    return heavyCommandProblem(words.slice(1).join(' ').replace(/^['"]|['"]$/g, ''));
+    return heavyCommandProblem(
+      words
+        .slice(1)
+        .join(' ')
+        .replace(/^['"]|['"]$/g, '')
+    );
   }
   if (cmd === 'npx' || cmd === 'bunx') cmd = nextWord(words);
   if (PM.has(cmd)) {
@@ -59,7 +95,7 @@ function segmentProblem(segment) {
     else if (verb === 'nx' || verb === 'turbo') cmd = verb;
     else return isScriptHeavy(verb) ? segment.trim() : null;
   }
-  if (HEAVY_TOOLS.has(cmd)) return segment.trim();
+  if (HEAVY_TOOLS.has(cmd)) return words[0] === 'watch' ? null : segment.trim();
   if (cmd === 'nx') {
     const verb = nextWord(words);
     if (HEAVY_NX.has(verb) || (verb === 'run' && isScriptHeavy(nextWord(words)?.split(':')[1]))) {
@@ -78,18 +114,27 @@ function segmentProblem(segment) {
 /** The heavy part of a Bash command, or null when it is light or already gated. */
 // Gated only when the whole command is one gated.mjs call (optionally after a `cd`), not whenever
 // the text mentions it: `node gated.mjs x && pnpm test` still runs the test outside the slot.
-const GATED_CALL = /^\s*(cd\s+\S+\s*&&\s*)?node\s+\S*\/gated\.mjs\s+(sh|bash)\s+-c\s+'[^']*(?:'\\''[^']*)*'\s*$/;
-const GATED_SIMPLE = /^\s*(cd\s+\S+\s*&&\s*)?node\s+\S*gated\.mjs\s+[^;&|()\n'"]+$/;
+// The path may be shell-quoted (spaces in it), as the deny message prints it.
+const ARG = String.raw`(?:'(?:[^']|'\\'')*'|\S+)`;
+const GATED_PATH = String.raw`(?:'(?:[^']|'\\'')*gated\.mjs'|\S*gated\.mjs)`;
+const GATED_CALL = new RegExp(
+  String.raw`^\s*(cd\s+${ARG}\s*&&\s*)?node\s+${GATED_PATH}\s+(sh|bash)\s+-c\s+'[^']*(?:'\\''[^']*)*'\s*$`
+);
+const GATED_SIMPLE = new RegExp(
+  String.raw`^\s*(cd\s+${ARG}\s*&&\s*)?node\s+${GATED_PATH}\s+[^;&|()\n'"]+$`
+);
 
 export function heavyCommandProblem(command) {
   if (typeof command !== 'string') return null;
   if (GATED_CALL.test(command) || GATED_SIMPLE.test(command)) return null;
-  for (const segment of command.split(/&&|\|\||[;|&()\n]/)) {
+  for (const segment of splitSegments(command)) {
     const problem = segmentProblem(segment);
     if (problem) return problem;
   }
   return null;
 }
+
+const shellQuote = (s) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
 export function hookResponse(input, gatedPath) {
   const matched = heavyCommandProblem(input?.tool_input?.command);
@@ -102,7 +147,7 @@ export function hookResponse(input, gatedPath) {
       permissionDecisionReason:
         `"${matched}" is heavy work. On this 16 GB Mac it must take a host-wide gate slot so parallel ` +
         `agents take turns instead of swapping the machine. Run it as:\n` +
-        `node ${gatedPath} sh -c ${quoted}\n` +
+        `node ${shellQuote(gatedPath)} sh -c ${quoted}\n` +
         `It waits for a free slot (it prints who holds them), then runs the command unchanged.`,
     },
   };

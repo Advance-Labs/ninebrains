@@ -1461,3 +1461,5 @@ separate worktrees outside the pre-push gate (#161), swap reached ~28 GB and mac
 | File | Change | Why |
 | --- | --- | --- |
 | `.claude/settings.json` | Bash `PreToolUse` hook running `tooling/scripts/claude-heavy-gate.mjs` | Denies heavy commands run outside a gate slot and hands the agent the gated command |
+| `tooling/scripts/gated.mjs` | Async `spawn` in its own process group; SIGINT/SIGTERM/SIGHUP forwarded to the group, slot released after the child exits | A killed gate (tool timeout) no longer leaves heavy work running without a slot |
+| `tooling/scripts/claude-heavy-gate.mjs` | `*:watch` scripts and `--watch` runs are not heavy; segments are split outside quotes only; the suggested `gated.mjs` path is shell-quoted and the quoted form is recognised as gated | Watch runs would hold a slot for hours; quoted operators were misread; paths with spaces were denied forever |
