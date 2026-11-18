@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,8 @@ test('ships every asset the page references', () => {
   for (const match of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) {
     const path = match[1];
     if (path.startsWith('//')) continue;
+    // Vercel Analytics script is served at runtime by Vercel infrastructure
+    if (path.startsWith('/_vercel/')) continue;
     assert.doesNotThrow(
       () => readFileSync(join(DIST, path.slice(1), path.endsWith('/') ? 'index.html' : '')),
       `referenced but not built: ${path}`
@@ -268,5 +270,14 @@ test('every built surface names ninebrains.dev and nothing names the old subdoma
     ['install.ps1', readFileSync(join(DIST, 'install.ps1'), 'utf8')],
   ]) {
     assert.doesNotMatch(text, /ninebrains\.runs-on\.dev/, `${name} still names the old host`);
+  }
+});
+
+test('every built page loads Vercel Web Analytics', () => {
+  const pages = readdirSync(DIST, { recursive: true }).filter((f) => f.endsWith('.html'));
+  assert.ok(pages.length > 1, 'builds the landing page and the compare pages');
+  for (const page of pages) {
+    const src = readFileSync(join(DIST, page), 'utf8');
+    assert.match(src, /<script defer src="\/_vercel\/insights\/script\.js"><\/script>/, page);
   }
 });

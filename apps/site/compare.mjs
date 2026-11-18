@@ -192,6 +192,7 @@ const foot = `    </main>
         <a href="https://advancelabs.dev">© 2026 Advance Labs Inc.</a>
       </nav>
     </footer>
+    <script defer src="/_vercel/insights/script.js"></script>
   </body>
 </html>
 `;
