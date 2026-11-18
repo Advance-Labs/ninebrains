@@ -76,6 +76,7 @@ import { pullRequestsComponent } from '@core/services/pull-requests/node';
 import { createPullRequestsGitHubAuthController } from '@core/services/pull-requests/node/pull-requests-auth';
 import { resolvePullRequestSyncIdentity } from '@core/services/pull-requests/node/sync-identity';
 import { resolveFileSearchDatabasePath } from '@main/core/file-search/database-path';
+import { resolveBundledRipgrepPath } from '@main/core/file-search/ripgrep-path';
 import { providerAccountRegistry } from '@main/core/provider-accounts/provider-account-registry-instance';
 import { sessionIntentFilePaths } from '@main/core/runtime/session-intent-stores';
 import { getGitExecutable } from '@main/core/utils/exec';
@@ -369,6 +370,7 @@ function startDesktopWorkersWithHost(
           env: process.env,
           dependencies: { watcher, userEnv: userShellEnv },
           databasePath: resolveFileSearchDatabasePath(),
+          ripgrepPath: resolveBundledRipgrepPath(),
         })
       );
       return await worker.ready();

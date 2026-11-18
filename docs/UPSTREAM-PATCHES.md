@@ -1452,3 +1452,10 @@ xterm did not have, and typed input overwrote the status line.
 |---|---|---|
 | `.github/workflows/release.yml`, `.github/workflows/build-matrix.yml` | mac runner `macos-14` → `macos-15` | GitHub retired the macos-14 image: the 0.2.10 run's mac job was cancelled with "The configuration 'macos-14-arm64-us-default' is not supported" |
 | `docs/RELEASING.md` | runner table updated | Matches the workflow |
+
+## 103. The app ships its own ripgrep, so repo search works without a system `rg` (`ninebrains/search-fix-av6xu`)
+
+| File | Change | Why |
+|---|---|---|
+| `electron-builder.config.ts`, `electron-builder.canary.config.ts` | `afterPack` runs `scripts/release/bundle-ripgrep.mjs` (new), given as an absolute path | Content search spawns `rg` and showed "ripgrep is not installed or could not be found" on any Mac without Homebrew ripgrep. The hook downloads the pinned ripgrep 15.2.0 build for the arch being packaged, checks its SHA-256, and puts `rg` plus its licenses in `Resources/ripgrep/` before signing. No npm dependency and no install script: CI installs with `--ignore-scripts`, and the mac job packages x64 on an arm64 runner, so a postinstall download would ship no binary or the wrong one. The path is absolute because `build.ts` packages from a temp deploy dir and `structuredClone`s the config. The download retries up to 3 times with backoff on network errors, 429 and 5xx (never on a checksum mismatch), and each asset is fetched once per process even though `afterPack` runs per target. Kept local rather than reusing `apps/workspace-server/scripts/package-helpers.ts`: that is TypeScript in another app with a different download and extract shape |
+| `src/main/gateway/desktop-workers.ts` | The file-search worker gets `ripgrepPath: resolveBundledRipgrepPath()` (new, `src/main/core/file-search/ripgrep-path.ts`) | Uses the bundled binary when it exists; in dev it returns undefined and search keeps using `rg` on PATH |
