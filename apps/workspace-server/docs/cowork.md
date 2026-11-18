@@ -81,7 +81,7 @@ The desktop imports the typed message schemas from `@emdash/workspace-server/cow
 
 ## Limits and known races
 
-Current limits: eight simultaneous socket peers, 128 open documents, 1 MiB of document text, and
+Current limits: eight authenticated peers (a connection counts only once it has joined with a valid token; at most 32 not-yet-authenticated connections are held, and one that has not authenticated within 5 seconds is closed), 128 open documents, 1 MiB of document text, and
 2 MiB per request frame. The frame limit applies to each frame and to any unterminated remainder,
 not to the accumulated read buffer, so two legal frames arriving in one read are both served.
 
@@ -97,12 +97,21 @@ drop stays immediate and clients should treat an unexplained disconnect as a pos
 
 Disk writes from other processes are detected before Save, but arbitrary external writers do not
 honor a cowork lock; a write racing inside the final check-and-write cannot be made atomic with
-ordinary POSIX files. The current desktop shows a save error and preserves the local buffer; a
+ordinary POSIX files. Save writes a temp file in the same directory, `fsync`s it, and renames it over the target, so a crash leaves either the old or the new file, never a truncated one. The file mode is preserved, and the group on a best-effort basis. Hard-linked files are refused (`unsupported-file`) because a rename would silently detach the other links. The current desktop shows a save error and preserves the local buffer; a
 dedicated shared conflict resolution UI is still needed.
 
 A document's persisted Yjs state is capped at four times the text limit. Yjs tombstones accumulate
-as a file is edited, and nothing compacts them, so a document edited heavily enough will start
-refusing updates rather than shrinking its history. No one has hit this, and it has no fix yet.
+as a file is edited, so when the encoded state would exceed the cap the server persists a compacted
+copy (a fresh Yjs doc holding the current text) instead. Only the persisted copy is compacted:
+connected peers keep their history, so they stay consistent, and the resident copy is rebuilt from
+the compacted state when the last peer leaves. An update is refused as `too-large` only when the
+text itself exceeds 1 MiB.
+
+When a file changes on disk while no peer is attached (the server was down, or the last peer left
+after an `external-change`), the next join discards the persisted state and loads the disk text:
+disk wins, and unsaved shared edits from before the change are dropped (logged to stderr). While
+peers stay connected after an outside write, Save keeps returning `external-change`; there is no
+conflict UI, and the document recovers when the last peer leaves.
 
 The security boundary is written up as SEC-48 through SEC-51 in `docs/THREAT-MODEL.md`. Read
 `agents/risky-areas/cowork.md` before changing anything in `src/cowork/`.

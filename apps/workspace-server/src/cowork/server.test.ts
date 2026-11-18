@@ -1,9 +1,20 @@
-import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
+import { CoworkDocuments } from './documents';
 import type { ServerMessage } from './protocol';
 import { startCoworkServer, type CoworkServerHandle } from './server';
 
@@ -11,6 +22,7 @@ type Client = {
   send(message: unknown): void;
   next(): Promise<ServerMessage>;
   close(): void;
+  closed(): Promise<void>;
 };
 
 let base: string;
@@ -265,10 +277,114 @@ describe('cowork server', () => {
     await server.close();
     await writeFile(join(root, 'shared.txt'), 'changed while offline');
     server = await startCoworkServer({ root, stateDir, socketPath, token });
+    // Disk wins: the stale persisted state is discarded rather than wedging every join.
     const stale = await connect(socketPath);
     stale.send({ type: 'join', token, path: 'shared.txt' });
-    expect(await stale.next()).toMatchObject({ type: 'error', code: 'external-change' });
+    expect(await joinedText(stale)).toBe('changed while offline');
     stale.close();
+  });
+
+  it('recovers from an external change once the last peer leaves', async () => {
+    const client = await connect(socketPath);
+    client.send({ type: 'join', token, path: 'shared.txt' });
+    expect((await client.next()).type).toBe('joined');
+    await writeFile(join(root, 'shared.txt'), 'agent wrote');
+    client.send({ type: 'save', path: 'shared.txt' });
+    expect(await client.next()).toMatchObject({ type: 'error', code: 'external-change' });
+    client.send({ type: 'save', path: 'shared.txt' });
+    expect(await client.next()).toMatchObject({ type: 'error', code: 'external-change' });
+    client.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const next = await connect(socketPath);
+    try {
+      next.send({ type: 'join', token, path: 'shared.txt' });
+      expect(await joinedText(next)).toBe('agent wrote');
+    } finally {
+      next.close();
+    }
+  });
+
+  it('keeps a leading UTF-8 BOM through Save', async () => {
+    const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('bom')]);
+    await writeFile(join(root, 'bom.txt'), bytes);
+    const client = await connect(socketPath);
+    try {
+      client.send({ type: 'join', token, path: 'bom.txt' });
+      expect((await client.next()).type).toBe('joined');
+      client.send({ type: 'save', path: 'bom.txt' });
+      expect((await client.next()).type).toBe('saved');
+      expect(await readFile(join(root, 'bom.txt'))).toEqual(bytes);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('saves via a temp file, keeping the file mode and leaving no temp behind', async () => {
+    await chmod(join(root, 'shared.txt'), 0o640);
+    const client = await connect(socketPath);
+    try {
+      client.send({ type: 'join', token, path: 'shared.txt' });
+      expect((await client.next()).type).toBe('joined');
+      client.send({ type: 'save', path: 'shared.txt' });
+      expect((await client.next()).type).toBe('saved');
+      expect((await stat(join(root, 'shared.txt'))).mode & 0o777).toBe(0o640);
+      expect(await readdir(root)).toEqual(['shared.txt']);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('compacts persisted history instead of failing once it outgrows the record cap', async () => {
+    const documents = await CoworkDocuments.open(root, stateDir, 1500);
+    const joined = await documents.join('shared.txt');
+    const local = new Y.Doc();
+    Y.applyUpdate(local, joined.update);
+    const text = local.getText('content');
+    for (let index = 0; index < 200; index += 1) {
+      const vector = Y.encodeStateVector(local);
+      text.insert(0, 'x');
+      text.delete(0, 1);
+      await documents.update('shared.txt', Y.encodeStateAsUpdate(local, vector));
+    }
+    await documents.release('shared.txt');
+    const reloaded = new Y.Doc();
+    Y.applyUpdate(reloaded, (await documents.join('shared.txt')).update);
+    expect(reloaded.getText('content').toString()).toBe('start');
+    await documents.release('shared.txt');
+  });
+
+  it('closes a connection that never authenticates, without counting it as an editor', async () => {
+    await server.close();
+    server = await startCoworkServer({ root, stateDir, socketPath, token, authTimeoutMs: 100 });
+    const silent = await Promise.all(Array.from({ length: 8 }, () => connect(socketPath)));
+    const closed = await Promise.all(silent.map((client) => client.closed()));
+    expect(closed).toHaveLength(8);
+    const editors = await Promise.all(Array.from({ length: 8 }, () => connect(socketPath)));
+    try {
+      for (const editor of editors) {
+        editor.send({ type: 'join', token, path: 'shared.txt' });
+        expect((await editor.next()).type).toBe('joined');
+      }
+      const ninth = await connect(socketPath);
+      ninth.send({ type: 'join', token, path: 'shared.txt' });
+      expect(await ninth.next()).toMatchObject({ type: 'error', code: 'too-many-peers' });
+      ninth.close();
+    } finally {
+      for (const editor of editors) editor.close();
+    }
+  });
+
+  it('lets real editors in while unauthenticated connections are pending', async () => {
+    const silent = await Promise.all(Array.from({ length: 8 }, () => connect(socketPath)));
+    const editor = await connect(socketPath);
+    try {
+      editor.send({ type: 'join', token, path: 'shared.txt' });
+      expect((await editor.next()).type).toBe('joined');
+    } finally {
+      editor.close();
+      for (const client of silent) client.close();
+    }
   });
 
   it('does not make a document resident when the peer has not joined it', async () => {
@@ -422,5 +538,17 @@ async function connect(path: string): Promise<Client> {
     close() {
       socket.destroy();
     },
+    closed() {
+      if (socket.destroyed) return Promise.resolve();
+      return new Promise((resolve) => socket.once('close', () => resolve()));
+    },
   };
+}
+
+async function joinedText(client: Client): Promise<string> {
+  const message = await client.next();
+  if (message.type !== 'joined') throw new Error(`expected joined, got ${JSON.stringify(message)}`);
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, Buffer.from(message.update, 'base64'));
+  return doc.getText('content').toString();
 }

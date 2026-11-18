@@ -12,7 +12,12 @@ export type CoworkServerOptions = {
   stateDir: string;
   socketPath: string;
   token: string;
+  /** How long a connection may stay unauthenticated. Default 5000. */
+  authTimeoutMs?: number;
 };
+
+const MAX_PEERS = 8;
+const MAX_PENDING = 32;
 
 export type CoworkServerHandle = { close(): Promise<void> };
 
@@ -43,7 +48,9 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
   let operations = Promise.resolve();
   const token = Buffer.from(options.token);
   const server = createServer((socket) => {
-    if (peers.size >= 8) {
+    // Connections that have not proven the token are bounded separately, so they
+    // can neither be mistaken for editors nor crowd real ones out of the cap.
+    if ([...peers].filter((other) => !other.authorized).length >= MAX_PENDING) {
       socket.destroy();
       return;
     }
@@ -53,6 +60,10 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
       authorized: false,
     };
     peers.add(peer);
+    const deadline = setTimeout(() => {
+      if (!peer.authorized) socket.destroy();
+    }, options.authTimeoutMs ?? 5000);
+    deadline.unref();
     let input = '';
     socket.setEncoding('utf8');
     socket.on('data', (chunk: string) => {
@@ -87,6 +98,7 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
       }
     });
     socket.on('close', () => {
+      clearTimeout(deadline);
       peers.delete(peer);
       operations = operations.then(async () => {
         for (const path of peer.joined) {
@@ -113,7 +125,13 @@ export async function startCoworkServer(options: CoworkServerOptions): Promise<C
       if (!sameToken(token, message.token)) {
         throw new CoworkError('unauthorized', 'Invalid session capability');
       }
-      peer.authorized = true;
+      if (!peer.authorized) {
+        if ([...peers].filter((other) => other.authorized).length >= MAX_PEERS) {
+          failPeer(peer, 'too-many-peers', 'Too many editors are connected');
+          return;
+        }
+        peer.authorized = true;
+      }
       const joined = await documents.join(message.path);
       peer.joined.add(joined.path);
       send(peer, {

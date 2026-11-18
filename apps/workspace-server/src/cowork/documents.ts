@@ -1,7 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { access, lstat, open, readFile, realpath, rename, writeFile } from 'node:fs/promises';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import {
+  access,
+  lstat,
+  open,
+  readFile,
+  realpath,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import * as Y from 'yjs';
 import { MAX_DOCUMENT_BYTES } from './protocol';
 
@@ -38,10 +47,15 @@ export class CoworkDocuments {
 
   private constructor(
     readonly root: string,
-    private readonly stateDir: string
+    private readonly stateDir: string,
+    private readonly maxRecordBytes: number
   ) {}
 
-  static async open(root: string, stateDir: string): Promise<CoworkDocuments> {
+  static async open(
+    root: string,
+    stateDir: string,
+    maxRecordBytes = MAX_DOCUMENT_BYTES * 4
+  ): Promise<CoworkDocuments> {
     const canonicalRoot = await realpath(root);
     const rootStat = await lstat(canonicalRoot);
     if (!rootStat.isDirectory()) throw new CoworkError('invalid-root', 'Root must be a directory');
@@ -60,7 +74,7 @@ export class CoworkDocuments {
     if (canonicalState === canonicalRoot || inside(canonicalRoot, canonicalState)) {
       throw new CoworkError('invalid-state', 'State directory must be outside the worktree');
     }
-    return new CoworkDocuments(canonicalRoot, canonicalState);
+    return new CoworkDocuments(canonicalRoot, canonicalState, maxRecordBytes);
   }
 
   private async canonicalPath(input: string): Promise<string> {
@@ -91,12 +105,21 @@ export class CoworkDocuments {
   private async persist(doc: Document, ydoc: Y.Doc, diskHash = doc.diskHash): Promise<void> {
     const output = this.statePath(doc.path);
     const temporary = `${output}.${randomUUID()}.tmp`;
-    const record = JSON.stringify({
-      diskHash,
-      update: Buffer.from(Y.encodeStateAsUpdate(ydoc)).toString('base64'),
-    });
-    if (Buffer.byteLength(record) > MAX_DOCUMENT_BYTES * 4) {
-      throw new CoworkError('too-large', 'Shared document history is too large');
+    const encode = (update: Uint8Array) =>
+      JSON.stringify({ diskHash, update: Buffer.from(update).toString('base64') });
+    let record = encode(Y.encodeStateAsUpdate(ydoc));
+    if (Buffer.byteLength(record) > this.maxRecordBytes) {
+      // Yjs keeps tombstones forever. The persisted copy is only read when no peer
+      // is attached, so it can drop history without touching what connected peers
+      // hold: re-encode the current text as a fresh doc. The resident doc keeps its
+      // history, so live sessions stay consistent.
+      const fresh = new Y.Doc();
+      fresh.getText('content').insert(0, ydoc.getText('content').toString());
+      record = encode(Y.encodeStateAsUpdate(fresh));
+      fresh.destroy();
+      if (Buffer.byteLength(record) > this.maxRecordBytes) {
+        throw new CoworkError('too-large', 'Shared document is too large');
+      }
     }
     try {
       await writeFile(temporary, record, { mode: 0o600 });
@@ -172,32 +195,49 @@ export class CoworkDocuments {
       if (!before.isFile() || (await realpath(doc.path)) !== doc.path) {
         throw new CoworkError('external-change', 'File path changed outside the shared editor');
       }
-      const file = await open(doc.path, constants.O_RDWR | constants.O_NOFOLLOW);
+      const dir = dirname(doc.path);
+      // doc.path is a canonical realpath of a regular file, so renaming over it
+      // replaces that file and never a symlink. A hard-linked file would silently
+      // lose its other links, so it is refused rather than rewritten.
+      if (before.nlink > 1) {
+        throw new CoworkError('unsupported-file', 'Hard-linked files cannot be saved safely');
+      }
+      const current = await readFile(doc.path);
+      if (sha256(current) !== doc.diskHash) {
+        throw new CoworkError('external-change', 'File changed outside the shared editor');
+      }
+      const temporary = join(dir, `.${basename(doc.path)}.${randomUUID()}.cowork-tmp`);
       try {
-        const opened = await file.stat();
-        if (
-          opened.dev !== before.dev ||
-          opened.ino !== before.ino ||
-          (await realpath(doc.path)) !== doc.path
-        ) {
-          throw new CoworkError('external-change', 'File path changed outside the shared editor');
+        const file = await open(temporary, 'wx', before.mode & 0o7777);
+        try {
+          await file.writeFile(content);
+          await file.chmod(before.mode & 0o7777);
+          // Keep the group so a group-shared worktree stays shared; best effort.
+          await file.chown(before.uid, before.gid).catch(() => {});
+          await file.sync();
+        } finally {
+          await file.close();
         }
-        const current = await file.readFile();
-        if (sha256(current) !== doc.diskHash) {
+        // Re-verify immediately before the swap. This narrows, not closes, the race
+        // with an outside writer (SEC-50).
+        const after = await lstat(doc.path);
+        if (
+          !after.isFile() ||
+          after.dev !== before.dev ||
+          after.ino !== before.ino ||
+          (await realpath(dir)) !== dir ||
+          sha256(await readFile(doc.path)) !== doc.diskHash
+        ) {
           throw new CoworkError('external-change', 'File changed outside the shared editor');
         }
-        const bytes = Buffer.from(content);
-        let offset = 0;
-        while (offset < bytes.length) {
-          const { bytesWritten } = await file.write(bytes, offset, bytes.length - offset, offset);
-          if (bytesWritten === 0) throw new CoworkError('write-failed', 'Could not write file');
-          offset += bytesWritten;
-        }
-        await file.truncate(bytes.length);
-        await file.sync();
-      } finally {
-        await file.close();
+        await rename(temporary, doc.path);
+      } catch (error) {
+        await unlink(temporary).catch(() => {});
+        throw error;
       }
+      const directory = await open(dir, constants.O_RDONLY).catch(() => undefined);
+      await directory?.sync().catch(() => {});
+      await directory?.close();
       doc.diskHash = sha256(content);
       await this.persist(doc, doc.ydoc);
       return { revision: doc.revision, path: doc.path, content };
@@ -227,7 +267,7 @@ export class CoworkDocuments {
     if (disk.byteLength > MAX_DOCUMENT_BYTES || disk.includes(0)) {
       throw new CoworkError('unsupported-file', 'Only small UTF-8 text files can be shared');
     }
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(disk);
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(disk);
     const ydoc = new Y.Doc();
     const stateFile = this.statePath(path);
     try {
@@ -239,11 +279,15 @@ export class CoworkDocuments {
         throw new Error('Invalid document state');
       }
       if (raw.diskHash !== sha256(disk)) {
-        throw new CoworkError('external-change', 'File changed while the shared editor was closed');
+        // No peer is attached while a document loads, so nobody holds unsaved text
+        // that this would discard. Disk wins; keeping the stale state would make
+        // every join fail until someone deleted it by hand.
+        process.stderr.write(`[cowork] ${path} changed on disk; discarding persisted state\n`);
+        ydoc.getText('content').insert(0, text);
+      } else {
+        Y.applyUpdate(ydoc, Buffer.from(raw.update, 'base64'));
       }
-      Y.applyUpdate(ydoc, Buffer.from(raw.update, 'base64'));
     } catch (error) {
-      if (error instanceof CoworkError) throw error;
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw new CoworkError('state-read-failed', `Cannot read shared document state: ${error}`);
       }
