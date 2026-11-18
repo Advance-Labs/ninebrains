@@ -1452,3 +1452,15 @@ xterm did not have, and typed input overwrote the status line.
 |---|---|---|
 | `.github/workflows/release.yml`, `.github/workflows/build-matrix.yml` | mac runner `macos-14` → `macos-15` | GitHub retired the macos-14 image: the 0.2.10 run's mac job was cancelled with "The configuration 'macos-14-arm64-us-default' is not supported" |
 | `docs/RELEASING.md` | runner table updated | Matches the workflow |
+
+## 104. A closed transport is not a failed disposal (`ninebrains/wire-shutdown-warn`)
+
+Every quit logged `scope cleanup failed` with a full `WireError: Wire transport failed permanently`
+stack under `state-expose:attachments/attachments.state:…`. Nothing broke (cleanup errors are
+caught and the quit completed), but a warning on every shutdown hides the one that matters.
+
+| File | Change | Why |
+|---|---|---|
+| `src/core/features/projects/node/project-attachment-manager.ts` | `disposeEntry`, the shared path of `releaseLease` and `dispose`, logs a `DISCONNECTED` `WireError` at debug and returns; every other failure still rethrows. `invalidate` and `recoverProject` go through `disposeProvider` and are unchanged | Releasing the last lease at quit disposes the project provider, and provider disposal still talks over Wire. The worker link closes first, so that call ends DISCONNECTED on every shutdown. Rethrowing it reached the scope's cleanup handler, which is where the warning came from. On a non-shutdown path a DISCONNECTED is a real fault and stays loud |
+| `packages/wire/src/rpc/index.ts` | Re-export `isWireError` from the `./rpc` subpath | It already existed in the package's api but was not reachable from an exported subpath; `WireError` alone would have meant an `instanceof` across bundle boundaries |
+| `src/core/features/projects/node/project-attachment-manager.test.ts` | Two cases: a provider whose `dispose()` rejects DISCONNECTED reports no cleanup error, and one that rejects for any other reason still does | The first fails without the fix. The scope catches cleanup errors and routes them to `onCleanupError`, so that handler is the only observable |
