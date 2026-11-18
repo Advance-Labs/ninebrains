@@ -35,8 +35,8 @@ sequence in `debian:bookworm-slim`, where no host Node.js installation is availa
 
 The packaging process:
 
-1. Bundles the server and its ten workers with all pure-JavaScript dependencies emitted into the
-   entry files or shared chunks.
+1. Bundles the server, its ten workers, and the two cowork role bundles with all pure-JavaScript
+   dependencies emitted into the entry files or shared chunks.
 2. Installs only `node-pty`, `better-sqlite3`, `@parcel/watcher`, and their runtime dependencies for
    the target platform. Linux native modules are compiled in the Docker builder; Darwin modules
    are installed with the downloaded target Node.js runtime.
@@ -157,6 +157,8 @@ emdash-workspace-server/
   node
   dist/
     index.mjs
+    cowork.mjs
+    cowork-protocol.mjs
     <ten worker>.mjs
     <shared chunks>.mjs
   licenses/

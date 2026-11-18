@@ -556,6 +556,54 @@ dispatcher + exec (2.4) · **GA** gates (Phase 4) · **BR** lane browser/CDP (4.
   names (`CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). A route's `''`
   removes the variable. Test `SEC-13 routing env comes only from the route`.
 
+### Cowork shared editing (CW, `apps/workspace-server/src/cowork`, 2026-09-23)
+
+The `serve-cowork` role is a separate process from the wire daemon, with its own socket, its own
+token and no workspace-worker dependency. It is reachable by local accounts in the socket's group,
+so the token is the whole authorization boundary.
+
+- **SEC-48 The socket, state and token are the server account's alone.** The role refuses to start
+  unless the token file is a regular file owned by the server account with no group or world bits
+  (`0600`), the socket directory is owned by it and not group or world writable, and the state
+  directory is owned by it, mode `0700`, and outside the worktree. The socket itself is `chmod`ed to
+  `0660`, so the group is the grant. A token under 32 bytes is refused. The token is compared with
+  `timingSafeEqual` after a length check. Tests `restricts the shared socket to owner and group`,
+  `rejects socket directories peers can replace and state directories peers can modify`, and the
+  unauthorized case in `rejects unauthorized joins, path traversal, and symlink escapes`.
+- **SEC-49 A shared path never leaves the worktree.** A client path must be relative and free of
+  NUL. It is resolved against the worktree root, checked lexically, `realpath`ed, checked again
+  after resolution, and must name a regular file the server can read and write. Document identity
+  is the canonical path, so two spellings of one file are one document and no alias reaches a
+  document the peer did not join. Authorization resolves through `canonicalize()`, which performs
+  those checks without making the document resident. Tests `rejects unauthorized joins, path
+  traversal, and symlink escapes` and `does not make a document resident when the peer has not
+  joined it`.
+- **SEC-50 Save refuses to clobber an outside write.** Before writing, Save re-`lstat`s the path,
+  re-checks device, inode and `realpath`, and compares the file's hash against the hash observed
+  when the document was loaded. A mismatch raises `external-change` and writes nothing. The write
+  itself goes to a same-directory temp file that is `fsync`ed and renamed over the canonical path
+  (a rename replaces a symlink rather than following it, and the path is already a canonical regular
+  file), so a crash never leaves a truncated file; hard-linked files are refused. When a document is
+  reloaded with no peer attached and the disk hash no longer matches the persisted state, the
+  persisted state is discarded and disk wins (logged). This narrows the race and does not close it:
+  agents and editors do not honor the lock, and there is no atomic compare-and-swap over an arbitrary
+  writer, so a write landing inside the final window is still lost. Tests `refuses to save over an external disk change`, `does not follow a file replaced
+  with a symlink before Save`, and `preserves unsaved document state across restart and detects
+  outside writes`.
+- **SEC-51 A token holder cannot exhaust the process.** At most 8 authenticated peers, at most 32
+  unauthenticated connections, each closed after 5 seconds without a valid join (so silent sockets
+  cannot lock editors out), at most 128 resident
+  documents, at most `MAX_FRAME_BYTES` (2 MiB) per frame and per unterminated remainder, and at most
+  `MAX_DOCUMENT_BYTES` (1 MiB) of document text. Frames are bounded individually rather than by the
+  accumulated read buffer, so two legal frames in one read are both served. Rejecting a request for
+  an unjoined path loads nothing, so failed requests cannot fill the resident cap. Tests `does not
+  make a document resident when the peer has not joined it`, `bounds each frame rather than the
+  whole read buffer`, `reports and drops a peer that sends a frame larger than the limit`, `closes a
+  connection that never authenticates, without counting it as an editor`, and `lets real editors in
+  while unauthenticated connections are pending`. Persisted Yjs history past `MAX_DOCUMENT_BYTES * 4`
+  is compacted to a fresh doc of the current text (`compacts persisted history instead of failing
+  once it outgrows the record cap`); `too-large` applies only when the text itself is too large.
+
 ## 5a. Status (2026-09-11)
 
 "Done" means the code enforces it and a test named after the ID proves it. "Open" means no
@@ -612,6 +660,10 @@ the agents or slices expected to close the gap.
 | SEC-45 | Done for unattended claude [w7-routing] | `routing-launch.e2e.test.ts`. Attended lanes have no egress list (as today) |
 | SEC-46 | N/A in wave 1 | No gateway exists |
 | SEC-47 | Done | The user role (M5). `user-role.test.ts`, `handshake.test.ts`, `brain-cli/test/cli.test.ts`. brain-mcp fails closed on a user token (`session.ts`), and typing `tools.ts`'s descriptions as `Record<Exclude<BrainOp, 'whoami' \| BrainHostOp>, …>` makes "agents never see host ops" a compile error rather than a convention. The Brain UI is gone, so the app's STOP surfaces are now the app menu and tray (main process, `Mod+Shift+Backspace`, still working when the window has hung) and `brain stop`; see SEC-30 |
+| SEC-48 | Done | `server.test.ts`: socket mode `0660`, and the socket-directory and state-directory preflights. Token length and `timingSafeEqual` are code-enforced without an ID-named test |
+| SEC-49 | Done | `server.test.ts`: traversal, symlink escape, and the unjoined-path case that proves authorization resolves without loading |
+| SEC-50 | Partial by design | `server.test.ts`: external change, symlink swap before Save, stale persisted state discarded on reload, in-session recovery after the last peer leaves, BOM preserved, and atomic temp-file save with mode kept. The residual race with an outside writer is accepted; see the note in the requirement |
+| SEC-51 | Done | `server.test.ts`: the unjoined-path cap case, the two-frames-in-one-read case, the oversized-frame drop, the auth deadline, pending connections not counting toward the editor cap, and persisted-history compaction |
 
 ## 6. Where the current design already breaks a requirement
 

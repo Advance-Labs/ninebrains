@@ -8,6 +8,7 @@ import {
   loadWorkspaceServerConfig,
   type WorkspaceServerConfig,
 } from './config';
+import { serveCowork } from './cowork/serve';
 import { daemonPaths } from './daemon/paths';
 import { removePidFile, writePidFile } from './daemon/pid-file';
 import { startDaemon } from './daemon/start';
@@ -31,6 +32,11 @@ async function main(): Promise<void> {
   switch (config.data.command) {
     case 'serve': {
       const active = await serve(config.data, logger);
+      installSignalHandlers(active);
+      break;
+    }
+    case 'serve-cowork': {
+      const active = await serveCowork(config.data);
       installSignalHandlers(active);
       break;
     }
