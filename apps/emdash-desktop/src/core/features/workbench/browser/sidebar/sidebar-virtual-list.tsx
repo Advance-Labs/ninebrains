@@ -1,14 +1,3 @@
-import { projectViewDef } from '@core/features/projects/contributions/views';
-import { getTaskStore } from '@core/features/tasks/api/browser/task-state/task-selectors';
-import { taskViewDef } from '@core/features/tasks/contributions/views';
-import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
-import { type SidebarRow } from '@core/features/workbench/browser/sidebar/sidebar-store';
-import { getSidebarStore } from '@core/features/workbench/contributions/browser/app-stores';
-import {
-  useNavigate,
-  useViewParams,
-  useWorkspaceSlots,
-} from '@core/primitives/navigation/browser/navigation-hooks';
 import {
   closestCenter,
   DndContext,
@@ -36,6 +25,17 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { observer } from 'mobx-react-lite';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { projectViewDef } from '@core/features/projects/contributions/views';
+import { getTaskStore } from '@core/features/tasks/api/browser/task-state/task-selectors';
+import { taskViewDef } from '@core/features/tasks/contributions/views';
+import { focusRegionAttr } from '@core/features/workbench/api/browser/focus-regions';
+import { type SidebarRow } from '@core/features/workbench/browser/sidebar/sidebar-store';
+import { getSidebarStore } from '@core/features/workbench/contributions/browser/app-stores';
+import {
+  useNavigate,
+  useViewParams,
+  useWorkspaceSlots,
+} from '@core/primitives/navigation/browser/navigation-hooks';
 import { SidebarProjectItem } from './project-item';
 import { treeKeyAction, treeRowMetas, type TreeRowMeta } from './sidebar-tree-keys';
 import { SidebarTaskItem } from './task-item';
